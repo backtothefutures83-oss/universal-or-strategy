@@ -8607,8 +8607,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             Print("[SIMA] ───────────────────────────────────────────────────");
-            Print($"[SIMA] TOTAL ACCOUNTS DETECTED: {simaAccountCount} | ALL ACTIVE by default");
-            Print("[SIMA] Use Fleet Manager to disable specific accounts");
+            Print($"[SIMA] TOTAL ACCOUNTS DETECTED: {simaAccountCount} | ALL INACTIVE by default");
+            Print("[SIMA] Use Fleet Manager or IPC TOGGLE_ACCOUNT to enable specific accounts");
             Print("[SIMA] ═══════════════════════════════════════════════════");
         }
 
@@ -8626,10 +8626,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    // V12.2: Fleet Active Check
-                    if (activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) && !isActive)
+                    // V12.8: Fleet Active Check — skip accounts NOT registered or disabled
+                    if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
-                        Print($"[SIMA] ⏩ SKIPPING {acct.Name} - Account Disabled in Fleet");
+                        Print($"[SIMA] ⏩ SKIPPING {acct.Name} - Account not enabled in Fleet");
                         continue;
                     }
 
@@ -8907,53 +8907,59 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            isFlattenRunning = true; // V12.8: Guard for Reaper
-            Print("[SIMA] ══════ GLOBAL FLATTEN START ══════");
-            int flattenCount = 0;
-            int skipCount = 0;
-
-            foreach (Account acct in Account.All)
+            isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
+            try
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                Print("[SIMA] ══════ GLOBAL FLATTEN START ══════");
+                int flattenCount = 0;
+                int skipCount = 0;
+
+                foreach (Account acct in Account.All)
                 {
-                    // V12.8: Respect Fleet Manager selection — skip accounts NOT registered or disabled
-                    if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
+                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        skipCount++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        // Collect instruments with open positions on this account
-                        List<Instrument> instrumentsToFlatten = new List<Instrument>();
-                        foreach (Position position in acct.Positions)
+                        // V12.8: Respect Fleet Manager selection — skip accounts NOT registered or disabled
+                        if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                         {
-                            if (position.MarketPosition != MarketPosition.Flat)
+                            skipCount++;
+                            continue;
+                        }
+
+                        try
+                        {
+                            // Collect instruments with open positions on this account
+                            List<Instrument> instrumentsToFlatten = new List<Instrument>();
+                            foreach (Position position in acct.Positions)
                             {
-                                instrumentsToFlatten.Add(position.Instrument);
+                                if (position.MarketPosition != MarketPosition.Flat)
+                                {
+                                    instrumentsToFlatten.Add(position.Instrument);
+                                }
                             }
-                        }
 
-                        if (instrumentsToFlatten.Count > 0)
+                            if (instrumentsToFlatten.Count > 0)
+                            {
+                                acct.Flatten(instrumentsToFlatten);
+                                flattenCount++;
+                                Print($"[SIMA] ✓ Flattened {instrumentsToFlatten.Count} position(s) on {acct.Name}");
+                            }
+
+                            // Reset expected position
+                            expectedPositions[acct.Name] = 0;
+                        }
+                        catch (Exception ex)
                         {
-                            acct.Flatten(instrumentsToFlatten);
-                            flattenCount++;
-                            Print($"[SIMA] ✓ Flattened {instrumentsToFlatten.Count} position(s) on {acct.Name}");
+                            Print($"[SIMA] ✗ FLATTEN FAILED on {acct.Name}: {ex.Message}");
                         }
-
-                        // Reset expected position
-                        expectedPositions[acct.Name] = 0;
-                    }
-                    catch (Exception ex)
-                    {
-                        Print($"[SIMA] ✗ FLATTEN FAILED on {acct.Name}: {ex.Message}");
                     }
                 }
-            }
 
-            isFlattenRunning = false; // V12.8: Release Reaper guard
-            Print($"[SIMA] ══════ GLOBAL FLATTEN COMPLETE: {flattenCount} flattened, {skipCount} skipped (disabled) ══════");
+                Print($"[SIMA] ══════ GLOBAL FLATTEN COMPLETE: {flattenCount} flattened, {skipCount} skipped (disabled) ══════");
+            }
+            finally
+            {
+                isFlattenRunning = false; // V12.8: Always release guard, even on exception
+            }
         }
 
         /// <summary>
@@ -9071,11 +9077,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (isCriticalDesync)
                         {
-                            Print($"[REAPER] 🚨 CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
-                            
+                            // V12.8: Throttle CRITICAL DESYNC logging to same shouldLog cadence to prevent output spam
+                            if (shouldLog)
+                                Print($"[REAPER] 🚨 CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+
                             if (AutoFlattenDesync)
                             {
-                                Print($"[REAPER] 💀 AUTO-FLATTENING {acct.Name} - Emergency Re-sync!");
+                                if (shouldLog)
+                                    Print($"[REAPER] 💀 AUTO-FLATTENING {acct.Name} - Emergency Re-sync!");
                                 try
                                 {
                                     acct.Flatten(new[] { Instrument });
@@ -9113,8 +9122,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (e == null) return;
 
-            // V12.8: Suppress per-execution logging during mass flatten to prevent UI freeze
-            if (!isFlattenRunning && EnableComplianceHub)
+            // V12.8: Block entire handler during mass flatten to prevent UI thread freeze
+            if (isFlattenRunning) return;
+
+            // V12.8: Only log per-execution when ComplianceHub is active
+            if (EnableComplianceHub)
                 Print(string.Format("[COMPLIANCE] Execution Update received for account."));
 
             // V12.7: Check if this fill is for a fleet entry with deferred brackets
