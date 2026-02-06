@@ -1864,7 +1864,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12 SIMA: Dispatch to fleet (replaces legacy slave broadcast)
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("OR", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice);
+                    ExecuteSmartDispatchEntry("OR", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Limit);
                 }
 
                 UpdateDisplay();
@@ -2122,7 +2122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12 SIMA: Dispatch to fleet (replaces legacy slave broadcast)
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("RMA", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice);
+                    ExecuteSmartDispatchEntry("RMA", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Limit);
                 }
 
                 // Deactivate RMA mode after entry (one-shot)
@@ -2214,7 +2214,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.1: Smart Dispatch to SIMA Fleet
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("RMA_IPC", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice);
+                    ExecuteSmartDispatchEntry("RMA_IPC", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Limit);
                 }
             }
             catch (Exception ex)
@@ -3613,9 +3613,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                Order newStop = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.StopMarket, quantity, 0, stopPrice, "", "Stop_" + entryName + "_" + DateTime.Now.Ticks)
-                    : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.StopMarket, quantity, 0, stopPrice, "", "Stop_" + entryName + "_" + DateTime.Now.Ticks);
+                Order newStop = null;
+                OrderAction exitAction = direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+
+                // V12.3: Route to correct account (fleet follower vs local)
+                if (activePositions.TryGetValue(entryName, out var pos) && pos.IsFollower && pos.ExecutingAccount != null)
+                {
+                    // Fleet follower: use Account API
+                    string sigName = "S_" + entryName;
+                    if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                    newStop = pos.ExecutingAccount.CreateOrder(Instrument, exitAction,
+                        OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, sigName, sigName, null);
+                    pos.ExecutingAccount.Submit(new[] { newStop });
+                }
+                else
+                {
+                    // Local: use SubmitOrderUnmanaged with truncated signal name
+                    string suffix = (DateTime.Now.Ticks % 100000000).ToString();
+                    string sigName = "S_" + entryName + "_" + suffix;
+                    if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                    newStop = SubmitOrderUnmanaged(0, exitAction, OrderType.StopMarket, quantity, 0, stopPrice, "", sigName);
+                }
 
                 if (newStop == null)
                 {
@@ -4157,10 +4175,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    newStop = pos.Direction == MarketPosition.Long
-                        ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.StopMarket, pos.RemainingContracts, 0, validatedStopPrice, "", "Stop_" + entryName + "_" + DateTime.Now.Ticks)
-                        : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.StopMarket, pos.RemainingContracts, 0, validatedStopPrice, "", "Stop_" + entryName + "_" + DateTime.Now.Ticks);
-                    
+                    // V12.3: Truncate signal name to stay under 50-char NinjaTrader limit
+                    string suffix = (DateTime.Now.Ticks % 100000000).ToString();
+                    string stopSigName = "S_" + entryName + "_" + suffix;
+                    if (stopSigName.Length > 50) stopSigName = stopSigName.Substring(0, 50);
+                    OrderAction stopExitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+                    newStop = SubmitOrderUnmanaged(0, stopExitAction, OrderType.StopMarket, pos.RemainingContracts, 0, validatedStopPrice, "", stopSigName);
+
                     if (newStop != null) stopOrders[entryName] = newStop;
                 }
 
@@ -4574,31 +4595,50 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print(string.Format("⚠️ EMERGENCY FLATTEN: Closing {0} position due to stop order failure", entryName));
 
+                // V12.3: Determine if this is a fleet follower or local position
+                bool isFleetFollower = pos.IsFollower && pos.ExecutingAccount != null;
+
                 // V8.31: Cancel ALL bracket orders first to prevent race conditions
+                // V12.3: Use Account.Cancel for fleet followers, CancelOrder for local
                 if (stopOrders.TryGetValue(entryName, out var stopOrder) && stopOrder != null)
                 {
                     if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted)
-                        CancelOrder(stopOrder);
+                    {
+                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { stopOrder });
+                        else CancelOrder(stopOrder);
+                    }
                 }
                 if (target1Orders.TryGetValue(entryName, out var t1Order) && t1Order != null)
                 {
                     if (t1Order.OrderState == OrderState.Working || t1Order.OrderState == OrderState.Accepted)
-                        CancelOrder(t1Order);
+                    {
+                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { t1Order });
+                        else CancelOrder(t1Order);
+                    }
                 }
                 if (target2Orders.TryGetValue(entryName, out var t2Order) && t2Order != null)
                 {
                     if (t2Order.OrderState == OrderState.Working || t2Order.OrderState == OrderState.Accepted)
-                        CancelOrder(t2Order);
+                    {
+                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { t2Order });
+                        else CancelOrder(t2Order);
+                    }
                 }
                 if (target3Orders.TryGetValue(entryName, out var t3Order) && t3Order != null)
                 {
                     if (t3Order.OrderState == OrderState.Working || t3Order.OrderState == OrderState.Accepted)
-                        CancelOrder(t3Order);
+                    {
+                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { t3Order });
+                        else CancelOrder(t3Order);
+                    }
                 }
                 if (target4Orders.TryGetValue(entryName, out var t4Order) && t4Order != null)
                 {
                     if (t4Order.OrderState == OrderState.Working || t4Order.OrderState == OrderState.Accepted)
-                        CancelOrder(t4Order);
+                    {
+                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { t4Order });
+                        else CancelOrder(t4Order);
+                    }
                 }
 
                 // V8.31: Clear pending replacements
@@ -4607,24 +4647,39 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Interlocked.Decrement(ref pendingReplacementCount);
                 }
 
-                // V8.31: Use live position quantity if available for more accurate flatten
                 int flattenQty = pos.RemainingContracts;
-                try
-                {
-                    if (Position != null && Position.MarketPosition != MarketPosition.Flat)
-                    {
-                        flattenQty = Math.Max(flattenQty, Position.Quantity);
-                    }
-                }
-                catch { }
+                OrderAction flattenAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
 
-                Order flattenOrder = pos.Direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, flattenQty, 0, 0, "", "EmergencyFlatten_" + entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, flattenQty, 0, 0, "", "EmergencyFlatten_" + entryName);
+                // V12.3: Route flatten order to correct account
+                Order flattenOrder = null;
+                if (isFleetFollower)
+                {
+                    // Fleet follower: flatten on the follower's own account
+                    string sigName = "EF_" + entryName;
+                    if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                    flattenOrder = pos.ExecutingAccount.CreateOrder(Instrument, flattenAction,
+                        OrderType.Market, TimeInForce.Gtc, flattenQty, 0, 0, "", sigName, null);
+                    pos.ExecutingAccount.Submit(new[] { flattenOrder });
+                }
+                else
+                {
+                    // Local: use SubmitOrderUnmanaged (use live position qty for accuracy)
+                    try
+                    {
+                        if (Position != null && Position.MarketPosition != MarketPosition.Flat)
+                            flattenQty = Math.Max(flattenQty, Position.Quantity);
+                    }
+                    catch { }
+
+                    string sigName = "EF_" + entryName;
+                    if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                    flattenOrder = SubmitOrderUnmanaged(0, flattenAction, OrderType.Market, flattenQty, 0, 0, "", sigName);
+                }
 
                 if (flattenOrder != null)
                 {
-                    Print(string.Format("Emergency flatten order submitted: {0} {1} contracts at MARKET",
+                    Print(string.Format("Emergency flatten order submitted on {0}: {1} {2} contracts at MARKET",
+                        isFleetFollower ? pos.ExecutingAccount.Name : "LOCAL",
                         pos.Direction == MarketPosition.Long ? "SELL" : "BUY",
                         flattenQty));
                 }
@@ -7494,6 +7549,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     connectedClients.Add(client);
                     Print("V12 IPC: New Client Connected");
 
+                    // V12.3: Request fleet state from external app so TOGGLE_ACCOUNT commands are re-sent
+                    // This ensures accounts selected in the Fleet Manager dropdown are synced after reconnect
+                    SendToExternalApp("REQUEST_FLEET_STATE|ALL");
+
                     // Handle client in a separate task
                     Task.Run(() => HandleClient(client));
                 }
@@ -8341,10 +8400,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         ///   - Signal = RMA/OR/MOMO: All accounts get RMA targets.
         /// Accounts use FIXED brackets (Path B) for zero trail lag.
         /// </summary>
-        private void ExecuteSmartDispatchEntry(string tradeType, OrderAction action, int quantity, double entryPrice)
+        private void ExecuteSmartDispatchEntry(string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType = OrderType.Market)
         {
             // V12.2: Diagnostic logging for copy trading troubleshooting
-            Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA}");
+            Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA} | OrderType={entryOrderType}");
 
             if (!EnableSIMA)
             {
@@ -8428,14 +8487,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string ocoId = tradeType + "_" + DateTime.Now.Ticks + "_" + i;
                     string fleetEntryName = "Fleet_" + acct.Name + "_" + tradeType + "_" + i;
 
-                    // Entry (Market) + Stop + Target
-                    Order entry = acct.CreateOrder(Instrument, action, OrderType.Market, TimeInForce.Gtc, quantity, 0, 0, ocoId, tradeType, null);
+                    // V12.3: Entry uses caller-specified order type (Limit for RMA, Market for MOMO/TREND)
+                    double limitPx = (entryOrderType == OrderType.Limit) ? entryPrice : 0;
+                    Order entry = acct.CreateOrder(Instrument, action, entryOrderType, TimeInForce.Gtc, quantity, limitPx, 0, ocoId, tradeType, null);
                     Order stop = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover, 
                         OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, ocoId, "Stop_" + tradeType, null);
                     Order target = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover, 
                         OrderType.Limit, TimeInForce.Gtc, quantity, t2TargetPrice, 0, ocoId, "Target_" + tradeType, null);
 
                     // V12.1: Track Follower Position for Active Trailing Stop Management
+                    bool isMarketEntry = (entryOrderType == OrderType.Market);
                     PositionInfo fleetPos = new PositionInfo
                     {
                         SignalName = fleetEntryName,
@@ -8453,7 +8514,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         IsRMATrade = true,          // Enforce Point-Based Trailing for all followers
                         IsTRENDTrade = (tradeType == "TREND"),
                         IsRetestTrade = (tradeType == "RETEST"),
-                        EntryFilled = true,         // Market entry
+                        EntryFilled = isMarketEntry, // V12.3: Only true for Market entries; Limit waits for fill
                         BracketSubmitted = true,
                         TicksSinceEntry = 0,
                         ExtremePriceSinceEntry = entryPrice,
@@ -8461,6 +8522,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     };
 
                     activePositions[fleetEntryName] = fleetPos;
+                    entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
                     stopOrders[fleetEntryName] = stop;
                     target2Orders[fleetEntryName] = target;
 
