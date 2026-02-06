@@ -7424,7 +7424,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else
                 {
                     MarketPosition direction = (clickPrice > currentPrice) ? MarketPosition.Short : MarketPosition.Long;
-                    ExecuteRMAEntry(clickPrice, direction);
+                    ExecuteRMAEntryV2(clickPrice, direction);
 
                     if (isRMAButtonClicked)
                     {
