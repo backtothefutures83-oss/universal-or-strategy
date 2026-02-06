@@ -408,8 +408,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool citEnabled = false;
         private int citTicks = 0;
         private HashSet<string> citAdjustedOrders = new HashSet<string>();
-        private string complianceLogPath;
-        private DateTime lastComplianceLog = DateTime.MinValue;
 
         #endregion
 
@@ -795,6 +793,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Path B Target (Points)", Description = "Fixed target distance for Path B trades", Order = 8, GroupName = "13. SIMA Settings")]
         [Range(0.25, 100.0)]
         public double PathBTargetPoints { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Chase If Touch (Points)", Description = "Distance to chase limit orders if price touches them (set to 0 to disable)", Order = 9, GroupName = "13. SIMA Settings")]
+        public string ChaseIfTouchPoints { get; set; }
 #endregion
 
         #region Properties - Apex Compliance (V12)
@@ -945,6 +947,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AutoFlattenDesync = false;
                 PathBStopPoints = 10.0;
                 PathBTargetPoints = 15.0;
+                ChaseIfTouchPoints = "0";
 
                 // Apex Compliance defaults
                 EnableComplianceHub = true;
