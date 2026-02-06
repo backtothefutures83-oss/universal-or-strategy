@@ -1090,8 +1090,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12 SIMA: Stop Reaper audit thread
                 StopReaperAudit();
                 
-                // V12.1: Unsubscribe from account updates
-                if (EnableComplianceHub)
+                // V12.7: Always unsubscribe from account updates (subscribed for fleet bracket management)
+                if (EnableSIMA)
                 {
                     foreach (Account acct in Account.All)
                     {
@@ -8506,14 +8506,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     // V12.3: Entry uses caller-specified order type (Limit for RMA, Market for MOMO/TREND)
                     double limitPx = (entryOrderType == OrderType.Limit) ? entryPrice : 0;
+                    bool isMarketEntry = (entryOrderType == OrderType.Market);
                     Order entry = acct.CreateOrder(Instrument, action, entryOrderType, TimeInForce.Gtc, quantity, limitPx, 0, ocoId, tradeType, null);
-                    Order stop = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover, 
-                        OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, ocoId, "Stop_" + tradeType, null);
-                    Order target = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover, 
-                        OrderType.Limit, TimeInForce.Gtc, quantity, t2TargetPrice, 0, ocoId, "Target_" + tradeType, null);
+
+                    // V12.7: For Limit entries, defer bracket submission until fill.
+                    // For Market entries, submit entry + stop + target together (instant fill expected).
+                    Order stop = null;
+                    Order target = null;
+                    if (isMarketEntry)
+                    {
+                        stop = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover,
+                            OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, ocoId, "Stop_" + tradeType, null);
+                        target = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover,
+                            OrderType.Limit, TimeInForce.Gtc, quantity, t2TargetPrice, 0, ocoId, "Target_" + tradeType, null);
+                    }
 
                     // V12.1: Track Follower Position for Active Trailing Stop Management
-                    bool isMarketEntry = (entryOrderType == OrderType.Market);
                     PositionInfo fleetPos = new PositionInfo
                     {
                         SignalName = fleetEntryName,
@@ -8532,7 +8540,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         IsTRENDTrade = (tradeType == "TREND"),
                         IsRetestTrade = (tradeType == "RETEST"),
                         EntryFilled = isMarketEntry, // V12.3: Only true for Market entries; Limit waits for fill
-                        BracketSubmitted = true,
+                        BracketSubmitted = isMarketEntry, // V12.7: Brackets deferred for Limit entries
                         TicksSinceEntry = 0,
                         ExtremePriceSinceEntry = entryPrice,
                         CurrentTrailLevel = 0
@@ -8540,10 +8548,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     activePositions[fleetEntryName] = fleetPos;
                     entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
-                    stopOrders[fleetEntryName] = stop;
-                    target2Orders[fleetEntryName] = target;
+                    if (stop != null) stopOrders[fleetEntryName] = stop;
+                    if (target != null) target2Orders[fleetEntryName] = target;
 
-                    acct.Submit(new[] { entry, stop, target });
+                    // V12.7: Submit only entry for Limit, full bracket for Market
+                    if (isMarketEntry)
+                        acct.Submit(new[] { entry, stop, target });
+                    else
+                        acct.Submit(new[] { entry });
 
                     int delta = (action == OrderAction.Buy) ? quantity : -quantity;
                     expectedPositions.AddOrUpdate(acct.Name, delta, (k, v) => v + delta);
@@ -8579,10 +8591,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     accountDailyProfit[acct.Name] = 0; // Initialize daily profit
                     activeFleetAccounts[acct.Name] = true; // V12 SIMA: Default to ACTIVE (User can disable via Fleet Manager)
                     
-                    // V12.1: Subscribe to execution updates for P/L tracking
+                    // V12.7: Always subscribe to execution updates for fleet bracket management
+                    // (Also used by ComplianceHub for P/L tracking)
+                    acct.ExecutionUpdate += OnAccountExecutionUpdate;
                     if (EnableComplianceHub)
                     {
-                        acct.ExecutionUpdate += OnAccountExecutionUpdate;
                         Print($"[SIMA] ✓ {acct.Name} | COMPLIANCE MONITORING ACTIVE");
                     }
                     else
@@ -8771,17 +8784,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Target1Price = t1Price,
                         Target2Price = t2Price,
                         EntryFilled = false,
+                        BracketSubmitted = false, // V12.7: Brackets deferred until entry fills
                         IsRMATrade = true
                     };
                     activePositions[localKey] = pos;
 
-                    Order stopOrder = SubmitOrderUnmanaged(0, exitAction, OrderType.StopMarket, qty, 0, stopPrice, localKey, "Stop_" + localKey);
-                    if (stopOrder != null) stopOrders[localKey] = stopOrder;
+                    // V12.7: Do NOT submit stop/target here — they will be submitted by
+                    // SubmitBracketOrders() when the entry limit fills in OnOrderUpdate.
+                    // Submitting them now would cause instant fills on marketable targets.
 
-                    Order targetOrder = SubmitOrderUnmanaged(0, exitAction, OrderType.Limit, qty, t2Price, 0, localKey, "Target_" + localKey);
-                    if (targetOrder != null) target2Orders[localKey] = targetOrder;
-
-                    Print($"[SIMA RMA V2] LOCAL OK: {localKey}");
+                    Print($"[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): {localKey} | Brackets deferred until fill");
                 }
                 else
                 {
@@ -8791,7 +8803,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ═══════════════════════════════════════════════════════
                 // 2. SIMA FLEET: Iterate Account.All for followers
                 // ═══════════════════════════════════════════════════════
-                if (!EnableSIMA) return;
+                if (!EnableSIMA)
+                {
+                    Print("[SIMA RMA V2] ⚠️ EnableSIMA is FALSE - Fleet dispatch SKIPPED. Enable SIMA in strategy parameters or send SET_SIMA|ON via IPC.");
+                    return;
+                }
 
                 int fleetOk = 0;
                 int fleetSkip = 0;
@@ -9082,10 +9098,57 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void OnAccountExecutionUpdate(object sender, ExecutionEventArgs e)
         {
             if (e == null) return;
-            
+
             // Log that a fill occurred (Safe access)
             Print(string.Format("[COMPLIANCE] Execution Update received for account."));
-            
+
+            // V12.7: Check if this fill is for a fleet entry with deferred brackets
+            try
+            {
+                Order filledOrder = e.Execution?.Order;
+                if (filledOrder != null && filledOrder.OrderState == OrderState.Filled)
+                {
+                    foreach (var kvp in entryOrders.ToArray())
+                    {
+                        if (kvp.Value == filledOrder)
+                        {
+                            string fleetKey = kvp.Key;
+                            if (activePositions.TryGetValue(fleetKey, out var pos) && pos.IsFollower && !pos.BracketSubmitted && !pos.EntryFilled)
+                            {
+                                pos.EntryFilled = true;
+                                pos.EntryPrice = e.Execution.Price; // Update to actual fill price
+
+                                // Submit deferred brackets on the follower's account
+                                Account acct = pos.ExecutingAccount;
+                                if (acct != null)
+                                {
+                                    OrderAction exitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+                                    double validatedStop = ValidateStopPrice(pos.Direction, pos.CurrentStopPrice);
+                                    string ocoId = "B_" + fleetKey;
+
+                                    Order fStop = acct.CreateOrder(Instrument, exitAction, OrderType.StopMarket,
+                                        TimeInForce.Gtc, pos.TotalContracts, 0, validatedStop, ocoId, "Stop_" + fleetKey.Substring(0, Math.Min(fleetKey.Length, 40)), null);
+                                    Order fTarget = acct.CreateOrder(Instrument, exitAction, OrderType.Limit,
+                                        TimeInForce.Gtc, pos.TotalContracts, pos.Target2Price, 0, ocoId, "Tgt_" + fleetKey.Substring(0, Math.Min(fleetKey.Length, 40)), null);
+
+                                    acct.Submit(new[] { fStop, fTarget });
+                                    stopOrders[fleetKey] = fStop;
+                                    target2Orders[fleetKey] = fTarget;
+                                    pos.BracketSubmitted = true;
+
+                                    Print($"[SIMA V12.7] Fleet brackets submitted on fill: {fleetKey} | Stop: {validatedStop:F2} | Target: {pos.Target2Price:F2}");
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Print($"[SIMA V12.7] Error in fleet bracket submission: {ex.Message}");
+            }
+
             // Update the compliance log with latest balances
             LogApexPerformance();
         }
