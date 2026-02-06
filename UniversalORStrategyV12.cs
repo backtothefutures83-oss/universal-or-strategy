@@ -8464,7 +8464,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.8: Skip accounts NOT registered or disabled in Fleet Manager UI
                 if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                 {
-                    Print($"[DISPATCH] ⏩ SKIPPING {acct.Name} - Account not enabled in Fleet");
+                    Print($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
                     continue;
                 }
 
@@ -8629,7 +8629,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.8: Fleet Active Check — skip accounts NOT registered or disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
-                        Print($"[SIMA] ⏩ SKIPPING {acct.Name} - Account not enabled in Fleet");
+                        Print($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
                         continue;
                     }
 
@@ -8821,6 +8821,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.8: Fleet Manager toggle — skip if account NOT registered or explicitly disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
+                        Print($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
                         fleetSkip++;
                         continue;
                     }
@@ -8912,19 +8913,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print("[SIMA] ══════ GLOBAL FLATTEN START ══════");
                 int flattenCount = 0;
-                int skipCount = 0;
+                int totalCount = 0;
 
+                // V12.9: Flatten ALL matching accounts regardless of Fleet Manager status.
+                // This is a safety mechanism — "Flatten All" must always be able to close everything.
                 foreach (Account acct in Account.All)
                 {
                     if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        // V12.8: Respect Fleet Manager selection — skip accounts NOT registered or disabled
-                        if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
-                        {
-                            skipCount++;
-                            continue;
-                        }
-
+                        totalCount++;
                         try
                         {
                             // Collect instruments with open positions on this account
@@ -8954,7 +8951,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                Print($"[SIMA] ══════ GLOBAL FLATTEN COMPLETE: {flattenCount} flattened, {skipCount} skipped (disabled) ══════");
+                Print($"[SIMA] ══════ GLOBAL FLATTEN COMPLETE: {flattenCount} flattened across {totalCount} accounts ══════");
             }
             finally
             {
@@ -9036,11 +9033,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // Throttle logging to once per 30 seconds
             bool shouldLog = (DateTime.Now - lastReaperLog).TotalSeconds >= 30;
+            int auditedCount = 0;
+            int activeCount = 0;
 
             foreach (Account acct in Account.All)
             {
                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
+                    auditedCount++;
+
                     // Get actual position on this instrument
                     Position pos = acct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
                     int actualQty = 0;
@@ -9054,10 +9055,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     int expectedQty = 0;
                     expectedPositions.TryGetValue(acct.Name, out expectedQty);
 
-                    // Log periodic heartbeat
-                    if (shouldLog && simaAccountCount > 0)
+                    // V12.9: Only log individual accounts when they have non-zero state (reduces spam)
+                    if (shouldLog && (expectedQty != 0 || actualQty != 0))
                     {
                         Print($"[REAPER] {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+                        activeCount++;
                     }
 
                     // Desync detection (V12.1 Path B: Hybrid Recovery)
@@ -9107,6 +9109,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (shouldLog)
             {
+                // V12.9: Single summary line instead of 12 "Expected=0, Actual=0" per cycle
+                if (activeCount == 0)
+                    Print($"[REAPER] Heartbeat: All {auditedCount} accounts flat.");
+                else
+                    Print($"[REAPER] Heartbeat: {activeCount}/{auditedCount} accounts with positions.");
                 lastReaperLog = DateTime.Now;
             }
         }
