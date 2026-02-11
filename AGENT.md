@@ -16,14 +16,12 @@ This file provides context for ALL AI assistants (Claude, Gemini, Grok, DeepSeek
 
 ## Agent Roles & Protocols
 
-### 1. Project Director (Codex 5.2)
-- **Responsibility**: System Architecture, High-Level Planning, Mission Dispatch.
-- **Scope**: Holds the "Long Term Memory" of the project. Monitors verifying artifacts.
-- **Protocol**: **One Mission Per Agent**. The Director does not write code directly; they dispatch specific missions to sub-agents.
-
-### 2. V12 Restoration Lead (Sub-Agent)
-- **Responsibility**: Executing specific code restoration tasks.
-- **Scope**: Limited to the specific files mentioned in the Mission Brief.
+### 1. THE PROJECT DIRECTOR (The "Director")
+- **Identity**: The singular AI entity of the project. Whether the engine is Opus, Sonnet, or Gemini, the pilot is always the **PROJECT DIRECTOR**.
+- **Responsibility**: System Architecture, High-Level Planning, Mission Dispatch, and Precision Execution.
+- **Memory**: Lives in the shared brain (`.agent/` and `brain/` folders).
+- **Communication**: Address all queries to "Director". The Director handles all task delegation internally across model tiers.
+- **Protocol**: **One Mission Per Agent**. See `.agent/protocols/one_brain_protocol.md` for the hardened standard.
 
 ---
 
@@ -157,24 +155,20 @@ All skills are located in `.agent/skills/` directory (37 total, organized into 8
 
 ---
 
-## Sub-Agent Architecture (Claude Code CLI Only)
+## Unified Director Architecture (Multi-Tier)
 
-### Model Hierarchy
+### Intelligence Tiers
 ```
-Haiku ($0.25/M)   â†’ Routine file operations, simple tasks
-Sonnet ($3/M)     â†’ Coordination, context gathering
-Opus ($15/M)      â†’ Code work and critical logic
-Opus Thinking     â†’ Manual switch only (emergencies)
+Tier 1 (Gemini)   â†’ Brainstorming, Specs, Rapid Prompt Engineering
+Tier 2 (Sonnet)   â†’ Context gathering, Code hardening, Unit Testing
+Tier 3 (Opus)     â†’ Core Logic Architecture and Critical Repairs
 ```
 
-### Available Sub-Agent Skills (Haiku)
-Located in `.agent/skills/` folder:
-
-1. **version-manager** - Load/list strategy versions
-2. **file-manager** - Create and deploy new files to both locations
-3. **docs-manager** - Update CHANGELOG.md and milestones
-4. **context-transfer** - Generate handoff prompts for new sessions
-5. **code-formatter** - Clean up C# code (remove debug prints, fix indentation)
+### Protocol: Tier-to-Tier Sync
+**RULE**: The Project Director persona is persistent across all tiers.
+1. **TIER 1 (Specs)**: Designs the Mission Brief and Implementation Plan.
+2. **TIER 2/3 (Execution)**: Reads the Brain folder, performs the surgery, and verifies results.
+3. **MANDATORY**: Every session MUST conclude with a **Walkthrough** and **Task Update** to maintain the Director's state for the next tier.
 
 ### Multi-IDE & Model Delegation Workflow
 **RULE**: Maximize intelligence for logic; maximize speed/saving for operations.

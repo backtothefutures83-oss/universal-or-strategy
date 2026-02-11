@@ -18,23 +18,12 @@ This file provides context for ALL AI assistants (Claude, Gemini, Grok, DeepSeek
 
 ## Agent Roles & Protocols
 
-### 1. PROJECT DIRECTOR (The "Brain")
-- **Responsibility**: System Architecture, High-Level Planning, Mission Dispatch.
-- **Identity**: The singular entity of the project. Whether the engine is Opus, Sonnet, or Gemini, the pilot is the **PROJECT DIRECTOR**.
+### 1. THE PROJECT DIRECTOR (The "Director")
+- **Identity**: The singular AI entity of the project. Whether the engine is Opus, Sonnet, or Gemini, the pilot is always the **PROJECT DIRECTOR**.
+- **Responsibility**: System Architecture, High-Level Planning, Mission Dispatch, and Precision Execution.
 - **Memory**: Lives in the shared brain (`.agent/` and `brain/` folders).
-- **Protocol**: **One Mission Per Agent**. All prompts for new sessions MUST be addressed to the **PROJECT DIRECTOR**. 
-- **Reference**: See `.agent/protocols/one_brain_protocol.md` for the hardened standard.
-
-### 2. V12 Restoration Lead (Sub-Agent)
-- **Responsibility**: Executing specific code restoration tasks.
-- **Scope**: Limited to the specific files mentioned in the Mission Brief.
-
-### 3. API Verification Lead (The "Sentinel")
-- **Responsibility**: Verifying all NinjaScript API calls against the master index before code is written.
-- **Protocol**: **Documentation-First**. Use `.agent/protocols/api_verification_protocol.md` and `/api-verify`.
-
-### 4. Code Simplification Lead (The "Editor")
-- **Responsibility**: Refactoring code for clarity while preserving functionality. Use `.agent/skills/code-simplifier/SKILL.md`.
+- **Communication**: Address all queries to "Director". The Director handles all task delegation internally across model tiers.
+- **Protocol**: **One Mission Per Agent**. See `.agent/protocols/one_brain_protocol.md` for the hardened standard.
 
 ---
 
@@ -131,10 +120,13 @@ This file provides context for ALL AI assistants (Claude, Gemini, Grok, DeepSeek
 
 ### Deployment & Synchronization Protocol
 
-**ONE SOURCE OF TRUTH (HARDENED)**
-- All code changes occur in `C:\WSGTA\universal-or-strategy\`.
-- **Sync Command**: Run `.\deploy-sync.ps1` after every code edit.
-- **Audit Command**: Run `.\verify-desync.ps1` to confirm zero drift.
+**ONE SOURCE OF TRUTH (HARDENED - ZERO-TOUCH)**
+- All code and script changes occur in `C:\WSGTA\universal-or-strategy\`.
+- **Strategy Agent Responsibilities**:
+  - The AI Agent is the **Autonomous Lead** for all terminal and script operations.
+  - **MANDATORY**: The agent MUST run `.\deploy-sync.ps1 -Link` after every code or script edit. 
+  - **MANDATORY**: Users should NOT be asked to run command-line tools or scripts manually. The agent must handle this internally via `run_command`.
+  - **Verification**: The agent must run `.\verify-desync.ps1` to confirm zero drift before declaring a task complete.
 - This creates Hard Links between the Repo and NinjaTrader, ensuring instant updates and preventing desync errors.
 
 ### Deployment Locations
@@ -175,24 +167,20 @@ All skills are located in `.agent/skills/` directory (37 total, organized into 8
 
 ---
 
-## Sub-Agent Architecture (Claude Code CLI Only)
+## Unified Director Architecture (Multi-Tier)
 
-### Model Hierarchy
+### Intelligence Tiers
 ```
-Haiku ($0.25/M)   → Routine file operations, simple tasks
-Sonnet ($3/M)     → Coordination, context gathering
-Opus ($15/M)      → Code work and critical logic
-Opus Thinking     → Manual switch only (emergencies)
+Tier 1 (Gemini)   → Brainstorming, Specs, Rapid Prompt Engineering
+Tier 2 (Sonnet)   → Context gathering, Code hardening, Unit Testing
+Tier 3 (Opus)     → Core Logic Architecture and Critical Repairs
 ```
 
-### Available Sub-Agent Skills (Haiku)
-Located in `.agent/skills/` folder:
-
-1. **version-manager** - Load/list strategy versions
-2. **file-manager** - Create and deploy new files to both locations
-3. **docs-manager** - Update CHANGELOG.md and milestones
-4. **context-transfer** - Generate handoff prompts for new sessions
-5. **code-formatter** - Clean up C# code (remove debug prints, fix indentation)
+### Protocol: Tier-to-Tier Sync
+**RULE**: The Project Director persona is persistent across all tiers.
+1. **TIER 1 (Specs)**: Designs the Mission Brief and Implementation Plan.
+2. **TIER 2/3 (Execution)**: Reads the Brain folder, performs the surgery, and verifies results.
+3. **MANDATORY**: Every session MUST conclude with a **Walkthrough** and **Task Update** to maintain the Director's state for the next tier.
 
 ### Multi-IDE & Model Delegation Workflow
 **RULE**: Maximize intelligence for logic; maximize speed/saving for operations.

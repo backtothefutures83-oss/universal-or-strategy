@@ -113,7 +113,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             public int ActiveCount { get; set; }
             public Dictionary<string, V12ModeSettings> Slots { get; set; }
             public Dictionary<string, int> LastUsedCountPerMode { get; set; } // V12.18: Sticky count per mode
-            public V12GlobalSettings Global { get; set; } // V12.23: Mode-independent global settings
 
             public V12FullConfig()
             {
@@ -121,7 +120,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                 ActiveCount = 3;
                 Slots = new Dictionary<string, V12ModeSettings>();
                 LastUsedCountPerMode = new Dictionary<string, int>();
-                Global = new V12GlobalSettings();
             }
 
             /// <summary>Build composite key: e.g. "ORB_3"</summary>
@@ -143,25 +141,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 string key = MakeKey(mode, count);
                 Slots[key] = settings;
-            }
-        }
-
-        /// <summary>V12.23: Global settings that persist across all modes (not per mode+count)</summary>
-        public class V12GlobalSettings
-        {
-            public string TrailDistance { get; set; } = "1.0";
-            public string BeBufferTicks { get; set; } = "2";
-
-            public string ToLine() => $"{TrailDistance}|{BeBufferTicks}";
-
-            public static V12GlobalSettings FromLine(string line)
-            {
-                var s = new V12GlobalSettings();
-                if (string.IsNullOrEmpty(line)) return s;
-                var parts = line.Split('|');
-                if (parts.Length >= 1) s.TrailDistance = parts[0];
-                if (parts.Length >= 2) s.BeBufferTicks = parts[1];
-                return s;
             }
         }
 
@@ -222,12 +201,11 @@ namespace NinjaTrader.NinjaScript.Indicators
         private Button retestButton, rmaButton;
         private int retestCycleState = 0;        // 0=RETEST, 1=RET+, 2=RET-
         private bool isRmaModeActive = false;    // RMA chart-click mode toggle
-        private bool isFfmaArmed = false;        // V12.24: FFMA Smart Toggle state (false=MNL, true=AUTO)
-        private Button momoButton, ffmaButton;
+        private Button momoButton, ffmaButton, mButton;
         private Button trendButton, trendRmaToggle, retestRmaToggle;
         private Button t1Button, t2Button, t3Button, t4Button, t5Button;
         private Button trim50Button, beButton, trailButton;
-        private TextBox trailDistInput, beBufferInput;
+        private TextBox trailDistInput;
         private Button flattenButton, cancelButton;
         private TextBlock lastPriceText;
 
@@ -697,16 +675,10 @@ namespace NinjaTrader.NinjaScript.Indicators
                 fullConfig.ActiveCount = selectedTargetCount;
                 fullConfig.SetSettings(selectedConfigMode, selectedTargetCount, CaptureCurrentSettings());
 
-                // V12.23: Persist global settings (mode-independent)
-                if (fullConfig.Global == null) fullConfig.Global = new V12GlobalSettings();
-                fullConfig.Global.TrailDistance = trailDistInput?.Text ?? "1.0";
-                fullConfig.Global.BeBufferTicks = beBufferInput?.Text ?? "2";
-
                 // Write text file: header + all dictionary entries
                 var sb = new StringBuilder();
                 sb.AppendLine($"ActiveMode={fullConfig.ActiveMode}");
                 sb.AppendLine($"ActiveCount={fullConfig.ActiveCount}");
-                sb.AppendLine($"GLOBAL={fullConfig.Global.ToLine()}");
                 foreach (var kvp in fullConfig.Slots)
                 {
                     sb.AppendLine($"{kvp.Key}={kvp.Value.ToLine()}");
@@ -750,11 +722,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                         int.TryParse(val, out int ac);
                         fullConfig.ActiveCount = ac > 0 ? ac : 3;
                     }
-                    else if (key == "GLOBAL")
-                    {
-                        // V12.23: Global settings (mode-independent)
-                        fullConfig.Global = V12GlobalSettings.FromLine(val);
-                    }
                     else if (key.Contains("_"))
                     {
                         // TOTAL RECALL format: e.g. "ORB_3=..."
@@ -782,13 +749,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 
                 // Apply active mode+count settings to UI
                 ApplySettings(fullConfig.GetSettings(activeMode, activeCount));
-
-                // V12.23: Restore global settings (mode-independent)
-                if (fullConfig.Global != null)
-                {
-                    if (trailDistInput != null) trailDistInput.Text = fullConfig.Global.TrailDistance ?? "1.0";
-                    if (beBufferInput != null) beBufferInput.Text = fullConfig.Global.BeBufferTicks ?? "2";
-                }
 
                 Print($"V12 TOTAL RECALL: Loaded {fullConfig.Slots.Count} slots, active: {activeMode}_{activeCount}");
             }
@@ -1612,15 +1572,31 @@ namespace NinjaTrader.NinjaScript.Indicators
             retestRow.Children.Add(retestRmaToggle);
             leftCol.Children.Add(retestRow);
 
-            // RMA button — V12.24: Simple one-shot mode selector (strategy manages armed state)
+            // RMA button
             rmaButton = CreateButton("RMA", double.NaN, PurpleFg, TextPrimary, PurpleFg);
             rmaButton.Margin = new Thickness(0, 2, 0, 0);
             rmaButton.Click += (s, e) =>
             {
-                ResetExecutionMode();
-                SendCommand("SET_RMA_MODE|ON");
-                SelectConfigMode("RMA", modeRmaButton);
-                SendCommand("SYNC_MODE|RMA");
+                isRmaModeActive = !isRmaModeActive;
+                if (isRmaModeActive)
+                {
+                    rmaButton.Background = PurpleFg;
+                    rmaButton.Foreground = Brushes.White;
+                    rmaButton.Content = "RMA ON";
+                    SendCommand("SET_RMA_MODE|ON");
+                    
+                    // V12.2: Switch config mode to RMA when activated
+                    SelectConfigMode("RMA", modeRmaButton);
+                    // V12.2: Sync external app to RMA mode
+                    SendCommand("SYNC_MODE|RMA");
+                }
+                else
+                {
+                    rmaButton.Background = Brushes.Transparent;
+                    rmaButton.Foreground = PurpleFg;
+                    rmaButton.Content = "RMA";
+                    SendCommand("SET_RMA_MODE|OFF");
+                }
                 TriggerGlow(PurpleFg);
             };
             leftCol.Children.Add(rmaButton);
@@ -1640,37 +1616,25 @@ namespace NinjaTrader.NinjaScript.Indicators
             leftCol.Children.Add(momoButton);
 
 
-            // V12.24: FFMA Smart Toggle — Default=MNL (muted), Armed=AUTO (pink)
-            ffmaButton = CreateButton("FFMA", double.NaN, BtnBg, PinkFg, PinkBorder);
+            // FFMA button
+            ffmaButton = CreateButton("FFMA", double.NaN, PinkBg, PinkFg, PinkBorder);
             ffmaButton.Margin = new Thickness(0, 2, 0, 0);
-            ffmaButton.Click += (s, e) =>
-            {
-                bool arming = !isFfmaArmed;  // Capture desired state before ResetExecutionMode clears it
-                ResetExecutionMode();         // Clears all modes including isFfmaArmed
+            ffmaButton.Click += (s, e) => { 
+                SendCommand("MODE_FFMA"); 
+                ResetExecutionMode(); // V12.20: One Click = One Order
+                TriggerGlow(PinkFg); 
+                // V12.2: Switch config mode when entry button clicked
                 SelectConfigMode("FFMA", modeFfmaButton);
                 SendCommand("SYNC_MODE|FFMA");
-
-                if (arming)
-                {
-                    // Arm AUTO mode: enable FFMA reversal scanner
-                    isFfmaArmed = true;
-                    ffmaButton.Content = "AUTO";
-                    ffmaButton.Background = PinkBg;
-                    ffmaButton.Foreground = Brushes.White;
-                    SendCommand("MODE_FFMA");
-                    TriggerGlow(PinkFg);
-                }
-                else
-                {
-                    // MNL mode: fire immediate market entry via FFMA DNA
-                    ffmaButton.Content = "FFMA";
-                    ffmaButton.Background = BtnBg;
-                    ffmaButton.Foreground = PinkFg;
-                    SendCommand("MODE_M");
-                    TriggerGlow(OrangeFg);
-                }
             };
             leftCol.Children.Add(ffmaButton);
+
+
+            // MNL (M) button
+            mButton = CreateButton("MNL", double.NaN, OrangeBg, OrangeFg, OrangeBorder);
+            mButton.Margin = new Thickness(0, 2, 0, 0);
+            mButton.Click += (s, e) => { SendCommand("MODE_M"); TriggerGlow(OrangeFg); };
+            leftCol.Children.Add(mButton);
 
             // TREND row with R toggle
             // V12.3: Locked to 36px to match TRAIL/RETEST for perfect center-line
@@ -1744,30 +1708,11 @@ namespace NinjaTrader.NinjaScript.Indicators
             trim50Button.Click += (s, e) => { SendCommand("TRIM_50"); TriggerGlow(OrangeFg); };
             rightCol.Children.Add(trim50Button);
 
-            // V12.23: BE row — Input + Button (matches TRAIL row layout)
-            Grid beRow = new Grid { Margin = new Thickness(0, 2, 0, 0) };
-            beRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
-            beRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            beBufferInput = CreateTextBox(0, "2");
-            beBufferInput.Height = 22;
-            beBufferInput.FontSize = 10;
-            beBufferInput.ToolTip = "BE Buffer (Ticks)";
-            Grid.SetColumn(beBufferInput, 0);
-            beRow.Children.Add(beBufferInput);
-
+            // BE button
             beButton = CreateButton("BE", double.NaN, CyanBg, CyanFg, CyanBorder);
-            beButton.Margin = new Thickness(2, 0, 0, 0);
-            beButton.Click += (s, e) =>
-            {
-                string ticks = beBufferInput?.Text ?? "2";
-                SendCommand($"BE_CUSTOM|{ticks}");
-                TriggerGlow(CyanFg);
-            };
-            Grid.SetColumn(beButton, 1);
-            beRow.Children.Add(beButton);
-
-            rightCol.Children.Add(beRow);
+            beButton.Margin = new Thickness(0, 2, 0, 0);
+            beButton.Click += (s, e) => { SendCommand("BE"); TriggerGlow(CyanFg); };
+            rightCol.Children.Add(beButton);
 
             // TRAIL row: Input + Button
             // V12.3: Locked to 36px to match R-Toggle for perfect center-line
@@ -2560,14 +2505,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             UpdateRmaButtonVisual(false);
 
-            // V12.24: Reset FFMA Smart Toggle
-            if (isFfmaArmed)
-            {
-                isFfmaArmed = false;
-                SendCommand("FFMA_DISARM");
-            }
-            UpdateFfmaButtonVisual(false);
-
             // Reset RETEST cycle
             retestCycleState = 0;
             if (retestButton != null) retestButton.Content = "RETEST";
@@ -2606,25 +2543,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                 rmaButton.Background = Brushes.Transparent;
                 rmaButton.Foreground = PurpleFg;
                 rmaButton.Content = "RMA";
-            }
-        }
-
-        // V12.24: Helper to sync FFMA Smart Toggle visual
-        private void UpdateFfmaButtonVisual(bool armed)
-        {
-            if (ffmaButton == null) return;
-            isFfmaArmed = armed;
-            if (armed)
-            {
-                ffmaButton.Content = "AUTO";
-                ffmaButton.Background = PinkBg;
-                ffmaButton.Foreground = Brushes.White;
-            }
-            else
-            {
-                ffmaButton.Content = "FFMA";
-                ffmaButton.Background = BtnBg;
-                ffmaButton.Foreground = PinkFg;
             }
         }
 
@@ -2976,13 +2894,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                         }
                         else if (parts[0] == "TREND" && parts.Length > 1)
                             UpdateTrendIndicator(parts[1]);
-                        else if (parts[0] == "FFMA_DISARMED")
-                        {
-                            // V12.24: Strategy disarmed FFMA after execution — reset toggle visual
-                            isFfmaArmed = false;
-                            UpdateFfmaButtonVisual(false);
-                            Print("V12.24: FFMA toggle reset via FFMA_DISARMED");
-                        }
                         else if (parts[0] == "REQUEST_FLEET_STATE")
                         {
                             // V12.3: Strategy requests current fleet state after reconnect

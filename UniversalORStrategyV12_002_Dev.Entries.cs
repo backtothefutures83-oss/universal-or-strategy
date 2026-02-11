@@ -191,12 +191,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void DeactivateFFMAMode()
         {
             isFFMAModeArmed = false;
-            UpdateFFMAButtonDisplay();
-        }
-
-        private void UpdateFFMAButtonDisplay()
-        {
-            // Legacy chart UI removed; no visual updates.
+            // V12.24: Notify panel to reset FFMA Smart Toggle visual
+            SendResponseToRemote("FFMA_DISARMED");
+            Print("V12.24: FFMA disarmed — sent FFMA_DISARMED to panel");
         }
 
         #endregion
@@ -908,6 +905,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V11: Trend RMA (9/15 Split) Mode
             if (isTrendRmaMode)
             {
+                Print(string.Format("V12.20: TREND Multiplier -> Mode=RMA (9/15 Split) ATR={0:F2}", currentATR));
                 ExecuteTrendSplitEntry();
                 return;
             }
@@ -968,6 +966,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V8.31: Both E1 and E2 now use ATR-based stops from live EMAs
                 double e1MultTrend = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
                 double e2MultTrend = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
+                Print(string.Format("V12.20: TREND Multiplier -> Mode={0} E1={1:F2}x E2={2:F2}x",
+                    isTrendRmaMode ? "RMA" : "STD", e1MultTrend, e2MultTrend));
 
                 double e1StopDist = Math.Min(currentATR * e1MultTrend, MaximumStop); // V8.31: ATR-based, MaxStop cap
                 double e2StopDist = Math.Min(currentATR * e2MultTrend, MaximumStop); // V8.31: MaxStop cap
@@ -1188,6 +1188,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Calculate stop and targets using ATR
                 double multToUse = isRetestRmaMode ? RMAStopATRMultiplier : RetestATRMultiplier;
+                Print(string.Format("V12.20: RETEST Multiplier -> Mode={0} Using={1:F2}x",
+                    isRetestRmaMode ? "RMA" : "STD", multToUse));
                 double stopDistance = Math.Min(currentATR * multToUse, MaximumStop); // V8.31: Use MaximumStop
 
                 double stopPrice = direction == MarketPosition.Long

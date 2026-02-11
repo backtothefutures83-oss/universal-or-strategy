@@ -1,24 +1,25 @@
-# Session Summary: Universal OR Strategy V12.11 - Emergency Diagnostic State
+# Session Summary: Universal OR Strategy V12.14 - "Total Recall" Stable State
 
-## Date: 2026-02-07 (Session 2)
+## Date: 2026-02-11 (Session 3)
 
 ### What was Tested/Changed
-- **Headless Migration**: Successfully extracted UI from `UniversalORStrategyV12.cs`.
-- **UI Restoration**: Restored `LegacyChartButtonsIndicator.cs` as a standalone tool.
-- **Expert Tooling**: Integrated TestSprite for AI-driven audits.
-- **Emergency Cleanup**: Purged all conflicting strategies and backups from Repo Root and NT8 `/bin/Custom/` folders.
+- **"Total Recall" Memory Overhaul**: Implemented composite keys (`MODE_COUNT`) for settings. Every mode + target count combo (e.g., ORB_3, ORB_4) has isolated memory.
+- **UI Layout Fix**: Resolved stretching of $Max Risk$ and $CIT$ input boxes. Refactored `riskRow` and `citRow` grids to use fixed-width left alignment.
+- **Deployment Hardening**: Created `deploy-sync.ps1` and `verify-desync.ps1`. Established **Hard Links** between Repo and NinjaTrader to enforce a single source of truth.
+- **IPC Safety**: Added `isApplyingSettings` guards to prevent UI-triggered "Ghost Saves" during mode switches.
 
 ### Results and Observations
-- **Critical Failure**: NinjaTrader 8 freezes during login/splash screen.
-- **Diagnosis**: We cleared naming collisions and folder misplacements, but the freeze persists. Likely a thread hang in initialization or a ghost assembly in the NT8 cache.
+- **PASS**: Memory correctly recalls values when switching from 3 to 4 targets and back.
+- **PASS**: Layout remains compact regardless of panel placement.
+- **PASS**: `verify-desync.ps1` confirms Repo and NinjaTrader are 100% in sync via Hard Links.
+- **Compilation Corrected**: Fixed CS7036 error caused by missing arguments in strategy sync response.
 
-### Next Planned Changes (Emergency Recovery)
-1.  Perform Binary Isolation (testing strategy and indicator one by one).
-2.  Audit NinjaTrader 8 Trace logs for deadlock signatures.
-3.  Verify `State.SetDefaults` in the "Headless" code isn't blocking the UI thread.
+### Next Planned Changes
+1.  **Ghost Order Monitor**: Monitor the new modular `Orders` logic during live trading to ensure terminal states (Cancelled/Rejected) are handled cleanly.
+2.  **Deadlock Audit**: (Planned) Review initialization hooks if any startup lag returns.
 
 ### Risks or Concerns
-- **Internal NT8 Cache**: NT8 sometimes holds onto compiled DLLs even when `.cs` files are removed. May require a manual bin/obj purge.
+- **Hard Link Fragility**: Some Git GUIs or "Clean" commands might sever hard links. Always run `.\verify-desync.ps1` at the start of new sessions.
 
 ---
-**Status**: HEADLESS MIGRATION BLOCKED BY NT8 STARTUP FREEZE.
+**Status**: V12.14 TOTAL RECALL — STABLE & DEPLOYED.

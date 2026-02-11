@@ -106,32 +106,32 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ConcurrentDictionary<string, PendingStopReplacement> pendingStopReplacements;
 
         // RMA Mode tracking
-        private bool isRMAModeActive;
-        private bool isRKeyHeld;
-        private bool isRMAButtonClicked;  // One-shot mode from button
+        private volatile bool isRMAModeActive;
+        private volatile bool isRKeyHeld;
+        private volatile bool isRMAButtonClicked;  // One-shot mode from button
 
         // V8.2: TREND Mode tracking
-        private bool isTRENDModeActive;
+        private volatile bool isTRENDModeActive;
         private bool pendingTRENDEntry;  // V8.2 FIX: Flag to execute TREND in OnBarUpdate when BarsInProgress=0
         private ConcurrentDictionary<string, string> linkedTRENDEntries;  // V8.30: Thread-safe - Links E1 and E2 by group ID
 
         // V8.4: RETEST Mode tracking
-        private bool isRetestModeActive;
+        private volatile bool isRetestModeActive;
 
         // V8.6: MOMO Mode tracking
-        private bool isMOMOModeActive;
+        private volatile bool isMOMOModeActive;
 
         // V8.7: FFMA Mode tracking (Far From Moving Average)
-        private bool isFFMAModeArmed;
+        private volatile bool isFFMAModeArmed;
         private double ffmaEntryBarHigh;   // Store entry candle high for stop (short)
         private double ffmaEntryBarLow;    // Store entry candle low for stop (long)
 
         // V11 Logic State
-        private bool isTrendRmaMode = false; // False = STD (All-in), True = RMA (9/15 Split)
-        private bool isRetestRmaMode = false; // V12: RETEST RMA toggle state
+        private volatile bool isTrendRmaMode = false; // False = STD (All-in), True = RMA (9/15 Split)
+        private volatile bool isRetestRmaMode = false; // V12: RETEST RMA toggle state
 
         // V12.2 Hybrid Sync: Logic State
-        private bool isTosSyncMode = false;
+        private volatile bool isTosSyncMode = false;
         private bool isLongArmed = false;
         private bool isShortArmed = false;
         private DateTime lastArmedTime = DateTime.MinValue;
@@ -166,6 +166,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Thread ipcThread;
         private volatile bool isIpcRunning;
         private readonly object ipcLock = new object();
+        private readonly object stateLock = new object();  // V12.20: Atomic mode transitions
         private ConcurrentQueue<string> ipcCommandQueue;
         // V12.2: Multi-Client Support
         private ConcurrentBag<TcpClient> connectedClients;
@@ -397,7 +398,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         public double BreakEvenTriggerPoints { get; set; }
 
-        public int BreakEvenOffsetTicks { get; set; }
+        private int BreakEvenOffsetTicks = 2; // V12.23: Panel is source of truth, no longer in properties window
 
         public double Trail1TriggerPoints { get; set; }
 
@@ -410,9 +411,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double Trail3TriggerPoints { get; set; }
 
         public double Trail3DistancePoints { get; set; }
-
-        [Range(1, 10)]
-        public int ManualBreakevenBuffer { get; set; }
 
         #endregion
 
@@ -657,14 +655,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Trailing stop defaults
                 BreakEvenTriggerPoints = 2.0;
-                BreakEvenOffsetTicks = 2;
                 Trail1TriggerPoints = 3.0;
                 Trail1DistancePoints = 2.0;
                 Trail2TriggerPoints = 4.0;
                 Trail2DistancePoints = 1.5;
                 Trail3TriggerPoints = 5.0;
                 Trail3DistancePoints = 1.0;
-                ManualBreakevenBuffer = 2;
 
                 // Display
                 ShowMidLine = true;

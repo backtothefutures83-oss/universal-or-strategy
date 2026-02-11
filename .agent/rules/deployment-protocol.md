@@ -5,13 +5,10 @@
 **Context:** NinjaTrader 8 (NT8) and GitHub Repository synchronization.
 
 ### 🛡️ Mandatory Rule for All Agents
-1.  **NEVER** manually copy-paste code into NinjaTrader folders.
-2.  **ALWAYS** edit files in the repository path: `C:\WSGTA\universal-or-strategy\`.
-3.  **MANDATORY SYNC**: After any code change (`write_to_file` or `replace_file_content`), you MUST execute:
-    ```powershell
-    .\deploy-sync.ps1
-    ```
-4.  **MANDATORY VERIFICATION**: Always run `.\verify-desync.ps1` to prove the audit trail is clean.
+- All agents MUST run `.\deploy-sync.ps1 -Link` immediately after modifying any `.cs` file or development script.
+- All agents MUST run `.\verify-desync.ps1` after the sync command to confirm successful hard link propagation.
+- **ZERO-TOUCH PROTOCOL**: Agents MUST NOT request the user to run terminal commands or scripts. Command execution is the sole responsibility of the active AI Agent via `run_command` tools.
+- Failure to run the sync script and verify results is considered a **CRITICAL PROTOCOL VIOLATION**.
 
 ### 🚀 Workflow
 - **Repo** = The Source

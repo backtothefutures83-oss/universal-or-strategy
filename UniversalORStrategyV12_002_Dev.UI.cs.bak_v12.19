@@ -154,9 +154,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         // V12.14: Broadcast RMA deactivation to panel
                         string deactivateConfig = string.Format(
-                            "CONFIG|OR|COUNT:{0};T1:{1};T2:{2};T3:{3};STR:{4};MAX:{5};TRMA:{6};RRMA:{7};",
+                            "CONFIG|OR|COUNT:{0};T1:{1};T2:{2};T3:{3};STR:{4};MAX:{5};",
                             minContracts, Target1FixedPoints, Target2Multiplier, Target3Multiplier,
-                            StopMultiplier, MaxRiskAmount, isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                            StopMultiplier, MaxRiskAmount);
                         SendResponseToRemote(deactivateConfig);
                         Print("V12.14: RMA auto-deactivated after entry - CONFIG broadcast sent");
                     }
@@ -347,9 +347,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             {
                                 string mode = isRMAModeActive ? "RMA" : "OR";
                                 string configResponse = string.Format(
-                                    "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:Points;T2:{3};T2TYPE:ATR;T3:{4};T3TYPE:ATR;T4:0;T4TYPE:ATR;T5:0;T5TYPE:ATR;STR:0;STRTYPE:Tick;MAX:0;CIT:{5};OT:Limit;TRMA:{6};RRMA:{7};\n",
-                                    mode, minContracts, Target1FixedPoints, Target2Multiplier, Target3Multiplier, ChaseIfTouchPoints ?? "0",
-                                    isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                                    "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:Points;T2:{3};T2TYPE:ATR;T3:{4};T3TYPE:ATR;T4:0;T4TYPE:ATR;T5:0;T5TYPE:ATR;STR:0;STRTYPE:Tick;MAX:0;CIT:{5};OT:Limit;\n",
+                                    mode, minContracts, Target1FixedPoints, Target2Multiplier, Target3Multiplier, ChaseIfTouchPoints ?? "0");
                                 byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
                                 stream.Write(responseBytes, 0, responseBytes.Length);
                                 stream.Flush();
@@ -599,49 +598,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print($"[V12] CIT updated: {ChaseIfTouchPoints}");
                         }
                     }
-                    else if (action == "BE" || action == "BE_CUSTOM" || action == "BE_PLUS_2" || action == "BE_PLUS_1") // V12.23: +BE_CUSTOM with dynamic ticks
+                    else if (action == "BE" || action == "BE_PLUS_2" || action == "BE_PLUS_1") // V12.18: Unified BE handler
                     {
-                        double beOffset;
-                        if (action == "BE_CUSTOM" && parts.Length >= 2)
-                        {
-                            // V12.23: Dynamic ticks from panel input — syncs auto-trail BE too
-                            int customTicks;
-                            if (!int.TryParse(parts[1].Trim(), out customTicks) || customTicks < 0)
-                                customTicks = BreakEvenOffsetTicks; // fallback to default
-                            BreakEvenOffsetTicks = customTicks; // V12.23: Sync auto-trail + fleet symmetry
-                            beOffset = customTicks * tickSize;
-                        }
-                        else if (action == "BE" || action == "BE_PLUS_2")
-                            beOffset = BreakEvenOffsetTicks * tickSize;
-                        else
-                            beOffset = 1 * tickSize; // Legacy BE_PLUS_1
+                        // V12.18: "BE" uses strategy's BreakEvenOffsetTicks property (default 2 ticks)
+                        // Legacy "BE_PLUS_2"/"BE_PLUS_1" still supported for backwards compat
+                        double beOffset = (action == "BE" || action == "BE_PLUS_2")
+                            ? BreakEvenOffsetTicks * tickSize   // Ticks → Points (e.g. 2 ticks × 0.25 = 0.50 pts on MES)
+                            : 1 * tickSize;                     // Legacy BE_PLUS_1 = 1 tick
                         MoveStopsToBreakevenWithOffset(beOffset);
-                    }
-                    else if (action == "FLATTEN_ONLY")
-                    {
-                        // V12.21: Flatten Only (Close Positions) - preserve pending orders
-                        if (EnableSIMA)
-                        {
-                            Print("[SIMA] IPC FLATTEN_ONLY → Closing all open positions (Pending orders preserved)");
-                            ClosePositionsOnlyApexAccounts(); // V12.21: Use new non-cancelling helper
-                        }
-                        else
-                        {
-                            Print("[V12] FLATTEN_ONLY → Closing all open positions (Pending orders preserved)");
-                            // CloseAllPositions(); // Native NT8 method closes positions and cancels orders usually? 
-                            // NT8 Flatten() cancels orders. We must use Close() on each position instead.
-                            
-                            foreach (Position pos in Account.Positions)
-                            {
-                                if (pos.Instrument.FullName == Instrument.FullName && pos.MarketPosition != MarketPosition.Flat)
-                                {
-                                    if (pos.MarketPosition == MarketPosition.Long)
-                                        ExitLong();
-                                    else
-                                        ExitShort();
-                                }
-                            }
-                        }
                     }
                     else if (action == "FLATTEN")
                     {
@@ -960,9 +924,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // Build CONFIG message to broadcast
                             string mode = isRMAModeActive ? "RMA" : "ORB";
                             string configMsg = string.Format(
-                                "CONFIG|{0}|COUNT:{1};T1:{2};T2:{3};T3:{4};STR:{5};MAX:{6};TRMA:{7};RRMA:{8};",
+                                "CONFIG|{0}|COUNT:{1};T1:{2};T2:{3};T3:{4};STR:{5};MAX:{6};",
                                 mode, targetCount, Target1FixedPoints, Target2Multiplier, Target3Multiplier,
-                                StopMultiplier, MaxRiskAmount, isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                                StopMultiplier, MaxRiskAmount);
 
                             // V12.13-D: Broadcast CONFIG to all connected panel clients
                             SendResponseToRemote(configMsg);
@@ -977,55 +941,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             string newMode = parts[1].Trim().ToUpper();
 
-                            // V12.20: Atomic mode transition — prevents partial state reads during switch
-                            lock (stateLock)
-                            {
+                            // Update internal mode state
+                            if (newMode == "RMA")
+                                isRMAModeActive = true;
+                            else if (newMode == "ORB" || newMode == "OR")
                                 isRMAModeActive = false;
-                                isRMAButtonClicked = false;
-                                isRetestModeActive = false;
-                                isTRENDModeActive = false;
-                                isMOMOModeActive = false;
-                                isFFMAModeArmed = false;
 
-                                if (newMode == "RMA")
-                                {
-                                    isRMAModeActive = true;
-                                    isRMAButtonClicked = true;
-                                }
-                                else if (newMode == "RETEST")
-                                {
-                                    isRetestModeActive = true;
-                                }
-                                else if (newMode == "TREND")
-                                {
-                                    isTRENDModeActive = true;
-                                }
-                                else if (newMode == "MOMO")
-                                {
-                                    isMOMOModeActive = true;
-                                }
-                                else if (newMode == "FFMA")
-                                {
-                                    isFFMAModeArmed = true;
-                                }
-                                // ORB/OR = all modes off (already deactivated above)
-                            }
-
-                            Print(string.Format("V12.20: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5}",
-                                newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
-
-                            UpdateRMAModeDisplay();
+                            Print(string.Format("V12.5: SET_MODE = {0}", newMode));
 
                             // Build CONFIG message to broadcast
                             string configMsg = string.Format(
-                                "CONFIG|{0}|COUNT:{1};T1:{2};T2:{3};T3:{4};STR:{5};MAX:{6};MODE:{0};TRMA:{7};RRMA:{8};",
+                                "CONFIG|{0}|COUNT:{1};T1:{2};T2:{3};T3:{4};STR:{5};MAX:{6};MODE:{0};",
                                 newMode, minContracts, Target1FixedPoints, Target2Multiplier, Target3Multiplier,
-                                StopMultiplier, MaxRiskAmount, isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                                StopMultiplier, MaxRiskAmount);
 
                             // V12.13-D: Broadcast CONFIG to all connected panel clients
                             SendResponseToRemote(configMsg);
 
-                            Print(string.Format("V12.20: CONFIG Broadcast -> {0}", configMsg));
+                            Print(string.Format("V12.5: CONFIG Broadcast -> {0}", configMsg));
                         }
                     }
 
@@ -1049,7 +982,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("IPC SET_MANUAL_PRICE: Invalid price format in command: {0}", command));
                         }
                     }
-                    else if (action.StartsWith("MODE_") || action.StartsWith("EXEC_") || action == "FFMA_DISARM")
+                    else if (action.StartsWith("MODE_") || action.StartsWith("EXEC_"))
                     {
                         ToggleStrategyMode(action);
                     }
@@ -1180,63 +1113,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ToggleStrategyMode(string action)
         {
-             // V12.20: Atomic flag mutations
-             lock (stateLock)
+             if (action == "MODE_RMA") isRMAModeActive = !isRMAModeActive;
+             else if (action == "MODE_MOMO") isMOMOModeActive = !isMOMOModeActive;
+             else if (action == "MODE_FFMA") Print("FFMA Mode Toggle received (Logic Pending)"); // V11 Support
+
+             // V11 Trend & Retest RMA Toggles
+             else if (action == "MODE_TREND_RMA")
              {
-                 if (action == "MODE_RMA") isRMAModeActive = !isRMAModeActive;
-                 else if (action == "MODE_MOMO") isMOMOModeActive = !isMOMOModeActive;
-                 else if (action == "MODE_FFMA")
-                 {
-                     isFFMAModeArmed = true;
-                     Print("V12.24: FFMA AUTO armed — reversal scanner active");
-                 }
-                 else if (action == "MODE_M")
-                 {
-                     Print("V12.24: MODE_M received — immediate FFMA entry pending");
-                 }
-                 else if (action == "FFMA_DISARM")
-                 {
-                     isFFMAModeArmed = false;
-                     Print("V12.24: FFMA disarmed via panel ResetExecutionMode");
-                 }
-                 else if (action == "MODE_TREND_RMA")
-                 {
-                     isTrendRmaMode = true;
-                     Print("IPC: TREND RMA Mode Enabled");
-                 }
-                 else if (action == "MODE_TREND_STD")
-                 {
-                     isTrendRmaMode = false;
-                     Print("IPC: TREND Standard Mode Enabled");
-                 }
-                 else if (action == "MODE_RETEST_RMA")
-                 {
-                     isRetestRmaMode = true;
-                     Print("IPC: RETEST RMA Mode Enabled");
-                 }
-                 else if (action == "MODE_RETEST_STD")
-                 {
-                     isRetestRmaMode = false;
-                     Print("IPC: RETEST Standard Mode Enabled");
-                 }
+                 isTrendRmaMode = true;
+                 Print("IPC: TREND RMA Mode Enabled");
+             }
+             else if (action == "MODE_TREND_STD")
+             {
+                 isTrendRmaMode = false;
+                 Print("IPC: TREND Standard Mode Enabled");
+             }
+             else if (action == "MODE_RETEST_RMA")
+             {
+                 isRetestRmaMode = true;
+                 Print("IPC: RETEST RMA Mode Enabled");
+             }
+             else if (action == "MODE_RETEST_STD")
+             {
+                 isRetestRmaMode = false;
+                 Print("IPC: RETEST Standard Mode Enabled");
              }
 
-             // Execution calls stay outside lock (they do their own order management)
-             if (action == "EXEC_TREND" || action == "EXEC_TREND_RMA") ExecuteTRENDEntry();
+             else if (action == "EXEC_TREND" || action == "EXEC_TREND_RMA") ExecuteTRENDEntry();
              else if (action == "EXEC_RETEST" || action == "EXEC_RETEST_PLUS" || action == "EXEC_RETEST_MINUS") ExecuteRetestEntry();
-             else if (action == "EXEC_MOMO") ExecuteMOMOEntry(lastKnownPrice);
-             else if (action == "MODE_M")
-             {
-                 // V12.24: Immediate market entry using FFMA trade DNA
-                 double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                 double ema9Value = _ema9Val;
-                 MarketPosition direction = currentPrice > ema9Value ? MarketPosition.Short : MarketPosition.Long;
-                 Print(string.Format("V12.24: MODE_M firing — Price={0:F2} vs EMA9={1:F2} → {2}", currentPrice, ema9Value, direction));
-                 ExecuteFFMAEntry(direction);
-             }
 
-             Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4} FFMA={5}",
-                action, isRMAModeActive, isMOMOModeActive, isTrendRmaMode, isRetestRmaMode, isFFMAModeArmed));
+             // V11: Add FFMA/MOMO execution via IPC if added to remote
+             else if (action == "EXEC_MOMO") ExecuteMOMOEntry(lastKnownPrice);
+
+             Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4}",
+                action, isRMAModeActive, isMOMOModeActive, isTrendRmaMode, isRetestRmaMode));
              UpdateDisplay();
         }
 

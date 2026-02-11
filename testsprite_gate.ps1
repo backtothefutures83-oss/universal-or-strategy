@@ -15,8 +15,16 @@ if (-not $Env:TESTSPRITE_API_KEY) {
 
 Write-Host "STARTING TESTSPRITE AI SCAN..." -ForegroundColor Cyan
 
-# Define targets
-$targets = @("UniversalORStrategyV12.cs", "V12StandardPanel.cs")
+# Define targets — V12 Modular Architecture (Phase 6 Update)
+$targets = @(
+    "UniversalORStrategyV12_002_Dev.cs",
+    "UniversalORStrategyV12_002_Dev.Orders.cs",
+    "UniversalORStrategyV12_002_Dev.Entries.cs",
+    "UniversalORStrategyV12_002_Dev.UI.cs",
+    "UniversalORStrategyV12_002_Dev.SIMA.cs",
+    "UniversalORStrategyV12_002_Dev.REAPER.cs",
+    "V12StandardPanel_V12_001_Dev.cs"
+)
 
 foreach ($file in $targets) {
     if (Test-Path $file) {

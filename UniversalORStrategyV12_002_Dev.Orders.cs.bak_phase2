@@ -1,4 +1,4 @@
-﻿// V12.16 MODULAR: Order Management Module (Extracted from main file)
+// V12.16 MODULAR: Order Management Module (Extracted from main file)
 // Contains: OnOrderUpdate, OnPositionUpdate, Trailing Stops, Position Sync, Stop Management
 using System;
 using System.Collections.Generic;
@@ -61,15 +61,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                             // Store intended entry price for slippage calculation
                             double intendedEntryPrice = pos.EntryPrice;
-
-                            // V12.18 PRICE INTEGRITY: Guard against zero fill price (NT8 race condition)
-                            if (averageFillPrice <= 0)
-                            {
-                                Print(string.Format("[PRICE_GUARD] CRITICAL: averageFillPrice={0} for {1}. Keeping intended price {2:F2}. NOT re-anchoring.",
-                                    averageFillPrice, entryName, intendedEntryPrice));
-                                SubmitBracketOrders(entryName, pos);
-                                continue;  // Skip all price re-anchoring, use intended prices
-                            }
 
                             string tradeType = pos.IsRMATrade ? "RMA" : "OR";
                             if (pos.IsMOMOTrade) tradeType = "MOMO"; // V8.22: Logging
@@ -301,7 +292,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                     // V12.12: Target order rejected - remove stale reference from dictionary
-                    Print(string.Format("[GHOST_FIX] Order {0} terminated (REJECTED). Nullifying reference.", orderName));
                     RemoveGhostOrderRef(order, "REJECTED");
                 }
 
@@ -321,13 +311,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             // Get the new price from the order (limit orders use limitPrice, stop orders use stopPrice)
                             double newPrice = limitPrice > 0 ? limitPrice : stopPrice;
-                            
-                            // V12.18 PRICE INTEGRITY: Guard against zero price from NT8 race condition
-                            if (newPrice <= 0)
-                            {
-                                Print(string.Format("[PRICE_GUARD] Entry-moved: newPrice={0} for {1}. Skipping re-anchor.", newPrice, entryName));
-                                break;
-                            }
                             
                             // Check if price changed (with tick tolerance)
                             if (Math.Abs(newPrice - pos.EntryPrice) > tickSize * 0.5)
@@ -399,7 +382,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             string entryName = kvp.Key;
                             if (stopOrders.TryRemove(entryName, out _))
                             {
-                                Print(string.Format("[GHOST_FIX] Order Stop_{0} terminated (CANCELLED). Nullifying reference.", entryName));
+                                Print(string.Format("V12.13c: Stop cancelled: {0} â€” removed from tracking", entryName));
                                 handledByExplicitCleanup = true;
                             }
                             break;
@@ -423,7 +406,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             {
                                 if (dict.TryRemove(kvp.Key, out _))
                                 {
-                                    Print(string.Format("[GHOST_FIX] Order {0}_{1} terminated (CANCELLED). Nullifying reference.", label, kvp.Key));
+                                    Print(string.Format("V12.13: {0} MANUALLY CANCELLED: {1} â€” contracts run with stop", label, kvp.Key));
                                     handledByExplicitCleanup = true;
                                 }
                                 break;
@@ -445,7 +428,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (entryOrders.TryGetValue(entryName, out var entryOrder) && entryOrder == order && !pos.EntryFilled)
                         {
-                            Print(string.Format("[GHOST_FIX] Order Entry_{0} terminated (CANCELLED). Nullifying reference. Full teardown.", entryName));
+                            Print(string.Format("V12.13: Entry CANCELLED â€” full teardown: {0}", entryName));
 
                             // Clean up local state
                             CleanupPosition(entryName);
@@ -541,29 +524,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else
                 {
                     Print(string.Format("[GHOST-AUDIT] NO MATCH in activePositions for OrderId={0} Name={1} on {2}", orderId, order.Name, acctName));
-
-                    // V12.18 SIMA CASCADE: If a master-account order was cancelled,
-                    // check if any follower positions share the same base signal and tear them down.
-                    if (EnableSIMA && order.OrderState == OrderState.Cancelled)
-                    {
-                        string orderSignal = order.Name;
-                        foreach (var kvp in activePositions.ToArray())
-                        {
-                            PositionInfo cascadePos = kvp.Value;
-                            if (!cascadePos.IsFollower) continue;
-                            // Match if the follower's signal name contains the order's signal
-                            if (kvp.Key.Contains(orderSignal) || orderSignal.Contains(kvp.Key))
-                            {
-                                // Only tear down if the follower's entry hasn't filled yet
-                                if (!cascadePos.EntryFilled)
-                                {
-                                    Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
-                                        orderSignal, kvp.Key, cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL"));
-                                    CleanupPosition(kvp.Key);
-                                }
-                            }
-                        }
-                    }
                 }
 
                 // Fallback: clear any stale reference for terminal follower order states
@@ -1075,7 +1035,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // This allows user to "arm" breakeven early and it auto-triggers when price reaches threshold
                 if (pos.ManualBreakevenArmed && !pos.ManualBreakevenTriggered)
                 {
-                    double beThreshold = pos.EntryPrice + (BreakEvenOffsetTicks * tickSize);
+                    double beThreshold = pos.EntryPrice + (ManualBreakevenBuffer * tickSize);
                     bool thresholdReached = false;
 
                     if (pos.Direction == MarketPosition.Long)
@@ -1084,7 +1044,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else // Short
                     {
-                        beThreshold = pos.EntryPrice - (BreakEvenOffsetTicks * tickSize);
+                        beThreshold = pos.EntryPrice - (ManualBreakevenBuffer * tickSize);
                         thresholdReached = Close[0] <= beThreshold;
                     }
 
@@ -1092,8 +1052,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         // Move stop to breakeven + buffer
                         double manualBEStop = pos.Direction == MarketPosition.Long
-                            ? pos.EntryPrice + (BreakEvenOffsetTicks * tickSize)
-                            : pos.EntryPrice - (BreakEvenOffsetTicks * tickSize);
+                            ? pos.EntryPrice + (ManualBreakevenBuffer * tickSize)
+                            : pos.EntryPrice - (ManualBreakevenBuffer * tickSize);
 
                         // Only move if it's better than current stop
                         bool shouldMove = pos.Direction == MarketPosition.Long
@@ -1106,7 +1066,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             newTrailLevel = 1; // Same as automatic breakeven
                             pos.ManualBreakevenTriggered = true;
                             Print(string.Format("â˜… MANUAL BREAKEVEN TRIGGERED: {0} â†’ Stop moved to {1:F2} (Entry + {2} tick)", 
-                                entryName, manualBEStop, BreakEvenOffsetTicks));
+                                entryName, manualBEStop, ManualBreakevenBuffer));
                         }
                     }
                 }
@@ -1580,7 +1540,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // Arm
                             pos.ManualBreakevenArmed = true;
                             Print(string.Format("BREAKEVEN ARMED: {0} - Will trigger at Entry + {1} tick(s)",
-                                kvp.Key, BreakEvenOffsetTicks));
+                                kvp.Key, ManualBreakevenBuffer));
                         }
                     }
                 }
@@ -2092,8 +2052,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (dict.TryRemove(kvp.Key, out _))
                         {
                             string matchType = (kvp.Value == order) ? "REF" : "ORDERID";
-                            Print(string.Format("[GHOST_FIX] Order {0}_{1} terminated ({2}). Nullifying reference. (match={3}, OrderId={4})",
-                                label, kvp.Key, reason, matchType, order.OrderId ?? "NULL"));
+                            Print(string.Format("V12.17: {0} {1} - removed ghost ref for {2} (match={3}, OrderId={4})",
+                                label, reason, kvp.Key, matchType, order.OrderId ?? "NULL"));
                             foundInDict = true;
                             removedLabel = label;
                             removedKey = kvp.Key;
@@ -2481,82 +2441,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                // === V12.18 REVERSE AUDIT: Strategy → Broker ===
-                // For each tracked order ref, verify it still exists as Working/Accepted
-                // in the broker's order collection. If it doesn't, it's a ghost — purge it.
-                Print(string.Format("[GHOST_FIX] REVERSE AUDIT START ({0})", reason));
-                int reverseGhosts = 0;
-
-                // Build a HashSet of live broker OrderIds for O(1) lookup
-                HashSet<string> liveBrokerOrderIds = new HashSet<string>();
-                foreach (Order brokerOrder in Account.Orders)
-                {
-                    if (brokerOrder != null && !string.IsNullOrEmpty(brokerOrder.OrderId) &&
-                        (brokerOrder.OrderState == OrderState.Working || brokerOrder.OrderState == OrderState.Accepted))
-                    {
-                        liveBrokerOrderIds.Add(brokerOrder.OrderId);
-                    }
-                }
-
-                // Also scan fleet accounts if SIMA is enabled
-                if (EnableSIMA)
-                {
-                    foreach (Account acct in Account.All)
-                    {
-                        if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            foreach (Order fleetOrder in acct.Orders)
-                            {
-                                if (fleetOrder != null && !string.IsNullOrEmpty(fleetOrder.OrderId) &&
-                                    (fleetOrder.OrderState == OrderState.Working || fleetOrder.OrderState == OrderState.Accepted))
-                                {
-                                    liveBrokerOrderIds.Add(fleetOrder.OrderId);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Check all strategy order dictionaries against live broker orders
-                var reverseCheckDicts = new (ConcurrentDictionary<string, Order> dict, string label)[]
-                {
-                    (stopOrders, "STOP"), (target1Orders, "T1"), (target2Orders, "T2"),
-                    (target3Orders, "T3"), (target4Orders, "T4"), (entryOrders, "ENTRY"),
-                };
-
-                foreach (var (dict, label) in reverseCheckDicts)
-                {
-                    foreach (var kvp in dict.ToArray())
-                    {
-                        Order trackedOrder = kvp.Value;
-                        if (trackedOrder == null) continue;
-
-                        // Only audit orders that SHOULD be alive (Working/Accepted)
-                        // Terminal orders are cleaned by OnOrderUpdate; this catches leaks
-                        bool isTerminal = (trackedOrder.OrderState == OrderState.Cancelled ||
-                                           trackedOrder.OrderState == OrderState.Rejected ||
-                                           trackedOrder.OrderState == OrderState.Filled ||
-                                           trackedOrder.OrderState == OrderState.Unknown);
-
-                        bool notInBroker = !string.IsNullOrEmpty(trackedOrder.OrderId) &&
-                                           !liveBrokerOrderIds.Contains(trackedOrder.OrderId);
-
-                        if (isTerminal || notInBroker)
-                        {
-                            if (dict.TryRemove(kvp.Key, out _))
-                            {
-                                string state = trackedOrder.OrderState.ToString();
-                                Print(string.Format("[GHOST_FIX] REVERSE AUDIT: {0} ghost for {1} purged (State={2}, InBroker={3}, OrderId={4})",
-                                    label, kvp.Key, state, !notInBroker, trackedOrder.OrderId ?? "NULL"));
-                                reverseGhosts++;
-                            }
-                        }
-                    }
-                }
-
-                Print(string.Format("[GHOST_FIX] REVERSE AUDIT COMPLETE: {0} ghosts purged", reverseGhosts));
-
-                if (foundOrphans || reverseGhosts > 0)
+                if (foundOrphans)
                     Print("Orphaned order reconciliation complete.");
             }
             catch (Exception ex)

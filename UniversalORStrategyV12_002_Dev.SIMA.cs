@@ -666,6 +666,80 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        private void ClosePositionsOnlyApexAccounts()
+        {
+            if (!EnableSIMA) return;
+
+            // V12.21: FLATTEN_ONLY logic (Closes positions, Preserves pending orders)
+            // Does NOT set isFlattenRunning guard because we aren't interfering with order cancellations
+            // However, rapid execution updates might occur.
+            
+            Print("[SIMA] ══════ GLOBAL POSITIONS CLOSE START (Running Limit/Stop Orders Preserved) ══════");
+            int closeCount = 0;
+            int totalCount = 0;
+
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    totalCount++;
+                    try
+                    {
+                        foreach (Position position in acct.Positions)
+                        {
+                            // Filter by instrument
+                            if (position.Instrument.FullName != Instrument.FullName) continue;
+
+                            if (position.MarketPosition != MarketPosition.Flat)
+                            {
+                                int qty = position.Quantity;
+                                OrderAction closeAction = position.MarketPosition == MarketPosition.Long 
+                                    ? OrderAction.Sell 
+                                    : OrderAction.BuyToCover;
+
+                                // Use Market order to close immediately
+                                string signalName = "GracefulClose_" + position.MarketPosition.ToString(); // Unique signal name
+                                Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market, 
+                                    TimeInForce.Gtc, qty, 0, 0, "", signalName, null);
+                                acct.Submit(new[] { closeOrder });
+
+                                closeCount++;
+                                Print($"[SIMA] ✓ Graceful Close: {qty} {position.MarketPosition} on {acct.Name}");
+                            }
+                        }
+
+                        // Reset expected position (assuming full close)
+                        expectedPositions[acct.Name] = 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        Print($"[SIMA] ✗ CLOSE FAILED on {acct.Name}: {ex.Message}");
+                    }
+                }
+            }
+            
+            // Master fallback safety (if not picked up by prefix)
+            bool masterCovered = Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!masterCovered && Account.Positions.Count > 0)
+            {
+                 foreach (Position position in Account.Positions)
+                {
+                    if (position.Instrument.FullName != Instrument.FullName) continue;
+                    
+                    if (position.MarketPosition != MarketPosition.Flat)
+                    {
+                         int qty = position.Quantity;
+                         if (position.MarketPosition == MarketPosition.Long) ExitLong(); else ExitShort();
+                         closeCount++;
+                         Print($"[SIMA] ✓ Graceful Close: Master {qty} {position.MarketPosition}");
+                    }
+                }
+                expectedPositions[Account.Name] = 0;
+            }
+
+            Print($"[SIMA] ══════ GLOBAL POSITIONS CLOSE COMPLETE: {closeCount} positions closed ══════");
+        }
+
         #endregion
     }
 }
