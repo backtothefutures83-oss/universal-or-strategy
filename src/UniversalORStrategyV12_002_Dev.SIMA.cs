@@ -8,6 +8,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Globalization;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -40,6 +41,58 @@ namespace NinjaTrader.NinjaScript.Strategies
             public Account Account;
             public double DailyPL;
             public string Name;
+        }
+
+        /// <summary>
+        /// V12.Phase8 [F-01/F-02]: Staging struct for target orders — committed to tracking dicts only after Submit succeeds.
+        /// </summary>
+        private struct StagedTarget
+        {
+            public int Num;
+            public double Price;
+            public Order Order;
+        }
+
+        /// <summary>
+        /// [STRESS_TEST Phase 9.0] When true, OnAccountExecutionUpdate injects duplicate execution events
+        /// into _accountExecutionQueue to validate the EntryFilled dedup guard under high-message density.
+        /// Default: false — must be manually enabled for stress testing only. Never enable in production.
+        /// </summary>
+        private bool isStressTestEnabled = false;
+
+        // V12.1101E [F-06]: Serialize expectedPositions mutations so Reaper never observes partial state.
+        private void AddExpectedPositionDeltaLocked(string accountName, int delta)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
+            lock (stateLock)
+            {
+                int oldVal = 0;
+                expectedPositions.TryGetValue(accountName, out oldVal);
+                int newVal = oldVal + delta;
+                expectedPositions.AddOrUpdate(accountName, delta, (k, v) => v + delta);
+                // [Phase 8.2 Part 3 - ACCOUNT_SYNC] Trace every mutation for desync audits.
+                Print(string.Format("[ACCOUNT_SYNC] {0} expected: {1} -> {2}", accountName, oldVal, newVal));
+            }
+        }
+
+        // V12.1101E [F-06]: Shared AddOrUpdate wrapper with stateLock serialization.
+        private void AddOrUpdateExpectedPositionLocked(string accountName, int addValue, Func<int, int> updateExisting)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null || updateExisting == null) return;
+            lock (stateLock)
+            {
+                expectedPositions.AddOrUpdate(accountName, addValue, (k, v) => updateExisting(v));
+            }
+        }
+
+        // V12.1101E [F-06]: Serialized set for expectedPositions.
+        private void SetExpectedPositionLocked(string accountName, int value)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
+            lock (stateLock)
+            {
+                expectedPositions[accountName] = value;
+            }
         }
 
         /// <summary>
@@ -92,188 +145,464 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ExecuteSmartDispatchEntry(string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType = OrderType.Market, params string[] masterEntryNames)
         {
-            // V12.2: Diagnostic logging for copy trading troubleshooting
-            Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA} | OrderType={entryOrderType}");
-
-            if (!EnableSIMA)
+            // V12.Phase8 [F-03]: Semaphore guard to prevent racing with SIMA lifecycle changes (ApplySimaState).
+            if (!_simaToggleSem.Wait(200))
             {
-                Print("[DISPATCH] ⚠️ SIMA DISABLED - Enable in strategy parameters to copy trade");
+                Print("[DISPATCH] ⚠️ Semaphore timeout — skipping dispatch to avoid SIMA lifecycle race");
                 return;
             }
 
-            List<AccountRankInfo> fleet = GetSortedAccountFleet();
+            // [Phase 7.2 LATENCY] T0: Start immediately after semaphore acquired, before any work.
+            var sw = Stopwatch.StartNew();
+            long t0Ticks = sw.ElapsedTicks;
 
-            // V12.2: Log fleet state for diagnostics
-            int activeCount = 0;
-            foreach (var acct in fleet)
+            try
             {
-                if (activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) && isActive)
-                    activeCount++;
-            }
-            Print($"[DISPATCH] Fleet: {fleet.Count} total accounts | {activeCount} ACTIVE in Fleet Manager");
+                // V12.2: Diagnostic logging for copy trading troubleshooting
+                Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA} | OrderType={entryOrderType}");
 
-            if (fleet.Count == 0)
-            {
-                Print("[DISPATCH] ⚠️ NO APEX ACCOUNTS DETECTED - Check AccountPrefix setting");
-                return;
-            }
-
-            if (activeCount == 0)
-            {
-                Print("[DISPATCH] ⚠️ NO ACCOUNTS ENABLED - Toggle accounts ON in Fleet Manager panel");
-            }
-
-            int trendCount = 0;
-            int rmaCount = 0;
-            string symmetryDispatchId = SymmetryGuardBeginDispatch(tradeType, action, quantity, entryPrice);
-            if (masterEntryNames != null)
-            {
-                foreach (string masterEntryName in masterEntryNames)
+                if (!EnableSIMA)
                 {
-                    if (!string.IsNullOrEmpty(masterEntryName))
-                        SymmetryGuardRegisterMasterEntry(symmetryDispatchId, masterEntryName);
-                }
-            }
-
-            for (int i = 0; i < fleet.Count; i++)
-            {
-                Account acct = fleet[i].Account;
-
-                // V12.1: Skip Master account if its order was already placed by the caller
-                if (acct == this.Account) continue;
-
-                // V12.8: Skip accounts NOT registered or disabled in Fleet Manager UI
-                if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
-                {
-                    Print($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
-                    continue;
+                    Print("[DISPATCH] ⚠️ SIMA DISABLED - Enable in strategy parameters to copy trade");
+                    return;
                 }
 
-                // Consistency Lock Check (Shared logic)
-                if (EnableConsistencyLock)
+                // EMERGENCY FIX [H-12]: Abort dispatch if flatten is in progress to prevent re-entry race.
+                if (isFlattenRunning)
                 {
-                    if (fleet[i].DailyPL >= MaxDailyProfitCap)
+                    Print("[DISPATCH] ⚠️ Aborting dispatch — flatten in progress (isFlattenRunning=true)");
+                    return; // finally block at line 414 releases _simaToggleSem
+                }
+
+                List<AccountRankInfo> fleet = GetSortedAccountFleet();
+
+                // V12.Audit [Q3-002]: Snapshot fleet active state under stateLock to prevent UI race.
+                // The UI/IPC thread can toggle activeFleetAccounts between TryGetValue and Submit,
+                // so we capture a consistent set of active account names once before the dispatch loop.
+                HashSet<string> activeAccountSnapshot;
+                lock (stateLock)
+                {
+                    activeAccountSnapshot = new HashSet<string>(
+                        activeFleetAccounts
+                            .Where(kvp => kvp.Value)
+                            .Select(kvp => kvp.Key));
+                }
+
+                // V12.2: Log fleet state for diagnostics
+                int activeCount = activeAccountSnapshot.Count;
+                Print($"[DISPATCH] Fleet: {fleet.Count} total accounts | {activeCount} ACTIVE in Fleet Manager");
+
+                if (fleet.Count == 0)
+                {
+                    Print("[DISPATCH] ⚠️ NO APEX ACCOUNTS DETECTED - Check AccountPrefix setting");
+                    return;
+                }
+
+                if (activeCount == 0)
+                {
+                    Print("[DISPATCH] ⚠️ NO ACCOUNTS ENABLED - Toggle accounts ON in Fleet Manager panel");
+                }
+
+                int rmaCount = 0;
+                string symmetryDispatchId = SymmetryGuardBeginDispatch(tradeType, action, quantity, entryPrice);
+                if (masterEntryNames != null)
+                {
+                    foreach (string masterEntryName in masterEntryNames)
                     {
-                        Print($"[DISPATCH] 🔒 SKIPPING {acct.Name} - Consistency Lock Active (${fleet[i].DailyPL:F2})");
+                        if (!string.IsNullOrEmpty(masterEntryName))
+                            SymmetryGuardRegisterMasterEntry(symmetryDispatchId, masterEntryName);
+                    }
+                }
+
+                // [Phase 7.2 LATENCY] T_LoopStart + batch log buffer (flushed once after loop).
+                long tLoopStartTicks = sw.ElapsedTicks;
+                var dispatchLog = new StringBuilder(512);
+                dispatchLog.AppendLine(string.Format("[LATENCY] Loop start at {0:F3} ms from entry",
+                    (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency));
+
+                for (int i = 0; i < fleet.Count; i++)
+                {
+                    Account acct = fleet[i].Account;
+
+                    // V12.1: Skip Master account if its order was already placed by the caller
+                    if (acct == this.Account) continue;
+
+                    // V12.Audit [Q3-002]: Use pre-snapshotted active set — prevents UI toggle race
+                    // between the active-check and acct.Submit on the next line.
+                    if (!activeAccountSnapshot.Contains(acct.Name))
+                    {
+                        dispatchLog.AppendLine($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
                         continue;
                     }
-                }
 
-                // V12: Followers ALWAYS use RMA multipliers for point-based trails (User Req)
-                bool useRmaForFollower = true;
-
-                double stopMult = useRmaForFollower ? RMAStopATRMultiplier : (tradeType == "TREND" && i == 0 ? TRENDEntry1ATRMultiplier : RMAStopATRMultiplier);
-                double t1Price = Target1FixedPoints;
-                double t2Mult = useRmaForFollower ? RMAT1ATRMultiplier : (tradeType == "TREND" && i == 0 ? Target3Multiplier : RMAT1ATRMultiplier);
-                double t3Mult = useRmaForFollower ? RMAT2ATRMultiplier : (tradeType == "TREND" && i == 0 ? (Target3Multiplier * 1.5) : RMAT2ATRMultiplier);
-
-                // Calculate fixed prices
-                double stopDist = Math.Min(currentATR * stopMult, MaximumStop);
-                double t2Dist = currentATR * t2Mult;
-                double t3Dist = currentATR * t3Mult;
-
-                double stopPrice = (action == OrderAction.Buy) ? entryPrice - stopDist : entryPrice + stopDist;
-                double t1TargetPrice = (action == OrderAction.Buy) ? entryPrice + t1Price : entryPrice - t1Price;
-                double t2TargetPrice = (action == OrderAction.Buy) ? entryPrice + t2Dist : entryPrice - t2Dist;
-                double t3TargetPrice = (action == OrderAction.Buy) ? entryPrice + t3Dist : entryPrice - t3Dist;
-
-                // Rounding
-                stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
-                t1TargetPrice = Instrument.MasterInstrument.RoundToTickSize(t1TargetPrice);
-                t2TargetPrice = Instrument.MasterInstrument.RoundToTickSize(t2TargetPrice);
-                t3TargetPrice = Instrument.MasterInstrument.RoundToTickSize(t3TargetPrice);
-
-                // V12.40 FLEET PARITY: Use same distribution as Master
-                int ft1, ft2, ft3, ft4;
-                GetTargetDistribution(quantity, out ft1, out ft2, out ft3, out ft4);
-
-                try
-                {
-                    string ocoId = tradeType + "_" + DateTime.Now.Ticks + "_" + i;
-                    string fleetEntryName = "Fleet_" + acct.Name + "_" + tradeType + "_" + i;
-                    SymmetryGuardRegisterFollower(symmetryDispatchId, fleetEntryName);
-
-                    // V12.3: Entry uses caller-specified order type (Limit for RMA, Market for MOMO/TREND)
-                    double limitPx = (entryOrderType == OrderType.Limit) ? entryPrice : 0;
-                    bool isMarketEntry = (entryOrderType == OrderType.Market);
-                    Order entry = acct.CreateOrder(Instrument, action, entryOrderType, TimeInForce.Gtc, quantity, limitPx, 0, ocoId, tradeType, null);
-
-                    // V12.7: For Limit entries, defer bracket submission until fill.
-                    // For Market entries, submit entry + stop + target together (instant fill expected).
-                    Order stop = null;
-                    Order target = null;
-                    if (isMarketEntry)
+                    // EMERGENCY FIX [H-13]: Reconcile stale expectedPositions with actual broker state.
+                    // If broker shows flat but memory shows a position, the account was externally closed.
+                    // [Phase 8.2 Part 3 - H-13 Hardened]: Use Math.Abs to handle short (negative) expected values.
+                    // Skip reset when a non-terminal entry order for this account is already in flight —
+                    // that means the Reaper repair is pending and expectedPositions is intentionally non-zero.
+                    try
                     {
-                        stop = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover,
-                            OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, ocoId, "Stop_" + tradeType, null);
-                        target = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover,
-                            OrderType.Limit, TimeInForce.Gtc, quantity, t2TargetPrice, 0, ocoId, "Target_" + tradeType, null);
+                        var brokerPos = acct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+                        bool brokerFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
+                        int expected;
+                        lock (stateLock) { expectedPositions.TryGetValue(acct.Name, out expected); }
+
+                        if (brokerFlat && Math.Abs(expected) > 0)
+                        {
+                            // Guard: if a non-terminal entry order is in-flight for this account,
+                            // the desync is intentional (Repair Hook pending). Skip forced reset.
+                            bool hasPendingRepairOrder = false;
+                            foreach (var kvp in entryOrders.ToArray())
+                            {
+                                var ord = kvp.Value;
+                                if (ord != null
+                                    && !IsOrderTerminal(ord.OrderState)
+                                    && activePositions.TryGetValue(kvp.Key, out var pos)
+                                    && pos.IsFollower
+                                    && pos.ExecutingAccount != null
+                                    && pos.ExecutingAccount.Name == acct.Name)
+                                {
+                                    hasPendingRepairOrder = true;
+                                    break;
+                                }
+                            }
+
+                            // [Phase 8.2 Part 4 - H-13 Hardened]: Also preserve expectedPositions if
+                            // activePositions holds metadata for this account — means a repair is INTENDED
+                            // even if the repair order hasn't been submitted yet (race window closed).
+                            bool hasActivePositionForAcct = activePositions.Values.Any(p =>
+                                p.IsFollower
+                                && p.ExecutingAccount != null
+                                && p.ExecutingAccount.Name == acct.Name);
+
+                            // V12.Phase8.4 [GHOST-FIX]: Also check if the Master account has a working entry for this signal.
+                            // If Master is still waiting to fill, we must preserve the fleet's expected positions.
+                            bool isMasterWaiting = false;
+                            foreach (var kvp in entryOrders.ToArray())
+                            {
+                                if (activePositions.TryGetValue(kvp.Key, out var pi) && !pi.IsFollower && pi.ExecutingAccount == this.Account)
+                                {
+                                    if (kvp.Value != null && (kvp.Value.OrderState == OrderState.Working || kvp.Value.OrderState == OrderState.Submitted || kvp.Value.OrderState == OrderState.Accepted))
+                                    {
+                                        isMasterWaiting = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (hasPendingRepairOrder || hasActivePositionForAcct || isMasterWaiting)
+                            {
+                                dispatchLog.AppendLine(string.Format(
+                                    "[DISPATCH] H-13 SKIP: {0} broker=Flat expected={1} but {2} — not resetting",
+                                    acct.Name, expected,
+                                    isMasterWaiting ? "Master entry still working" : (hasPendingRepairOrder ? "repair order in flight" : "activePositions metadata present")));
+                            }
+                            else
+                            {
+                                SetExpectedPositionLocked(acct.Name, 0);
+                                dispatchLog.AppendLine(string.Format(
+                                    "[DISPATCH] Stale expectedPos cleared for {0}: was {1}, broker is Flat",
+                                    acct.Name, expected));
+                            }
+                        }
+                    }
+                    catch { }
+
+                    // Consistency Lock Check (Shared logic)
+                    if (EnableConsistencyLock)
+                    {
+                        if (fleet[i].DailyPL >= MaxDailyProfitCap)
+                        {
+                            dispatchLog.AppendLine($"[DISPATCH] 🔒 SKIPPING {acct.Name} - Consistency Lock Active (${fleet[i].DailyPL:F2})");
+                            continue;
+                        }
                     }
 
-                    // V12.1: Track Follower Position for Active Trailing Stop Management
-                    // V12.40: Full 4-target distribution — mirrors Master exactly
-                    PositionInfo fleetPos = new PositionInfo
+                    // V12: Followers ALWAYS use RMA multipliers for point-based trails (User Req)
+                    bool useRmaForFollower = true;
+                    MarketPosition followerDirection = action == OrderAction.Buy ? MarketPosition.Long : MarketPosition.Short;
+
+                    // [LEAK-01]: Use centralized ATR calculator (ceiling + min/max guards, fleet-ready).
+                    double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+
+                    double stopPrice = (action == OrderAction.Buy) ? entryPrice - stopDist : entryPrice + stopDist;
+                    double t1TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 1, useRmaForFollower);
+                    double t2TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 2, useRmaForFollower);
+                    double t3TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 3, useRmaForFollower);
+                    double t4TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 4, useRmaForFollower);
+                    double t5TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 5, useRmaForFollower);
+
+                    // Rounding
+                    stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
+
+                    // V1102Q [PARITY-01]: Scale quantity for Micro accounts (e.g. ES->MES 10x parity)
+                    int followerQty = Math.Max(1, quantity * FleetParityMultiplier);
+
+                    // V12.40 FLEET PARITY: Use same distribution as Master (applied to scaled quantity)
+                    int ft1, ft2, ft3, ft4, ft5;
+                    GetTargetDistribution(followerQty, out ft1, out ft2, out ft3, out ft4, out ft5);
+
+                    string ocoId = tradeType + "_" + DateTime.Now.Ticks + "_" + i;
+                    string fleetEntryName = "Fleet_" + acct.Name + "_" + tradeType + "_" + i;
+
+                    try
                     {
-                        SignalName = fleetEntryName,
-                        Direction = action == OrderAction.Buy ? MarketPosition.Long : MarketPosition.Short,
-                        TotalContracts = quantity,
-                        RemainingContracts = quantity,
-                        EntryPrice = entryPrice,
-                        InitialStopPrice = stopPrice,
-                        CurrentStopPrice = stopPrice,
-                        Target1Price = t1TargetPrice,
-                        Target2Price = t2TargetPrice,
-                        Target3Price = t3TargetPrice,
-                        T1Contracts = ft1,
-                        T2Contracts = ft2,
-                        T3Contracts = ft3,
-                        T4Contracts = ft4,
-                        ExecutingAccount = acct,
-                        IsFollower = true,
-                        IsRMATrade = true,          // Enforce Point-Based Trailing for all followers
-                        IsTRENDTrade = (tradeType == "TREND"),
-                        IsRetestTrade = (tradeType == "RETEST"),
-                        EntryFilled = isMarketEntry, // V12.3: Only true for Market entries; Limit waits for fill
-                        BracketSubmitted = isMarketEntry, // V12.7: Brackets deferred for Limit entries
-                        TicksSinceEntry = 0,
-                        ExtremePriceSinceEntry = entryPrice,
-                        CurrentTrailLevel = 0
-                    };
+                        SymmetryGuardRegisterFollower(symmetryDispatchId, fleetEntryName);
 
-                    activePositions[fleetEntryName] = fleetPos;
-                    entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
-                    if (stop != null) stopOrders[fleetEntryName] = stop;
-                    if (target != null) target2Orders[fleetEntryName] = target;
+                        // V12.3: Entry uses caller-specified order type (Limit for RMA, Market for MOMO/TREND)
+                        double limitPx = (entryOrderType == OrderType.Limit) ? entryPrice : 0;
+                        bool isMarketEntry = (entryOrderType == OrderType.Market);
+                        Order entry = acct.CreateOrder(Instrument, action, entryOrderType, TimeInForce.Gtc, followerQty, limitPx, 0, ocoId, tradeType, null);
+                        if (entry == null)
+                        {
+                            dispatchLog.AppendLine($"[DISPATCH] Entry create failed on {acct.Name} for {fleetEntryName}");
+                            continue;
+                        }
 
-                    // V12.7: Submit only entry for Limit, full bracket for Market
-                    if (isMarketEntry)
-                        acct.Submit(new[] { entry, stop, target });
-                    else
-                        acct.Submit(new[] { entry });
+                        // V12.1: Track follower position for active trailing/target management
+                        // V12.1101E: Full 5-target distribution mirrors Master
+                        PositionInfo fleetPos = new PositionInfo
+                        {
+                            SignalName = fleetEntryName,
+                            Direction = action == OrderAction.Buy ? MarketPosition.Long : MarketPosition.Short,
+                            TotalContracts = followerQty,
+                            RemainingContracts = followerQty,
+                            EntryPrice = entryPrice,
+                            InitialStopPrice = stopPrice,
+                            CurrentStopPrice = stopPrice,
+                            Target1Price = t1TargetPrice,
+                            Target2Price = t2TargetPrice,
+                            Target3Price = t3TargetPrice,
+                            Target4Price = t4TargetPrice,
+                            Target5Price = t5TargetPrice,
+                            T1Contracts = ft1,
+                            T2Contracts = ft2,
+                            T3Contracts = ft3,
+                            T4Contracts = ft4,
+                            T5Contracts = ft5,
+                            ExecutingAccount = acct,
+                            IsFollower = true,
+                            IsRMATrade = true,          // Enforce Point-Based Trailing for all followers
+                            IsTRENDTrade = (tradeType == "TREND"),
+                            IsRetestTrade = (tradeType == "RETEST"),
+                            EntryFilled = isMarketEntry, // V12.3: Only true for Market entries; Limit waits for fill
+                            BracketSubmitted = isMarketEntry, // V12.7: Brackets deferred for Limit entries
+                            TicksSinceEntry = 0,
+                            ExtremePriceSinceEntry = entryPrice,
+                            CurrentTrailLevel = 0
+                        };
 
-                    int delta = (action == OrderAction.Buy) ? quantity : -quantity;
-                    expectedPositions.AddOrUpdate(acct.Name, delta, (k, v) => v + delta);
+                        // V12.7: Submit only entry for Limit; market entries include stop + non-runner targets.
+                        if (isMarketEntry)
+                        {
+                            var ordersToSubmit = new List<Order> { entry };
+                            OrderAction exitAction = action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover;
+                            double validatedStop = ValidateStopPrice(fleetPos.Direction, fleetPos.CurrentStopPrice);
 
-                    rmaCount++;
+                            string stopSig = SymmetryTrim("Stop_" + fleetEntryName, 40);
+                            Order stop = acct.CreateOrder(
+                                Instrument,
+                                exitAction,
+                                OrderType.StopMarket,
+                                TimeInForce.Gtc,
+                                Math.Max(1, fleetPos.TotalContracts),
+                                0,
+                                validatedStop,
+                                ocoId,
+                                stopSig,
+                                null);
+
+                            ordersToSubmit.Add(stop);
+
+                            int nonRunnerLimitQty = 0;
+                            int runnerQty = 0;
+                            var stagedTargets = new List<StagedTarget>(5);
+
+                            // V12.Phase8.3: Use activeTargetCount from dashboard to restrict number of targets submitted
+                            for (int targetNum = 1; targetNum <= Math.Min(5, activeTargetCount); targetNum++)
+                            {
+                                int targetQty = GetTargetContracts(fleetPos, targetNum);
+                                if (targetQty <= 0) continue;
+
+                                if (IsRunnerTarget(targetNum))
+                                {
+                                    runnerQty += targetQty;
+                                    continue;
+                                }
+
+                                double targetPrice = GetTargetPrice(fleetPos, targetNum);
+                                if (targetPrice <= 0)
+                                {
+                                    dispatchLog.AppendLine(string.Format("[SIMA TARGET_SKIP] T{0} for {1} has qty={2} but invalid price={3:F2}; skipped",
+                                        targetNum, fleetEntryName, targetQty, targetPrice));
+                                    continue;
+                                }
+
+                                string targetSig = SymmetryTrim("T" + targetNum + "_" + fleetEntryName, 40);
+                                Order target = acct.CreateOrder(
+                                    Instrument,
+                                    exitAction,
+                                    OrderType.Limit,
+                                    TimeInForce.Gtc,
+                                    targetQty,
+                                    targetPrice,
+                                    0,
+                                    ocoId,
+                                    targetSig,
+                                    null);
+
+                                // V12.Phase8 [F-01/F-02]: Stage target orders locally; commit after Submit.
+                                stagedTargets.Add(new StagedTarget { Num = targetNum, Price = targetPrice, Order = target });
+
+                                ordersToSubmit.Add(target);
+                                nonRunnerLimitQty += targetQty;
+                            }
+
+                            // V12.Phase7 [C-02]: Reserve expectedPositions BEFORE Submit to eliminate Reaper
+                            // race window. If Submit throws, undo the reservation in the catch block.
+                            int delta = (action == OrderAction.Buy) ? quantity : -quantity;
+                            AddExpectedPositionDeltaLocked(acct.Name, delta);
+
+                            // [Phase 7.2 LATENCY] Measure broker submit round-trip — stateLock is NOT held here.
+                            long tSubmitStart = sw.ElapsedTicks;
+                            acct.Submit(ordersToSubmit.ToArray());
+                            long tSubmitEnd = sw.ElapsedTicks;
+                            dispatchLog.AppendLine(string.Format("  RTT | {0,-28} | Market+{1}orders | {2,8:F3} ms",
+                                acct.Name, ordersToSubmit.Count,
+                                (tSubmitEnd - tSubmitStart) * 1000.0 / Stopwatch.Frequency));
+
+                            // V12.Audit [Q2-002]: Commit all tracking dicts atomically under stateLock to eliminate
+                            // the expectedPositions > 0 / activePositions empty desync window seen by Reaper.
+                            // AddExpectedPositionDeltaLocked (above) already holds stateLock internally;
+                            // this separate lock wraps only the post-Submit commit block.
+                            lock (stateLock)
+                            {
+                                activePositions[fleetEntryName] = fleetPos;
+                                entryOrders[fleetEntryName] = entry;
+                                stopOrders[fleetEntryName] = stop;
+                                // Commit staged target orders to tracking dictionaries
+                                foreach (var st in stagedTargets)
+                                {
+                                    var targetDict = GetTargetOrdersDictionary(st.Num);
+                                    if (targetDict != null)
+                                        targetDict[fleetEntryName] = st.Order;
+                                }
+                            }
+
+                            dispatchLog.AppendLine(string.Format("[SIMA STOP_AUDIT] OK {0}: StopQty={1} NonRunnerLimits={2} RunnerQty={3}",
+                                fleetEntryName, fleetPos.TotalContracts, nonRunnerLimitQty, runnerQty));
+                        }
+                        else
+                        {
+                            int delta = (action == OrderAction.Buy) ? quantity : -quantity;
+                            AddExpectedPositionDeltaLocked(acct.Name, delta);
+
+                            // [Phase 7.2 LATENCY] Measure broker submit round-trip — stateLock is NOT held here.
+                            long tSubmitStart = sw.ElapsedTicks;
+                            acct.Submit(new[] { entry });
+                            long tSubmitEnd = sw.ElapsedTicks;
+                            dispatchLog.AppendLine(string.Format("  RTT | {0,-28} | Limit        | {1,8:F3} ms",
+                                acct.Name,
+                                (tSubmitEnd - tSubmitStart) * 1000.0 / Stopwatch.Frequency));
+
+                            // V12.Audit [Q2-002]: Commit all tracking dicts atomically under stateLock to eliminate
+                            // the expectedPositions > 0 / activePositions empty desync window seen by Reaper.
+                            lock (stateLock)
+                            {
+                                activePositions[fleetEntryName] = fleetPos;
+                                entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
+                            }
+                        }
+
+                        rmaCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        // V12.Audit [ORPHAN-02]: Use direct stateLock set for rollback to prevent
+                        // concurrent update loss in ConcurrentDictionary functional update.
+                        // Under high concurrency (two parallel fleet dispatches), the losing thread's
+                        // functional-update rollback would be silently discarded; direct set under lock is safe.
+                        int rollbackDelta = (action == OrderAction.Buy) ? -quantity : quantity;
+                        lock (stateLock)
+                        {
+                            if (expectedPositions.TryGetValue(acct.Name, out int currentExpected))
+                            {
+                                expectedPositions[acct.Name] = Math.Max(0, currentExpected + rollbackDelta);
+                            }
+                        }
+
+                        // V12.Phase8 [F-01]: Full tracking-dict cleanup on Submit failure.
+                        activePositions.TryRemove(fleetEntryName, out _);
+                        entryOrders.TryRemove(fleetEntryName, out _);
+                        stopOrders.TryRemove(fleetEntryName, out _);
+                        for (int tNum = 1; tNum <= 5; tNum++)
+                        {
+                            var targetDict = GetTargetOrdersDictionary(tNum);
+                            if (targetDict != null)
+                                targetDict.TryRemove(fleetEntryName, out _);
+                        }
+
+                        dispatchLog.AppendLine($"[DISPATCH] ✗ FAILED on {acct.Name}: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Print($"[DISPATCH] ✗ FAILED on {acct.Name}: {ex.Message}");
-                }
+
+                // [Phase 7.2 LATENCY] T_Final: Fleet loop complete — stop clock, flush forensic report.
+                sw.Stop();
+                long tFinalTicks = sw.ElapsedTicks;
+                double totalMs  = tFinalTicks        * 1000.0 / Stopwatch.Frequency;
+                double setupMs  = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
+                double loopMs   = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
+
+                var report = new StringBuilder(1024);
+                report.AppendLine("╔══════════════════════════════════════════════════════════════╗");
+                report.AppendLine("║          ⏱  FORENSIC PULSE REPORT — Phase 7.2 Latency        ║");
+                report.AppendLine("╠══════════════════════════════════════════════════════════════╣");
+                report.AppendLine(string.Format("║  Signal   : {0,-10}  Action : {1,-10}  Qty : {2,-5}        ║",
+                    tradeType, action, quantity));
+                report.AppendLine(string.Format("║  Total MS : {0,8:F3}   Setup MS : {1,8:F3}   Loop MS : {2,8:F3}  ║",
+                    totalMs, setupMs, loopMs));
+                report.AppendLine(string.Format("║  Fleet    : {0,3} accounts  |  Dispatched : {1,3}                    ║",
+                    fleet.Count, rmaCount));
+                report.AppendLine("╠══════════════════════════════════════════════════════════════╣");
+                report.AppendLine("║  TYPE | ACCOUNT                       | ORDER TYPE   |   RTT  ║");
+                report.AppendLine("╠══════════════════════════════════════════════════════════════╣");
+                report.Append(dispatchLog.ToString());
+                report.AppendLine("╚══════════════════════════════════════════════════════════════╝");
+                Print(report.ToString().TrimEnd());
             }
-
-            Print($"[DISPATCH] COMPLETED: {trendCount} Trend / {rmaCount} RMA Trades Assigned");
+            catch (Exception ex)
+            {
+                Print("[DISPATCH] CRITICAL ERROR in ExecuteSmartDispatchEntry: " + ex.Message);
+            }
+            finally
+            {
+                // V12.Phase8 [F-03]: Always release the SIMA toggle semaphore.
+                _simaToggleSem.Release();
+            }
         }
 
         /// <summary>
-        /// V12 SIMA: Enumerate and log all connected accounts matching the AccountPrefix
-        /// </summary>
-        /// <summary>
         /// V12.1101E [A-4]: Idempotent unsubscribe — removes all SIMA event handlers before
         /// re-subscribing. Prevents handler accumulation on repeated SIMA toggle cycles.
+        /// V12.Phase6 [UNSUB-TRACK]: Deterministic unsubscribe — uses tracked set of subscribed accounts
+        /// instead of re-scanning Account.All, which may have changed since subscribe time.
         /// </summary>
         private void UnsubscribeFromFleetAccounts()
         {
+            // First: unsubscribe from tracked set (deterministic — guaranteed to match subscribe)
+            foreach (string acctName in _subscribedAccountNames)
+            {
+                foreach (Account acct in Account.All)
+                {
+                    if (acct.Name == acctName)
+                    {
+                        acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+                        acct.OrderUpdate     -= OnAccountOrderUpdate;
+                        break;
+                    }
+                }
+            }
+            // Fallback: also sweep Account.All for any handlers from untracked subscribe paths
             foreach (Account acct in Account.All)
             {
                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -281,6 +610,55 @@ namespace NinjaTrader.NinjaScript.Strategies
                     acct.ExecutionUpdate -= OnAccountExecutionUpdate;
                     acct.OrderUpdate     -= OnAccountOrderUpdate;
                 }
+            }
+            _subscribedAccountNames.Clear();
+        }
+
+        /// <summary>
+        /// V12.Phase6 [LIFECYCLE]: Centralized SIMA state transition. Handles full lifecycle:
+        /// enable → enumerate accounts + subscribe handlers + hydrate positions + start Reaper
+        /// disable → stop Reaper + unsubscribe handlers + clear fleet state
+        /// Replaces raw EnableSIMA flag toggles to prevent handler leaks and Reaper state mismatches.
+        /// </summary>
+        private void ApplySimaState(bool enabled)
+        {
+            // V12.Audit [H-10]: If a previous toggle timed out, attempt retry now.
+            // We re-enter with the same `enabled` argument that was pending.
+            // If the semaphore is still held this call will time out again, setting the flag once more.
+            if (_simaTogglePending)
+                Print("[SIMA LIFECYCLE] Retrying previously timed-out toggle (pending retry flag was set).");
+
+            // V12.Phase7 [H-10]: Serialize enable/disable transitions to prevent race between
+            // concurrent IPC commands and UI toggles leaving SIMA in a partially initialized state.
+            if (!_simaToggleSem.Wait(500))
+            {
+                // V12.Audit [H-10]: Record that this toggle did not complete so the next caller can retry.
+                _simaTogglePending = true;
+                Print("[SIMA_WARN] ApplySimaState timed out waiting for semaphore — toggle pending retry.");
+                return;
+            }
+            try
+            {
+                if (enabled)
+                {
+                    EnumerateApexAccounts(); // Unsubs first (idempotent), then re-subscribes + hydrates
+                    if (ReaperAuditEnabled)
+                        StartReaperAudit();
+                    Print("[SIMA LIFECYCLE] SIMA ENABLED — fleet enumerated, Reaper started");
+                }
+                else
+                {
+                    StopReaperAudit();
+                    UnsubscribeFromFleetAccounts();
+                    Print("[SIMA LIFECYCLE] SIMA DISABLED — Reaper stopped, handlers unsubscribed");
+                }
+                EnableSIMA = enabled;
+                // V12.Audit [H-10]: Toggle completed successfully — clear any pending-retry flag.
+                _simaTogglePending = false;
+            }
+            finally
+            {
+                _simaToggleSem.Release();
             }
         }
 
@@ -298,7 +676,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     simaAccountCount++;
-                    expectedPositions[acct.Name] = 0; // Initialize expected position as flat
+                    SetExpectedPositionLocked(acct.Name, 0); // Initialize expected position as flat
                     accountDailyProfit[acct.Name] = 0; // Initialize daily profit
                     EnsureAccountComplianceTracking(acct.Name, GetComplianceNow());
                     activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE — wait for Fleet Manager / IPC to enable
@@ -307,6 +685,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // (Also used by ComplianceHub for P/L tracking)
                     acct.ExecutionUpdate += OnAccountExecutionUpdate;
                     acct.OrderUpdate += OnAccountOrderUpdate;
+                    _subscribedAccountNames.Add(acct.Name); // V12.Phase6 [UNSUB-TRACK]: Track for deterministic unsubscribe
                     if (EnableComplianceHub)
                     {
                         Print($"[SIMA] ✓ {acct.Name} | COMPLIANCE MONITORING ACTIVE");
@@ -322,6 +701,48 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print($"[SIMA] TOTAL ACCOUNTS DETECTED: {simaAccountCount} | ALL INACTIVE by default");
             Print("[SIMA] Use Fleet Manager or IPC TOGGLE_ACCOUNT to enable specific accounts");
             Print("[SIMA] ═══════════════════════════════════════════════════");
+
+            // V12.Phase6 [HYDRATE]: Seed expectedPositions from live broker state
+            HydrateExpectedPositionsFromBroker();
+        }
+
+        /// <summary>
+        /// V12.Phase6 [HYDRATE]: Reads actual broker positions for each fleet account and seeds
+        /// expectedPositions accordingly. Prevents false Reaper CRITICAL DESYNC alerts when the
+        /// strategy restarts while accounts hold open positions.
+        /// </summary>
+        private void HydrateExpectedPositionsFromBroker()
+        {
+            int hydratedCount = 0;
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                try
+                {
+                    foreach (Position pos in acct.Positions)
+                    {
+                        if (pos != null && pos.Instrument != null
+                            && pos.Instrument.FullName == Instrument.FullName
+                            && pos.MarketPosition != MarketPosition.Flat)
+                        {
+                            int qty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
+                            // V12.Phase7 [M-10]: Use AddOrUpdate instead of direct assignment to prevent
+                            // overwriting if called multiple times or during concurrent access.
+                            AddOrUpdateExpectedPositionLocked(acct.Name, qty, v => qty);
+                            Print($"[SIMA HYDRATE] {acct.Name}: Seeded expected={qty} from broker ({pos.MarketPosition} {pos.Quantity})");
+                            hydratedCount++;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print($"[SIMA HYDRATE] WARNING: Could not read positions for {acct.Name}: {ex.Message}");
+                }
+            }
+            if (hydratedCount > 0)
+                Print($"[SIMA HYDRATE] Hydrated {hydratedCount} account(s) with live broker positions");
         }
 
         /// <summary>
@@ -330,6 +751,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ExecuteMultiAccountMarket(OrderAction action, int quantity, string signalName)
         {
             if (!EnableSIMA) return;
+            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
+            if (isFlattenRunning) return;
 
             int successCount = 0;
             int failCount = 0;
@@ -360,20 +783,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         Order order = acct.CreateOrder(Instrument, action, OrderType.Market,
                             TimeInForce.Gtc, quantity, 0, 0, "", signalName, null);
-                        acct.Submit(new[] { order });
 
-                        // V12.1101E [A-5]: Only update expected position tracker AFTER successful submit —
-                        // prevents ghost deltas from accumulating when CreateOrder/Submit throws.
                         if (order != null)
                         {
+                            // V12.Phase7 [C-02/H-07]: Reserve expectedPositions BEFORE Submit to eliminate
+                            // Reaper false-desync race. Rolled back in catch block on failure.
                             int delta = (action == OrderAction.Buy || action == OrderAction.BuyToCover) ? quantity : -quantity;
-                            expectedPositions.AddOrUpdate(acct.Name, delta, (k, v) => v + delta);
+                            AddExpectedPositionDeltaLocked(acct.Name, delta);
+                            acct.Submit(new[] { order });
                         }
 
                         successCount++;
                     }
                     catch (Exception ex)
                     {
+                        // V12.Phase7 [GAP-3]: Undo expectedPositions reservation if submission failed.
+                        // Delta may or may not have been applied (depends on where exception occurred),
+                        // but rollback is safe — Math.Max(0, ...) prevents negative values.
+                        int rollbackDelta = (action == OrderAction.Buy || action == OrderAction.BuyToCover) ? -quantity : quantity;
+                        AddOrUpdateExpectedPositionLocked(acct.Name, 0, v => Math.Max(0, v + rollbackDelta));
                         failCount++;
                         Print($"[SIMA] ✗ FAILED on {acct.Name}: {ex.Message}");
                     }
@@ -389,6 +817,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ExecuteMultiAccountBracket(OrderAction action, int quantity, string signalName, double stopPoints, double targetPoints)
         {
             if (!EnableSIMA) return;
+            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
+            if (isFlattenRunning) return;
 
             int successCount = 0;
             double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
@@ -414,12 +844,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         double stopPrice = action == OrderAction.Buy ? currentPrice - stopPoints : currentPrice + stopPoints;
                         double targetPrice = action == OrderAction.Buy ? currentPrice + targetPoints : currentPrice - targetPoints;
 
-                        // Round to nearest tick (V12.Hardening: guard against tickSize == 0)
-                        if (tickSize > 0)
-                        {
-                            stopPrice  = Math.Round(stopPrice  / tickSize) * tickSize;
-                            targetPrice = Math.Round(targetPrice / tickSize) * tickSize;
-                        }
+                        // V12.Phase6 [TICK-01]: Standardized tick rounding via MasterInstrument API
+                        stopPrice  = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
+                        targetPrice = Instrument.MasterInstrument.RoundToTickSize(targetPrice);
 
                         // 2. Create Bracket
                         string ocoId = action.ToString() + "_" + DateTime.Now.Ticks;
@@ -432,15 +859,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Order target = acct.CreateOrder(Instrument, action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover,
                             OrderType.Limit, TimeInForce.Gtc, quantity, targetPrice, 0, ocoId, "Target_" + signalName, null);
 
+                        // V12.Phase7 [C-02/GAP-2]: Reserve expectedPositions BEFORE Submit to eliminate
+                        // Reaper race window. Rolled back in catch block on failure.
+                        int delta = (action == OrderAction.Buy) ? quantity : -quantity;
+                        AddExpectedPositionDeltaLocked(acct.Name, delta);
+
                         // 3. Submit as Atomic Group (Broker OCO)
                         acct.Submit(new[] { entry, stop, target });
-
-                        int delta = (action == OrderAction.Buy) ? quantity : -quantity;
-                        expectedPositions.AddOrUpdate(acct.Name, delta, (k, v) => v + delta);
                         successCount++;
                     }
                     catch (Exception ex)
                     {
+                        // V12.Phase7 [C-02/GAP-2]: Undo expectedPositions reservation if submission failed.
+                        int rollbackDelta = (action == OrderAction.Buy) ? -quantity : quantity;
+                        AddOrUpdateExpectedPositionLocked(acct.Name, rollbackDelta, v => Math.Max(0, v + rollbackDelta));
                         Print($"[SIMA] ✗ BRACKET FAILED on {acct.Name}: {ex.Message}");
                     }
                 }
@@ -459,38 +891,45 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// CRITICAL: Every account's entry order is registered in entryOrders AND activePositions
         /// with a unique key (accountName + "_RMA") so ManageCIT can chase the entire fleet.
         /// </summary>
-        private void ExecuteRMAEntryV2(double price, MarketPosition direction)
+        private void ExecuteRMAEntryV2(double price, MarketPosition direction, int contracts)
         {
+            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
+            if (isFlattenRunning) return;
+
+            // [A1]: Defensive guard — caller must pre-calculate a valid quantity.
+            if (contracts <= 0)
+            {
+                Print(string.Format("[RMA] ExecuteRMAEntryV2 received invalid contracts={0}. Aborting entry.", contracts));
+                return;
+            }
+
             try
             {
-                int qty = Math.Max(1, minContracts);
-
-                // Calculate Stops & Targets using V12 RMA Logic
-                double stopDist = Math.Min(currentATR * RMAStopATRMultiplier, MaximumStop);
-                double t1Dist = Target1FixedPoints;
-                double t2Dist = currentATR * RMAT1ATRMultiplier;
-                double t3Dist = currentATR * RMAT2ATRMultiplier;
-
+                // Calculate stop and 5 targets using RMA profile.
+                bool useRmaTargetProfile = true;
+                // [LEAK-01]: Use centralized ATR calculator (ceiling + min/max guards, fleet-ready).
+                double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+                // [A1]: contracts parameter used directly — CalculatePositionSize removed from this method.
+                // stopDist is retained to compute actual bracket stop price below.
+                int qty = contracts;
                 double stopPrice = (direction == MarketPosition.Long) ? price - stopDist : price + stopDist;
-                double t1Price = (direction == MarketPosition.Long) ? price + t1Dist : price - t1Dist;
-                double t2Price = (direction == MarketPosition.Long) ? price + t2Dist : price - t2Dist;
-                double t3Price = (direction == MarketPosition.Long) ? price + t3Dist : price - t3Dist;
-
                 stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
-                t1Price = Instrument.MasterInstrument.RoundToTickSize(t1Price);
-                t2Price = Instrument.MasterInstrument.RoundToTickSize(t2Price);
-                t3Price = Instrument.MasterInstrument.RoundToTickSize(t3Price);
 
-                // V12.40 FLEET PARITY: Calculate distribution for both Master and Fleet
-                int rt1, rt2, rt3, rt4;
-                GetTargetDistribution(qty, out rt1, out rt2, out rt3, out rt4);
+                double t1Price = CalculateTargetPrice(direction, price, 1, useRmaTargetProfile);
+                double t2Price = CalculateTargetPrice(direction, price, 2, useRmaTargetProfile);
+                double t3Price = CalculateTargetPrice(direction, price, 3, useRmaTargetProfile);
+                double t4Price = CalculateTargetPrice(direction, price, 4, useRmaTargetProfile);
+                double t5Price = CalculateTargetPrice(direction, price, 5, useRmaTargetProfile);
+
+                // V12.1101E FLEET PARITY: calculate full 5-target distribution for both Master and Fleet.
+                int rt1, rt2, rt3, rt4, rt5;
+                GetTargetDistribution(qty, out rt1, out rt2, out rt3, out rt4, out rt5);
 
                 string baseSignal = "RMA_" + DateTime.Now.Ticks;
                 OrderAction entryAction = (direction == MarketPosition.Long) ? OrderAction.Buy : OrderAction.SellShort;
                 string symmetryDispatchId = SymmetryGuardBeginDispatch("RMA", entryAction, qty, price);
-                OrderAction exitAction = (direction == MarketPosition.Long) ? OrderAction.Sell : OrderAction.BuyToCover;
 
-                Print($"[SIMA RMA V2] {direction} @ {price} | Stop: {stopPrice} | T1: {t1Price} | T2: {t2Price} | Qty: {qty}");
+                Print($"[SIMA RMA V2] {direction} @ {price} | Stop: {stopPrice} | T1: {t1Price} | T2: {t2Price} | T3: {t3Price} | T4: {t4Price} | T5: {t5Price} | Qty: {qty}");
 
                 // ═══════════════════════════════════════════════════════
                 // 1. LOCAL ACCOUNT: SubmitOrderUnmanaged (chart-visible)
@@ -507,12 +946,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         SignalName = localKey,
                         Direction = direction,
                         TotalContracts = qty,
+                        T1Contracts = rt1,
+                        T2Contracts = rt2,
+                        T3Contracts = rt3,
+                        T4Contracts = rt4,
+                        T5Contracts = rt5,
                         RemainingContracts = qty,
                         EntryPrice = price,
                         InitialStopPrice = stopPrice,
                         CurrentStopPrice = stopPrice,
                         Target1Price = t1Price,
                         Target2Price = t2Price,
+                        Target3Price = t3Price,
+                        Target4Price = t4Price,
+                        Target5Price = t5Price,
                         EntryFilled = false,
                         BracketSubmitted = false, // V12.7: Brackets deferred until entry fills
                         IsRMATrade = true
@@ -521,7 +968,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     // V12.12: Register Master account in expectedPositions (was missing — caused false Reaper desyncs)
                     int localDelta = (direction == MarketPosition.Long) ? qty : -qty;
-                    expectedPositions.AddOrUpdate(Account.Name, localDelta, (k, v) => v + localDelta);
+                    AddExpectedPositionDeltaLocked(Account.Name, localDelta);
                     Print($"[SIMA] Master expectedPositions updated: {Account.Name} delta={localDelta}");
 
                     // V12.7: Do NOT submit stop/target here — they will be submitted by
@@ -582,11 +1029,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Order fEntry = acct.CreateOrder(Instrument, entryAction, OrderType.Limit,
                             TimeInForce.Gtc, qty, price, 0, ocoId, fleetKey, null);
 
+                        // [M8.1 NRE-01]: CreateOrder returns null for disconnected or invalid account/instrument pairs.
+                        // Guard before reservation — expectedPositions not yet incremented, no rollback needed.
+                        if (fEntry == null)
+                        {
+                            dispatchLog.AppendLine($"[SIMA RMA V2] WARN {fleetKey} on {acct.Name}: " +
+                                "CreateOrder returned null — account may be disconnected. Skipping.");
+                            continue;
+                        }
+
+                        // V12.Phase7 [C-02]: Reserve expectedPositions BEFORE Submit to eliminate Reaper race.
+                        int delta = (direction == MarketPosition.Long) ? qty : -qty;
+                        AddExpectedPositionDeltaLocked(acct.Name, delta);
+
                         acct.Submit(new[] { fEntry });
 
                         // Register in unified dictionaries so CIT + trailing works for this account
                         entryOrders[fleetKey] = fEntry;
-                        // V12.40: Full 4-target distribution — mirrors Master exactly
+                        // V12.1101E: Full 5-target distribution mirrors Master exactly.
                         activePositions[fleetKey] = new PositionInfo
                         {
                             SignalName = fleetKey,
@@ -599,10 +1059,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Target1Price = t1Price,
                             Target2Price = t2Price,
                             Target3Price = t3Price,
+                            Target4Price = t4Price,
+                            Target5Price = t5Price,
                             T1Contracts = rt1,
                             T2Contracts = rt2,
                             T3Contracts = rt3,
                             T4Contracts = rt4,
+                            T5Contracts = rt5,
                             EntryFilled = false,
                             IsRMATrade = true,
                             IsFollower = true,
@@ -611,15 +1074,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ExtremePriceSinceEntry = price,
                             CurrentTrailLevel = 0
                         };
-                        // stopOrders and target2Orders set by OnAccountExecutionUpdate on fill
-
-                        int delta = (direction == MarketPosition.Long) ? qty : -qty;
-                        expectedPositions.AddOrUpdate(acct.Name, delta, (k, v) => v + delta);
+                        // stopOrders/target1..target5 are set by follower bracket submission on fill
 
                         fleetOk++;
                     }
                     catch (Exception ex)
                     {
+                        // V12.Phase7 [C-02]: Undo expectedPositions reservation if submission failed.
+                        int rollbackDelta = (direction == MarketPosition.Long) ? -qty : qty;
+                        AddOrUpdateExpectedPositionLocked(acct.Name, rollbackDelta, v => Math.Max(0, v + rollbackDelta));
                         Print($"[SIMA RMA V2] FAIL {acct.Name}: {ex.Message}");
                     }
                 }
@@ -657,25 +1120,48 @@ namespace NinjaTrader.NinjaScript.Strategies
                         totalCount++;
                         try
                         {
-                            // Collect instruments with open positions on this account
-                            List<Instrument> instrumentsToFlatten = new List<Instrument>();
-                            foreach (Position position in acct.Positions)
+                            // [V12.12] Cancel all working orders for this instrument first.
+                            // acct.Flatten() is a managed API and silently no-ops in IsUnmanaged=true strategies.
+                            List<Order> ordersToCancel = new List<Order>();
+                            foreach (Order order in acct.Orders)
                             {
-                                if (position.MarketPosition != MarketPosition.Flat)
+                                if (order.Instrument.FullName == Instrument.FullName &&
+                                    (order.OrderState == OrderState.Working || order.OrderState == OrderState.Submitted ||
+                                     order.OrderState == OrderState.Accepted || order.OrderState == OrderState.ChangePending ||
+                                     order.OrderState == OrderState.ChangeSubmitted))
                                 {
-                                    instrumentsToFlatten.Add(position.Instrument);
+                                    ordersToCancel.Add(order);
                                 }
                             }
-
-                            if (instrumentsToFlatten.Count > 0)
+                            if (ordersToCancel.Count > 0)
                             {
-                                acct.Flatten(instrumentsToFlatten);
+                                acct.Cancel(ordersToCancel);
+                                Print($"[SIMA] Cancelled {ordersToCancel.Count} working order(s) on {acct.Name}");
+                            }
+
+                            // Submit Market close orders for each open position
+                            int closedCount = 0;
+                            foreach (Position position in acct.Positions)
+                            {
+                                if (position.MarketPosition == MarketPosition.Flat) continue;
+                                int qty = position.Quantity;
+                                OrderAction closeAction = position.MarketPosition == MarketPosition.Long
+                                    ? OrderAction.Sell
+                                    : OrderAction.BuyToCover;
+                                string signalName = "Flatten_" + position.MarketPosition.ToString();
+                                Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market,
+                                    TimeInForce.Gtc, qty, 0, 0, "", signalName, null);
+                                acct.Submit(new[] { closeOrder });
+                                closedCount++;
+                            }
+                            if (closedCount > 0)
+                            {
                                 flattenCount++;
-                                Print($"[SIMA] ✓ Flattened {instrumentsToFlatten.Count} position(s) on {acct.Name}");
+                                Print($"[SIMA] ✓ Flattened {closedCount} position(s) on {acct.Name}");
                             }
 
                             // Reset expected position
-                            expectedPositions[acct.Name] = 0;
+                            SetExpectedPositionLocked(acct.Name, 0);
                         }
                         catch (Exception ex)
                         {
@@ -692,23 +1178,48 @@ namespace NinjaTrader.NinjaScript.Strategies
                     totalCount++;
                     try
                     {
-                        List<Instrument> masterInstruments = new List<Instrument>();
-                        foreach (Position position in Account.Positions)
+                        // [V12.12] Cancel all working master orders before closing position.
+                        List<Order> masterOrdersToCancel = new List<Order>();
+                        foreach (Order order in Account.Orders)
                         {
-                            if (position.MarketPosition != MarketPosition.Flat)
+                            if (order.Instrument.FullName == Instrument.FullName &&
+                                (order.OrderState == OrderState.Working || order.OrderState == OrderState.Submitted ||
+                                 order.OrderState == OrderState.Accepted || order.OrderState == OrderState.ChangePending ||
+                                 order.OrderState == OrderState.ChangeSubmitted))
                             {
-                                masterInstruments.Add(position.Instrument);
+                                masterOrdersToCancel.Add(order);
                             }
                         }
-
-                        if (masterInstruments.Count > 0)
+                        if (masterOrdersToCancel.Count > 0)
                         {
-                            Account.Flatten(masterInstruments);
-                            flattenCount++;
-                            Print($"[SIMA] V12.12 Master flatten: {masterInstruments.Count} position(s) on {Account.Name} (outside prefix filter)");
+                            Account.Cancel(masterOrdersToCancel);
+                            Print($"[SIMA] Cancelled {masterOrdersToCancel.Count} working order(s) on {Account.Name}");
                         }
 
-                        expectedPositions[Account.Name] = 0;
+                        // Submit Market close orders via SubmitOrderUnmanaged for the master account
+                        int masterClosedCount = 0;
+                        foreach (Position position in Account.Positions)
+                        {
+                            if (position.MarketPosition == MarketPosition.Flat) continue;
+                            int qty = position.Quantity;
+                            string signalName = position.MarketPosition == MarketPosition.Long
+                                ? "Flatten_MasterLong"
+                                : "Flatten_MasterShort";
+                            Order masterClose = position.MarketPosition == MarketPosition.Long
+                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qty, 0, 0, "", signalName)
+                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", signalName);
+                            if (masterClose != null)
+                                masterClosedCount++;
+                            else
+                                Print($"[SIMA] ✗ Master close FAILED (SubmitOrderUnmanaged returned null): {position.MarketPosition} {qty}");
+                        }
+                        if (masterClosedCount > 0)
+                        {
+                            flattenCount++;
+                            Print($"[SIMA] V12.12 Master flatten: {masterClosedCount} position(s) on {Account.Name} (outside prefix filter)");
+                        }
+
+                        SetExpectedPositionLocked(Account.Name, 0);
                     }
                     catch (Exception ex)
                     {
@@ -720,7 +1231,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
-                isFlattenRunning = false; // V12.8: Always release guard, even on exception
+                // V1101E HOT-PATCH: If FlattenAll holds stateLock, it owns guard release at the true end of the global flatten.
+                if (!Monitor.IsEntered(stateLock))
+                    isFlattenRunning = false; // V12.8: Always release guard, even on exception
             }
         }
 
@@ -767,7 +1280,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
 
                         // Reset expected position (assuming full close)
-                        expectedPositions[acct.Name] = 0;
+                        SetExpectedPositionLocked(acct.Name, 0);
                     }
                     catch (Exception ex)
                     {
@@ -787,12 +1300,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (position.MarketPosition != MarketPosition.Flat)
                     {
                          int qty = position.Quantity;
-                         if (position.MarketPosition == MarketPosition.Long) ExitLong(); else ExitShort();
-                         closeCount++;
-                         Print($"[SIMA] ✓ Graceful Close: Master {qty} {position.MarketPosition}");
+                         Order masterClose = position.MarketPosition == MarketPosition.Long
+                             ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qty, 0, 0, "", "GracefulClose_MasterLong")
+                             : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", "GracefulClose_MasterShort");
+                         if (masterClose != null)
+                         {
+                             closeCount++;
+                             Print($"[SIMA] ✓ Graceful Close: Master {qty} {position.MarketPosition}");
+                         }
+                         else
+                         {
+                             Print($"[SIMA] ✗ Graceful Close FAILED: Master {qty} {position.MarketPosition} (SubmitOrderUnmanaged returned null)");
+                         }
                     }
                 }
-                expectedPositions[Account.Name] = 0;
+                SetExpectedPositionLocked(Account.Name, 0);
             }
 
             Print($"[SIMA] ══════ GLOBAL POSITIONS CLOSE COMPLETE: {closeCount} positions closed ══════");
