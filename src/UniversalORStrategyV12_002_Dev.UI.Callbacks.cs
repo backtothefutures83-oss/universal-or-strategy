@@ -34,9 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region UI
 
-        // V12.44: UpdateRMAModeDisplay() removed — legacy chart UI no-op
-        // V12.44: OnKeyUp() removed — empty handler, R key no longer used for RMA
-        // V12.44: UpdateDisplay() permanently removed — all 28+ call sites cleaned
+        // V12.1101E [D-01]: Removed legacy no-op UI stub remnants.
 
         private void AttachHotkeys()
         {
@@ -131,12 +129,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (momoActive)
                 {
-                    ExecuteMOMOEntry(clickPrice);
+                    // MOMO uses a fixed-points stop: Math.Min(MOMOStopPoints, MaximumStop)
+                    double momoStopDist = Math.Min(MOMOStopPoints, MaximumStop);
+                    int momoContracts   = CalculatePositionSize(momoStopDist);
+                    ExecuteMOMOEntry(clickPrice, momoContracts);
                 }
                 else
                 {
                     MarketPosition direction = (clickPrice > currentPrice) ? MarketPosition.Short : MarketPosition.Long;
-                    ExecuteRMAEntryV2(clickPrice, direction);
+                    double rmaStopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+                    int rmaContracts   = CalculatePositionSize(rmaStopDist);
+                    ExecuteRMAEntryV2(clickPrice, direction, rmaContracts);
 
                     if (isRMAButtonClicked)
                     {
@@ -160,8 +163,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             // Basic hotkeys
-            if (e.Key == Key.L) { ExecuteLong(); e.Handled = true; }
-            else if (e.Key == Key.S) { ExecuteShort(); e.Handled = true; }
+            if (e.Key == Key.L) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); ExecuteLong(orContracts); e.Handled = true; }
+            else if (e.Key == Key.S) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); ExecuteShort(orContracts); e.Handled = true; }
+            // V12.1101E [PH5-COLLIDE-01]: Panic hotkey routes through lifecycle-safe flatten pipeline.
             else if (e.Key == Key.F) { FlattenAll(); e.Handled = true; }
 
             // v5.12: T1 Actions (1 + letter)
@@ -203,7 +207,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region Target & Runner Actions
-        // v5.12: Execute target actions (T1 or T2)
+        // v5.12: Execute target actions (T1..T5)
         private void ExecuteTargetAction(string targetType, string action)
         {
             try
@@ -227,10 +231,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                         continue;
                     }
 
-                    // V8.30: Use ConcurrentDictionary reference directly
-                    ConcurrentDictionary<string, Order> targetOrders = (targetType == "T1") ? target1Orders : (targetType == "T2" ? target2Orders : target3Orders);
-                    int targetContracts = (targetType == "T1") ? pos.T1Contracts : (targetType == "T2" ? pos.T2Contracts : pos.T3Contracts);
-                    bool targetFilled = (targetType == "T1") ? pos.T1Filled : (targetType == "T2" ? pos.T2Filled : pos.T3Filled);
+                    if (!TryResolveTargetContext(pos, targetType, out int targetNumber, out var targetOrders, out int targetContracts, out bool targetFilled))
+                    {
+                        Print(string.Format("{0} ACTION: Invalid target identifier", targetType));
+                        continue;
+                    }
+
+                    if (targetContracts <= 0)
+                    {
+                        Print(string.Format("{0} ACTION: No contracts assigned for {1}", targetType, entryName));
+                        continue;
+                    }
+
+                    if (IsRunnerTarget(targetNumber) && action != "market" && action != "cancel")
+                    {
+                        Print(string.Format("{0} ACTION: Target is configured as Runner (trail-only), action {1} skipped for {2}",
+                            targetType, action, entryName));
+                        continue;
+                    }
 
                     if (targetFilled)
                     {
@@ -316,8 +334,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void MoveTargetOrder(string entryName, string targetType, double newPrice, int quantity, MarketPosition direction)
         {
-            // V8.30: Use ConcurrentDictionary reference directly
-            ConcurrentDictionary<string, Order> targetOrders = (targetType == "T1") ? target1Orders : (targetType == "T2" ? target2Orders : target3Orders);
+            if (!TryParseTargetNumber(targetType, out int targetNumber))
+                return;
+
+            // Runner targets are trail-only: do not submit limit orders.
+            if (IsRunnerTarget(targetNumber))
+            {
+                Print(string.Format("MoveTargetOrder SKIPPED: {0} is configured as Runner (trail-only)", targetType));
+                return;
+            }
+
+            if (quantity <= 0) return;
+
+            ConcurrentDictionary<string, Order> targetOrders = GetTargetOrdersDictionary(targetNumber);
+            if (targetOrders == null) return;
 
             // V8.30: Thread-safe cancel existing target order
             if (targetOrders.TryRemove(entryName, out var existingTarget))
@@ -333,6 +363,53 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (newTargetOrder != null)
             {
                 targetOrders[entryName] = newTargetOrder;
+            }
+        }
+
+        private bool TryResolveTargetContext(
+            PositionInfo pos,
+            string targetType,
+            out int targetNumber,
+            out ConcurrentDictionary<string, Order> targetOrders,
+            out int targetContracts,
+            out bool targetFilled)
+        {
+            targetOrders = null;
+            targetContracts = 0;
+            targetFilled = false;
+
+            if (!TryParseTargetNumber(targetType, out targetNumber))
+                return false;
+
+            targetOrders = GetTargetOrdersDictionary(targetNumber);
+            targetContracts = GetTargetContracts(pos, targetNumber);
+            targetFilled = IsTargetFilled(pos, targetNumber);
+            return targetOrders != null;
+        }
+
+        private static bool TryParseTargetNumber(string targetType, out int targetNumber)
+        {
+            targetNumber = 0;
+            if (string.IsNullOrWhiteSpace(targetType)) return false;
+
+            string normalized = targetType.Trim().ToUpperInvariant();
+            if (!normalized.StartsWith("T")) return false;
+
+            return int.TryParse(normalized.Substring(1), out targetNumber) &&
+                   targetNumber >= 1 &&
+                   targetNumber <= 5;
+        }
+
+        private ConcurrentDictionary<string, Order> GetTargetOrdersDictionary(int targetNumber)
+        {
+            switch (targetNumber)
+            {
+                case 1: return target1Orders;
+                case 2: return target2Orders;
+                case 3: return target3Orders;
+                case 4: return target4Orders;
+                case 5: return target5Orders;
+                default: return null;
             }
         }
 
@@ -405,9 +482,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                             break;
 
                         case "stopbe":
-                            // Move stop to breakeven
-                            UpdateStopOrder(entryName, pos, pos.EntryPrice, 1);
-                            Print(string.Format("★ RUNNER STOP → BREAKEVEN: {0} - Stop @ {1:F2}", entryName, pos.EntryPrice));
+                            // [Build 1102I] Use correct BE stop formula: EntryPrice ± BreakEvenOffsetTicks.
+                            // Guard checks vs full beStopTarget, not raw entry, to prevent partial-offset execution.
+                            double beStopTarget = pos.Direction == MarketPosition.Long
+                                ? pos.EntryPrice + (BreakEvenOffsetTicks * Instrument.MasterInstrument.TickSize)
+                                : pos.EntryPrice - (BreakEvenOffsetTicks * Instrument.MasterInstrument.TickSize);
+                            beStopTarget = Instrument.MasterInstrument.RoundToTickSize(beStopTarget);
+                            bool beViable = pos.Direction == MarketPosition.Long
+                                ? currentPrice >= beStopTarget
+                                : currentPrice <= beStopTarget;
+                            if (!beViable)
+                            {
+                                pos.ManualBreakevenArmed     = true;
+                                pos.ManualBreakevenTriggered = false;
+                                Print(string.Format("★ BE SHIELD: {0} price {1:F2} not at BE level {2:F2} — armed for auto-trigger",
+                                    entryName, currentPrice, beStopTarget));
+                                break;
+                            }
+                            UpdateStopOrder(entryName, pos, beStopTarget, 1);
+                            // [Build 1102K] Mark triggered so ManageTrailingStops armed path does not re-fire.
+                            pos.ManualBreakevenTriggered = true;
+                            Print(string.Format("★ RUNNER STOP → BREAKEVEN: {0} - Stop @ {1:F2} (Entry ± {2} ticks)",
+                                entryName, beStopTarget, BreakEvenOffsetTicks));
                             break;
 
                         case "lock50":
