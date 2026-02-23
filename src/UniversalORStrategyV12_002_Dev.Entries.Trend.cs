@@ -1,0 +1,407 @@
+// V12.Phase7 MODULAR: TREND Entry Node (Split from Entries.cs — Phase 7 Partition)
+// Contains: ExecuteTRENDEntry, CreateTRENDPosition, ActivateTRENDMode,
+//           DeactivateTRENDMode, ExecuteTRENDManualEntry
+using System;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.Strategies;
+using System.Net;
+using System.Net.Sockets;
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    {
+        #region TREND Entry Logic (V8.2)
+
+        /// <summary>
+        /// Calculates the weighted-average ATR stop distance used for TREND position sizing.
+        /// E1 uses TRENDEntry1ATRMultiplier (or RMAStopATRMultiplier in RMA mode), weighted 1/3.
+        /// E2 uses TRENDEntry2ATRMultiplier (or RMAStopATRMultiplier in RMA mode), weighted 2/3.
+        /// Pure math on indicator/property values — no side effects, safe to call from UI layer.
+        /// </summary>
+        private double CalculateTRENDStopDistance()
+        {
+            double e1Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
+            double e2Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
+            double e1StopDist = CalculateATRStopDistance(e1Mult);
+            double e2StopDist = CalculateATRStopDistance(e2Mult);
+            return (e1StopDist * (1.0 / 3.0)) + (e2StopDist * (2.0 / 3.0));
+        }
+
+        /// <summary>
+        /// V8.2: Execute TREND trade with dual limit orders
+        /// Entry 1 (1/3) at 9 EMA with fixed 2pt stop
+        /// Entry 2 (2/3) at 15 EMA with 1.1x ATR trailing stop off EMA15
+        /// </summary>
+        private void ExecuteTRENDEntry(int contracts)
+        {
+            // V12.Phase7 [C-09]: Compliance enforcement gate.
+            if (!IsOrderAllowed()) return;
+            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
+            if (isFlattenRunning) return;
+
+            if (contracts <= 0)
+            {
+                Print(string.Format("[TREND] ExecuteTRENDEntry received invalid contracts={0}. Aborting entry.", contracts));
+                return;
+            }
+
+            // V8.2 FIX: Only execute when on primary series (BarsInProgress=0)
+            // This ensures we get correct EMA values from BarsArray[0]
+            if (BarsInProgress != 0)
+            {
+                pendingTRENDEntry = true;
+                Print("TREND entry deferred to next primary bar update (BarsInProgress=" + BarsInProgress + ")");
+                return;
+            }
+
+            // Clear pending flag since we're executing now
+            pendingTRENDEntry = false;
+
+            if (!TRENDEnabled)
+            {
+                Print("TREND mode is disabled");
+                return;
+            }
+
+            if (currentATR <= 0 || ema9 == null || ema15 == null)
+            {
+                Print("Cannot execute TREND entry - indicators not ready");
+                return;
+            }
+
+            // V11: Trend RMA (9/15 Split) Mode
+            if (isTrendRmaMode)
+            {
+                Print(string.Format("V12.20: TREND Multiplier -> Mode=RMA (9/15 Split) ATR={0:F2}", currentATR));
+                ExecuteTrendSplitEntry();
+                return;
+            }
+
+            // V8.2: Ensure we have enough bars for EMA calculation
+            if (CurrentBar < 20)
+            {
+                Print("Cannot execute TREND entry - not enough bars (CurrentBar=" + CurrentBar + ")");
+                return;
+            }
+            try
+            {
+                // V8.2: Simple check for enough bars
+                if (CurrentBar < 20)
+                {
+                    Print("Cannot execute TREND entry - not enough bars (CurrentBar=" + CurrentBar + ")");
+                    return;
+                }
+
+                // Get current tick price for direction determination
+                double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+
+                // V8.2: Use stored EMA instances (now guaranteed BarsInProgress=0)
+                if (ema9 == null || ema15 == null)
+                {
+                    Print("Cannot execute TREND entry - EMA indicators not initialized");
+                    return;
+                }
+
+                // V8.10: Use [0] (live tick) for real-time EMA values since Calculate.OnPriceChange updates EMAs on every tick
+                double ema9Value = ema9[0];
+                double ema15Value = ema15[0];
+
+                // V8.10 DEBUG
+                Print(string.Format("TREND DEBUG: ema9[0]={0:F2} ema15[0]={1:F2} Price={2:F2}", ema9Value, ema15Value, currentPrice));
+                Print(string.Format("TREND DEBUG: Close[0]={0:F2} CurrentBar={1} BarsInProgress={2}",
+                    Close[0], CurrentBar, BarsInProgress));
+
+                // Sanity check: EMAs should be different
+                if (Math.Abs(ema9Value - ema15Value) < tickSize * 2)
+                {
+                    Print(string.Format("WARNING: EMAs very close ({0:F2} vs {1:F2})", ema9Value, ema15Value));
+                }
+
+                // Direction: EMA below price = LONG (buying pullback), EMA above = SHORT
+                MarketPosition direction;
+                if (ema9Value < currentPrice)
+                {
+                    direction = MarketPosition.Long;
+                    Print(string.Format("TREND: EMA9 below price ({0:F2} < {1:F2}) = LONG setup", ema9Value, currentPrice));
+                }
+                else
+                {
+                    direction = MarketPosition.Short;
+                    Print(string.Format("TREND: EMA9 above price ({0:F2} > {1:F2}) = SHORT setup", ema9Value, currentPrice));
+                }
+
+                // V8.31: Both E1 and E2 now use ATR-based stops from live EMAs
+                double e1MultTrend = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
+                double e2MultTrend = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
+                Print(string.Format("V12.20: TREND Multiplier -> Mode={0} E1={1:F2}x E2={2:F2}x",
+                    isTrendRmaMode ? "RMA" : "STD", e1MultTrend, e2MultTrend));
+
+                double e1StopDist = CalculateATRStopDistance(e1MultTrend); // V12.30: Ceiling-rounded
+                double e2StopDist = CalculateATRStopDistance(e2MultTrend); // V12.30: Ceiling-rounded
+
+                // Weighted average stop distance for the group (used for logging only; sizing comes from caller)
+                double weightedStopDist = (e1StopDist * (1.0/3.0)) + (e2StopDist * (2.0/3.0));
+
+                int totalContracts = contracts;
+
+                // Split: 1/3 at 9 EMA, 2/3 at 15 EMA
+                int entry1Qty = (int)Math.Ceiling(totalContracts / 3.0);
+                int entry2Qty = totalContracts - entry1Qty;
+
+                if (entry1Qty < 1) entry1Qty = 1;
+                if (entry2Qty < 1) entry2Qty = 1;
+
+                // Final validation: totalContracts = sum of entries
+                totalContracts = entry1Qty + entry2Qty;
+
+                Print(string.Format("TREND RISK: Risk=${0} | E1Stop={1:F2} | E2Stop={2:F2} | WeightedDist={3:F2} | TotalQty={4}",
+                    MaxRiskAmount, e1StopDist, e2StopDist, weightedStopDist, totalContracts));
+                Print(string.Format("TREND SPLIT: E1Qty={0} (1/3) | E2Qty={1} (2/3)", entry1Qty, entry2Qty));
+
+                string timestamp = DateTime.Now.ToString("HHmmssffff");
+                string trendGroupId = "TREND_" + timestamp;
+                string entry1Name = trendGroupId + "_E1";
+                string entry2Name = trendGroupId + "_E2";
+
+                // V8.31: ENTRY 1: 1/3 at 9 EMA with ATR-based stop from live EMA9
+                double entry1Price = ema9Value;
+                double e1AtrStop = CalculateATRStopDistance(e1MultTrend);  // V12.30: Ceiling-rounded
+                double stop1Price = direction == MarketPosition.Long
+                    ? ema9Value - e1AtrStop  // V8.31: Stop is 1.1x ATR below live EMA9
+                    : ema9Value + e1AtrStop; // V8.31: Stop is 1.1x ATR above live EMA9
+
+                // ENTRY 2: 2/3 at 15 EMA with ATR trailing stop
+                double entry2Price = ema15Value;
+                double stop2Price = direction == MarketPosition.Long
+                    ? ema15Value - CalculateATRStopDistance(e2MultTrend)
+                    : ema15Value + CalculateATRStopDistance(e2MultTrend);
+
+                // Create position info for Entry 1
+                PositionInfo pos1 = CreateTRENDPosition(entry1Name, direction, entry1Price, stop1Price,
+                    entry1Qty, true, trendGroupId, isTrendRmaMode);
+                activePositions[entry1Name] = pos1;
+
+                // Create position info for Entry 2
+                PositionInfo pos2 = CreateTRENDPosition(entry2Name, direction, entry2Price, stop2Price,
+                    entry2Qty, false, trendGroupId, isTrendRmaMode);
+                activePositions[entry2Name] = pos2;
+
+                // Link the entries together
+                linkedTRENDEntries[entry1Name] = entry2Name;
+                linkedTRENDEntries[entry2Name] = entry1Name;
+
+                // Submit Entry 1 limit order
+                Order entryOrder1 = direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, entry1Qty, entry1Price, 0, "", entry1Name)
+                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, entry1Qty, entry1Price, 0, "", entry1Name);
+                entryOrders[entry1Name] = entryOrder1;
+
+                // Submit Entry 2 limit order
+                Order entryOrder2 = direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, entry2Qty, entry2Price, 0, "", entry2Name)
+                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, entry2Qty, entry2Price, 0, "", entry2Name);
+                entryOrders[entry2Name] = entryOrder2;
+
+                Print(string.Format("TREND ORDERS PLACED: {0} Total={1} contracts",
+                    direction == MarketPosition.Long ? "LONG" : "SHORT", totalContracts));
+                Print(string.Format("  E1: {0}@{1:F2} (EMA9) | Stop: {2:F2} ({3}xATR from EMA9)",
+                    entry1Qty, ema9Value, stop1Price, TRENDEntry1ATRMultiplier));
+                Print(string.Format("  E2: {0}@{1:F2} (EMA15) | Stop: {2:F2} ({3}xATR trail)",
+                    entry2Qty, ema15Value, stop2Price, TRENDEntry2ATRMultiplier));
+
+                // V12.1: Smart Dispatch to SIMA Fleet
+                if (EnableSIMA)
+                {
+                    // For Trend trades, followers get the full totalContracts qty split by the dispatcher
+                    ExecuteSmartDispatchEntry(
+                        "TREND",
+                        direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort,
+                        totalContracts,
+                        currentPrice,
+                        OrderType.Market,
+                        entry1Name,
+                        entry2Name);
+                }
+
+                // Deactivate TREND mode after placing orders
+                DeactivateTRENDMode();
+            }
+            catch (Exception ex)
+            {
+                Print("ERROR ExecuteTRENDEntry: " + ex.Message);
+            }
+        }
+
+        private PositionInfo CreateTRENDPosition(string entryName, MarketPosition direction,
+            double entryPrice, double stopPrice, int contracts, bool isEntry1, string groupId, bool isRma)
+        {
+            bool useRmaTargetProfile = true;
+            double target1Price = CalculateTargetPrice(direction, entryPrice, 1, useRmaTargetProfile);
+            double target2Price = CalculateTargetPrice(direction, entryPrice, 2, useRmaTargetProfile);
+            double target3Price = CalculateTargetPrice(direction, entryPrice, 3, useRmaTargetProfile);
+            double target4Price = CalculateTargetPrice(direction, entryPrice, 4, useRmaTargetProfile);
+            double target5Price = CalculateTargetPrice(direction, entryPrice, 5, useRmaTargetProfile);
+
+            int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+            GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
+
+            Print(string.Format("TREND POSITION: {0} contracts \u2192 T1:{1} T2:{2} T3:{3} T4:{4} T5:{5}",
+                contracts, t1Qty, t2Qty, t3Qty, t4Qty, t5Qty));
+
+            return new PositionInfo
+            {
+                SignalName = entryName,
+                Direction = direction,
+                TotalContracts = contracts,
+                T1Contracts = t1Qty,
+                T2Contracts = t2Qty,
+                T3Contracts = t3Qty,
+                T4Contracts = t4Qty,
+                T5Contracts = t5Qty,
+                RemainingContracts = contracts,
+                EntryPrice = entryPrice,
+                InitialStopPrice = stopPrice,
+                CurrentStopPrice = stopPrice,
+                Target1Price = target1Price,
+                Target2Price = target2Price,
+                Target3Price = target3Price,
+                Target4Price = target4Price,
+                Target5Price = target5Price,
+                EntryFilled = false,
+                T1Filled = false,
+                T2Filled = false,
+                T3Filled = false,
+                T4Filled = false,
+                T5Filled = false,
+                BracketSubmitted = false,
+                ExtremePriceSinceEntry = entryPrice,
+                CurrentTrailLevel = 0,
+                IsRMATrade = isRma,
+                IsTRENDTrade = true,
+                IsTRENDEntry1 = isEntry1,
+                IsTRENDEntry2 = !isEntry1,
+                LinkedTRENDGroup = groupId
+            };
+        }
+
+        private void ActivateTRENDMode()
+        {
+            isTRENDModeActive = true;
+        }
+
+        private void DeactivateTRENDMode()
+        {
+            isTRENDModeActive = false;
+        }
+
+        #endregion
+
+        #region TREND Manual Entry Methods (V12.27)
+
+        /// <summary>
+        /// V12.27: TREND manual entry at user-specified price with 100% risk allocation.
+        /// Uses full MaxRiskAmount (no 1/3 + 2/3 split like standard TREND).
+        /// Submits a single limit order at the manual price.
+        /// </summary>
+        private void ExecuteTRENDManualEntry(double manualPrice, MarketPosition direction, int contracts)
+        {
+            // V12.Phase7 [C-09]: Compliance enforcement gate.
+            if (!IsOrderAllowed()) return;
+            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
+            if (isFlattenRunning) return;
+
+            if (contracts <= 0)
+            {
+                Print(string.Format("[TREND] ExecuteTRENDManualEntry received invalid contracts={0}. Aborting entry.", contracts));
+                return;
+            }
+
+            if (currentATR <= 0)
+            {
+                Print("V12.27 TREND_MANUAL: Ignored - ATR not available");
+                return;
+            }
+
+            try
+            {
+                double entryPrice = Instrument.MasterInstrument.RoundToTickSize(manualPrice);
+
+                // V12.27: 100% risk allocation - single position at manual price
+                // Stop uses RMA multiplier (Trend RMA Mode forced)
+                double stopDistance = CalculateATRStopDistance(RMAStopATRMultiplier); // V12.30: Ceiling-rounded
+                // V12.Phase6 [TICK-01]: All prices rounded to valid tick increments
+                double stopPrice = Instrument.MasterInstrument.RoundToTickSize(direction == MarketPosition.Long
+                    ? entryPrice - stopDistance
+                    : entryPrice + stopDistance);
+
+                bool useRmaTargetProfile = true;
+                double target1Price = CalculateTargetPrice(direction, entryPrice, 1, useRmaTargetProfile);
+                double target2Price = CalculateTargetPrice(direction, entryPrice, 2, useRmaTargetProfile);
+                double target3Price = CalculateTargetPrice(direction, entryPrice, 3, useRmaTargetProfile);
+
+                // V12.27: 100% risk - full position size supplied by caller (no split)
+                int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+                GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
+
+                string signalName = direction == MarketPosition.Long ? "TrendMnlLong" : "TrendMnlShort";
+                string entryName = signalName + "_" + DateTime.Now.ToString("HHmmssffff");
+
+                PositionInfo pos = CreateTRENDPosition(entryName, direction, entryPrice, stopPrice,
+                    contracts, true, "TMNL_" + DateTime.Now.Ticks, true);
+                activePositions[entryName] = pos;
+
+                // Submit LIMIT order at manual price
+                Order entryOrder = direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, contracts, entryPrice, 0, "", entryName)
+                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, contracts, entryPrice, 0, "", entryName);
+                entryOrders[entryName] = entryOrder;
+
+                Print(string.Format("V12.27 TREND_MANUAL: {0} {1}@{2:F2} LIMIT | Stop: {3:F2} | 100% Risk",
+                    direction, contracts, entryPrice, stopPrice));
+                Print(string.Format("V12.27 TREND_MANUAL TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2}",
+                    t1Qty, target1Price, t2Qty, target2Price, t3Qty, target3Price, t4Qty, pos.Target4Price, t5Qty, pos.Target5Price));
+
+                if (EnableSIMA)
+                {
+                    ExecuteSmartDispatchEntry(
+                        "TREND_MNL",
+                        direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort,
+                        contracts,
+                        entryPrice,
+                        OrderType.Limit,
+                        entryName);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Print("ERROR ExecuteTRENDManualEntry: " + ex.Message);
+            }
+        }
+
+        #endregion
+    }
+}
