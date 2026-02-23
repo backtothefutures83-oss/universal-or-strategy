@@ -162,10 +162,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 lock (stateLock)
                                 {
                                     string mode = isRMAModeActive ? "RMA" : "OR";
+                                    double t2Value = isRMAModeActive ? RMAT1ATRMultiplier : Target2Multiplier;
+                                    double t3Value = isRMAModeActive ? RMAT2ATRMultiplier : Target3Multiplier;
+                                    double stopValue = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
                                     configResponse = string.Format(
-                                        "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:Points;T2:{3};T2TYPE:ATR;T3:{4};T3TYPE:ATR;T4:0;T4TYPE:ATR;T5:0;T5TYPE:ATR;STR:{5};STRTYPE:Tick;MAX:{6};CIT:{7};OT:Limit;TRMA:{8};RRMA:{9};\n",
-                                        mode, minContracts, Target1FixedPoints, Target2Multiplier, Target3Multiplier,
-                                        StopMultiplier, MaxRiskAmount, ChaseIfTouchPoints ?? "0",
+                                        "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
+                                        mode, activeTargetCount, Target1FixedPoints, ToIpcTargetMode(T1Type),
+                                        t2Value, ToIpcTargetMode(T2Type),
+                                        t3Value, ToIpcTargetMode(T3Type),
+                                        Target4Multiplier, ToIpcTargetMode(T4Type),
+                                        Target5Multiplier, ToIpcTargetMode(T5Type),
+                                        stopValue, MaxRiskAmount, ChaseIfTouchPoints ?? "0",
                                         isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
                                 }
                                 byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
@@ -219,6 +226,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch { }
         }
 
+        private static string ToIpcTargetMode(TargetMode mode)
+        {
+            return mode == TargetMode.Points ? "Points" : mode.ToString();
+        }
+
+        private static bool TryParseTargetMode(string raw, out TargetMode mode)
+        {
+            mode = TargetMode.ATR;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+
+            string normalized = raw.Trim().ToUpperInvariant();
+            switch (normalized)
+            {
+                case "ATR":
+                case "A":
+                    mode = TargetMode.ATR;
+                    return true;
+                case "TICKS":
+                case "TICK":
+                case "T":
+                    mode = TargetMode.Ticks;
+                    return true;
+                case "POINTS":
+                case "POINT":
+                case "PTS":
+                case "P":
+                    mode = TargetMode.Points;
+                    return true;
+                case "RUNNER":
+                case "R":
+                    mode = TargetMode.Runner;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private void HandleExternalSignal(object sender, SignalBroadcaster.ExternalCommandSignal e)
         {
             // V10.3: Only non-winners (secondary charts) need to handle the broadcast
@@ -248,7 +292,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.9: Global commands bypass symbol filter entirely — these are account/fleet-level, not instrument-level
                     bool isGlobalCommand = action == "TOGGLE_ACCOUNT" || action == "SET_SIMA" ||
                                            action == "GET_FLEET" || action == "DIAG_FLEET" || action == "CANCEL_ALL" ||
-                                           action == "FLATTEN" || action == "SYNC_ALL" || action == "REQUEST_FLEET_STATE";
+                                           action == "FLATTEN" || action == "SYNC_ALL" || action == "MKT_SYNC" ||
+                                           action == "REQUEST_FLEET_STATE";
 
                     // V10.3: Robust Symbol Matching (Matches MGC to GC/MGC, MES to ES/MES, etc.)
                     string mySym = Instrument.MasterInstrument.Name.ToUpper();
@@ -354,6 +399,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                                         if (configMode == "RMA") RMAT2ATRMultiplier = v; else Target3Multiplier = v;
                                     }
                                 }
+                                else if (key == "T4")
+                                {
+                                    if (double.TryParse(val, out double v)) Target4Multiplier = v;
+                                }
+                                else if (key == "T5")
+                                {
+                                    if (double.TryParse(val, out double v)) Target5Multiplier = v;
+                                }
+                                else if (key == "T1TYPE")
+                                {
+                                    if (TryParseTargetMode(val, out var parsed)) T1Type = parsed;
+                                }
+                                else if (key == "T2TYPE")
+                                {
+                                    if (TryParseTargetMode(val, out var parsed)) T2Type = parsed;
+                                }
+                                else if (key == "T3TYPE")
+                                {
+                                    if (TryParseTargetMode(val, out var parsed)) T3Type = parsed;
+                                }
+                                else if (key == "T4TYPE")
+                                {
+                                    if (TryParseTargetMode(val, out var parsed)) T4Type = parsed;
+                                }
+                                else if (key == "T5TYPE")
+                                {
+                                    if (TryParseTargetMode(val, out var parsed)) T5Type = parsed;
+                                }
                                 else if (key == "STR") {
                                     if (double.TryParse(val, out double v)) {
                                         if (configMode == "RMA") RMAStopATRMultiplier = v; else StopMultiplier = v;
@@ -367,7 +440,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 }
                                 else if (key == "COUNT") {
                                     if (int.TryParse(val, out int v)) {
-                                        minContracts = v;
+                                        activeTargetCount = v; // V12.Phase8.3: Isolated — no longer overwrites minContracts risk floor
                                     }
                                 }
                                 else if (key == "TRMA") { isTrendRmaMode = (val == "1"); }
@@ -502,7 +575,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     string oName = order.Name;
                                     if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                         oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                        oName.StartsWith("T3_") || oName.StartsWith("T4_"))
+                                        oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
                                         continue;
 
                                     CancelOrder(order);
@@ -527,7 +600,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                             string oName = order.Name;
                                             if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                                 oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                                oName.StartsWith("T3_") || oName.StartsWith("T4_"))
+                                                oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
                                                 continue;
 
                                             acct.Cancel(new[] { order });
@@ -552,7 +625,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     string oName = order.Name;
                                     if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                         oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                        oName.StartsWith("T3_") || oName.StartsWith("T4_"))
+                                        oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
                                         continue;
 
                                     CancelOrder(order);
@@ -598,7 +671,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (EnableSIMA)
                         {
                             OrderAction orderAction = action == "LONG" ? OrderAction.Buy : OrderAction.SellShort;
-                            int qty = Math.Max(1, minContracts);
+
+                            // [Phase 8.2 Part 3 - IPC SIZING]: Calculate ATR-sized quantity to match
+                            // what ExecuteRMAEntryV2 would use, instead of defaulting to minContracts (= 1).
+                            // This ensures manual LONG/SHORT button entries enter at the correct fleet size.
+                            int qty;
+                            try
+                            {
+                                // [Phase 8.2 Part 4 - IPC SIZING FIX]: Use RMAStopATRMultiplier to match
+                                // the actual RMA engine risk model. StopMultiplier caused incorrect stop
+                                // distances on high-value instruments (ES/NQ), flooring qty to 1.
+                                double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+                                if (stopDist <= 0)
+                                {
+                                    stopDist = MinimumStop;
+                                    Print($"[IPC SIZING] ATR latency detected. Falling back to MinimumStop={MinimumStop:F4}");
+                                }
+                                qty = stopDist > 0 ? CalculatePositionSize(stopDist) : Math.Max(1, minContracts);
+                                Print($"[IPC SIZING] Calculation: StopDist={stopDist:F4}, Risk={MaxRiskAmount}, TargetQty={qty}");
+                            }
+                            catch
+                            {
+                                qty = Math.Max(1, minContracts);
+                            }
+                            qty = Math.Max(1, qty); // safety floor
 
                             if (EnablePathB)
                             {
@@ -616,7 +712,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // Original single-account logic
                             MarketPosition direction = action == "LONG" ? MarketPosition.Long : MarketPosition.Short;
                             double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                            ExecuteRMAEntryV2(currentPrice, direction);
+                            double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
+                            int contracts    = CalculatePositionSize(stopDist);
+                            ExecuteRMAEntryV2(currentPrice, direction, contracts);
                         }
                     }
                     // V10.3: OR Breakout Entry Commands
@@ -628,7 +726,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (isLongArmed)
                             {
                                 Print("[SYNC] ToS Handshake Received -> Executing OR_LONG");
-                                ExecuteLong();
+                                double orStopDist = CalculateORStopDistance();
+                                int orContracts   = CalculatePositionSize(orStopDist);
+                                ExecuteLong(orContracts);
                                 isLongArmed = false;
                             }
                             else
@@ -638,7 +738,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         else
                         {
-                            ExecuteLong();
+                            double orStopDist = CalculateORStopDistance();
+                            int orContracts   = CalculatePositionSize(orStopDist);
+                            ExecuteLong(orContracts);
                             Print("V10.3: OR_LONG executed via IPC");
                         }
                     }
@@ -650,7 +752,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (isShortArmed)
                             {
                                 Print("[SYNC] ToS Handshake Received -> Executing OR_SHORT");
-                                ExecuteShort();
+                                double orStopDist = CalculateORStopDistance();
+                                int orContracts   = CalculatePositionSize(orStopDist);
+                                ExecuteShort(orContracts);
                                 isShortArmed = false;
                             }
                             else
@@ -660,7 +764,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         else
                         {
-                            ExecuteShort();
+                            double orStopDist = CalculateORStopDistance();
+                            int orContracts   = CalculatePositionSize(orStopDist);
+                            ExecuteShort(orContracts);
                             Print("V10.3: OR_SHORT executed via IPC");
                         }
                     }
@@ -757,19 +863,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                     // V12.6: SET_SIMA|ON or SET_SIMA|OFF - Remote SIMA toggle from external panel
+                    // V12.Phase6 [LIFECYCLE]: Uses centralized ApplySimaState for full lifecycle management
                     else if (action == "SET_SIMA")
                     {
                         if (parts.Length > 1)
                         {
                             bool enable = parts[1].Trim().ToUpper() == "ON";
-                            EnableSIMA = enable;
-                            Print($"V12.6: SET_SIMA = {enable}");
-
-                            // Re-enumerate accounts when enabling to ensure fleet is populated
-                            if (enable && simaAccountCount == 0)
-                            {
-                                EnumerateApexAccounts();
-                            }
+                            ApplySimaState(enable);
+                            Print($"V12.Phase6: SET_SIMA = {enable} (lifecycle applied)");
                         }
                     }
                     // V12.2: Diagnostic command to check fleet state
@@ -826,15 +927,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                     // V12.5: SET_TARGETS|count - Panel is sole source of truth
+                    // V12.Phase8.3: Now writes to activeTargetCount — minContracts is symbol-specific risk floor only
                     else if (action == "SET_TARGETS")
                     {
                         if (parts.Length > 1 && int.TryParse(parts[1], out int targetCount))
                         {
-                            minContracts = targetCount;
-                            Print(string.Format("V12.25: SET_TARGETS = {0} contracts (no CONFIG echo)", targetCount));
+                            activeTargetCount = targetCount;
+                            Print(string.Format("V12.Phase8.3: SET_TARGETS = {0} targets (minContracts preserved at {1})", targetCount, minContracts));
                             // V12.25: CONFIG broadcast REMOVED — Panel is sole source of truth.
                             // Sending CONFIG back here caused the Ping-Pong overwrite bug.
                         }
+                    }
+                    // Phase 9.1: MKT_SYNC — Toggle ToS Armed Mode (Top button)
+                    else if (action == "MKT_SYNC")
+                    {
+                        isTosSyncMode = !isTosSyncMode;
+                        Print(string.Format("[SYNC] ToS Sync Mode: {0}", isTosSyncMode));
+                    }
+                    // Phase 9.1: SYNC_ALL — Refresh active target orders to match current panel config (Bottom button)
+                    else if (action == "SYNC_ALL")
+                    {
+                        Print("[SYNC_ALL] Refresh triggered — recalculating active target orders");
+                        RefreshActivePositionOrders();
                     }
                     // V12.5: SET_MODE|mode - Panel is sole source of truth
                     else if (action == "SET_MODE")
@@ -902,7 +1016,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             cachedMnlPrice = manualPrice;
                             currentRmaAnchor = RmaAnchorType.Manual;
-                            isMnlArmed = true;
+                            // V12.1101E [D-02]: Legacy isMnlArmed flag purged; cachedMnlPrice + anchor state is authoritative.
 
                             Print(string.Format("IPC SET_MANUAL_PRICE: {0:F2} | Anchor set to MANUAL", manualPrice));
                         }
@@ -922,7 +1036,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (double.TryParse(parts[2], out double price) && price > 0)
                             {
                                 Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                                ExecuteTRENDManualEntry(price, mp);
+                                double trendDist   = CalculateTRENDStopDistance();
+                                int trendContracts = CalculatePositionSize(trendDist);
+                                ExecuteTRENDManualEntry(price, mp, trendContracts);
                             }
                             else
                             {
@@ -940,7 +1056,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (double.TryParse(parts[2], out double price) && price > 0)
                             {
                                 Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                                ExecuteRetestManualEntry(price, mp);
+                                double retestDist   = CalculateRetestStopDistance();
+                                int retestContracts = CalculatePositionSize(retestDist);
+                                ExecuteRetestManualEntry(price, mp, retestContracts);
                             }
                             else
                             {
@@ -980,8 +1098,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else if (action == "GET_LAYOUT")
                     {
                         string mode = isRMAModeActive ? "RMA" : "OR";
-                        Print(string.Format("V12 GET_LAYOUT: Mode={0} Count={1} T1={2}pt T2={3}xATR T3={4}xATR",
-                            mode, minContracts, Target1FixedPoints, Target2Multiplier, Target3Multiplier));
+                        Print(string.Format("V12 GET_LAYOUT: Mode={0} Count={1} T1={2}({3}) T2={4}({5}) T3={6}({7}) T4={8}({9}) T5={10}({11})",
+                            mode, activeTargetCount,
+                            Target1FixedPoints, T1Type,
+                            Target2Multiplier, T2Type,
+                            Target3Multiplier, T3Type,
+                            Target4Multiplier, T4Type,
+                            Target5Multiplier, T5Type));
                     }
                 }
                 catch (Exception ex)
@@ -1029,7 +1152,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.44: MoveStopsToBreakevenPlusOne() removed — dead code, replaced by MoveStopsToBreakevenWithOffset()
 
         /// <summary>
-        /// V10.3: Close a specific target (T1, T2, T3, or T4) at market for all active positions
+        /// V10.3: Close a specific target (T1..T5) at market for all active positions
         /// Cancels working limit order and submits market order to close
         /// </summary>
         private void FlattenSpecificTarget(int targetNumber)
@@ -1054,6 +1177,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         case 2: qtyToClose = pos.T2Contracts; targetDict = target2Orders; targetName = "T2"; break;
                         case 3: qtyToClose = pos.T3Contracts; targetDict = target3Orders; targetName = "T3"; break;
                         case 4: qtyToClose = pos.T4Contracts; targetDict = target4Orders; targetName = "T4"; break;
+                        case 5: qtyToClose = pos.T5Contracts; targetDict = target5Orders; targetName = "T5"; break;
                         default:
                             Print(string.Format("V10.3: Invalid target number {0}", targetNumber));
                             return;
@@ -1138,8 +1262,18 @@ namespace NinjaTrader.NinjaScript.Strategies
              }
 
              // Execution calls stay outside lock (they do their own order management)
-             if (action == "EXEC_TREND" || action == "EXEC_TREND_RMA") ExecuteTRENDEntry();
-             else if (action == "EXEC_RETEST" || action == "EXEC_RETEST_PLUS" || action == "EXEC_RETEST_MINUS") ExecuteRetestEntry();
+             if (action == "EXEC_TREND" || action == "EXEC_TREND_RMA")
+             {
+                 double trendDist   = CalculateTRENDStopDistance();
+                 int trendContracts = CalculatePositionSize(trendDist);
+                 ExecuteTRENDEntry(trendContracts);
+             }
+             else if (action == "EXEC_RETEST" || action == "EXEC_RETEST_PLUS" || action == "EXEC_RETEST_MINUS")
+             {
+                 double retestDist   = CalculateRetestStopDistance();
+                 int retestContracts = CalculatePositionSize(retestDist);
+                 ExecuteRetestEntry(retestContracts);
+             }
              else if (action == "EXEC_MOMO") ExecuteMOMOEntry(lastKnownPrice);
              else if (action == "MODE_M")
              {
