@@ -26,6 +26,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Build 1102R: Queue for naked-position emergency stop requests (background → strategy thread)
         private ConcurrentQueue<(string AccountName, MarketPosition Direction, int Qty)> _reaperNakedStopQueue
             = new ConcurrentQueue<(string, MarketPosition, int)>();
+        // Build 1102R: Prevents duplicate emergency stops while broker confirmation is pending (mirrors _repairInFlight)
+        private readonly HashSet<string> _reaperNakedStopInFlight = new HashSet<string>();
 
         /// <summary>
         /// V12 SIMA: Start the Reaper audit background thread
@@ -252,12 +254,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (!hasWorkingStop)
                         {
-                            Print(string.Format(
-                                "[REAPER][NAKED_POSITION] {0}: {1} contracts with NO working stop. Queuing emergency hard stop.",
-                                acct.Name, actualQty));
+                            // BUG-M2: Dedup guard — prevents duplicate emergency stops across REAPER cycles
+                            bool alreadyNakedInFlight;
+                            lock (stateLock) { alreadyNakedInFlight = _reaperNakedStopInFlight.Contains(acct.Name); }
 
-                            _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
-                            TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null);
+                            if (!alreadyNakedInFlight)
+                            {
+                                lock (stateLock) { _reaperNakedStopInFlight.Add(acct.Name); }
+                                Print(string.Format(
+                                    "[REAPER][NAKED_POSITION] {0}: {1} contracts with NO working stop. Queuing emergency hard stop.",
+                                    acct.Name, actualQty));
+                                _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
+                                // BUG-I2: TriggerCustomEvent wrapped in try/catch (matches repair/flatten pattern)
+                                try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                                catch (Exception tcEx) { Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed: {0}", tcEx.Message)); }
+                            }
                         }
                     }
                 }
@@ -573,12 +584,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (item.Direction == MarketPosition.Long)
                     {
-                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] - MaximumStop * TickSize);
+                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] - MaximumStop);
                         closeAction = OrderAction.Sell;
                     }
                     else
                     {
-                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] + MaximumStop * TickSize);
+                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] + MaximumStop);
                         closeAction = OrderAction.BuyToCover;
                     }
 
@@ -590,12 +601,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     acct.Submit(new[] { emergencyStop });
 
+                    // BUG-M2: Clear in-flight guard after successful submission
+                    lock (stateLock) { _reaperNakedStopInFlight.Remove(item.AccountName); }
                     Print(string.Format(
                         "[REAPER][EMERGENCY_STOP] Submitted StopMarket for {0}: {1} {2}ct @ {3:F2}",
                         item.AccountName, closeAction, item.Qty, stopPrice));
                 }
                 catch (Exception ex)
                 {
+                    // BUG-M2: Clear in-flight guard on failure so next cycle can retry
+                    lock (stateLock) { _reaperNakedStopInFlight.Remove(item.AccountName); }
                     Print(string.Format("[REAPER][EMERGENCY_STOP_FAIL] {0}: {1}", item.AccountName, ex.Message));
                 }
             }
