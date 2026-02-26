@@ -20,6 +20,12 @@
 - **Source Truth**: All primary NinjaScript logic resides in `src/`.
 - **Deployment**: Local builds MUST be synced to `C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\` using the `./deploy-sync.ps1` script (or `/deploy` skill).
 
+### 4. Repo Hygiene
+- **Zero-Delta Start**: Every new phase MUST begin with a 0-delta `main` branch to prevent context debt.
+- **Atomic Merging**: Merge and delete feature branches immediately after successful F5 compilation and initial testing.
+- **Binary Guard**: DO NOT commit `.exe`, `.log`, or `.bak` files. Use stashing or `.gitignore`.
+- **Clean Dashboard**: All agents (Claude, Gemini, Antigravity, Rovo Dev) MUST ensure the repo is clean before starting new missions.
+
 ## 🕹️ Director Commands ($)
 
 - **$PLAN_AUDIT**: Use `read_terminal` on the active Claude/Antigravity PID to ingest Sonnet's implementation plan. Perform a forensic logic audit before recommending approval to the Director.

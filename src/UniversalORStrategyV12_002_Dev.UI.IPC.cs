@@ -301,10 +301,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string targetSymbol = parts.Length > 1 ? parts[1] : "Global";
 
                     // V12.9: Global commands bypass symbol filter entirely — these are account/fleet-level, not instrument-level
+                    // [1102Z-F] MOVE_TARGET and LOCK_50 use parts[1] for parameters (not symbol), so they must bypass
+                    // the symbol filter. Each handler internally filters by activePositions so only charts with live
+                    // positions act. This is the correct fix for the "For Me? False [target=T1]" rejection.
                     bool isGlobalCommand = action == "TOGGLE_ACCOUNT" || action == "SET_SIMA" ||
                                            action == "GET_FLEET" || action == "DIAG_FLEET" || action == "CANCEL_ALL" ||
                                            action == "FLATTEN" || action == "SYNC_ALL" || action == "MKT_SYNC" ||
-                                           action == "REQUEST_FLEET_STATE" || action == "RESET_MEMORY";
+                                           action == "REQUEST_FLEET_STATE" || action == "RESET_MEMORY" ||
+                                           action.StartsWith("MOVE_TARGET") || action == "LOCK_50"; // [1102Z-F]
 
                     // V10.3: Robust Symbol Matching (Matches MGC to GC/MGC, MES to ES/MES, etc.)
                     string mySym = Instrument.MasterInstrument.Name.ToUpper();
@@ -339,34 +343,47 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (action == "TRIM_25" || action == "TRIM_50")
             {
                 double percent = action == "TRIM_50" ? 0.5 : 0.25;
-                // V12.1101E [A-3/SK-02]: Snapshot .Values before iterating — ConcurrentDictionary.Values
-                // is not safe to iterate while OnOrderUpdate/OnExecutionUpdate may remove entries.
+                // V12.1101E [A-3/SK-02]: Snapshot .Values before iterating.
+                // [1102Z-F]: TRIM now routes to pos.ExecutingAccount for fleet followers.
                 foreach (var pos in activePositions.Values.ToArray())
                 {
-                    if (pos.RemainingContracts > 1)  // V10.3.1: Need at least 2 contracts to trim (leaves 1+ after)
+                    if (pos.RemainingContracts > 1)
                     {
-                        // V10.3.1 FIX: Improved Floor logic for small positions (e.g., MGC 2-lot)
-                        // Math.Max(1, ...) ensures we always trim at least 1 contract when trimming
-                        // This fixes the issue where 2 * 0.25 = 0.5 → Floor = 0 (no trim)
+                        // V10.3.1 FIX: Math.Max(1, ...) ensures we always trim at least 1 contract.
                         int rawQty = Math.Max(1, (int)Math.Floor(pos.RemainingContracts * percent));
                         int remainingAfterTrim = pos.RemainingContracts - rawQty;
 
-                        // Safety check: Ensure at least 1 contract remains after trim (never flatten via trim)
+                        // Safety: never flatten via trim
                         if (remainingAfterTrim < 1)
-                        {
-                            rawQty = pos.RemainingContracts - 1;  // Adjust to leave exactly 1 contract
-                        }
+                            rawQty = pos.RemainingContracts - 1;
 
-                        // Only execute if we're actually trimming something and leaving position open
                         if (rawQty >= 1 && (pos.RemainingContracts - rawQty) >= 1)
                         {
-                            Print(string.Format("IPC Trim: Closing {0} of {1} contracts for {2} ({3:P0})",
-                                rawQty, pos.RemainingContracts, pos.SignalName, percent));
+                            OrderAction trimAction = pos.Direction == MarketPosition.Long
+                                ? OrderAction.Sell : OrderAction.BuyToCover;
 
-                            if (pos.Direction == MarketPosition.Long)
-                                SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                            // [1102Z-F]: Route to fleet follower account when applicable
+                            if (EnableSIMA && pos.IsFollower && pos.ExecutingAccount != null)
+                            {
+                                string trimSig = "Trim_" + pos.SignalName;
+                                if (trimSig.Length > 50) trimSig = trimSig.Substring(0, 50);
+                                Order trimOrder = pos.ExecutingAccount.CreateOrder(
+                                    Instrument, trimAction, OrderType.Market, TimeInForce.Gtc,
+                                    rawQty, 0, 0, "", trimSig, null);
+                                pos.ExecutingAccount.Submit(new[] { trimOrder });
+                                Print(string.Format("[SIMA] TRIM {0}%: Follower {1} → {2} closing {3} contracts",
+                                    (int)(percent * 100), pos.SignalName, pos.ExecutingAccount.Name, rawQty));
+                            }
                             else
-                                SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                            {
+                                Print(string.Format("IPC Trim: Closing {0} of {1} contracts for {2} ({3:P0})",
+                                    rawQty, pos.RemainingContracts, pos.SignalName, percent));
+
+                                if (pos.Direction == MarketPosition.Long)
+                                    SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                                else
+                                    SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                            }
                         }
                         else
                         {
@@ -376,7 +393,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else
                     {
-                        // 1-contract positions cannot be trimmed (would flatten)
                         Print(string.Format("IPC Trim SKIPPED: {0} has only 1 contract - use FLATTEN to close", pos.SignalName));
                     }
                 }
@@ -530,6 +546,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ChaseIfTouchPoints = parts[1].Trim();
                             Print($"[V12] CIT updated: {ChaseIfTouchPoints}");
                         }
+                    }
+                    else if (action == "LOCK_50")
+                    {
+                        // [1102Z-F]: IPC LOCK_50 — Lock 50% of unrealized profit on all active positions.
+                        // Delegates to ExecuteRunnerAction which already handles all account routing.
+                        Print("[IPC LOCK_50] Received — routing to ExecuteRunnerAction(lock50)");
+                        ExecuteRunnerAction("lock50");
                     }
                     else if (action == "BE" || action == "BE_CUSTOM" || action == "BE_PLUS_2" || action == "BE_PLUS_1") // V12.23: +BE_CUSTOM with dynamic ticks
                     {

@@ -143,7 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (order.Account == this.Account && 
                     (orderState == OrderState.Working || orderState == OrderState.Accepted || orderState == OrderState.ChangeSubmitted))
                 {
-                    PropagateMasterPriceMove(order, limitPrice, stopPrice);
+                    PropagateMasterPriceMove(order, limitPrice, stopPrice, quantity);
                 }
 
                 // Entry filled
@@ -1195,7 +1195,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         ///   3. Target moves use pos.ExecutingAccount.Cancel + CreateOrder + Submit (not ChangeOrder).
         ///   4. Entry (Limit, pre-fill) moves implemented via cancel/resubmit.
         /// </summary>
-        private void PropagateMasterPriceMove(Order masterOrder, double newLimit, double newStop)
+        private void PropagateMasterPriceMove(Order masterOrder, double newLimit, double newStop, int newMasterQty = 0)
         {
             if (!EnableSIMA || masterOrder == null || masterOrder.Account != this.Account) return;
 
@@ -1285,7 +1285,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // on every user-drag, and historically resubmitted Limit followers at price 0.
                     double effectiveEntryPrice = newLimit > 0 ? newLimit : newStop;
                     if (effectiveEntryPrice <= 0) continue; // both zero — NT8 callback race, skip safely
-                    PropagateMasterEntryMove(fleetEntryName, pos, effectiveEntryPrice);
+                    PropagateMasterEntryMove(fleetEntryName, pos, effectiveEntryPrice, newMasterQty);
                 }
                 else if (isStopMove)
                     PropagateMasterStopMove(fleetEntryName, pos, newStop);
@@ -1371,7 +1371,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// covering the cancel gap. REAPER's ChangePending guard (AuditApexPositions line 193) provides
         /// a second layer of protection.
         /// </summary>
-        private void PropagateMasterEntryMove(string fleetEntryName, PositionInfo pos, double newLimit)
+        private void PropagateMasterEntryMove(string fleetEntryName, PositionInfo pos, double newLimit, int newMasterQty = 0)
         {
             if (!entryOrders.TryGetValue(fleetEntryName, out var fEntry) || fEntry == null) return;
             if (fEntry.OrderState != OrderState.Working && fEntry.OrderState != OrderState.Accepted) return;
@@ -1380,10 +1380,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [FIX-PM-02b]: For StopMarket/StopLimit orders price lives in StopPrice (LimitPrice is always 0).
             bool isStopTypeEntry = fEntry.OrderType == OrderType.StopMarket || fEntry.OrderType == OrderType.StopLimit;
             double fEffectivePrice = isStopTypeEntry ? fEntry.StopPrice : fEntry.LimitPrice;
-            if (Math.Abs(fEffectivePrice - roundedLimit) <= tickSize / 2) return;
 
-            Print(string.Format("[MOVE-SYNC] Entry move: {0} on {1}: {2:F2} -> {3:F2}",
-                fleetEntryName, pos.ExecutingAccount.Name, fEffectivePrice, roundedLimit));
+            // [QTY-SYNC]: Scale master quantity for this follower.
+            // Fallback to fEntry.Quantity if no quantity signal (pure price-change callback, or qty=0 noise).
+            int scaledQty = (newMasterQty > 0 && FleetParityMultiplier > 0)
+                ? (int)Math.Max(1L, (long)newMasterQty * FleetParityMultiplier)  // [922Z-OVF]: long cast prevents int overflow before clamp
+                : fEntry.Quantity;
+
+            bool priceChanged    = Math.Abs(fEffectivePrice - roundedLimit) > tickSize / 2;
+            bool quantityChanged = scaledQty != fEntry.Quantity;
+            if (!priceChanged && !quantityChanged) return;
+
+            Print(string.Format("[MOVE-SYNC] Entry move: {0} on {1}: {2:F2} -> {3:F2} x{4}",
+                fleetEntryName, pos.ExecutingAccount.Name, fEffectivePrice, roundedLimit, scaledQty));
 
             // 1102Z-D: Stamp grace BEFORE Cancel — opens 5-second REAPER suppression window covering the cancel gap.
             StampReaperMoveGrace();
@@ -1396,23 +1405,43 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 OrderAction entryAction = pos.Direction == MarketPosition.Long
                     ? OrderAction.Buy : OrderAction.SellShort;
-                // [1102Z-D]: Fresh signal name forces NT8 to treat resubmitted order as a new identity.
-                string signalName = SymmetryTrim(fleetEntryName, 28) + "_MGE_" + (DateTime.UtcNow.Ticks % 10000000);
+                // [GHOST-FIX-1 Build 922Z]: Preserve original fleetEntryName as signal name.
+                // The identity chain MUST be: activePositions key == entryOrders key == order signal name.
+                // The old code appended a random "_MGE_" + timestamp suffix, which broke the chain:
+                //   → OnAccountExecutionUpdate could not find the key in entryOrders on fill
+                //   → SubmitBracketOrders was never called → position was naked (no stop, no target)
+                //   → REAPER saw naked position and fired emergency flatten, causing the ghost entry cascade.
+                // Using fleetEntryName directly restores the chain and ensures brackets are submitted on fill.
+                string signalName = fleetEntryName;
 
                 // [FIX-PM-02c]: Preserve original order type so StopMarket followers remain StopMarket.
                 double limitPx = (!isStopTypeEntry) ? roundedLimit : 0;
                 double stopPx  = ( isStopTypeEntry) ? roundedLimit : 0;
                 Order newEntry = pos.ExecutingAccount.CreateOrder(
                     Instrument, entryAction, fEntry.OrderType, TimeInForce.Gtc,
-                    fEntry.Quantity, limitPx, stopPx,
+                    scaledQty, limitPx, stopPx,
                     "MGE_" + DateTime.UtcNow.Ticks.ToString(),
                     signalName, null);
 
                 pos.ExecutingAccount.Submit(new[] { newEntry });
                 entryOrders[fleetEntryName] = newEntry;
 
-                Print(string.Format("[MOVE-SYNC] Entry resubmitted (protected): {0} @ {1:F2}",
-                    fleetEntryName, roundedLimit));
+                // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
+                lock (stateLock)
+                {
+                    pos.TotalContracts     = scaledQty;
+                    pos.RemainingContracts = scaledQty;
+                    int ft1, ft2, ft3, ft4, ft5;
+                    GetTargetDistribution(scaledQty, out ft1, out ft2, out ft3, out ft4, out ft5);
+                    pos.T1Contracts = ft1;
+                    pos.T2Contracts = ft2;
+                    pos.T3Contracts = ft3;
+                    pos.T4Contracts = ft4;
+                    pos.T5Contracts = ft5;
+                }
+
+                Print(string.Format("[MOVE-SYNC] Entry resubmitted (protected): {0} @ {1:F2} x{2}",
+                    fleetEntryName, roundedLimit, scaledQty));
             }
             catch (Exception ex)
             {

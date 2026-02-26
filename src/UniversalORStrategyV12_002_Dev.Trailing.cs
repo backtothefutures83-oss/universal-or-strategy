@@ -854,10 +854,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Find the target order for this position
+                // [1102Z-F]: Search the correct account — follower orders live on their own account,
+                // not on the Master account from which Account.Orders is sourced.
                 string targetOrderName = $"T{targetNum}_{entryName}";
                 Order targetOrder = null;
+                var searchAcct = (pos.IsFollower && pos.ExecutingAccount != null)
+                    ? pos.ExecutingAccount
+                    : Account;
                 
-                foreach (Order order in Account.Orders)
+                foreach (Order order in searchAcct.Orders)
                 {
                     if (order != null && 
                         order.Name == targetOrderName && 
@@ -917,18 +922,44 @@ namespace NinjaTrader.NinjaScript.Strategies
                 
                 if (!isValidMove) continue;
                 
-                // Move the order using ChangeOrder
+                // Move the order: Master uses ChangeOrder; followers use cancel+resubmit via account API.
+                // ChangeOrder only works for orders submitted through the NinjaScript managed order system.
+                // Fleet follower orders are submitted via acct.Submit(), so they require the broker-level API.
                 try
                 {
-                    ChangeOrder(targetOrder, targetOrder.Quantity, newTargetPrice, 0);
-                    movedCount++;
-                    
-                    double profitFromEntry = Math.Abs(newTargetPrice - entryPrice);
-                    Print($"[V14] MoveSpecificTarget T{targetNum}: {entryName} → {newTargetPrice:F2} (+{profitFromEntry:F2} from entry {entryPrice:F2})");
+                    if (pos.IsFollower && pos.ExecutingAccount != null)
+                    {
+                        // [1102Z-F]: Fleet follower path — cancel old limit, resubmit at new price
+                        pos.ExecutingAccount.Cancel(new[] { targetOrder });
+
+                        OrderAction exitAct = pos.Direction == MarketPosition.Long
+                            ? OrderAction.Sell : OrderAction.BuyToCover;
+                        Order newFollowerOrder = pos.ExecutingAccount.CreateOrder(
+                            Instrument, exitAct, OrderType.Limit, TimeInForce.Gtc,
+                            targetOrder.Quantity, newTargetPrice, 0, "", targetOrderName, null);
+                        pos.ExecutingAccount.Submit(new[] { newFollowerOrder });
+
+                        // Update dictionary reference so the strategy tracks the new order
+                        var tDictF = GetTargetOrdersDictionary(targetNum);
+                        if (tDictF != null) tDictF[entryName] = newFollowerOrder;
+
+                        movedCount++;
+                        double profitFromEntryF = Math.Abs(newTargetPrice - entryPrice);
+                        Print($"[SIMA] MoveSpecificTarget T{targetNum}: Follower {entryName} on {pos.ExecutingAccount.Name} → {newTargetPrice:F2} (+{profitFromEntryF:F2})");
+                    }
+                    else
+                    {
+                        // Master path — ChangeOrder is fine for NinjaScript-managed orders
+                        ChangeOrder(targetOrder, targetOrder.Quantity, newTargetPrice, 0);
+                        movedCount++;
+
+                        double profitFromEntry = Math.Abs(newTargetPrice - entryPrice);
+                        Print($"[V14] MoveSpecificTarget T{targetNum}: {entryName} → {newTargetPrice:F2} (+{profitFromEntry:F2} from entry {entryPrice:F2})");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Print($"[V14] MoveSpecificTarget T{targetNum}: ChangeOrder FAILED for {entryName} - {ex.Message}");
+                    Print($"[V14] MoveSpecificTarget T{targetNum}: Move FAILED for {entryName} - {ex.Message}");
                 }
             }
             

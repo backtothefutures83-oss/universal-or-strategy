@@ -312,6 +312,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Reaper Interval (ms)", GroupName = "12. SIMA", Order = 10)]
         public int ReaperIntervalMs { get; set; }
 
+        // GHOST-FIX-2 [Build 922Z]: Grace window before REAPER fires emergency stop on naked position.
+        // 3 seconds covers the normal bracket-order broker-confirmation lag after a fill.
+        // Set to 0 to disable the grace window (immediate fire — legacy behaviour).
+        [NinjaScriptProperty]
+        [Range(0, 10)]
+        [Display(Name = "Naked Position Grace (sec)", Description = "Seconds REAPER waits before declaring a no-stop position a true emergency. Default: 3. Prevents false EF_ during bracket confirmation lag.", GroupName = "12. SIMA", Order = 10)]
+        public int NakedPositionGraceSec { get; set; }
+
         [NinjaScriptProperty]
         [Range(1, 50)]
         [Display(Name = "Repair Tick Fence", GroupName = "12. SIMA", Order = 11)]

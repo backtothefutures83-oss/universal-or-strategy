@@ -646,6 +646,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableSIMA = false; // SAFETY: Default to OFF
                 ReaperAuditEnabled = true;
                 ReaperIntervalMs = 1000;          // 1 second audit cycle
+                NakedPositionGraceSec = 3;        // GHOST-FIX-2 [922Z]: 3s grace before emergency stop on naked position
                 EnablePathB = false;
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;

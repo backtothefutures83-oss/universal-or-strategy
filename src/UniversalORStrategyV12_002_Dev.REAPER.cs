@@ -29,6 +29,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Build 1102R: Prevents duplicate emergency stops while broker confirmation is pending (mirrors _repairInFlight)
         private readonly HashSet<string> _reaperNakedStopInFlight = new HashSet<string>();
 
+        // GHOST-FIX-2 [Build 922Z]: Tracks when an account first appeared as "naked" (position with no working stop).
+        // REAPER only fires emergency stop after NakedPositionGraceSec have elapsed, preventing race-condition
+        // triggers during the normal bracket-confirmation window immediately after a fill.
+        private ConcurrentDictionary<string, DateTime> _nakedPositionFirstSeen
+            = new ConcurrentDictionary<string, DateTime>();
+
+        // [922Z-THROTTLE]: Prevents "Repair BLOCKED" from printing every second during intentional long-sitting orders.
+        // Key = blocking order name; Value = last time the message was printed.
+        private ConcurrentDictionary<string, DateTime> _repairBlockedLastLogged
+            = new ConcurrentDictionary<string, DateTime>();
+
         /// <summary>
         /// V12 SIMA: Start the Reaper audit background thread
         /// </summary>
@@ -158,6 +169,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // We do NOT flatten or panic here.
                         if (actualQty == 0 && expectedQty != 0)
                         {
+                            // GHOST-FIX-3 [Build 922Z]: Skip repair for the Master chart account.
+                            // When AccountPrefix matches the Master account name (e.g. "PA-APEX-422136-06" contains "Apex"),
+                            // REAPER incorrectly treats it as a desynced follower and tries to repair it every second.
+                            // The Master uses SubmitOrderUnmanaged — there is never a IsFollower=true PositionInfo for it —
+                            // so ProcessReaperRepairQueue always prints "No PositionInfo found" and loops forever.
+                            if (acct.Name == Account.Name)
+                            {
+                                if (shouldLog) Print($"[REAPER] {acct.Name} is the Master account — skipping follower repair (uses SubmitOrderUnmanaged path).");
+                                continue;
+                            }
+
                             // V12.Phase8.2: Follower is FLAT but expected position exists — candidate for auto-repair.
                             // V12.Phase8.3: Repair identity includes instrument to prevent cross-chart collisions
                             string repairKey = acct.Name + "_" + Instrument.FullName;
@@ -209,8 +231,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 }
                                 else
                                 {
-                                    // [M8.2 REPAIR-01]: Always emit blocking identity to expose zombie triggers.
-                                    Print($"[REAPER] Repair BLOCKED by {blockingOrderName} in state {blockingState}");
+                                    // [922Z-THROTTLE]: Only log once per 30s per blocking order to avoid Output flood
+                                    // during intentional long-sitting limit orders (e.g. test orders far from market).
+                                    string throttleKey = blockingOrderName ?? acct.Name;
+                                    DateTime lastLogged;
+                                    bool shouldLogBlocked = !_repairBlockedLastLogged.TryGetValue(throttleKey, out lastLogged)
+                                                            || (DateTime.UtcNow - lastLogged).TotalSeconds >= 30;
+                                    if (shouldLogBlocked)
+                                    {
+                                        _repairBlockedLastLogged[throttleKey] = DateTime.UtcNow;
+                                        Print($"[REAPER] Repair BLOCKED by {blockingOrderName} in state {blockingState} (throttled: next log in 30s)");
+                                    }
                                 }
                             }
                             else
@@ -258,22 +289,48 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (!hasWorkingStop)
                         {
-                            // BUG-M2: Dedup guard — prevents duplicate emergency stops across REAPER cycles
-                            bool alreadyNakedInFlight;
-                            lock (stateLock) { alreadyNakedInFlight = _reaperNakedStopInFlight.Contains(acct.Name); }
-
-                            if (!alreadyNakedInFlight)
+                            // GHOST-FIX-2 [Build 922Z]: Grace-delay guard before emergency action.
+                            // Bracket orders (stop + targets) take 0–3 seconds to reach the broker after a fill.
+                            // Firing immediately causes false EF_ / EMERGENCY_STOP_ during that normal window.
+                            // Only trigger after NakedPositionGraceSec seconds of confirmed naked state.
+                            DateTime firstSeen;
+                            int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
+                            if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
                             {
-                                lock (stateLock) { _reaperNakedStopInFlight.Add(acct.Name); }
+                                // First time we see this account naked — start the grace clock.
+                                _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
                                 Print(string.Format(
-                                    "[REAPER][NAKED_POSITION] {0}: {1} contracts with NO working stop. Queuing emergency hard stop.",
-                                    acct.Name, actualQty));
-                                _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
-                                // BUG-I2: TriggerCustomEvent wrapped in try/catch (matches repair/flatten pattern)
-                                try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
-                                catch (Exception tcEx) { Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed: {0}", tcEx.Message)); }
+                                    "[REAPER][NAKED_POSITION] {0}: {1}ct naked — starting {2}s grace window (bracket confirmation delay).",
+                                    acct.Name, actualQty, graceSeconds));
                             }
+                            else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
+                            {
+                                // Grace window expired — naked state is real and persistent. Fire emergency.
+                                // BUG-M2: Dedup guard — prevents duplicate emergency stops across REAPER cycles
+                                bool alreadyNakedInFlight;
+                                lock (stateLock) { alreadyNakedInFlight = _reaperNakedStopInFlight.Contains(acct.Name); }
+
+                                if (!alreadyNakedInFlight)
+                                {
+                                    lock (stateLock) { _reaperNakedStopInFlight.Add(acct.Name); }
+                                    Print(string.Format(
+                                        "[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                                        acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
+                                    _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
+                                    // BUG-I2: TriggerCustomEvent wrapped in try/catch (matches repair/flatten pattern)
+                                    try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                                    catch (Exception tcEx) { Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed: {0}", tcEx.Message)); }
+                                }
+                            }
+                            // else: still within grace window — wait, do not fire
                         }
+                        else
+                        {
+                            // Position now has a working stop — clear the naked grace clock for this account.
+                            // This resets the timer so a future naked episode gets a full fresh grace window.
+                            _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+                        }
+
                     }
                 }
             }

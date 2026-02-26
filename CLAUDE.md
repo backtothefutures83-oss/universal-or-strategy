@@ -33,6 +33,12 @@
 - **Regression Audit**: Every patch MUST be followed by a `/audit` command to check for downstream side-effects before declaring completion.
 - **Scope Discipline**: Confirm the exact file list before editing. NEVER expand scope to configs/docs unless explicitly instructed.
 
+### 4. Repo Hygiene
+- **Zero-Delta Start**: Every new phase MUST begin with a 0-delta `main` branch to prevent context debt.
+- **Atomic Merging**: Merge and delete feature branches immediately after successful F5 compilation and initial testing.
+- **Binary Guard**: DO NOT commit `.exe`, `.log`, or `.bak` files. Use stashing or `.gitignore`.
+- **Clean Dashboard**: All agents (Claude, Gemini, Antigravity) MUST ensure the repo is clean before starting new missions.
+
 ## 🕹️ Director Commands ($)
 
 - **$PLAN_AUDIT**: Use `read_terminal` on the active Claude/Antigravity PID to ingest Sonnet's implementation plan. Perform a forensic logic audit before recommending approval to the Director.
@@ -40,4 +46,4 @@
 - **$AUDIT**: Trigger the `/audit` skill to scan the `src/` directory.
 
 ## Agent Synchronization
-AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini) MUST follow the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** as the primary source of truth for architectural standards and safety protocols.
+AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini, Rovo Dev) MUST follow the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** as the primary source of truth for architectural standards and safety protocols.
