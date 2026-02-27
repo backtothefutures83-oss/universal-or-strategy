@@ -67,19 +67,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("");
 
                 // Audit Case 3: Target Distribution (Priority Fill)
-                Print("[AUDIT] CASE 3: TARGET DISTRIBUTION (5-TARGET PRIORITY + RUNNER)");
-                // [BUILD 926]: Print the active count so this audit is not misleading.
-                // NOTE: If this runs before the IPC app connects and sends COUNT:n, activeTargetCount
-                // will reflect the NinjaTrader property default (often 1), making T1 receive all contracts.
-                // In real trades, COUNT is set by the IPC app AFTER connect — distribution is correct there.
-                Print(string.Format("  [INFO] activeTargetCount at audit time = {0} (IPC app may not have connected yet)", activeTargetCount));
-                int[] testQuantities = { 1, 3, 5, 10 };
-                foreach (int qty in testQuantities)
+                // [BUILD 926 FIX]: Test all 5 count scenarios explicitly.
+                // activeTargetCount is useless here — this audit fires at startup BEFORE the IPC
+                // app connects and pushes COUNT:n. Testing all counts makes this timing-independent.
+                Print("[AUDIT] CASE 3: TARGET DISTRIBUTION (ALL COUNT SCENARIOS)");
+                int[] auditCounts = { 1, 2, 3, 4, 5 };
+                int[] auditQtys   = { 1, 2, 3, 5, 10 };
+                foreach (int count in auditCounts)
                 {
-                    int t1, t2, t3, t4, t5;
-                    GetTargetDistribution(qty, out t1, out t2, out t3, out t4, out t5);
-                    Print(string.Format("  Total {0} Contracts \u2192 T1:{1} | T2:{2} | T3:{3} | T4:{4} | T5:{5} (T1/T5 Invariant Audit)",
-                        qty, t1, t2, t3, t4, t5));
+                    Print(string.Format("  --- Count={0} targets ---", count));
+                    foreach (int qty in auditQtys)
+                    {
+                        int t1, t2, t3, t4, t5;
+                        GetTargetDistribution(qty, out t1, out t2, out t3, out t4, out t5, count);
+                        Print(string.Format("    {0} contr \u2192 T1:{1} T2:{2} T3:{3} T4:{4} T5:{5}",
+                            qty, t1, t2, t3, t4, t5));
+                    }
                 }
 
                 // Audit Case 3b: Universal Ladder ATR Spread
