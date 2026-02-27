@@ -220,7 +220,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // Build 1102Y-V3 [MS-03 ROLLBACK]: Submit failed — undo Order Ledger reservation.
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaOR);
-                    Print("[ERROR][1102Y-V3] OR SubmitOrderUnmanaged returned NULL for " + entryName + " — Master expected rolled back.");
+                    Print("[ERROR][1102Y-V3] OR SubmitOrderUnmanaged returned NULL for " + entryName + " — Master expected rolled back. Fleet dispatch aborted.");
+                    // [FIX-OR-E]: Must abort here. Without an early return, ExecuteSmartDispatchEntry
+                    // dispatches fleet followers for a master entry that does not exist → phantom fleet entries.
+                    activePositions.TryRemove(entryName, out _);
+                    return;
                 }
 
                 entryOrders[entryName] = entryOrder;
@@ -233,7 +237,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12 SIMA: Dispatch to fleet (replaces legacy slave broadcast)
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("OR", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Limit);
+                    // [923A-P0-OR]: StopMarket prevents immediate "marketable limit" fill.
+                    // OR Long entry price is ABOVE current market; a Limit order there is immediately
+                    // marketable on Apex/Tradovate (fills at current ask). StopMarket activates only
+                    // when price actually reaches/breaks the OR High/Low — matching master behavior.
+                    ExecuteSmartDispatchEntry("OR", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.StopMarket);
                 }
             }
             catch (Exception ex)

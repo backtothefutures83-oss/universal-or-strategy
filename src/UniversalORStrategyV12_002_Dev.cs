@@ -41,6 +41,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
+        public const string BUILD_TAG = "923B"; // V12.923B: Ghost Entry Fix — Spontaneous Cancellations + Hallucinated REAPER Repairs
+
         #region Variables
 
         // OR tracking
@@ -554,7 +556,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description = "Universal OR Strategy V12.12 - Build 1102K";
+                Description = "Universal OR Strategy V12.12 - Build " + BUILD_TAG;
                 Name = "UniversalORStrategyV12_002";
                 Calculate = Calculate.OnPriceChange;  // CRITICAL FIX: Updates on every price tick for real-time trailing
                 EntriesPerDirection = 10;
@@ -781,6 +783,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Realtime)
             {
+                Print("╔══════════════════════════════════════════════════════════════╗");
+                Print("║          🛡  BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE        ║");
+                Print(string.Format("║          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    ║", BUILD_TAG));
+                Print("╚══════════════════════════════════════════════════════════════╝");
+
                 // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
                 // EMERGENCY SAFE MODE (V12.32): Disabling background services to allow platform login
                 StartIpcServer();

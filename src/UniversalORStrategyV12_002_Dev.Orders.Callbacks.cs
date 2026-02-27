@@ -399,6 +399,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 CleanupPosition(kvp.Key);
                                 SetExpectedPositionLocked(ExpKey(rejAcctName), 0);
                                 Print(string.Format("[ZOMBIE-FIX] expectedPositions zeroed for {0} after rejection.", ExpKey(rejAcctName)));
+                                // [FIX-CS2-D]: Cascade fleet follower cleanup on master entry rejection.
+                                if (EnableSIMA && !kvp.Value.IsFollower)
+                                {
+                                    CascadeFleetFollowerCleanup(kvp.Key);
+                                }
                                 break;
                             }
                         }
@@ -611,6 +616,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 : Account.Name;
                             SetExpectedPositionLocked(ExpKey(cancelAcctName), 0);
                             Print(string.Format("[1102U] Ghost Memory cleared for {0} after entry cancel.", ExpKey(cancelAcctName)));
+
+                            // [FIX-CS2-C]: Cascade fleet follower cleanup on master entry cancel.
+                            // Without this, fleet followers remain Working (their StopMarket fires later) and
+                            // expectedPositions stays non-zero → REAPER hallucinates a repair after followers cancel.
+                            if (EnableSIMA && !pos.IsFollower)
+                            {
+                                CascadeFleetFollowerCleanup(entryName);
+                            }
 
                             handledByExplicitCleanup = true;
                             break;
@@ -1346,7 +1359,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Order replacement = pos.ExecutingAccount.CreateOrder(
                     Instrument, exitAction, OrderType.Limit, TimeInForce.Gtc,
                     qty, roundedLimit, 0,
-                    "MGT_" + DateTime.UtcNow.Ticks.ToString(),
+                    // [923A-P1b-GUID]: 8-char GUID fragment replaces Ticks — eliminates collision risk at high resubmit frequency
+                    "MGT_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                     signalName, null);
 
                 pos.ExecutingAccount.Submit(new[] { replacement });
@@ -1383,9 +1397,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // [QTY-SYNC]: Scale master quantity for this follower.
             // Fallback to fEntry.Quantity if no quantity signal (pure price-change callback, or qty=0 noise).
-            int scaledQty = (newMasterQty > 0 && FleetParityMultiplier > 0)
-                ? (int)Math.Max(1L, (long)newMasterQty * FleetParityMultiplier)  // [922Z-OVF]: long cast prevents int overflow before clamp
-                : fEntry.Quantity;
+            // [923A-P2a-OVF]: checked{} forces explicit OverflowException vs silent int truncation on extreme parity ratios
+            // (e.g., 1 NQ → 10 MES with very high master qty). Clamps to maxContracts on overflow.
+            int scaledQty;
+            try
+            {
+                scaledQty = (newMasterQty > 0 && FleetParityMultiplier > 0)
+                    ? checked((int)Math.Max(1L, (long)newMasterQty * FleetParityMultiplier))  // [922Z-OVF+923A]: long cast + checked int
+                    : fEntry.Quantity;
+            }
+            catch (OverflowException)
+            {
+                Print(string.Format("[923A-OVF] Parity scalar overflow for {0} — clamping to maxContracts ({1})", fleetEntryName, maxContracts));
+                scaledQty = maxContracts;
+            }
 
             bool priceChanged    = Math.Abs(fEffectivePrice - roundedLimit) > tickSize / 2;
             bool quantityChanged = scaledQty != fEntry.Quantity;
@@ -1394,37 +1419,55 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print(string.Format("[MOVE-SYNC] Entry move: {0} on {1}: {2:F2} -> {3:F2} x{4}",
                 fleetEntryName, pos.ExecutingAccount.Name, fEffectivePrice, roundedLimit, scaledQty));
 
-            // 1102Z-D: Stamp grace BEFORE Cancel — opens 5-second REAPER suppression window covering the cancel gap.
+            // [FIX-PME-A]: Create BEFORE Cancel — fail-fast without irreversible cancel.
+            // CreateOrder can return null (rate-limit, account locked, disconnected).
+            // Without this guard, Submit(null) throws after Cancel was already sent → follower vanishes.
+            OrderAction entryAction = pos.Direction == MarketPosition.Long
+                ? OrderAction.Buy : OrderAction.SellShort;
+            // [GHOST-FIX-1 Build 922Z]: Preserve original fleetEntryName as signal name.
+            // The identity chain MUST be: activePositions key == entryOrders key == order signal name.
+            string signalName = fleetEntryName;
+            // [FIX-PM-02c]: Preserve original order type so StopMarket followers remain StopMarket.
+            double limitPx = (!isStopTypeEntry) ? roundedLimit : 0;
+            double stopPx  = ( isStopTypeEntry) ? roundedLimit : 0;
+            Order newEntry = pos.ExecutingAccount.CreateOrder(
+                Instrument, entryAction, fEntry.OrderType, TimeInForce.Gtc,
+                scaledQty, limitPx, stopPx,
+                // [923A-P1-GUID]: 8-char hex GUID fragment — eliminates collision risk at extreme resubmit frequency.
+                "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                signalName, null);
+
+            if (newEntry == null)
+            {
+                Print(string.Format("[MOVE-SYNC] ABORT PropagateMasterEntryMove {0} on {1}: CreateOrder null. Old entry preserved — no cancel.",
+                    fleetEntryName, pos.ExecutingAccount.Name));
+                return;
+            }
+
+            // 1102Z-D: Stamp REAPER grace BEFORE Cancel.
             StampReaperMoveGrace();
 
-            // 1102Z-D [Protected Resubmit]: Cancel + CreateOrder + Submit is the sole path.
-            // Account.Change() was removed — it is a silent no-op on Apex/Tradovate.
+            // [FIX-PME-B]: Pre-update dict BEFORE Cancel so REAPER background thread immediately
+            // sees newEntry (OrderState.Initialized) as hasWorkingEntry=true — closes race window.
+            // REAPER.cs explicitly includes Initialized in the hasWorkingEntry guard.
+            entryOrders[fleetEntryName] = newEntry;
+
             try
             {
                 pos.ExecutingAccount.Cancel(new[] { fEntry });
+            }
+            catch (Exception cancelEx)
+            {
+                // Cancel failed — fEntry may still be alive. Restore dict so nothing is orphaned.
+                entryOrders[fleetEntryName] = fEntry;
+                Print(string.Format("[MOVE-SYNC] ERROR Cancel {0} on {1}: {2}. Move aborted — old entry preserved.",
+                    fleetEntryName, pos.ExecutingAccount.Name, cancelEx.Message));
+                return;
+            }
 
-                OrderAction entryAction = pos.Direction == MarketPosition.Long
-                    ? OrderAction.Buy : OrderAction.SellShort;
-                // [GHOST-FIX-1 Build 922Z]: Preserve original fleetEntryName as signal name.
-                // The identity chain MUST be: activePositions key == entryOrders key == order signal name.
-                // The old code appended a random "_MGE_" + timestamp suffix, which broke the chain:
-                //   → OnAccountExecutionUpdate could not find the key in entryOrders on fill
-                //   → SubmitBracketOrders was never called → position was naked (no stop, no target)
-                //   → REAPER saw naked position and fired emergency flatten, causing the ghost entry cascade.
-                // Using fleetEntryName directly restores the chain and ensures brackets are submitted on fill.
-                string signalName = fleetEntryName;
-
-                // [FIX-PM-02c]: Preserve original order type so StopMarket followers remain StopMarket.
-                double limitPx = (!isStopTypeEntry) ? roundedLimit : 0;
-                double stopPx  = ( isStopTypeEntry) ? roundedLimit : 0;
-                Order newEntry = pos.ExecutingAccount.CreateOrder(
-                    Instrument, entryAction, fEntry.OrderType, TimeInForce.Gtc,
-                    scaledQty, limitPx, stopPx,
-                    "MGE_" + DateTime.UtcNow.Ticks.ToString(),
-                    signalName, null);
-
+            try
+            {
                 pos.ExecutingAccount.Submit(new[] { newEntry });
-                entryOrders[fleetEntryName] = newEntry;
 
                 // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
                 lock (stateLock)
@@ -1443,10 +1486,71 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("[MOVE-SYNC] Entry resubmitted (protected): {0} @ {1:F2} x{2}",
                     fleetEntryName, roundedLimit, scaledQty));
             }
-            catch (Exception ex)
+            catch (Exception submitEx)
             {
-                Print(string.Format("[MOVE-SYNC] ERROR PropagateMasterEntryMove {0}: {1}",
-                    fleetEntryName, ex.Message));
+                // Submit failed. fEntry already cancelled. Clear pre-updated dict ref so
+                // REAPER can queue repair (hasWorkingEntry=false path).
+                entryOrders.TryRemove(fleetEntryName, out _);
+                Print(string.Format("[MOVE-SYNC] ERROR Submit {0} on {1}: {2}. Entry cancelled; REAPER will repair.",
+                    fleetEntryName, pos.ExecutingAccount.Name, submitEx.Message));
+            }
+        }
+
+        /// <summary>
+        /// [FIX-CS2]: When a master entry is cancelled or rejected, cascade cleanup to all
+        /// linked fleet followers. Zeroes each follower's expectedPositions BEFORE calling
+        /// CleanupPosition so that subsequent broker-confirm cancel events (OnAccountOrderUpdate →
+        /// ProcessAccountOrderQueue) see gfExpected==0 → GF-01 graceful flush path (no DESYNC alarm,
+        /// no REAPER repair). Uses Symmetry dispatch context for precise follower resolution;
+        /// falls back to scanning activePositions when no dispatch context exists.
+        /// </summary>
+        private void CascadeFleetFollowerCleanup(string masterEntryName)
+        {
+            IEnumerable<string> followerKeys;
+            if (symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId) &&
+                symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+            {
+                string[] snap;
+                lock (ctx.Sync) { snap = ctx.FollowerEntries.ToArray(); }
+                followerKeys = snap;
+            }
+            else
+            {
+                // [AUDIT-P0]: Lock to get atomic snapshot — prevents TOCTOU where a follower is
+                // removed between scan and cleanup (ConcurrentDictionary iteration is not atomic
+                // relative to the downstream SetExpectedPositionLocked + CleanupPosition sequence).
+                var fallback = new List<string>();
+                lock (stateLock)
+                {
+                    foreach (var kvp in activePositions)
+                        if (kvp.Value.IsFollower && kvp.Value.ExecutingAccount != null)
+                            fallback.Add(kvp.Key);
+                }
+                followerKeys = fallback;
+            }
+
+            foreach (string followerKey in followerKeys)
+            {
+                string fAcctName = null;
+                // [AUDIT-P2]: Snapshot fAcctName and zero expectedPositions under stateLock to prevent
+                // concurrent OnOrderUpdate/REAPER from mutating PositionInfo.ExecutingAccount in parallel.
+                // CleanupPosition (broker I/O via Account.Cancel) stays outside the lock — never hold
+                // stateLock across network/broker calls.
+                lock (stateLock)
+                {
+                    if (!activePositions.TryGetValue(followerKey, out var fPos)) continue;
+                    if (!fPos.IsFollower || fPos.ExecutingAccount == null) continue;
+                    fAcctName = fPos.ExecutingAccount.Name;
+                    // Zero expectedPositions FIRST so that the broker-confirm cancel event fires
+                    // ProcessAccountOrderQueue with gfExpected==0 → GF-01 graceful flush (no repair queued).
+                    SetExpectedPositionLocked(ExpKey(fAcctName), 0);
+                }
+
+                // Cancel entry order and clean tracking state (broker I/O outside stateLock)
+                CleanupPosition(followerKey);
+
+                Print(string.Format("[CS2-CASCADE] Master {0} cancel → follower {1} on {2}: expectedPositions zeroed + cleanup issued.",
+                    masterEntryName, followerKey, fAcctName));
             }
         }
 

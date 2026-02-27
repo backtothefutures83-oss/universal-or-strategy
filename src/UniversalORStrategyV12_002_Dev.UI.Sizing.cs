@@ -101,7 +101,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             double effectiveRisk = riskToUse - slippageCushionDollars;
 
             // STEP 2: FLOOR the quantity (never exceed $MaxRisk after slippage reserve)
-            int contracts = (int)Math.Floor(effectiveRisk / stopDollars);
+            // [923A-P2b-OVF]: checked{} guards against astronomically low stopDollars (near-zero ATR)
+            // producing a double→int overflow. Clamps to maxContracts on overflow rather than silent wrap.
+            int contracts;
+            try   { contracts = checked((int)Math.Floor(effectiveRisk / stopDollars)); }
+            catch (OverflowException)
+            {
+                Print($"[923A-OVF] Sizing overflow — stop={stopDollars:F4} effectiveRisk={effectiveRisk:F0} — clamping to maxContracts ({maxContracts})");
+                contracts = maxContracts;
+            }
 
             // V12.Phase8.3: Diagnostic warning when ATR/Risk math produces 0 — makes risk-floor fallbacks visible
             if (contracts == 0)
