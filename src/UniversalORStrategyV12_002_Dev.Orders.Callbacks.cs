@@ -1315,7 +1315,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // FIX: Fleet entry names are stamped with the trade type at dispatch time:
                 //   Format: "Fleet_<AccountName>_<TRADETYPE>_<Index>"
                 //   Example: "Fleet_PA-APEX-422136-05_OR_0", "Fleet_APEX-09_RMA_1"
-                // Parse the type from SignalName — zero new fields, zero cross-file dependency.
+                //
+                // [BUILD 927 – Codex P2 Fix]: Do NOT use Contains("_TYPE_") — if an account name
+                // itself contains a trade-type substring (e.g. _RMA_, _OR_), Contains() misclassifies
+                // the follower by matching the account name token instead of the TRADETYPE segment.
+                //
+                // SAFE APPROACH: Extract TRADETYPE by segment position.
+                // TRADETYPE is always the second-to-last underscore-delimited segment:
+                //   lastUnderscore      = before the numeric Index
+                //   secondLastUnderscore = before the TRADETYPE token
+                // Example: "Fleet_SimApexSim_02_OR_0"
+                //   lastUs  → before "0"    → remaining = "Fleet_SimApexSim_02_OR"
+                //   typeUs  → before "OR"   → extracted = "OR"  ✓
                 var fallback = new List<string>();
                 foreach (var kvp in activePositions)
                 {
@@ -1325,26 +1336,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                         fallback.Add(kvp.Key);
                         continue;
                     }
-                    // Parse trade type from SignalName token "_TRADETYPE_"
+
+                    // --- Segment-position extraction ---
                     string sig = kvp.Value.SignalName ?? kvp.Key;
                     string followerType = null;
-                    if      (sig.Contains("_TREND_"))  followerType = "TREND";
-                    else if (sig.Contains("_RETEST_")) followerType = "RETEST";
-                    else if (sig.Contains("_MOMO_"))   followerType = "MOMO";
-                    else if (sig.Contains("_FFMA_"))   followerType = "FFMA";
-                    else if (sig.Contains("_RMA_"))    followerType = "RMA";
-                    else if (sig.Contains("_OR_"))     followerType = "OR";
-                    else
+                    int lastUs = sig.LastIndexOf('_');
+                    if (lastUs > 0)
                     {
-                        // Could not parse — fall back to boolean flags (safe for non-RMA types)
+                        int typeUs = sig.LastIndexOf('_', lastUs - 1);
+                        if (typeUs >= 0)
+                        {
+                            string extracted = sig.Substring(typeUs + 1, lastUs - typeUs - 1);
+                            // Validate against known set — rejects garbage from unusual account names
+                            if (extracted == "OR"     || extracted == "RMA"  ||
+                                extracted == "TREND"  || extracted == "RETEST" ||
+                                extracted == "MOMO"   || extracted == "FFMA")
+                                followerType = extracted;
+                        }
+                    }
+
+                    // Fallback: segment parsing failed — use boolean flags (RMA/OR ambiguity defaults to RMA)
+                    if (followerType == null)
+                    {
                         if      (kvp.Value.IsTRENDTrade)  followerType = "TREND";
                         else if (kvp.Value.IsRetestTrade)  followerType = "RETEST";
                         else if (kvp.Value.IsMOMOTrade)    followerType = "MOMO";
                         else if (kvp.Value.IsFFMATrade)    followerType = "FFMA";
-                        // For RMA vs OR ambiguity (both have IsRMATrade=true): default to RMA
-                        // since that is the more dangerous to misroute (broader fallback safety).
                         else                               followerType = "RMA";
                     }
+
                     if (followerType == masterTradeType)
                         fallback.Add(kvp.Key);
                 }
