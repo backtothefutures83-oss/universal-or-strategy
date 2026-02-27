@@ -441,11 +441,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ExtremePriceSinceEntry = entryPrice,
                             CurrentTrailLevel = 0,
                         };
-                        // [BUILD 926 – Codex P1 Fix]: Set authoritative type tag post-init.
-                        // Assigned outside the initializer block — NinjaTrader's partial-class compiler
-                        // cannot resolve nested-class fields (defined in another partial file) inside
-                        // object-initializer expressions. Post-init assignment compiles correctly.
-                        fleetPos.TradeTypeTag = tradeType;
 
                         // V12.7: Submit only entry for Limit; market entries include stop + non-runner targets.
                         if (isMarketEntry)

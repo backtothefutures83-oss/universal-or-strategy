@@ -1314,35 +1314,50 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                // [BUILD 926 – Codex P1 Fix]: Fallback type match now uses TradeTypeTag exclusively.
-                // Previously used IsRMATrade which is stamped true on ALL followers — causing OR followers
-                // to fail the OR predicate (!IsRMATrade) and incorrectly route into RMA propagation.
+                // [BUILD 926 – Codex P1 Fix]: Fallback type match now uses SignalName parsing.
+                //
+                // ROOT CAUSE: IsRMATrade=true is stamped on ALL fleet followers (ExecuteSmartDispatchEntry
+                // line 434) to enforce point-based trailing. Using IsRMATrade as a type discriminator
+                // caused OR followers to fail the !IsRMATrade predicate and be excluded from OR
+                // propagation, and incorrectly included in RMA propagation.
+                //
+                // FIX: Fleet entry names are stamped with the trade type at dispatch time:
+                //   Format: "Fleet_<AccountName>_<TRADETYPE>_<Index>"
+                //   Example: "Fleet_PA-APEX-422136-05_OR_0", "Fleet_APEX-09_RMA_1"
+                // Parse the type from SignalName — zero new fields, zero cross-file dependency.
                 var fallback = new List<string>();
                 foreach (var kvp in activePositions)
                 {
                     if (!kvp.Value.IsFollower || kvp.Value.ExecutingAccount == null) continue;
-                    bool typeMatch;
-                    if (!string.IsNullOrEmpty(kvp.Value.TradeTypeTag))
+                    if (masterTradeType == null)
                     {
-                        // Build 926+: reliable exact match
-                        typeMatch = (masterTradeType == null) || (kvp.Value.TradeTypeTag == masterTradeType);
+                        fallback.Add(kvp.Key);
+                        continue;
                     }
+                    // Parse trade type from SignalName token "_TRADETYPE_"
+                    string sig = kvp.Value.SignalName ?? kvp.Key;
+                    string followerType = null;
+                    if      (sig.Contains("_TREND_"))  followerType = "TREND";
+                    else if (sig.Contains("_RETEST_")) followerType = "RETEST";
+                    else if (sig.Contains("_MOMO_"))   followerType = "MOMO";
+                    else if (sig.Contains("_FFMA_"))   followerType = "FFMA";
+                    else if (sig.Contains("_RMA_"))    followerType = "RMA";
+                    else if (sig.Contains("_OR_"))     followerType = "OR";
                     else
                     {
-                        // Legacy pre-Tag followers: fall back to boolean chain (imperfect but preserved for compatibility)
-                        typeMatch = (masterTradeType == null)
-                            || (masterTradeType == "TREND"  && kvp.Value.IsTRENDTrade)
-                            || (masterTradeType == "MOMO"   && kvp.Value.IsMOMOTrade)
-                            || (masterTradeType == "FFMA"   && kvp.Value.IsFFMATrade)
-                            || (masterTradeType == "RETEST" && kvp.Value.IsRetestTrade)
-                            || (masterTradeType == "RMA"    && kvp.Value.IsRMATrade && !kvp.Value.IsTRENDTrade && !kvp.Value.IsRetestTrade)
-                            || (masterTradeType == "OR"     && !kvp.Value.IsTRENDTrade && !kvp.Value.IsMOMOTrade && !kvp.Value.IsFFMATrade && !kvp.Value.IsRetestTrade && !kvp.Value.IsTRENDTrade);
+                        // Could not parse — fall back to boolean flags (safe for non-RMA types)
+                        if      (kvp.Value.IsTRENDTrade)  followerType = "TREND";
+                        else if (kvp.Value.IsRetestTrade)  followerType = "RETEST";
+                        else if (kvp.Value.IsMOMOTrade)    followerType = "MOMO";
+                        else if (kvp.Value.IsFFMATrade)    followerType = "FFMA";
+                        // For RMA vs OR ambiguity (both have IsRMATrade=true): default to RMA
+                        // since that is the more dangerous to misroute (broader fallback safety).
+                        else                               followerType = "RMA";
                     }
-                    if (typeMatch)
+                    if (followerType == masterTradeType)
                         fallback.Add(kvp.Key);
                 }
                 followerEntryNames = fallback;
-
             }
 
             // --- Step 3: Apply move to each linked follower ---
