@@ -1,4 +1,4 @@
-// V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
+﻿// V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
 // Based on UniversalORStrategyV10_3.cs (BUILD 1702)
 // SIMA Architecture: One strategy instance on Master account broadcasts to all Apex accounts
 //
@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
-        public const string BUILD_TAG = "923B"; // V12.923B: Ghost Entry Fix — Spontaneous Cancellations + Hallucinated REAPER Repairs
+        public const string BUILD_TAG = "924";  // V12.924: Shield Hardening – Cross-Trade Price Move Repair
 
         #region Variables
 
@@ -235,6 +235,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string dailySummaryCsvPath;
         private DateTime lastDailySummaryCheck = DateTime.MinValue;
         private readonly object dailySummaryLock = new object();
+
+        // [BUILD 924 - Fix C] CIT suppression flag: set true during PropagateMasterPriceMove,
+        // cleared in finally block. Prevents CIT from market-firing freshly resubmitted follower
+        // limit entries before the propagation sync cycle completes.
+        private volatile bool _propagationActive = false;
 
         // CIT (Chase If Touch) â€” uses ChaseIfTouchPoints property (NinjaScriptProperty)
 
