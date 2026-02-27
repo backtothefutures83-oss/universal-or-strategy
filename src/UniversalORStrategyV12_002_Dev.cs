@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
-        public const string BUILD_TAG = "924";  // V12.924: Shield Hardening – Cross-Trade Price Move Repair
+        public const string BUILD_TAG = "925";  // V12.925: P1 Fix – Follower Stop Lifecycle Breach (ExecutingAccount.Cancel routing)
 
         #region Variables
 

@@ -88,6 +88,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V12.1101E [F-07]: Request stop cancellation without dropping dictionary state early.
         // We only remove references after broker-confirmed terminal states.
+        // [BUILD 925 - P1 Fix]: Route follower stop cancels through pos.ExecutingAccount.Cancel()
+        // instead of the master-local CancelOrder() API. CancelOrder() is a NinjaScript-managed
+        // call that only works for orders submitted via SubmitOrderUnmanaged(). Fleet follower
+        // stops are submitted via acct.Submit(), so they require the broker-level Account.Cancel()
+        // API — identical to the pattern already proven correct in CleanupPosition() [BUG-2a].
         private void RequestStopCancelLifecycleSafe(string entryName)
         {
             if (string.IsNullOrEmpty(entryName)) return;
@@ -98,7 +103,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted
                 || stopOrder.OrderState == OrderState.ChangePending || stopOrder.OrderState == OrderState.ChangeSubmitted)
             {
-                CancelOrder(stopOrder);
+                // [BUILD 925 - P1 Fix]: Check if this is a fleet follower — use its account context.
+                bool isFollowerStop = activePositions.TryGetValue(entryName, out var posRef)
+                    && posRef != null && posRef.IsFollower && posRef.ExecutingAccount != null;
+
+                if (isFollowerStop)
+                {
+                    // Fleet follower stop: must use Account API — CancelOrder() targets master account only.
+                    Print(string.Format("[925-P1] Follower stop cancel routed via ExecutingAccount.Cancel() for {0} on {1}",
+                        entryName, posRef.ExecutingAccount.Name));
+                    posRef.ExecutingAccount.Cancel(new[] { stopOrder });
+                }
+                else
+                {
+                    // Master/local stop: use the standard NinjaScript managed cancel.
+                    CancelOrder(stopOrder);
+                }
                 return;
             }
 

@@ -17,9 +17,9 @@ If the link is broken or files need refreshing, run the deployment script:
 
 ## 🏷️ 3. Version Traceability (Build Tags)
 Every forensic or architectural change MUST be accompanied by an increment to the `BUILD_TAG` in `UniversalORStrategyV12_002_Dev.cs`.
-*   **Current Build:** `923B`
+*   **Current Build:** `925`
 *   **Audit Step:** On strategy start, verify the NinjaTrader Output window shows:
-    `🛡 BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE | Build: 923B`
+    `🛡 BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE | Build: 925`
 
 ## 🔎 4. Zero-Trust Policy
 Never assume the code on GitHub is the code running in NinjaTrader.
