@@ -1280,28 +1280,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // --- Step 2: Resolve follower entry names via Symmetry dispatch context ---
 
-            // [BUILD 926 – Codex P1 Fix]: Derive master TradeType via authoritative TradeTypeTag first,
-            // then fall back to the boolean-flag chain (for master positions, booleans are accurate).
-            // NOTE: For FOLLOWERS, IsRMATrade=true on ALL entries (stamped by ExecuteSmartDispatchEntry
-            // for trailing behavior) — it is NOT reliable as a type discriminator. Always use TradeTypeTag.
+            // [BUILD 926 – Codex P1 Fix]: Derive master TradeType from boolean flags.
+            // Master boolean flags ARE accurate (master positions set IsTRENDTrade, IsRMATrade etc. correctly).
+            // Only FOLLOWER flags are contaminated (IsRMATrade=true on ALL followers for trailing behavior).
+            // Follower type discrimination uses SignalName parsing instead — see fallback scan below.
             string masterTradeType = null;
             if (activePositions.TryGetValue(masterEntryName, out var masterPosForType))
             {
-                if (!string.IsNullOrEmpty(masterPosForType.TradeTypeTag))
-                {
-                    // Use the authoritative stamp if present (Build 926+)
-                    masterTradeType = masterPosForType.TradeTypeTag;
-                }
-                else
-                {
-                    // Legacy fallback: derive from booleans (master booleans are accurate; follower booleans are not)
-                    if (masterPosForType.IsTRENDTrade)       masterTradeType = "TREND";
-                    else if (masterPosForType.IsRMATrade)    masterTradeType = "RMA";
-                    else if (masterPosForType.IsMOMOTrade)   masterTradeType = "MOMO";
-                    else if (masterPosForType.IsFFMATrade)   masterTradeType = "FFMA";
-                    else if (masterPosForType.IsRetestTrade) masterTradeType = "RETEST";
-                    else                                     masterTradeType = "OR";
-                }
+                if (masterPosForType.IsTRENDTrade)       masterTradeType = "TREND";
+                else if (masterPosForType.IsRMATrade)    masterTradeType = "RMA";
+                else if (masterPosForType.IsMOMOTrade)   masterTradeType = "MOMO";
+                else if (masterPosForType.IsFFMATrade)   masterTradeType = "FFMA";
+                else if (masterPosForType.IsRetestTrade) masterTradeType = "RETEST";
+                else                                     masterTradeType = "OR";
             }
 
             IEnumerable<string> followerEntryNames;
