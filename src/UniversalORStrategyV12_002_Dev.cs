@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
-        public const string BUILD_TAG = "927";  // V12.927: Codex P2 – segment-position follower type parsing (account name substring safety)
+        public const string BUILD_TAG = "928";  // V12.928: Codex P2 – IsRetestTrade before IsRMATrade in master type derivation
 
         #region Variables
 

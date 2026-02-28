@@ -1287,11 +1287,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             string masterTradeType = null;
             if (activePositions.TryGetValue(masterEntryName, out var masterPosForType))
             {
-                if (masterPosForType.IsTRENDTrade)       masterTradeType = "TREND";
+                // [BUILD 928 – Codex P2 Fix]: IsRetestTrade MUST be checked before IsRMATrade.
+                // RETEST positions set both IsRetestTrade=true AND IsRMATrade=true (uses RMA trailing).
+                // Old order checked IsRMATrade first → RETEST master classified as "RMA" → fallback
+                // propagation targets RMA followers and silently skips RETEST followers.
+                if      (masterPosForType.IsTRENDTrade)  masterTradeType = "TREND";
+                else if (masterPosForType.IsRetestTrade) masterTradeType = "RETEST"; // ← before RMA
                 else if (masterPosForType.IsRMATrade)    masterTradeType = "RMA";
                 else if (masterPosForType.IsMOMOTrade)   masterTradeType = "MOMO";
                 else if (masterPosForType.IsFFMATrade)   masterTradeType = "FFMA";
-                else if (masterPosForType.IsRetestTrade) masterTradeType = "RETEST";
                 else                                     masterTradeType = "OR";
             }
 
