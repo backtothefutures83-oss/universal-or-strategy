@@ -646,6 +646,44 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        /// <summary>
+        /// Build 929 Fix3 [P1]: PR #2 Image 3 — Capture follower list before cleanup.
+        /// Cancels all follower entry orders linked to this master BEFORE CleanupPosition
+        /// destroys the dispatch map. Without this, followers stay alive as zombie Limit orders.
+        /// </summary>
+        private void SymmetryGuardCascadeFollowerCleanup(string masterEntryName)
+        {
+            if (!symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId)) return;
+            if (!symmetryDispatchById.TryGetValue(dispatchId, out var ctx)) return;
+
+            string[] followers;
+            lock (ctx.Sync) { followers = ctx.FollowerEntries.ToArray(); }
+
+            Print(string.Format("[CASCADE] Master {0} cancelled — terminating {1} linked follower(s).", masterEntryName, followers.Length));
+
+            foreach (string followerName in followers)
+            {
+                if (!activePositions.TryGetValue(followerName, out var pos)) continue;
+                if (!entryOrders.TryGetValue(followerName, out var order)) continue;
+                if (order == null) continue;
+
+                if (order.OrderState == OrderState.Working  ||
+                    order.OrderState == OrderState.Submitted ||
+                    order.OrderState == OrderState.Accepted)
+                {
+                    Print(string.Format("[CASCADE] Cancelling follower entry: {0} (Acc: {1})", followerName, pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : "Master"));
+                    if (pos.ExecutingAccount != null)
+                        pos.ExecutingAccount.Cancel(new[] { order });
+                    else
+                        CancelOrder(order);
+
+                    // Zero expected position — prevents Reaper from re-queuing a repair
+                    string acctKey = pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : Account.Name;
+                    SetExpectedPositionLocked(ExpKey(acctKey), 0);
+                }
+            }
+        }
+
         private void SymmetryGuardForgetEntry(string entryName)
         {
             if (string.IsNullOrEmpty(entryName)) return;

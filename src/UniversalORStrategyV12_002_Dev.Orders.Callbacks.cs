@@ -621,6 +621,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             Print(string.Format("[GHOST_FIX] Order Entry_{0} terminated (CANCELLED). Nullifying reference. Full teardown.", entryName));
 
+                            // Build 929 Fix3 [P1]: cancel followers BEFORE wiping the dispatch map
+                            if (EnableSIMA && !pos.IsFollower)
+                                SymmetryGuardCascadeFollowerCleanup(entryName);
+
                             // Clean up local state
                             CleanupPosition(entryName);
 
