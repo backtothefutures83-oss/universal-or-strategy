@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
-        public const string BUILD_TAG = "928";  // V12.928: Codex P2 – IsRetestTrade before IsRMATrade in master type derivation
+        public const string BUILD_TAG = "929";  // V12.929: Final Hardening — IPC loop fix, flatten-on-stop-throw, cascade follower cleanup
 
         #region Variables
 

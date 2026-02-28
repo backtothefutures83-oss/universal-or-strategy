@@ -64,7 +64,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         FlattenPositionByName(entryName);
                         return;
                     }
-                    pos.ExecutingAccount.Submit(new[] { sOrd });
+                    // Build 929 Fix2 [P1]: Wrap Submit in local try/catch.
+                    // If Submit() throws (broker disconnect, margin, reject), the outer catch only logs
+                    // and returns — leaving this follower with a filled position and NO stop loss.
+                    // We must flatten immediately to prevent a naked position.
+                    try
+                    {
+                        pos.ExecutingAccount.Submit(new[] { sOrd });
+                    }
+                    catch (Exception submitEx)
+                    {
+                        Print(string.Format("[BRACKET_FATAL] Follower stop Submit THREW for {0}: {1}. Emergency flattening.", entryName, submitEx.Message));
+                        EmergencyFlattenSingleFleetAccount(pos.ExecutingAccount);
+                        return;
+                    }
                     stopOrder = sOrd;
                 }
                 else

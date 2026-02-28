@@ -800,8 +800,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // Apex/Tradovate treats as a Market order → instant fill without price touching level.
                             if (currentPrice <= 0)
                             {
-                                Print("[IPC] ABORT RMA dispatch: currentPrice=0 — lastKnownPrice and Close[0] both invalid. Wait for first bar before sending RMA commands.");
-                                break;
+                                Print("[IPC] ABORT RMA dispatch: currentPrice=0 — lastKnownPrice and Close[0] both invalid. Skipping command, continuing queue drain.");
+                                continue; // Build 929 Fix1 [P2]: skip bad-price command, keep draining queue
                             }
                             double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
                             int contracts    = CalculatePositionSize(stopDist);
