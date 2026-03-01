@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
-        public const string BUILD_TAG = "929";  // V12.929: Final Hardening — IPC loop fix, flatten-on-stop-throw, cascade follower cleanup
+        public const string BUILD_TAG = "930";  // V12.930: Account-Safety — delta rollback + underscore trade type fix
 
         #region Variables
 
