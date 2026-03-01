@@ -31,7 +31,7 @@ using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
         /// <summary>
         /// V12 SIMA: Helper struct to rank accounts by Daily P/L
@@ -99,8 +99,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Interlocked.Exchange(ref _lastExpectedPositionSetTicks, DateTime.UtcNow.Ticks);
         }
 
-        // Build 930 [P1]: Delta rollback for cascade cancellations.
-        // Subtracts only the cancelled entry's quantity, clamped to >= 0.
+        // Build 930.1 [P1]: Delta rollback for cascade cancellations.
+        // Subtracts or adds the cancelled entry's quantity to the signed total.
         // Preserves expected position for other active entries on the same account.
         private void DeltaExpectedPositionLocked(string accountName, int delta)
         {
@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 int current;
                 expectedPositions.TryGetValue(accountName, out current);
-                int updated = Math.Max(0, current + delta);
+                int updated = current + delta;
                 expectedPositions[accountName] = updated;
                 Print(string.Format("[ACCOUNT_SYNC] {0} expected delta: {1} + ({2}) = {3}", accountName, current, delta, updated));
             }

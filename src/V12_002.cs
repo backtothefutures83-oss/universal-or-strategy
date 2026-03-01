@@ -39,9 +39,9 @@ using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "930";  // V12.930: Account-Safety — delta rollback + underscore trade type fix
+        public const string BUILD_TAG = "932";  // V12.932: Final Project-Wide Architectural Polish — delta rollback + underscore trade type fix
 
         #region Variables
 
@@ -376,7 +376,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Build 1102Y-V3 [LG-01]: Target Ladder Guard — "The Staircase Rule."
-        /// Iterates T1 → T5 and ensures every rung is at least one tick FURTHER from entry
+        /// Iterates T1 ? T5 and ensures every rung is at least one tick FURTHER from entry
         /// than the rung before it. In low volatility the ATR-based T2 can be tighter than
         /// the fixed Scalp (T1), causing price inversion and incorrect order slotting.
         /// Call this after computing target prices and again after fill-price re-anchoring.
@@ -562,7 +562,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = "Universal OR Strategy V12.12 - Build " + BUILD_TAG;
-                Name = "UniversalORStrategyV12_002";
+                Name = "V12_002";
                 Calculate = Calculate.OnPriceChange;  // CRITICAL FIX: Updates on every price tick for real-time trailing
                 EntriesPerDirection = 10;
                 EntryHandling = EntryHandling.UniqueEntries;
@@ -657,7 +657,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnablePathB = false;
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;
-                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES→MES fleet parity
+                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES?MES fleet parity
                 PathBStopPoints = 10.0;
                 PathBTargetPoints = 15.0;
                 ChaseIfTouchPoints = "0";
@@ -773,6 +773,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 ResetOR();
 
+                // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
+                // [Build 932]: Start IPC in DataLoaded so Control Surface connects even if market is closed/offline.
+                StartIpcServer();
+
                 Print(string.Format("UniversalORStrategy V12.14 | {0} | Tick: {1} | PV: ${2}", symbol, tickSize, pointValue));
                 Print(string.Format("Session: {0} - {1} {2} | OR: {3} min",
                     SessionStart.ToString("HH:mm"), SessionEnd.ToString("HH:mm"), SelectedTimeZone, (int)ORTimeframe));
@@ -788,14 +792,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Realtime)
             {
-                Print("╔══════════════════════════════════════════════════════════════╗");
-                Print("║          🛡  BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE        ║");
-                Print(string.Format("║          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    ║", BUILD_TAG));
-                Print("╚══════════════════════════════════════════════════════════════╝");
-
-                // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
-                // EMERGENCY SAFE MODE (V12.32): Disabling background services to allow platform login
-                StartIpcServer();
+                Print("+--------------------------------------------------------------+");
+                Print("¦          ??  BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE        ¦");
+                Print(string.Format("¦          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    ¦", BUILD_TAG));
+                Print("+--------------------------------------------------------------+");
 
                 if (EnableSIMA)
                 {

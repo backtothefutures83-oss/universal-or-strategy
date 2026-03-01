@@ -11,7 +11,7 @@ using NinjaTrader.NinjaScript.Strategies;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
         #region V12 REAPER Audit Logic
 
@@ -194,6 +194,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 string blockingOrderName  = null;
                                 OrderState blockingState  = OrderState.Unknown;
 
+                                // Build 931 [REAPER-SNAPSHOT]: Thread-safe snapshot prevents torn-reads on background thread.
+                                Dictionary<string, PositionInfo> activeSnapshot;
+                                lock (stateLock) { activeSnapshot = new Dictionary<string, PositionInfo>(activePositions); }
+
                                 foreach (var kvp in entryOrders.ToArray())
                                 {
                                     Order ord = kvp.Value;
@@ -202,11 +206,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     OrderState ordState = ord.OrderState;
                                     // [M8.2 REPAIR-01]: Skip terminal/zombie states — they must never block a
                                     // legitimate repair even if the order object is still in the dictionary.
-                                    if (ordState == OrderState.Cancelled || ordState == OrderState.Rejected
-                                        || ordState == OrderState.Filled)
-                                        continue;
+                                    if (IsOrderTerminal(ordState)) continue;
 
-                                    if (activePositions.TryGetValue(kvp.Key, out var pi)
+                                    if (activeSnapshot.TryGetValue(kvp.Key, out var pi)
                                         && pi.IsFollower && pi.ExecutingAccount != null
                                         && pi.ExecutingAccount.Name == acct.Name
                                         && (ordState == OrderState.Working

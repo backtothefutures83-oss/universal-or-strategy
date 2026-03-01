@@ -8,7 +8,7 @@ using NinjaTrader.NinjaScript;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
         #region V12.50 Symmetry Guard
 
@@ -431,11 +431,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             string stopSig = SymmetryTrim("Stop_" + fleetEntryName, 40);
             Order stop = acct.CreateOrder(Instrument, exitAction, OrderType.StopMarket,
                 TimeInForce.Gtc, Math.Max(1, pos.TotalContracts), 0, validatedStop, ocoId, stopSig, null);
-            stopOrders[fleetEntryName] = stop;
-            ordersToSubmit.Add(stop);
 
             int nonRunnerLimitQty = 0;
             int runnerQty = 0;
+
+            // Stage orders locally; commit atomically under stateLock.
+            var stagedTargets = new List<(int targetNum, Order order)>();
 
             for (int targetNum = 1; targetNum <= 5; targetNum++)
             {
@@ -473,17 +474,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     targetSig,
                     null);
 
-                switch (targetNum)
-                {
-                    case 1: target1Orders[fleetEntryName] = target; break;
-                    case 2: target2Orders[fleetEntryName] = target; break;
-                    case 3: target3Orders[fleetEntryName] = target; break;
-                    case 4: target4Orders[fleetEntryName] = target; break;
-                    case 5: target5Orders[fleetEntryName] = target; break;
-                }
-
+                stagedTargets.Add((targetNum, target));
                 ordersToSubmit.Add(target);
                 nonRunnerLimitQty += targetQty;
+            }
+
+            // Atomic commit before broker submission prevents REAPER race.
+            ordersToSubmit.Insert(0, stop);
+            lock (stateLock)
+            {
+                stopOrders[fleetEntryName] = stop;
+                foreach (var (targetNum, order) in stagedTargets)
+                    GetTargetOrdersDictionary(targetNum)[fleetEntryName] = order;
             }
 
             acct.Submit(ordersToSubmit.ToArray());
@@ -678,12 +680,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                         CancelOrder(order);
 
-                    // Build 930 Fix P1: Per-entry delta rollback — do NOT hard-wipe to zero.
-                    // ExpKey is account+instrument aggregate; hard-zero destroys other active
-                    // entries on the same account, causing REAPER to incorrectly flatten them.
-                    // Instead subtract only this entry's quantity from the running total.
+                    // Build 930.1 P1: Direction-aware delta rollback.
+                    // expectedPositions is signed (Long=+, Short=-). Cancelling a Short must add back.
                     string acctKey = pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : Account.Name;
-                    DeltaExpectedPositionLocked(ExpKey(acctKey), -pos.TotalContracts);
+                    int delta = (pos.Direction == MarketPosition.Long) ? -pos.TotalContracts : pos.TotalContracts;
+                    DeltaExpectedPositionLocked(ExpKey(acctKey), delta);
                 }
             }
         }

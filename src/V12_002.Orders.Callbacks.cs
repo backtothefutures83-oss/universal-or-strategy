@@ -30,7 +30,7 @@ using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
         #region Order Callbacks
 
@@ -873,14 +873,50 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Check for EXTERNAL close (position went flat from outside strategy)
                 if (marketPosition == MarketPosition.Flat)
                 {
-                    // EMERGENCY FIX [H-14]: Sync expectedPositions when this account's position goes flat.
-                    // Prevents dispatch loop from seeing stale expected=1 and re-entering on every bar.
+                    // [H-14]: Sync expectedPositions on flat. Build 931: guard against spurious flat.
                     string flatAcctName = position?.Account?.Name;
                     if (!string.IsNullOrEmpty(flatAcctName))
                     {
-                        // Build 1102U [BUG-1]: Composite key — only clears THIS instrument's slot on this account.
-                        SetExpectedPositionLocked(ExpKey(flatAcctName), 0);
-                        Print($"[OnPositionUpdate] expectedPositions cleared for {ExpKey(flatAcctName)} (position flat)");
+                        string flatExpKey = ExpKey(flatAcctName);
+                        bool hasPendingEntry = false;
+                        foreach (var kvp in entryOrders.ToArray())
+                        {
+                            var ord = kvp.Value;
+                            if (ord != null
+                                && !IsOrderTerminal(ord.OrderState)
+                                && activePositions.TryGetValue(kvp.Key, out var pos)
+                                && pos.ExecutingAccount != null
+                                && pos.ExecutingAccount.Name == flatAcctName)
+                            {
+                                hasPendingEntry = true;
+                                break;
+                            }
+                        }
+
+                        bool hasActivePositionForAcct = false;
+                        if (!hasPendingEntry)
+                        {
+                            foreach (var kvp in activePositions.ToArray())
+                            {
+                                if (kvp.Value.ExecutingAccount != null
+                                    && kvp.Value.ExecutingAccount.Name == flatAcctName
+                                    && !kvp.Value.EntryFilled)
+                                {
+                                    hasActivePositionForAcct = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (hasPendingEntry || hasActivePositionForAcct)
+                        {
+                            Print($"[OnPositionUpdate] H-14 SKIP: {flatExpKey} broker=Flat but {(hasPendingEntry ? "pending entry in flight" : "activePositions metadata present")} — not resetting expectedPositions");
+                        }
+                        else
+                        {
+                            SetExpectedPositionLocked(flatExpKey, 0);
+                            Print($"[OnPositionUpdate] expectedPositions cleared for {flatExpKey} (position flat)");
+                        }
                     }
 
                     // V8.22: Even if activePositions is empty (strategy restart), we should scan for orphans

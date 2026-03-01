@@ -9,6 +9,7 @@
 ## 🛡️ Protocol Hardening (V12.Phase7)
 
 ### 1. Scope Control
+- **Discovery Guard**: AI agents MUST automatically ignore all backups (`*.bak`), archives (`ARCHIVE_*`), and date-stamped files from global scans. Reference **[.agent/rules/zero_waste_discovery.md](file:///.agent/rules/zero_waste_discovery.md)** for the full exclusion patterns.
 - **Surgical Edits**: AI agents MUST restrict code modifications to the specific files requested in the Mission Brief. NEVER refactor unrelated files without explicit Director authorization.
 - **Zero-Trust Planning**: Always generate an `implementation_plan.md` before applying code changes to local files.
 

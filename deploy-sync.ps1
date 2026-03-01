@@ -13,29 +13,29 @@ $NtIndicatorDir = Join-Path $NtCustomDir "Indicators"
 # File Mappings (Source in Repo -> Target in NT8)
 $Mappings = @(
     # Indicators
-    @{ src = "V12StandardPanel_V12_001_Dev.cs"; dst = Join-Path $NtIndicatorDir "V12StandardPanel_V12_001_Dev.cs" },
+    @{ src = "V12_001.cs"; dst = Join-Path $NtIndicatorDir "V12_001.cs" },
     
     # Strategy (Modularized V12_002 Series)
-    @{ src = "UniversalORStrategyV12_002_Dev.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.FFMA.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.FFMA.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.OR.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.OR.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.RMA.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.RMA.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.MOMO.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.MOMO.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.Trend.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.Trend.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Entries.Retest.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Entries.Retest.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Orders.Callbacks.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Orders.Callbacks.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Orders.Management.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Orders.Management.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.SIMA.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.SIMA.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.REAPER.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.REAPER.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.UI.Callbacks.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.UI.Callbacks.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.UI.Compliance.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.UI.Compliance.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.UI.IPC.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.UI.IPC.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.UI.Sizing.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.UI.Sizing.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Symmetry.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Symmetry.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.LogicAudit.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.LogicAudit.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Trailing.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Trailing.cs" },
-    @{ src = "UniversalORStrategyV12_002_Dev.Properties.cs"; dst = Join-Path $NtStrategyDir "UniversalORStrategyV12_002_Dev.Properties.cs" },
+    @{ src = "V12_002.cs"; dst = Join-Path $NtStrategyDir "V12_002.cs" },
+    @{ src = "V12_002.Entries.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.cs" },
+    @{ src = "V12_002.Entries.FFMA.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.FFMA.cs" },
+    @{ src = "V12_002.Entries.OR.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.OR.cs" },
+    @{ src = "V12_002.Entries.RMA.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.RMA.cs" },
+    @{ src = "V12_002.Entries.MOMO.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.MOMO.cs" },
+    @{ src = "V12_002.Entries.Trend.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.Trend.cs" },
+    @{ src = "V12_002.Entries.Retest.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.Retest.cs" },
+    @{ src = "V12_002.Orders.Callbacks.cs"; dst = Join-Path $NtStrategyDir "V12_002.Orders.Callbacks.cs" },
+    @{ src = "V12_002.Orders.Management.cs"; dst = Join-Path $NtStrategyDir "V12_002.Orders.Management.cs" },
+    @{ src = "V12_002.SIMA.cs"; dst = Join-Path $NtStrategyDir "V12_002.SIMA.cs" },
+    @{ src = "V12_002.REAPER.cs"; dst = Join-Path $NtStrategyDir "V12_002.REAPER.cs" },
+    @{ src = "V12_002.UI.Callbacks.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.Callbacks.cs" },
+    @{ src = "V12_002.UI.Compliance.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.Compliance.cs" },
+    @{ src = "V12_002.UI.IPC.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.IPC.cs" },
+    @{ src = "V12_002.UI.Sizing.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.Sizing.cs" },
+    @{ src = "V12_002.Symmetry.cs"; dst = Join-Path $NtStrategyDir "V12_002.Symmetry.cs" },
+    @{ src = "V12_002.LogicAudit.cs"; dst = Join-Path $NtStrategyDir "V12_002.LogicAudit.cs" },
+    @{ src = "V12_002.Trailing.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.cs" },
+    @{ src = "V12_002.Properties.cs"; dst = Join-Path $NtStrategyDir "V12_002.Properties.cs" },
     
     # Shared Components
     @{ src = "SignalBroadcaster.cs"; dst = Join-Path $NtStrategyDir "SignalBroadcaster.cs" }
@@ -44,7 +44,13 @@ $Mappings = @(
 Write-Host "`n--- WSGTA DEPLOY SYNC: Hardening Environment ---" -ForegroundColor Cyan
 
 foreach ($map in $Mappings) {
-    $srcPath = Join-Path (Join-Path $RepoRoot "src") $map.src
+    if ($map.src -match "Indicator") {
+        $srcPath = Join-Path (Join-Path $RepoRoot "src") $map.src
+    }
+    else {
+        $srcPath = Join-Path (Join-Path $RepoRoot "src") $map.src
+    }
+    
     $dstPath = $map.dst
     
     if (!(Test-Path $srcPath)) {
@@ -59,16 +65,20 @@ foreach ($map in $Mappings) {
     # Sync Logic
     if (Test-Path $dstPath) {
         $item = Get-Item $dstPath
-        if ($item.Attributes -match "ReparsePoint") {
-            # Check if it's already linked
-            Write-Host "SECURE: $($map.src) is already linked." -ForegroundColor Gray
-            continue
-        }
+        # If it's a file but NOT a link, backup it
+        # Check if it's already a link to the current source
+        $isLink = $item.Attributes -match "ReparsePoint"
         
-        # Backup if it's a real file (to avoid losing work)
-        $backup = $dstPath + ".bak_" + (Get-Date -Format "yyyyMMdd_HHmm")
-        Write-Host "BACKUP: Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
-        Move-Item $dstPath $backup
+        if ($isLink) {
+            # Verify it points to the right place or just recreate it
+            Remove-Item $dstPath -Force
+        }
+        else {
+            # Backup if it's a real file (to avoid losing work)
+            $backup = $dstPath + ".bak_" + (Get-Date -Format "yyyyMMdd_HHmm")
+            Write-Host "BACKUP: Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
+            Move-Item $dstPath $backup
+        }
     }
 
     # Create the Link
