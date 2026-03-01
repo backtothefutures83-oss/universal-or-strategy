@@ -678,12 +678,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                         CancelOrder(order);
 
-                    // Build 930 Fix P1: Per-entry delta rollback — do NOT hard-wipe to zero.
-                    // ExpKey is account+instrument aggregate; hard-zero destroys other active
-                    // entries on the same account, causing REAPER to incorrectly flatten them.
-                    // Instead subtract only this entry's quantity from the running total.
+                    // Build 930.1 P1: Direction-aware delta rollback.
+                    // expectedPositions is signed (Long=+, Short=-). Cancelling a Short must add back.
                     string acctKey = pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : Account.Name;
-                    DeltaExpectedPositionLocked(ExpKey(acctKey), -pos.TotalContracts);
+                    int delta = (pos.Direction == MarketPosition.Long) ? -pos.TotalContracts : pos.TotalContracts;
+                    DeltaExpectedPositionLocked(ExpKey(acctKey), delta);
                 }
             }
         }
