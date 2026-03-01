@@ -431,11 +431,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             string stopSig = SymmetryTrim("Stop_" + fleetEntryName, 40);
             Order stop = acct.CreateOrder(Instrument, exitAction, OrderType.StopMarket,
                 TimeInForce.Gtc, Math.Max(1, pos.TotalContracts), 0, validatedStop, ocoId, stopSig, null);
-            stopOrders[fleetEntryName] = stop;
-            ordersToSubmit.Add(stop);
 
             int nonRunnerLimitQty = 0;
             int runnerQty = 0;
+
+            // Build 931 [SYM-LOCK]: Stage target orders locally before committing to dicts under stateLock.
+            // Prevents REAPER from seeing a naked position (entry filled, no stop/target in dict).
+            var stagedTargets = new List<(int targetNum, Order order)>();
 
             for (int targetNum = 1; targetNum <= 5; targetNum++)
             {
@@ -473,17 +475,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                     targetSig,
                     null);
 
-                switch (targetNum)
-                {
-                    case 1: target1Orders[fleetEntryName] = target; break;
-                    case 2: target2Orders[fleetEntryName] = target; break;
-                    case 3: target3Orders[fleetEntryName] = target; break;
-                    case 4: target4Orders[fleetEntryName] = target; break;
-                    case 5: target5Orders[fleetEntryName] = target; break;
-                }
-
+                stagedTargets.Add((targetNum, target));
                 ordersToSubmit.Add(target);
                 nonRunnerLimitQty += targetQty;
+            }
+
+            // Build 931 [SYM-LOCK]: Commit all order references atomically under stateLock
+            // BEFORE acct.Submit() — ensures REAPER never sees a naked position.
+            ordersToSubmit.Insert(0, stop);
+            lock (stateLock)
+            {
+                stopOrders[fleetEntryName] = stop;
+                foreach (var (targetNum, order) in stagedTargets)
+                {
+                    switch (targetNum)
+                    {
+                        case 1: target1Orders[fleetEntryName] = order; break;
+                        case 2: target2Orders[fleetEntryName] = order; break;
+                        case 3: target3Orders[fleetEntryName] = order; break;
+                        case 4: target4Orders[fleetEntryName] = order; break;
+                        case 5: target5Orders[fleetEntryName] = order; break;
+                    }
+                }
             }
 
             acct.Submit(ordersToSubmit.ToArray());

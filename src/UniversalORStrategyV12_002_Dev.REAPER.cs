@@ -194,6 +194,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 string blockingOrderName  = null;
                                 OrderState blockingState  = OrderState.Unknown;
 
+                                // Build 931 [REAPER-SNAPSHOT]: Thread-safe snapshot prevents torn-reads on background thread.
+                                Dictionary<string, PositionInfo> activeSnapshot;
+                                lock (stateLock) { activeSnapshot = new Dictionary<string, PositionInfo>(activePositions); }
+
                                 foreach (var kvp in entryOrders.ToArray())
                                 {
                                     Order ord = kvp.Value;
@@ -206,7 +210,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                         || ordState == OrderState.Filled)
                                         continue;
 
-                                    if (activePositions.TryGetValue(kvp.Key, out var pi)
+                                    if (activeSnapshot.TryGetValue(kvp.Key, out var pi)
                                         && pi.IsFollower && pi.ExecutingAccount != null
                                         && pi.ExecutingAccount.Name == acct.Name
                                         && (ordState == OrderState.Working
