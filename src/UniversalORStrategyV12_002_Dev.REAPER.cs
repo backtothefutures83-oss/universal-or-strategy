@@ -206,9 +206,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     OrderState ordState = ord.OrderState;
                                     // [M8.2 REPAIR-01]: Skip terminal/zombie states — they must never block a
                                     // legitimate repair even if the order object is still in the dictionary.
-                                    if (ordState == OrderState.Cancelled || ordState == OrderState.Rejected
-                                        || ordState == OrderState.Filled)
-                                        continue;
+                                    if (IsOrderTerminal(ordState)) continue;
 
                                     if (activeSnapshot.TryGetValue(kvp.Key, out var pi)
                                         && pi.IsFollower && pi.ExecutingAccount != null

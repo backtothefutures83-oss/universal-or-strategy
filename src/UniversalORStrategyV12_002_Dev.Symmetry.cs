@@ -435,8 +435,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int nonRunnerLimitQty = 0;
             int runnerQty = 0;
 
-            // Build 931 [SYM-LOCK]: Stage target orders locally before committing to dicts under stateLock.
-            // Prevents REAPER from seeing a naked position (entry filled, no stop/target in dict).
+            // Stage orders locally; commit atomically under stateLock.
             var stagedTargets = new List<(int targetNum, Order order)>();
 
             for (int targetNum = 1; targetNum <= 5; targetNum++)
@@ -480,23 +479,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 nonRunnerLimitQty += targetQty;
             }
 
-            // Build 931 [SYM-LOCK]: Commit all order references atomically under stateLock
-            // BEFORE acct.Submit() — ensures REAPER never sees a naked position.
+            // Atomic commit before broker submission prevents REAPER race.
             ordersToSubmit.Insert(0, stop);
             lock (stateLock)
             {
                 stopOrders[fleetEntryName] = stop;
                 foreach (var (targetNum, order) in stagedTargets)
-                {
-                    switch (targetNum)
-                    {
-                        case 1: target1Orders[fleetEntryName] = order; break;
-                        case 2: target2Orders[fleetEntryName] = order; break;
-                        case 3: target3Orders[fleetEntryName] = order; break;
-                        case 4: target4Orders[fleetEntryName] = order; break;
-                        case 5: target5Orders[fleetEntryName] = order; break;
-                    }
-                }
+                    GetTargetOrdersDictionary(targetNum)[fleetEntryName] = order;
             }
 
             acct.Submit(ordersToSubmit.ToArray());

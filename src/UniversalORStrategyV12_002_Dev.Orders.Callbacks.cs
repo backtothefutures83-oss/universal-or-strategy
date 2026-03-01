@@ -873,13 +873,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Check for EXTERNAL close (position went flat from outside strategy)
                 if (marketPosition == MarketPosition.Flat)
                 {
-                    // EMERGENCY FIX [H-14]: Sync expectedPositions when this account's position goes flat.
-                    // Prevents dispatch loop from seeing stale expected=1 and re-entering on every bar.
-                    // Build 931 [P1-FIX]: Guard against spurious flat — only zero if activePositions also confirms flat.
+                    // [H-14]: Sync expectedPositions on flat. Build 931: guard against spurious flat.
                     string flatAcctName = position?.Account?.Name;
                     if (!string.IsNullOrEmpty(flatAcctName))
                     {
-                        // Build 931: Spurious flat guard — skip zero if entries or positions still reference this account.
+                        string flatExpKey = ExpKey(flatAcctName);
                         bool hasPendingEntry = false;
                         foreach (var kvp in entryOrders.ToArray())
                         {
@@ -912,13 +910,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (hasPendingEntry || hasActivePositionForAcct)
                         {
-                            Print($"[OnPositionUpdate] H-14 SKIP: {ExpKey(flatAcctName)} broker=Flat but {(hasPendingEntry ? "pending entry in flight" : "activePositions metadata present")} — not resetting expectedPositions");
+                            Print($"[OnPositionUpdate] H-14 SKIP: {flatExpKey} broker=Flat but {(hasPendingEntry ? "pending entry in flight" : "activePositions metadata present")} — not resetting expectedPositions");
                         }
                         else
                         {
-                            // Build 1102U [BUG-1]: Composite key — only clears THIS instrument's slot on this account.
-                            SetExpectedPositionLocked(ExpKey(flatAcctName), 0);
-                            Print($"[OnPositionUpdate] expectedPositions cleared for {ExpKey(flatAcctName)} (position flat)");
+                            SetExpectedPositionLocked(flatExpKey, 0);
+                            Print($"[OnPositionUpdate] expectedPositions cleared for {flatExpKey} (position flat)");
                         }
                     }
 
