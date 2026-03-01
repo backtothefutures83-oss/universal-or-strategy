@@ -99,6 +99,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Interlocked.Exchange(ref _lastExpectedPositionSetTicks, DateTime.UtcNow.Ticks);
         }
 
+        // Build 930 [P1]: Delta rollback for cascade cancellations.
+        // Subtracts only the cancelled entry's quantity, clamped to >= 0.
+        // Preserves expected position for other active entries on the same account.
+        private void DeltaExpectedPositionLocked(string accountName, int delta)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
+            lock (stateLock)
+            {
+                int current;
+                expectedPositions.TryGetValue(accountName, out current);
+                int updated = Math.Max(0, current + delta);
+                expectedPositions[accountName] = updated;
+                Print(string.Format("[ACCOUNT_SYNC] {0} expected delta: {1} + ({2}) = {3}", accountName, current, delta, updated));
+            }
+        }
+
         /// <summary>
         /// 1102Z-C [RR-2b]: Stamp _lastExpectedPositionSetTicks to open a fresh 5-second REAPER grace window.
         /// Call before any follower entry order mutation (Change or Cancel) during a price-move propagation.

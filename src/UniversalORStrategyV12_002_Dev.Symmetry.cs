@@ -678,9 +678,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                         CancelOrder(order);
 
-                    // Zero expected position — prevents Reaper from re-queuing a repair
+                    // Build 930 Fix P1: Per-entry delta rollback — do NOT hard-wipe to zero.
+                    // ExpKey is account+instrument aggregate; hard-zero destroys other active
+                    // entries on the same account, causing REAPER to incorrectly flatten them.
+                    // Instead subtract only this entry's quantity from the running total.
                     string acctKey = pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : Account.Name;
-                    SetExpectedPositionLocked(ExpKey(acctKey), 0);
+                    DeltaExpectedPositionLocked(ExpKey(acctKey), -pos.TotalContracts);
                 }
             }
         }

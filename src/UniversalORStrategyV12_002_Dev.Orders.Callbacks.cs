@@ -1358,8 +1358,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // Validate against known set — rejects garbage from unusual account names
                             if (extracted == "OR"     || extracted == "RMA"  ||
                                 extracted == "TREND"  || extracted == "RETEST" ||
-                                extracted == "MOMO"   || extracted == "FFMA")
-                                followerType = extracted;
+                                extracted == "MOMO"   || extracted == "FFMA"  ||
+                                // Build 930 Fix P2: Suffix-marker support — FFMA_MNL, FFMA_MNL_MKT, OR_RETEST etc.
+                                extracted.StartsWith("FFMA_") || extracted.StartsWith("MOMO_") ||
+                                extracted.StartsWith("OR_")   || extracted.StartsWith("RMA_")  ||
+                                extracted.StartsWith("TREND_") || extracted.StartsWith("RETEST_"))
+                                followerType = extracted.Split('_')[0]; // normalize to base type
                         }
                     }
 
