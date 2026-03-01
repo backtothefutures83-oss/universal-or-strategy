@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class UniversalORStrategyV12_002_Dev : Strategy
     {
-        public const string BUILD_TAG = "930";  // V12.930: Account-Safety — delta rollback + underscore trade type fix
+        public const string BUILD_TAG = "932";  // V12.932: Final Project-Wide Architectural Polish — delta rollback + underscore trade type fix
 
         #region Variables
 
