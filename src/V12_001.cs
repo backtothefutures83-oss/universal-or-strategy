@@ -168,6 +168,9 @@ namespace NinjaTrader.NinjaScript.Indicators
         private volatile bool isShuttingDown = false;
         private System.Threading.Timer reconnectTimer;
         private ConcurrentQueue<string> responseQueue = new ConcurrentQueue<string>();
+        // [Build 934]: Throttle IPC retry log spam — print on 1st failure then once per 60 s
+        private int      _ipcRetryCount    = 0;
+        private DateTime _lastRetryLogTime = DateTime.MinValue;
 
         // Symbol State
         private string activeSymbol = "MES";
@@ -2993,8 +2996,11 @@ namespace NinjaTrader.NinjaScript.Indicators
                     tcpClient.Connect("127.0.0.1", IpcPort);
                     tcpStream = tcpClient.GetStream();
                     isConnected = true;
+                    // [Build 934]: Reset retry counters on successful connect
+                    _ipcRetryCount    = 0;
+                    _lastRetryLogTime = DateTime.MinValue;
 
-                    Print($"V12 STANDARD: Connected on port {IpcPort}");
+                    Print($"V12 Panel: Strategy connected on port {IpcPort} ✓");
 
                     if (ChartControl != null)
                     {
@@ -3014,10 +3020,17 @@ namespace NinjaTrader.NinjaScript.Indicators
                     SendCommand("GET_LAYOUT");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Print($"V12 STANDARD: Connection failed - {ex.Message}");
                 isConnected = false;
+                _ipcRetryCount++;
+
+                // [Build 934]: Log only on first failure and then at most once per 60 seconds
+                if (_ipcRetryCount == 1 || (DateTime.Now - _lastRetryLogTime).TotalSeconds >= 60)
+                {
+                    Print($"V12 Panel: Strategy offline — retrying in background (attempt #{_ipcRetryCount})");
+                    _lastRetryLogTime = DateTime.Now;
+                }
 
                 if (ChartControl != null)
                 {
@@ -3032,7 +3045,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                 }
 
                 // [Build 933]: Start retry loop on initial failure (market closed / Strategy not yet live).
-                // Previously ScheduleReconnect() only ran after a live connection dropped.
                 ScheduleReconnect();
             }
         }
@@ -3177,13 +3189,13 @@ namespace NinjaTrader.NinjaScript.Indicators
                 {
                     if (isShuttingDown || isConnected) return;
 
-                    Print("V12.14: Auto-reconnect attempting...");
+                    // [Build 934]: Removed per-attempt "Auto-reconnect attempting..." print — now throttled in ConnectToStrategy() catch block
                     try
                     {
                         ConnectToStrategy();
                         if (isConnected)
                         {
-                            Print("V12.14: Auto-reconnect SUCCESS");
+                            Print("V12 Panel: Strategy came online — connected ✓");
                             lock (_reconnectLock) { reconnectTimer = null; }
                         }
                         else
@@ -3193,7 +3205,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     }
                     catch (Exception ex)
                     {
-                        Print($"V12.14: Auto-reconnect failed - {ex.Message}");
+                        // [Build 934]: Logging is throttled inside ConnectToStrategy() catch — no extra print here
                         ScheduleReconnect();
                     }
                 }, null, 3000, Timeout.Infinite);
