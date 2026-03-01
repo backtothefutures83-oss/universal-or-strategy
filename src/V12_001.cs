@@ -3026,10 +3026,14 @@ namespace NinjaTrader.NinjaScript.Indicators
                         if (hubStatusLed != null)
                         {
                             hubStatusLed.Background = TextMuted;
-                            hubStatusLed.ToolTip = "IPC Disconnected";
+                            hubStatusLed.ToolTip = "Waiting for Strategy (retrying...)";
                         }
                     }));
                 }
+
+                // [Build 933]: Start retry loop on initial failure (market closed / Strategy not yet live).
+                // Previously ScheduleReconnect() only ran after a live connection dropped.
+                ScheduleReconnect();
             }
         }
 
