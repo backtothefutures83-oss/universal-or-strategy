@@ -31,7 +31,7 @@ using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
         /// <summary>
         /// V12 SIMA: Helper struct to rank accounts by Daily P/L

@@ -1,4 +1,4 @@
-﻿// V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
+// V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
 // Based on UniversalORStrategyV10_3.cs (BUILD 1702)
 // SIMA Architecture: One strategy instance on Master account broadcasts to all Apex accounts
 //
@@ -39,9 +39,9 @@ using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "932";  // V12.932: Final Project-Wide Architectural Polish — delta rollback + underscore trade type fix
+        public const string BUILD_TAG = "932";  // V12.932: Final Project-Wide Architectural Polish � delta rollback + underscore trade type fix
 
         #region Variables
 
@@ -52,7 +52,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double sessionRange;
         private bool isInORWindow;
         private bool orComplete;
-        private volatile bool retestFiredThisSession;  // V12.1101E [B-2]: Latch — prevent multiple RETEST entries per session | V12.Phase8 [F-06]: volatile for cross-thread visibility
+        private volatile bool retestFiredThisSession;  // V12.1101E [B-2]: Latch � prevent multiple RETEST entries per session | V12.Phase8 [F-06]: volatile for cross-thread visibility
         private DateTime orStartDateTime;
         private DateTime orEndDateTime;
         private DateTime sessionStartDateTime;
@@ -64,8 +64,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double tickSize;
         private double pointValue;
         private int minContracts;
-        private int activeTargetCount = 1; // V12.Phase8.3: Dashboard target count (1–5). Isolated from minContracts to prevent risk floor corruption.
-        private int maxContracts;  // V12.1101E [B-9]: Upper bound from MESMaximum/MGCMaximum — prevents runaway ATR sizer
+        private int activeTargetCount = 1; // V12.Phase8.3: Dashboard target count (1�5). Isolated from minContracts to prevent risk floor corruption.
+        private int maxContracts;  // V12.1101E [B-9]: Upper bound from MESMaximum/MGCMaximum � prevents runaway ATR sizer
 
         // ATR Indicator for RMA
         private ATR atrIndicator;
@@ -110,13 +110,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V8.30: Replaced Dictionary with ConcurrentDictionary for thread-safe access
         private ConcurrentDictionary<string, PendingStopReplacement> pendingStopReplacements;
 
-        // V12.Hardening: Execution dedup guard — prevents double-decrement from OnOrderUpdate + OnExecutionUpdate
+        // V12.Hardening: Execution dedup guard � prevents double-decrement from OnOrderUpdate + OnExecutionUpdate
         private readonly HashSet<string> processedExecutionIds = new HashSet<string>();
         private readonly Queue<string> processedExecutionIdQueue = new Queue<string>(); // For bounded pruning
         // V12.1101E [F-08]: Secondary dedup cache when broker omits executionId.
         private readonly HashSet<string> processedExecutionFallbackKeys = new HashSet<string>();
         private readonly Queue<string> processedExecutionFallbackQueue = new Queue<string>(); // For bounded pruning
-        // V12.Phase7 [GAP-4]: executionDeduplicateLock removed — C-01 unified all dedup under stateLock
+        // V12.Phase7 [GAP-4]: executionDeduplicateLock removed � C-01 unified all dedup under stateLock
         private const int MaxProcessedExecutionIds = 500;
 
         // V12.Phase6 [CONCURRENCY-01]: Marshal broker-thread account execution events to strategy thread
@@ -203,10 +203,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int simaAccountCount = 0; // Cached count of detected Apex accounts
         private DateTime lastReaperLog = DateTime.MinValue;
 
-        // V12.Phase6 [UNSUB-TRACK]: Deterministic unsubscribe — tracks which accounts have active event handlers
+        // V12.Phase6 [UNSUB-TRACK]: Deterministic unsubscribe � tracks which accounts have active event handlers
         private readonly HashSet<string> _subscribedAccountNames = new HashSet<string>();
 
-        // V12.Phase7 [H-10]: Mutex guard for SIMA enable/disable transitions — prevents partial state
+        // V12.Phase7 [H-10]: Mutex guard for SIMA enable/disable transitions � prevents partial state
         // if two enable/disable calls interleave (e.g. IPC toggle while UI toggle in progress).
         private readonly SemaphoreSlim _simaToggleSem = new SemaphoreSlim(1, 1);
         // V12.Audit [H-10]: Tracks a toggle that could not complete due to semaphore timeout.
@@ -241,7 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // limit entries before the propagation sync cycle completes.
         private volatile bool _propagationActive = false;
 
-        // CIT (Chase If Touch) â€” uses ChaseIfTouchPoints property (NinjaScriptProperty)
+        // CIT (Chase If Touch) — uses ChaseIfTouchPoints property (NinjaScriptProperty)
 
         #endregion
 
@@ -258,7 +258,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public int T4Contracts;
             public int T5Contracts;
             public int InitialTargetCount;   // Build 1102Y-V2 [U-03]: activeTargetCount snapshot at entry fill time
-            public volatile int RemainingContracts; // V12.1101E [SK-08]: volatile — written from OnOrderUpdate, OnExecutionUpdate, OnBarUpdate threads
+            public volatile int RemainingContracts; // V12.1101E [SK-08]: volatile � written from OnOrderUpdate, OnExecutionUpdate, OnBarUpdate threads
             public double EntryPrice;
             public OrderType EntryOrderType = OrderType.Market;
             public double InitialStopPrice;
@@ -327,7 +327,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return GetTargetMode(targetNumber) == TargetMode.Runner;
         }
 
-        // Universal Ladder: single-arg magnitude lookup — T(n)Value is the sole source of truth.
+        // Universal Ladder: single-arg magnitude lookup � T(n)Value is the sole source of truth.
         private double GetConfiguredTargetMagnitude(int targetNumber)
         {
             switch (targetNumber)
@@ -341,7 +341,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // Universal Ladder: single pricing oracle — reads T(n)Type + Target(n)Value, no role branching.
+        // Universal Ladder: single pricing oracle � reads T(n)Type + Target(n)Value, no role branching.
         private double CalculateTargetPrice(MarketPosition direction, double entryPrice, int targetNumber)
         {
             TargetMode mode = GetTargetMode(targetNumber);
@@ -375,8 +375,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Build 1102Y-V3 [LG-01]: Target Ladder Guard — "The Staircase Rule."
-        /// Iterates T1 → T5 and ensures every rung is at least one tick FURTHER from entry
+        /// Build 1102Y-V3 [LG-01]: Target Ladder Guard � "The Staircase Rule."
+        /// Iterates T1 ? T5 and ensures every rung is at least one tick FURTHER from entry
         /// than the rung before it. In low volatility the ATR-based T2 can be tighter than
         /// the fixed Scalp (T1), causing price inversion and incorrect order slotting.
         /// Call this after computing target prices and again after fill-price re-anchoring.
@@ -397,7 +397,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             for (int i = 1; i < prices.Length; i++)
             {
                 if (prices[i] <= 0) continue; // Skip unused/runner slots
-                if (prices[i - 1] <= 0) continue; // Previous slot unused — nothing to compare against
+                if (prices[i - 1] <= 0) continue; // Previous slot unused � nothing to compare against
 
                 double minValid = isLong
                     ? prices[i - 1] + tickSize
@@ -425,7 +425,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     pos.SignalName, pos.Target1Price, pos.Target2Price, pos.Target3Price, pos.Target4Price, pos.Target5Price));
         }
 
-        // Universal Ladder: pure delegation — T(n)Type dropdown drives all pricing for all trade types.
+        // Universal Ladder: pure delegation � T(n)Type dropdown drives all pricing for all trade types.
         private double CalculateTargetPriceFromPos(MarketPosition direction, double entryPrice, PositionInfo pos, int targetNumber)
         {
             return CalculateTargetPrice(direction, entryPrice, targetNumber);
@@ -583,7 +583,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Risk defaults
                 RiskPerTrade = 200;
-                ReducedRiskPerTrade = 200; // deprecated — hidden in UI (RISK-01)
+                ReducedRiskPerTrade = 200; // deprecated � hidden in UI (RISK-01)
                 StopThresholdPoints = 5.0;
                 SlippageCushionPoints = 1.0; // SLIP-01: 1pt default cushion for follower slippage
                 MESMinimum = 1;
@@ -657,7 +657,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnablePathB = false;
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;
-                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES→MES fleet parity
+                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES?MES fleet parity
                 PathBStopPoints = 10.0;
                 PathBTargetPoints = 15.0;
                 ChaseIfTouchPoints = "0";
@@ -788,10 +788,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Realtime)
             {
-                Print("╔══════════════════════════════════════════════════════════════╗");
-                Print("║          🛡  BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE        ║");
-                Print(string.Format("║          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    ║", BUILD_TAG));
-                Print("╚══════════════════════════════════════════════════════════════╝");
+                Print("+--------------------------------------------------------------+");
+                Print("�          ??  BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE        �");
+                Print(string.Format("�          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    �", BUILD_TAG));
+                Print("+--------------------------------------------------------------+");
 
                 // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
                 // EMERGENCY SAFE MODE (V12.32): Disabling background services to allow platform login
@@ -835,7 +835,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StopReaperAudit();
                 
                 // V12.7: Always unsubscribe from account updates (subscribed for fleet bracket management)
-                // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() — unconditional (no EnableSIMA guard)
+                // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() � unconditional (no EnableSIMA guard)
                 // to handle cases where flag was toggled OFF mid-session while handlers were still subscribed.
                 UnsubscribeFromFleetAccounts();
                 
@@ -843,7 +843,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SignalBroadcaster.OnExternalCommand -= HandleExternalSignal;
 
                 // V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
-                // Static events survive instance disposal — without this, dead instance handlers accumulate
+                // Static events survive instance disposal � without this, dead instance handlers accumulate
                 // and fire into garbage-collected strategy contexts on reload, causing phantom order submissions.
                 SignalBroadcaster.ClearAllSubscribers();
 

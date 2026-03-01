@@ -31,7 +31,7 @@ using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public partial class UniversalORStrategyV12_002_Dev : Strategy
+    public partial class V12_002 : Strategy
     {
         // V12 SIMA: BroadcastEntrySignal and V8 Copy Trading region removed.
         // Trade copying is replaced by direct Account.All iteration in ExecuteSmartDispatchEntry.
