@@ -1046,7 +1046,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     // V8.30: Always draw immediately when OR completes (important event)
                     DrawORBox();
-                    lastDrawORBoxTime = DateTime.Now;
+                    lastDrawORBoxTime = DateTime.UtcNow;
                 }
 
                 // Update box if OR complete
@@ -1063,10 +1063,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V8.30: Throttle DrawORBox updates to prevent chart saturation
                 if (orComplete && sessionHigh != double.MinValue && inActiveSession)
                 {
-                    if ((DateTime.Now - lastDrawORBoxTime).TotalMilliseconds >= DRAW_ORBOX_THROTTLE_MS)
+                    if ((DateTime.UtcNow - lastDrawORBoxTime).TotalMilliseconds >= DRAW_ORBOX_THROTTLE_MS)
                     {
                         DrawORBox();
-                        lastDrawORBoxTime = DateTime.Now;
+                        lastDrawORBoxTime = DateTime.UtcNow;
                     }
                 }
 

@@ -448,6 +448,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
         }
 
+        // Build 935 [R-02]: Cap per-drain budget to prevent strategy-thread starvation
+        // under high-velocity broker event bursts. Mirrors IpcMaxCommandsPerDrain pattern.
+        private const int MaxAccountOrdersPerDrain = 8;
+
         private void ProcessAccountOrderQueue()
         {
             // V12.Phase7 [THREAD-01a]: Buffer-and-wait during flatten (symmetric with ProcessAccountExecutionQueue).
@@ -457,8 +461,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            int drainedCount = 0;
             QueuedAccountOrderUpdate item;
-            while (_accountOrderQueue.TryDequeue(out item))
+            while (drainedCount < MaxAccountOrdersPerDrain && _accountOrderQueue.TryDequeue(out item))
             {
                 if (isFlattenRunning)
                 {
@@ -466,9 +471,100 @@ namespace NinjaTrader.NinjaScript.Strategies
                     try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
                     return;
                 }
-
+                drainedCount++;
                 ProcessQueuedAccountOrder(item);
             }
+            // If items remain after budget exhausted, reschedule for next strategy-thread slice.
+            if (!_accountOrderQueue.IsEmpty)
+                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+        }
+
+        // Build 935 [R-01]: Returns true if 'order' belongs to 'entryKey' position.
+        // Encapsulates the 7-way compound OR so the outer search loop stays trivial.
+        private bool TryFindOrderInPosition(Order order, string entryKey, out string matchedEntry)
+        {
+            matchedEntry = null;
+            if ((entryOrders.TryGetValue(entryKey,   out var eOrder)  && (eOrder  == order || (eOrder  != null && eOrder.OrderId  == order.OrderId))) ||
+                (stopOrders.TryGetValue(entryKey,    out var sOrder)  && (sOrder  == order || (sOrder  != null && sOrder.OrderId  == order.OrderId))) ||
+                (target1Orders.TryGetValue(entryKey, out var t1Order) && (t1Order == order || (t1Order != null && t1Order.OrderId == order.OrderId))) ||
+                (target2Orders.TryGetValue(entryKey, out var t2Order) && (t2Order != null && t2Order.OrderId == order.OrderId)) ||
+                (target3Orders.TryGetValue(entryKey, out var t3Order) && (t3Order != null && t3Order.OrderId == order.OrderId)) ||
+                (target4Orders.TryGetValue(entryKey, out var t4Order) && (t4Order != null && t4Order.OrderId == order.OrderId)) ||
+                (target5Orders.TryGetValue(entryKey, out var t5Order) && (t5Order != null && t5Order.OrderId == order.OrderId)))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            return false;
+        }
+
+        // Build 935 [R-01]: Handles a follower order positively matched to an active position.
+        // Entry-not-filled → rollback + desync label. Entry-filled or stop/target → ghost log + cleanup.
+        private void HandleMatchedFollowerOrder(string matchedEntry, PositionInfo matchedPos, Order order, string acctName, string reason)
+        {
+            if (entryOrders.TryGetValue(matchedEntry, out var entryOrder) &&
+                (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
+                !matchedPos.EntryFilled)
+            {
+                entryOrders.TryRemove(matchedEntry, out _);
+                int gfExp = 0;
+                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
+                if (gfExp == 0) return;
+
+                Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
+                Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "⚠ FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
+            }
+            else
+            {
+                Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
+                RemoveGhostOrderRef(order, reason);
+            }
+        }
+
+        // Build 935 [R-01]: SIMA cascade cleanup for unmatched master-cancel events.
+        // Receives pre-computed snapshot — eliminates the second activePositions.ToArray() allocation.
+        private void ExecuteFollowerCascadeCleanup(bool enableSima, Order order, string reason, KeyValuePair<string, PositionInfo>[] snapshot)
+        {
+            // V12.18 SIMA CASCADE: If a master-account order was cancelled,
+            // check if any follower positions share the same base signal and tear them down.
+            if (enableSima && order.OrderState == OrderState.Cancelled && order.Account == this.Account)
+            {
+                string orderSignal = order.Name;
+                foreach (var kvp in snapshot)
+                {
+                    PositionInfo cascadePos = kvp.Value;
+                    if (!cascadePos.IsFollower) continue;
+                    if (kvp.Key.Contains(orderSignal) || orderSignal.Contains(kvp.Key))
+                    {
+                        string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
+                        if (!cascadePos.EntryFilled)
+                        {
+                            Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
+                                orderSignal, kvp.Key, cascadeAcctName));
+                            CleanupPosition(kvp.Key);
+
+                            if (cascadePos.ExecutingAccount != null)
+                            {
+                                int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
+                                DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
+                                ClearDispatchSyncPending(ExpKey(cascadeAcctName));
+                                try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
+                            }
+                        }
+                        else
+                        {
+                            Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} — follower {1} on {2} is FILLED. Issuing emergency flatten.",
+                                orderSignal, kvp.Key, cascadeAcctName));
+                            if (cascadePos.ExecutingAccount != null)
+                            {
+                                Account filledFollowerAcct = cascadePos.ExecutingAccount;
+                                TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
+                            }
+                        }
+                    }
+                }
+            }
+            RemoveGhostOrderRef(order, reason);
         }
 
         private void ProcessQueuedAccountOrder(QueuedAccountOrderUpdate item)
@@ -481,89 +577,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             string acctName = item.Account != null ? item.Account.Name : "UNKNOWN";
             Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
 
+            // Build 935 [R-01]: Single snapshot — reused by both identity search and cascade cleanup,
+            // eliminating the second activePositions.ToArray() allocation in the cascade path.
+            var snapshot = activePositions.ToArray();
+
             string matchedEntry = null;
-            foreach (var kvp in activePositions.ToArray())
+            PositionInfo matchedPos = null;
+            foreach (var kvp in snapshot)
             {
                 if (!activePositions.ContainsKey(kvp.Key)) continue;
                 PositionInfo pos = kvp.Value;
                 if (!pos.IsFollower || pos.ExecutingAccount == null || pos.ExecutingAccount != item.Account) continue;
-
-                if ((entryOrders.TryGetValue(kvp.Key, out var eOrder) && (eOrder == order || (eOrder != null && eOrder.OrderId == order.OrderId))) ||
-                    (stopOrders.TryGetValue(kvp.Key, out var sOrder) && (sOrder == order || (sOrder != null && sOrder.OrderId == order.OrderId))) ||
-                    (target1Orders.TryGetValue(kvp.Key, out var t1Order) && (t1Order == order || (t1Order != null && t1Order.OrderId == order.OrderId))) ||
-                    (target2Orders.TryGetValue(kvp.Key, out var t2Order) && (t2Order != null && t2Order.OrderId == order.OrderId)) ||
-                    (target3Orders.TryGetValue(kvp.Key, out var t3Order) && (t3Order != null && t3Order.OrderId == order.OrderId)) ||
-                    (target4Orders.TryGetValue(kvp.Key, out var t4Order) && (t4Order != null && t4Order.OrderId == order.OrderId)) ||
-                    (target5Orders.TryGetValue(kvp.Key, out var t5Order) && (t5Order != null && t5Order.OrderId == order.OrderId)))
+                if (TryFindOrderInPosition(order, kvp.Key, out matchedEntry))
                 {
-                    matchedEntry = kvp.Key;
+                    matchedPos = pos;
                     break;
                 }
             }
 
-            if (!string.IsNullOrEmpty(matchedEntry) && activePositions.TryGetValue(matchedEntry, out var matchedPos))
-            {
-                if (entryOrders.TryGetValue(matchedEntry, out var entryOrder) &&
-                    (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
-                    !matchedPos.EntryFilled)
-                {
-                    entryOrders.TryRemove(matchedEntry, out _);
-                    int gfExp = 0;
-                    lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
-                    if (gfExp == 0) return;
-
-                    Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
-                    Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "⚠ FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
-                }
-                else
-                {
-                    Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
-                    RemoveGhostOrderRef(order, reason);
-                }
-            }
+            if (!string.IsNullOrEmpty(matchedEntry) && matchedPos != null && activePositions.ContainsKey(matchedEntry))
+                HandleMatchedFollowerOrder(matchedEntry, matchedPos, order, acctName, reason);
             else
-            {
-                // V12.18 SIMA CASCADE: If a master-account order was cancelled,
-                // check if any follower positions share the same base signal and tear them down.
-                if (EnableSIMA && order.OrderState == OrderState.Cancelled && order.Account == this.Account)
-                {
-                    string orderSignal = order.Name;
-                    foreach (var kvp in activePositions.ToArray())
-                    {
-                        PositionInfo cascadePos = kvp.Value;
-                        if (!cascadePos.IsFollower) continue;
-                        if (kvp.Key.Contains(orderSignal) || orderSignal.Contains(kvp.Key))
-                        {
-                            string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
-                            if (!cascadePos.EntryFilled)
-                            {
-                                Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
-                                    orderSignal, kvp.Key, cascadeAcctName));
-                                CleanupPosition(kvp.Key);
-
-                                if (cascadePos.ExecutingAccount != null)
-                                {
-                                    int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
-                                    DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
-                                    ClearDispatchSyncPending(ExpKey(cascadeAcctName));
-                                    try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
-                                }
-                            }
-                            else
-                            {
-                                Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} — follower {1} on {2} is FILLED. Issuing emergency flatten.",
-                                    orderSignal, kvp.Key, cascadeAcctName));
-                                if (cascadePos.ExecutingAccount != null)
-                                {
-                                    Account filledFollowerAcct = cascadePos.ExecutingAccount;
-                                    TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
-                                }
-                            }
-                        }
-                    }
-                }
-                RemoveGhostOrderRef(order, reason);
-            }
+                ExecuteFollowerCascadeCleanup(EnableSIMA, order, reason, snapshot);
         }
 
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)

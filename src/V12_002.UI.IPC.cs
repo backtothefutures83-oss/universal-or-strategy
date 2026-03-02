@@ -227,21 +227,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Handle GET_LAYOUT (Synchronous Response to THIS client only)
             if (message.StartsWith("GET_LAYOUT"))
             {
-                string configResponse;
+                // Build 935 [R-04]: Snapshot scalar state under lock; format string outside
+                // to minimize critical section duration (removes string allocation from lock).
+                string snapMode; double snapStop; int snapCount;
+                double snapT1, snapT2, snapT3, snapT4, snapT5;
+                TargetMode snapT1Type, snapT2Type, snapT3Type, snapT4Type, snapT5Type;
+                string snapCit; bool snapTrma, snapRrma;
                 lock (stateLock)
                 {
-                    string mode = isRMAModeActive ? "RMA" : "OR";
-                    double stopValue = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
-                    configResponse = string.Format(
-                        "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
-                        mode, activeTargetCount, Target1Value, ToIpcTargetMode(T1Type),
-                        Target2Value, ToIpcTargetMode(T2Type),
-                        Target3Value, ToIpcTargetMode(T3Type),
-                        Target4Value, ToIpcTargetMode(T4Type),
-                        Target5Value, ToIpcTargetMode(T5Type),
-                        stopValue, MaxRiskAmount, ChaseIfTouchPoints ?? "0",
-                        isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                    snapMode   = isRMAModeActive ? "RMA" : "OR";
+                    snapStop   = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
+                    snapCount  = activeTargetCount;
+                    snapT1     = Target1Value; snapT1Type = T1Type;
+                    snapT2     = Target2Value; snapT2Type = T2Type;
+                    snapT3     = Target3Value; snapT3Type = T3Type;
+                    snapT4     = Target4Value; snapT4Type = T4Type;
+                    snapT5     = Target5Value; snapT5Type = T5Type;
+                    snapCit    = ChaseIfTouchPoints ?? "0";
+                    snapTrma   = isTrendRmaMode;
+                    snapRrma   = isRetestRmaMode;
                 }
+                string configResponse = string.Format(
+                    "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
+                    snapMode, snapCount, snapT1, ToIpcTargetMode(snapT1Type),
+                    snapT2, ToIpcTargetMode(snapT2Type),
+                    snapT3, ToIpcTargetMode(snapT3Type),
+                    snapT4, ToIpcTargetMode(snapT4Type),
+                    snapT5, ToIpcTargetMode(snapT5Type),
+                    snapStop, MaxRiskAmount, snapCit,
+                    snapTrma ? "1" : "0", snapRrma ? "1" : "0");
                 byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
                 stream.Write(responseBytes, 0, responseBytes.Length);
                 stream.Flush();

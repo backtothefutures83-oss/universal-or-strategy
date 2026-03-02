@@ -166,7 +166,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void AuditApexPositions()
         {
-            bool shouldLog = (DateTime.Now - lastReaperLog).TotalSeconds >= 30;
+            bool shouldLog = (DateTime.UtcNow - lastReaperLog).TotalSeconds >= 30;
             int auditedCount = 0;
             int activeCount = 0;
 
@@ -193,7 +193,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print($"[REAPER] Heartbeat: All {auditedCount} accounts flat.");
                 else
                     Print($"[REAPER] Heartbeat: {activeCount}/{auditedCount} accounts with positions.");
-                lastReaperLog = DateTime.Now;
+                lastReaperLog = DateTime.UtcNow;
             }
         }
 
