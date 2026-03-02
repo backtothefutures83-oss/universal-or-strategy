@@ -40,11 +40,27 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ConcurrentDictionary<string, DateTime> _repairBlockedLastLogged
             = new ConcurrentDictionary<string, DateTime>();
 
-        private bool IsReaperFillGraceActive()
+        // Build 935 [REAPER-B935-002]: Per-account fill-grace timestamps.
+        // Replaces single global _lastExpectedPositionSetTicks which incorrectly blocked ALL account repairs
+        // whenever ANY account had a fill. Now each account tracks its own fill-grace window independently.
+        private readonly ConcurrentDictionary<string, long> _accountFillGraceTicks
+            = new ConcurrentDictionary<string, long>();
+
+        // Stamps per-account fill grace. Call from SetExpectedPositionLocked when applying a non-zero delta.
+        private void StampAccountFillGrace(string expKey)
         {
-            long stampTicks = Interlocked.Read(ref _lastExpectedPositionSetTicks);
-            return stampTicks > 0 && (DateTime.UtcNow.Ticks - stampTicks) < ReaperFillGraceTicks;
+            _accountFillGraceTicks[expKey] = DateTime.UtcNow.Ticks;
         }
+
+        private bool IsReaperFillGraceActive(string expKey)
+        {
+            if (_accountFillGraceTicks.TryGetValue(expKey, out long stampTicks))
+                return stampTicks > 0 && (DateTime.UtcNow.Ticks - stampTicks) < ReaperFillGraceTicks;
+            // Fallback: check legacy global stamp (covers master account path)
+            long globalStamp = Interlocked.Read(ref _lastExpectedPositionSetTicks);
+            return globalStamp > 0 && (DateTime.UtcNow.Ticks - globalStamp) < ReaperFillGraceTicks;
+        }
+
 
         private bool TryGetRepairDistanceLimitPoints(out double limitPoints)
         {
@@ -180,7 +196,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         expectedPositions.TryGetValue(expectedKey, out expectedQty);
                         syncPending = _dispatchSyncPendingExpKeys.Contains(expectedKey);
                     }
-                    bool inFillGrace = IsReaperFillGraceActive();
+                    // Build 935 [REAPER-B935-002]: Use per-account grace (not global) to prevent
+                    // a fill on Account A from blocking repairs on a desynced Account B.
+                    bool inFillGrace = IsReaperFillGraceActive(expectedKey);
 
                     // V12.9: Only log individual accounts when they have non-zero state (reduces spam)
                     if (shouldLog && (expectedQty != 0 || actualQty != 0))
