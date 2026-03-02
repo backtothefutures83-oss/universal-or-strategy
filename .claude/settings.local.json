@@ -17,7 +17,9 @@
       "Skill(commit-commands:commit)",
       "Skill(commit-commands:commit:*)",
       "Bash(git rm --cached --ignore-unmatch CONSOLIDATED_AUDIT.md HANDOFF_PROJECT_MANAGER.md PROPERTIES_AUDIT_REPORT.md acli.exe src/StressTest.cs src/V12StandardPanel_V12_001_Dev.cs)",
-      "Bash(git rm CONSOLIDATED_AUDIT.md HANDOFF_PROJECT_MANAGER.md PROPERTIES_AUDIT_REPORT.md acli.exe src/StressTest.cs src/V12StandardPanel_V12_001_Dev.cs)"
+      "Bash(git rm CONSOLIDATED_AUDIT.md HANDOFF_PROJECT_MANAGER.md PROPERTIES_AUDIT_REPORT.md acli.exe src/StressTest.cs src/V12StandardPanel_V12_001_Dev.cs)",
+      "Bash(git checkout -b build-935-emergency-reform)",
+      "Bash(node --input-type=commonjs:*)"
     ]
   }
 }

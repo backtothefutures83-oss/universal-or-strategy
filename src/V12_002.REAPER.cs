@@ -523,190 +523,161 @@ namespace NinjaTrader.NinjaScript.Strategies
             string repairKey = accountName + "_" + Instrument.FullName;
             try
             {
-                    // 1. Find the stored PositionInfo for this account in activePositions
-                    PositionInfo repairPos = null;
-                    string repairEntryName = null;
-                    foreach (var kvp in activePositions.ToArray())
-                    {
-                        PositionInfo pi = kvp.Value;
-                        if (pi.IsFollower && pi.ExecutingAccount != null
-                            && pi.ExecutingAccount.Name == accountName)
-                        {
-                            repairPos = pi;
-                            repairEntryName = kvp.Key;
-                            break;
-                        }
-                    }
-
-                    if (repairPos == null)
-                    {
-                        Print($"[REAPER REPAIR] \u2717 No PositionInfo found for {accountName} — cannot repair.");
-                        continue;
-                    }
-
-                    OrderType repairOrderType = repairPos.EntryOrderType;
-                    double repairEntryPrice = Instrument.MasterInstrument.RoundToTickSize(repairPos.EntryPrice);
-                    double repairLimitPrice = 0;
-                    double repairStopPrice = 0;
-
-                    if (repairOrderType == OrderType.Limit)
-                    {
-                        repairLimitPrice = repairEntryPrice;
-                    }
-                    else if (repairOrderType == OrderType.StopMarket)
-                    {
-                        repairStopPrice = repairEntryPrice;
-                    }
-                    else if (repairOrderType == OrderType.StopLimit)
-                    {
-                        repairLimitPrice = repairEntryPrice;
-                        repairStopPrice = repairEntryPrice;
-                    }
-
-                    // Build 935: hard risk gate for ALL repair order types.
-                    // Repairs must remain inside the tighter of ATR-derived distance and tick fence distance.
-                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                    if (currentPrice <= 0)
-                    {
-                        Print($"[REAPER] REPAIR BLOCKED: invalid currentPrice={currentPrice:F4} for {accountName}.");
-                        continue;
-                    }
-
-                    if (!TryGetRepairDistanceLimitPoints(out double repairLimitPoints))
-                    {
-                        Print($"[REAPER] REPAIR BLOCKED: unable to derive repair distance bound for {accountName}.");
-                        continue;
-                    }
-
-                    double hardBoundDiff = Math.Abs(currentPrice - repairEntryPrice);
-                    if (hardBoundDiff > repairLimitPoints)
-                    {
-                        Print($"[REAPER] REPAIR BLOCKED: {accountName} {repairOrderType} exceeds hard bound. " +
-                              $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, Diff={hardBoundDiff:F4} > Limit={repairLimitPoints:F4}.");
-                        continue;
-                    }
-
-                    // 2. Safety Fence: enforce only when repair submits a Market order.
-                    if (repairOrderType == OrderType.Market)
-                    {
-                        // Legacy market-fence check retained as a secondary guard.
-                        // currentPrice already validated above.
-                        double priceDiff = Math.Abs(currentPrice - repairEntryPrice);
-                        double fenceDistance = RepairTickFence * tickSize;
-
-                        if (priceDiff > fenceDistance)
-                        {
-                            // V12.Phase8.3: Actionable diagnostic — tells trader how to override if needed
-                            Print($"[REAPER] REPAIR BLOCKED: Price fence exceeded for {accountName}. " +
-                                  $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, " +
-                                  $"Diff={priceDiff:F4} > Fence={fenceDistance:F4} ({RepairTickFence} ticks). " +
-                                  $"Adjust RepairTickFence if you want to force entry.");
-                            continue;
-                        }
-                    }
-
-                    // 3. Resolve account object
-                    Account targetAcct = repairPos.ExecutingAccount;
-                    if (targetAcct == null)
-                    {
-                        Print($"[REAPER REPAIR] \u2717 ExecutingAccount is null for {accountName}");
-                        continue;
-                    }
-
-                    // 4. Mark in-flight to prevent double-repair
-                    // V12.Phase8.3: Key includes instrument for cross-chart uniqueness
-                    lock (stateLock) { _repairInFlight.Add(repairKey); }
-
-                    // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern
-                    OrderAction action = repairPos.Direction == MarketPosition.Long
-                        ? OrderAction.Buy : OrderAction.SellShort;
-                    int quantity = repairPos.TotalContracts;
-                    // FIX-C1 [Build 1102Z]: Use the original activePositions key as the NT8 signal name.
-                    // The old "Repair_" prefix diverged the signal name from the key, breaking the
-                    // identity chain: activePositions key == entryOrders key == order signal name.
-                    // OnOrderUpdate.entryOrders.Values.Contains(order) would return false on fill,
-                    // SubmitBracketOrders would never be called, and the position would be naked.
-                    string repairSignal = repairEntryName;
-
-                    Order repairEntry = targetAcct.CreateOrder(
-                        Instrument,
-                        action,
-                        repairOrderType,
-                        TimeInForce.Gtc,
-                        quantity,
-                        repairLimitPrice,
-                        repairStopPrice,
-                        "",
-                        repairSignal,
-                        null);
-
-                    if (repairEntry == null)
-                    {
-                        Print($"[REAPER REPAIR] \u2717 CreateOrder returned null for {accountName}");
-                        lock (stateLock) { _repairInFlight.Remove(repairKey); }
-                        continue;
-                    }
-
-                    // NOTE: expectedPositions are ALREADY preserved from Phase 8.1 (the original
-                    // dispatch reserved them and the Ghost Fix intentionally kept them). Do NOT
-                    // call AddExpectedPositionDeltaLocked here — that would double-count.
-
-                    // V12.Phase8.2 [RACE-GUARD]: Re-verify expectedPositions immediately before
-                    // order submission. A manual flatten may have zeroed expectedPositions while
-                    // this repair was sitting in the queue — submitting into a flat account would
-                    // create a "Phantom Repair" (ghost long/short with no corresponding Risk stop).
-                    // Build 1102U [BUG-1]: Composite key + stateLock guard (was unguarded on background thread).
-                    int currentExpected = 0;
-                    lock (stateLock) { expectedPositions.TryGetValue(ExpKey(accountName), out currentExpected); }
-                    if (currentExpected == 0)
-                    {
-                        Print($"[REAPER REPAIR] ⚠ RACE GUARD ABORT for {accountName}: " +
-                              $"expectedPositions cleared to 0 while repair was in queue. Discarding repair order.");
-                        lock (stateLock) { _repairInFlight.Remove(repairKey); }
-                        continue;
-                    }
-
-                    // FIX-C2 [Build 1102Z]: Register repair order under the ORIGINAL activePositions key
-                    // and reset BracketSubmitted so OnOrderUpdate will call SubmitBracketOrders on fill.
-                    //
-                    // Without this:
-                    //   1. entryOrders[repairEntryName] still references the OLD (cancelled/missing) entry.
-                    //   2. OnOrderUpdate's entryOrders.Values.Contains(repairEntry) returns false.
-                    //   3. SubmitBracketOrders is never called → position is naked (no stop, no targets).
-                    //
-                    // BracketSubmitted = false is required for Market-entry repair: the original bracket
-                    // orders were co-submitted at dispatch time and are now gone (account was desync'd).
-                    // For Limit/StopMarket repairs it was already false, so this is a safe no-op there.
-                    lock (stateLock)
-                    {
-                        repairPos.BracketSubmitted = false;
-                        entryOrders[repairEntryName] = repairEntry;
-                    }
-
-                    targetAcct.Submit(new[] { repairEntry });
-
-                    Print($"[REAPER REPAIR] \u2713 Repair order submitted for {accountName} under key={repairEntryName}: " +
-                          $"{action} {quantity} {repairOrderType} " +
-                          $"{(repairOrderType == OrderType.Market ? "@ Market" : "@ " + repairEntryPrice.ToString("F2"))} " +
-                          $"(original entry={repairEntryPrice:F2})");
-
-                    // 6. Clear DESYNC chart label for this account (defensive — label may or may not exist)
-                    try
-                    {
-                        string desyncTag = "SIMA_DESYNC_" + accountName;
-                        RemoveDrawObject(desyncTag);
-                    }
-                    catch { }
-
-                    // 7. Clear in-flight flag (order is now submitted; execution callbacks manage state)
-                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
-                }
-                catch (Exception ex)
+                // 1. Find the stored PositionInfo for this account in activePositions
+                PositionInfo repairPos = null;
+                string repairEntryName = null;
+                foreach (var kvp in activePositions.ToArray())
                 {
-                    Print($"[REAPER REPAIR] \u2717 FAILED for {accountName}: {ex.Message}");
-                    // Roll back in-flight flag so retry is possible on next audit cycle
-                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                    PositionInfo pi = kvp.Value;
+                    if (pi.IsFollower && pi.ExecutingAccount != null
+                        && pi.ExecutingAccount.Name == accountName)
+                    {
+                        repairPos = pi;
+                        repairEntryName = kvp.Key;
+                        break;
+                    }
                 }
+
+                if (repairPos == null)
+                {
+                    Print($"[REAPER REPAIR] \u2717 No PositionInfo found for {accountName} — cannot repair.");
+                    return;
+                }
+
+                OrderType repairOrderType = repairPos.EntryOrderType;
+                double repairEntryPrice = Instrument.MasterInstrument.RoundToTickSize(repairPos.EntryPrice);
+                double repairLimitPrice = 0;
+                double repairStopPrice = 0;
+
+                if (repairOrderType == OrderType.Limit)
+                {
+                    repairLimitPrice = repairEntryPrice;
+                }
+                else if (repairOrderType == OrderType.StopMarket)
+                {
+                    repairStopPrice = repairEntryPrice;
+                }
+                else if (repairOrderType == OrderType.StopLimit)
+                {
+                    repairLimitPrice = repairEntryPrice;
+                    repairStopPrice = repairEntryPrice;
+                }
+
+                // Build 935: hard risk gate for ALL repair order types.
+                // Repairs must remain inside the tighter of ATR-derived distance and tick fence distance.
+                double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                if (currentPrice <= 0)
+                {
+                    Print($"[REAPER] REPAIR BLOCKED: invalid currentPrice={currentPrice:F4} for {accountName}.");
+                    return;
+                }
+
+                if (!TryGetRepairDistanceLimitPoints(out double repairLimitPoints))
+                {
+                    Print($"[REAPER] REPAIR BLOCKED: unable to derive repair distance bound for {accountName}.");
+                    return;
+                }
+
+                double hardBoundDiff = Math.Abs(currentPrice - repairEntryPrice);
+                if (hardBoundDiff > repairLimitPoints)
+                {
+                    Print($"[REAPER] REPAIR BLOCKED: {accountName} {repairOrderType} exceeds hard bound. " +
+                          $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, Diff={hardBoundDiff:F4} > Limit={repairLimitPoints:F4}.");
+                    return;
+                }
+
+                // 2. Safety Fence: enforce only when repair submits a Market order.
+                if (repairOrderType == OrderType.Market)
+                {
+                    // Legacy market-fence check retained as a secondary guard.
+                    double priceDiff = Math.Abs(currentPrice - repairEntryPrice);
+                    double fenceDistance = RepairTickFence * tickSize;
+
+                    if (priceDiff > fenceDistance)
+                    {
+                        Print($"[REAPER] REPAIR BLOCKED: Price fence exceeded for {accountName}. " +
+                              $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, " +
+                              $"Diff={priceDiff:F4} > Fence={fenceDistance:F4} ({RepairTickFence} ticks). " +
+                              $"Adjust RepairTickFence if you want to force entry.");
+                        return;
+                    }
+                }
+
+                // 3. Resolve account object
+                Account targetAcct = repairPos.ExecutingAccount;
+                if (targetAcct == null)
+                {
+                    Print($"[REAPER REPAIR] \u2717 ExecutingAccount is null for {accountName}");
+                    return;
+                }
+
+                // 4. Mark in-flight to prevent double-repair
+                lock (stateLock) { _repairInFlight.Add(repairKey); }
+
+                // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern
+                OrderAction action = repairPos.Direction == MarketPosition.Long
+                    ? OrderAction.Buy : OrderAction.SellShort;
+                int quantity = repairPos.TotalContracts;
+                string repairSignal = repairEntryName;
+
+                Order repairEntry = targetAcct.CreateOrder(
+                    Instrument,
+                    action,
+                    repairOrderType,
+                    TimeInForce.Gtc,
+                    quantity,
+                    repairLimitPrice,
+                    repairStopPrice,
+                    "",
+                    repairSignal,
+                    null);
+
+                if (repairEntry == null)
+                {
+                    Print($"[REAPER REPAIR] \u2717 CreateOrder returned null for {accountName}");
+                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                    return;
+                }
+
+                // V12.Phase8.2 [RACE-GUARD]: Re-verify expectedPositions immediately before order submission.
+                int currentExpected = 0;
+                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(accountName), out currentExpected); }
+                if (currentExpected == 0)
+                {
+                    Print($"[REAPER REPAIR] ⚠ RACE GUARD ABORT for {accountName}: " +
+                          $"expectedPositions cleared to 0 while repair was in queue. Discarding repair order.");
+                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                    return;
+                }
+
+                lock (stateLock)
+                {
+                    repairPos.BracketSubmitted = false;
+                    entryOrders[repairEntryName] = repairEntry;
+                }
+
+                targetAcct.Submit(new[] { repairEntry });
+
+                Print($"[REAPER REPAIR] \u2713 Repair order submitted for {accountName} under key={repairEntryName}: " +
+                      $"{action} {quantity} {repairOrderType} " +
+                      $"{(repairOrderType == OrderType.Market ? "@ Market" : "@ " + repairEntryPrice.ToString("F2"))} " +
+                      $"(original entry={repairEntryPrice:F2})");
+
+                // 6. Clear DESYNC chart label
+                try
+                {
+                    string desyncTag = "SIMA_DESYNC_" + accountName;
+                    RemoveDrawObject(desyncTag);
+                }
+                catch { }
+
+                // 7. Clear in-flight flag
+                lock (stateLock) { _repairInFlight.Remove(repairKey); }
+            }
+            catch (Exception ex)
+            {
+                Print($"[REAPER REPAIR] \u2717 FAILED for {accountName}: {ex.Message}");
+                lock (stateLock) { _repairInFlight.Remove(repairKey); }
             }
         }
 

@@ -37,9 +37,16 @@ $Mappings = @(
     @{ src = "V12_002.Trailing.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.cs" },
     @{ src = "V12_002.Properties.cs"; dst = Join-Path $NtStrategyDir "V12_002.Properties.cs" },
     
+    # Strategy Components
+    @{ src = "V12_002.Constants.cs"; dst = Join-Path $NtStrategyDir "V12_002.Constants.cs" },
+    @{ src = "V12_002.Atm.cs"; dst = Join-Path $NtStrategyDir "V12_002.Atm.cs" },
+    @{ src = "V12_002.AccountUpdate.cs"; dst = Join-Path $NtStrategyDir "V12_002.AccountUpdate.cs" },
+    @{ src = "V12_002.Data.cs"; dst = Join-Path $NtStrategyDir "V12_002.Data.cs" },
+
     # Shared Components
     @{ src = "SignalBroadcaster.cs"; dst = Join-Path $NtStrategyDir "SignalBroadcaster.cs" }
 )
+
 
 Write-Host "`n--- WSGTA DEPLOY SYNC: Hardening Environment ---" -ForegroundColor Cyan
 
