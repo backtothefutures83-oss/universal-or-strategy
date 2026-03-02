@@ -148,7 +148,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // multibyte sequences across TCP reads. StrictUtf8.GetString() was stateless
                     // and would throw DecoderFallbackException on split-packet UTF-8, disconnecting
                     // a valid client unnecessarily.
-                    Decoder utf8Decoder = Encoding.UTF8.GetDecoder();
+                    // Build 935 [B935-P1]: Strict instance — throwOnInvalidBytes:true rejects
+                    // malformed payloads with DecoderFallbackException instead of '?' substitution.
+                    Decoder utf8Decoder = new UTF8Encoding(false, true).GetDecoder();
                     char[] charBuf = new char[4096];
 
                     while (isIpcRunning && client.Connected)
@@ -410,6 +412,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             return "F00";
         }
 
+        /// <summary>
+        /// Build 935 [B935-P1]: Reverse alias resolver — maps a UI alias (F01, F02…) or a raw
+        /// account name back to the real broker account name. Returns null if the identity cannot
+        /// be matched; callers MUST null-check the return value before passing to broker APIs.
+        /// </summary>
+        private string ResolveAccountName(string identity)
+        {
+            if (string.IsNullOrWhiteSpace(identity))
+                return null;
+
+            var accounts = GetFleetAccountsSnapshot();
+
+            // Fast path: already a real account name
+            var direct = accounts.FirstOrDefault(
+                a => string.Equals(a.Name, identity, StringComparison.OrdinalIgnoreCase));
+            if (direct != null)
+                return direct.Name;
+
+            // Reverse alias lookup: F01 → real name via BuildFleetAliasMap
+            var aliasMap = BuildFleetAliasMap(accounts);
+            foreach (var kv in aliasMap)
+            {
+                if (string.Equals(kv.Value, identity, StringComparison.OrdinalIgnoreCase))
+                    return kv.Key;
+            }
+
+            Print($"V12 IPC REJECT: ResolveAccountName could not resolve identity '{identity}'");
+            return null;
+        }
+
         private void HandleExternalSignal(object sender, SignalBroadcaster.ExternalCommandSignal e)
         {
             // V10.3: Only non-winners (secondary charts) need to handle the broadcast
@@ -498,165 +530,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         continue;
                     }
 
-                    Print(string.Format("{0:HH:mm:ss} | IPC Executing {1} for {2}", DateTime.Now, action, Instrument.MasterInstrument.Name));
+                    Print(string.Format("{0:HH:mm:ss} | IPC Executing {1} for {2}", DateTime.UtcNow, action, Instrument.MasterInstrument.Name));
 
-            if (action == "TRIM_25" || action == "TRIM_50")
-            {
-                double percent = action == "TRIM_50" ? 0.5 : 0.25;
-                // V12.1101E [A-3/SK-02]: Snapshot .Values before iterating.
-                // [1102Z-F]: TRIM now routes to pos.ExecutingAccount for fleet followers.
-                foreach (var pos in activePositions.Values.ToArray())
-                {
-                    if (pos.RemainingContracts > 1)
-                    {
-                        // V10.3.1 FIX: Math.Max(1, ...) ensures we always trim at least 1 contract.
-                        int rawQty = Math.Max(1, (int)Math.Floor(pos.RemainingContracts * percent));
-                        int remainingAfterTrim = pos.RemainingContracts - rawQty;
-
-                        // Safety: never flatten via trim
-                        if (remainingAfterTrim < 1)
-                            rawQty = pos.RemainingContracts - 1;
-
-                        if (rawQty >= 1 && (pos.RemainingContracts - rawQty) >= 1)
-                        {
-                            OrderAction trimAction = pos.Direction == MarketPosition.Long
-                                ? OrderAction.Sell : OrderAction.BuyToCover;
-
-                            // [1102Z-F]: Route to fleet follower account when applicable
-                            if (EnableSIMA && pos.IsFollower && pos.ExecutingAccount != null)
-                            {
-                                string trimSig = "Trim_" + pos.SignalName;
-                                if (trimSig.Length > 50) trimSig = trimSig.Substring(0, 50);
-                                Order trimOrder = pos.ExecutingAccount.CreateOrder(
-                                    Instrument, trimAction, OrderType.Market, TimeInForce.Gtc,
-                                    rawQty, 0, 0, "", trimSig, null);
-                                pos.ExecutingAccount.Submit(new[] { trimOrder });
-                                Print(string.Format("[SIMA] TRIM {0}%: Follower {1} → {2} closing {3} contracts",
-                                    (int)(percent * 100), pos.SignalName, pos.ExecutingAccount.Name, rawQty));
-                            }
-                            else
-                            {
-                                Print(string.Format("IPC Trim: Closing {0} of {1} contracts for {2} ({3:P0})",
-                                    rawQty, pos.RemainingContracts, pos.SignalName, percent));
-
-                                if (pos.Direction == MarketPosition.Long)
-                                    SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
-                                else
-                                    SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
-                            }
-                        }
-                        else
-                        {
-                            Print(string.Format("IPC Trim SKIPPED: {0} contracts for {1} - cannot satisfy {2:P0} trim with 1+ remaining",
-                                pos.RemainingContracts, pos.SignalName, percent));
-                        }
-                    }
-                    else
-                    {
-                        Print(string.Format("IPC Trim SKIPPED: {0} has only 1 contract - use FLATTEN to close", pos.SignalName));
-                    }
-                }
-            }
+                    if (action == "TRIM_25" || action == "TRIM_50")
+                        HandleTrimCommand(action, parts);
                     else if (action == "CONFIG")
-                    {
-                        // V12 PRO: Parse the full config sync from side panel
-                        // Format: CONFIG|Mode|COUNT:3;T1:1.0;T1TYPE:Points;T2:0.5;T2TYPE:ATR;...
-                        if (parts.Length > 2)
-                        {
-                            string configMode = parts[1];
-                            string configContent = parts[2];
-                            string[] settingsItems = configContent.Split(';');
-                            foreach (string setting in settingsItems)
-                            {
-                                if (string.IsNullOrEmpty(setting)) continue;
-                                string[] kv = setting.Split(':');
-                                if (kv.Length < 2) continue;
-                                string key = kv[0].ToUpper();
-                                string val = kv[1];
-
-                                if (key == "T1") { if (double.TryParse(val, out double v)) Target1Value = v; }
-                                else if (key == "CIT") { ChaseIfTouchPoints = val; }
-                                else if (key == "T2") {
-                                    if (double.TryParse(val, out double v)) {
-                                        string vmReason;
-                                        if (!ValidateIpcMultiplier(v, out vmReason))
-                                            Print($"[IPC REJECT] T2 value {v} rejected: {vmReason}");
-                                        else Target2Value = v;
-                                    }
-                                }
-                                else if (key == "T3") {
-                                    if (double.TryParse(val, out double v)) {
-                                        string vmReason;
-                                        if (!ValidateIpcMultiplier(v, out vmReason))
-                                            Print($"[IPC REJECT] T3 value {v} rejected: {vmReason}");
-                                        else Target3Value = v;
-                                    }
-                                }
-                                else if (key == "T4")
-                                {
-                                    if (double.TryParse(val, out double v)) {
-                                        string vmReason;
-                                        if (!ValidateIpcMultiplier(v, out vmReason))
-                                            Print($"[IPC REJECT] T4 value {v} rejected: {vmReason}");
-                                        else Target4Value = v;
-                                    }
-                                }
-                                else if (key == "T5")
-                                {
-                                    if (double.TryParse(val, out double v)) {
-                                        string vmReason;
-                                        if (!ValidateIpcMultiplier(v, out vmReason))
-                                            Print($"[IPC REJECT] T5 value {v} rejected: {vmReason}");
-                                        else Target5Value = v;
-                                    }
-                                }
-                                else if (key == "T1TYPE")
-                                {
-                                    if (TryParseTargetMode(val, out var parsed)) T1Type = parsed;
-                                }
-                                else if (key == "T2TYPE")
-                                {
-                                    if (TryParseTargetMode(val, out var parsed)) T2Type = parsed;
-                                }
-                                else if (key == "T3TYPE")
-                                {
-                                    if (TryParseTargetMode(val, out var parsed)) T3Type = parsed;
-                                }
-                                else if (key == "T4TYPE")
-                                {
-                                    if (TryParseTargetMode(val, out var parsed)) T4Type = parsed;
-                                }
-                                else if (key == "T5TYPE")
-                                {
-                                    if (TryParseTargetMode(val, out var parsed)) T5Type = parsed;
-                                }
-                                else if (key == "STR") {
-                                    if (double.TryParse(val, out double v)) {
-                                        string vmReason;
-                                        if (!ValidateIpcMultiplier(v, out vmReason))
-                                            Print($"[IPC REJECT] STR multiplier {v} rejected: {vmReason}");
-                                        else if (configMode == "RMA") RMAStopATRMultiplier = v; else StopMultiplier = v;
-                                    }
-                                }
-                                else if (key == "MAX") {
-                                    if (double.TryParse(val, out double v)) {
-                                        MaxRiskAmount = v;
-                                        RiskPerTrade = v;
-                                    }
-                                }
-                                else if (key == "COUNT") {
-                                    if (int.TryParse(val, out int v)) {
-                                        // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
-                                        int clamped = Math.Max(1, Math.Min(5, v));
-                                        lock (stateLock) { activeTargetCount = clamped; }
-                                    }
-                                }
-                                else if (key == "TRMA") { isTrendRmaMode = (val == "1"); }
-                                else if (key == "RRMA") { isRetestRmaMode = (val == "1"); }
-                            }
-                            Print(string.Format("[V12] Sync All CONFIG ({0}) Applied: {1}", configMode, configContent));
-                        }
-                    }
+                        HandleConfigCommand(parts);
                     else if (action == "SET_TRAIL")
                     {
                         // V12 PRO: Dynamic trail - move stop to current price +/- distance
@@ -1076,16 +955,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                     else if (action.StartsWith("GET_FLEET"))
-                    {
-                        var fleetAccounts = GetFleetAccountsSnapshot();
-                        var aliasMap = BuildFleetAliasMap(fleetAccounts);
-                        StringBuilder sb = new StringBuilder("CONFIG|FLEET");
-                        sb.Append("|COUNT:").Append(fleetAccounts.Count);
-                        foreach (var acct in fleetAccounts)
-                            sb.Append("|").Append(GetIpcFleetIdentity(acct.Name, aliasMap));
-                        SendResponseToRemote(sb.ToString());
-                        Print("[SIMA] GET_FLEET → Responded with account list");
-                    }
+                        HandleFleetCommand(action, parts);
                     else if (action.StartsWith("SET_MAX_RISK"))
                     {
                         if (parts.Length > 2 && double.TryParse(parts[2], out double val))
@@ -1096,53 +966,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                     else if (action.StartsWith("TOGGLE_ACCOUNT"))
-                    {
-                        if (parts.Length > 2)
-                        {
-                            string acctName = parts[1];
-                            bool active = parts[2] == "1";
-                            // V12.1101E [A-2]: Lock IPC writes to activeFleetAccounts — this dict is also
-                            // read by the strategy thread (ExecuteMultiAccountMarket) without a lock.
-                            lock (stateLock)
-                            {
-                                activeFleetAccounts[acctName] = active;
-                            }
-                            Print($"[V12.2] TOGGLE_ACCOUNT: {acctName} | Active={active}");
-                        }
-                    }
+                        HandleToggleAccountCommand(parts);
                     // V12.6: SET_SIMA|ON or SET_SIMA|OFF - Remote SIMA toggle from external panel
                     // V12.Phase6 [LIFECYCLE]: Uses centralized ApplySimaState for full lifecycle management
                     else if (action == "SET_SIMA")
-                    {
-                        if (parts.Length > 1)
-                        {
-                            bool enable = parts[1].Trim().ToUpper() == "ON";
-                            ApplySimaState(enable);
-                            Print($"V12.Phase6: SET_SIMA = {enable} (lifecycle applied)");
-                        }
-                    }
+                        HandleFleetCommand(action, parts);
                     // V12.2: Diagnostic command to check fleet state
                     else if (action == "DIAG_FLEET")
-                    {
-                        Print("[DIAG] ══════════════════════════════════════════════════");
-                        Print($"[DIAG] EnableSIMA = {EnableSIMA}");
-                        Print($"[DIAG] AccountPrefix = \"{AccountPrefix}\"");
-                        int total = 0;
-                        int active = 0;
-                        foreach (Account acct in Account.All)
-                        {
-                            if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                total++;
-                                bool isActive = false;
-                                activeFleetAccounts.TryGetValue(acct.Name, out isActive);
-                                if (isActive) active++;
-                                Print($"[DIAG]   {acct.Name} -> {(isActive ? "✓ ACTIVE" : "✗ INACTIVE")}");
-                            }
-                        }
-                        Print($"[DIAG] TOTAL: {total} accounts | {active} ACTIVE");
-                        Print("[DIAG] ══════════════════════════════════════════════════");
-                    }
+                        HandleFleetCommand(action, parts);
                     else if (action.StartsWith("SET_ANCHOR"))
                     {
                         // V11: SET_ANCHOR|EMA30|Global
@@ -1252,34 +1083,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     // V12.25: SET_LEADER_ACCOUNT|accountName — Panel tells strategy which account is the leader
                     else if (action == "SET_LEADER_ACCOUNT")
-                    {
-                        if (parts.Length > 1)
-                        {
-                            string newLeader = parts[1].Trim();
-                            Print($"V12.25 IPC: Leader Account synced to [{newLeader}]");
-                        }
-                    }
+                        HandleFleetCommand(action, parts);
                     else if (action == "REQUEST_FLEET_STATE")
-                    {
-                        StringBuilder fsb = new StringBuilder("FLEET_STATE|");
-                        fsb.Append(Instrument.FullName).Append("|");
-                        fsb.Append(Position.MarketPosition).Append("|");
-
-                        var fleetAccounts = GetFleetAccountsSnapshot();
-                        var aliasMap = BuildFleetAliasMap(fleetAccounts);
-                        List<string> acctStates = new List<string>();
-                        foreach (Account acct in fleetAccounts)
-                        {
-                            var bPos = acct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
-                            int act = (bPos != null && bPos.MarketPosition != MarketPosition.Flat)
-                                ? (bPos.MarketPosition == MarketPosition.Long ? (int)bPos.Quantity : -(int)bPos.Quantity) : 0;
-                            int exp = 0;
-                            if (expectedPositions != null) expectedPositions.TryGetValue(ExpKey(acct.Name), out exp);
-                            acctStates.Add($"{GetIpcFleetIdentity(acct.Name, aliasMap)}:{act}:{exp}");
-                        }
-                        fsb.Append(string.Join(";", acctStates));
-                        SendResponseToRemote(fsb.ToString());
-                    }
+                        HandleFleetCommand(action, parts);
                     else if (action == "SET_MANUAL_PRICE")
                     {
                         // Format: SET_MANUAL_PRICE|<price>|<symbol> - price is in parts[1] (after split by |)
@@ -1390,6 +1196,272 @@ namespace NinjaTrader.NinjaScript.Strategies
                 try { TriggerCustomEvent(o => ProcessIpcCommands(), null); } catch { }
             }
         }
+
+        // ── Build 935 [B935-P2]: Extracted IPC sub-handlers ──────────────────────────────
+
+        /// <summary>
+        /// Handles TRIM_25 / TRIM_50 — partial position close by percentage.
+        /// </summary>
+        private void HandleTrimCommand(string action, string[] parts)
+        {
+            double percent = action == "TRIM_50" ? 0.5 : 0.25;
+            // V12.1101E [A-3/SK-02]: Snapshot .Values before iterating.
+            // [1102Z-F]: TRIM now routes to pos.ExecutingAccount for fleet followers.
+            foreach (var pos in activePositions.Values.ToArray())
+            {
+                if (pos.RemainingContracts > 1)
+                {
+                    // V10.3.1 FIX: Math.Max(1, ...) ensures we always trim at least 1 contract.
+                    int rawQty = Math.Max(1, (int)Math.Floor(pos.RemainingContracts * percent));
+                    int remainingAfterTrim = pos.RemainingContracts - rawQty;
+
+                    // Safety: never flatten via trim
+                    if (remainingAfterTrim < 1)
+                        rawQty = pos.RemainingContracts - 1;
+
+                    if (rawQty >= 1 && (pos.RemainingContracts - rawQty) >= 1)
+                    {
+                        OrderAction trimAction = pos.Direction == MarketPosition.Long
+                            ? OrderAction.Sell : OrderAction.BuyToCover;
+
+                        // [1102Z-F]: Route to fleet follower account when applicable
+                        if (EnableSIMA && pos.IsFollower && pos.ExecutingAccount != null)
+                        {
+                            string trimSig = "Trim_" + pos.SignalName;
+                            if (trimSig.Length > 50) trimSig = trimSig.Substring(0, 50);
+                            Order trimOrder = pos.ExecutingAccount.CreateOrder(
+                                Instrument, trimAction, OrderType.Market, TimeInForce.Gtc,
+                                rawQty, 0, 0, "", trimSig, null);
+                            pos.ExecutingAccount.Submit(new[] { trimOrder });
+                            Print(string.Format("[SIMA] TRIM {0}%: Follower {1} → {2} closing {3} contracts",
+                                (int)(percent * 100), pos.SignalName, pos.ExecutingAccount.Name, rawQty));
+                        }
+                        else
+                        {
+                            Print(string.Format("IPC Trim: Closing {0} of {1} contracts for {2} ({3:P0})",
+                                rawQty, pos.RemainingContracts, pos.SignalName, percent));
+
+                            if (pos.Direction == MarketPosition.Long)
+                                SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                            else
+                                SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                        }
+                    }
+                    else
+                    {
+                        Print(string.Format("IPC Trim SKIPPED: {0} contracts for {1} - cannot satisfy {2:P0} trim with 1+ remaining",
+                            pos.RemainingContracts, pos.SignalName, percent));
+                    }
+                }
+                else
+                {
+                    Print(string.Format("IPC Trim SKIPPED: {0} has only 1 contract - use FLATTEN to close", pos.SignalName));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles CONFIG — syncs T1-T5 values/types, stop multiplier, risk, and target count.
+        /// Format: CONFIG|Mode|COUNT:3;T1:1.0;T1TYPE:Points;T2:0.5;T2TYPE:ATR;...
+        /// </summary>
+        private void HandleConfigCommand(string[] parts)
+        {
+            // V12 PRO: Parse the full config sync from side panel
+            if (parts.Length <= 2)
+                return;
+
+            string configMode = parts[1];
+            string configContent = parts[2];
+            string[] settingsItems = configContent.Split(';');
+            foreach (string setting in settingsItems)
+            {
+                if (string.IsNullOrEmpty(setting)) continue;
+                string[] kv = setting.Split(':');
+                if (kv.Length < 2) continue;
+                string key = kv[0].ToUpper();
+                string val = kv[1];
+
+                if (key == "T1") { if (double.TryParse(val, out double v)) Target1Value = v; }
+                else if (key == "CIT") { ChaseIfTouchPoints = val; }
+                else if (key == "T2") {
+                    if (double.TryParse(val, out double v)) {
+                        string vmReason;
+                        if (!ValidateIpcMultiplier(v, out vmReason))
+                            Print($"[IPC REJECT] T2 value {v} rejected: {vmReason}");
+                        else Target2Value = v;
+                    }
+                }
+                else if (key == "T3") {
+                    if (double.TryParse(val, out double v)) {
+                        string vmReason;
+                        if (!ValidateIpcMultiplier(v, out vmReason))
+                            Print($"[IPC REJECT] T3 value {v} rejected: {vmReason}");
+                        else Target3Value = v;
+                    }
+                }
+                else if (key == "T4") {
+                    if (double.TryParse(val, out double v)) {
+                        string vmReason;
+                        if (!ValidateIpcMultiplier(v, out vmReason))
+                            Print($"[IPC REJECT] T4 value {v} rejected: {vmReason}");
+                        else Target4Value = v;
+                    }
+                }
+                else if (key == "T5") {
+                    if (double.TryParse(val, out double v)) {
+                        string vmReason;
+                        if (!ValidateIpcMultiplier(v, out vmReason))
+                            Print($"[IPC REJECT] T5 value {v} rejected: {vmReason}");
+                        else Target5Value = v;
+                    }
+                }
+                else if (key == "T1TYPE") { if (TryParseTargetMode(val, out var parsed)) T1Type = parsed; }
+                else if (key == "T2TYPE") { if (TryParseTargetMode(val, out var parsed)) T2Type = parsed; }
+                else if (key == "T3TYPE") { if (TryParseTargetMode(val, out var parsed)) T3Type = parsed; }
+                else if (key == "T4TYPE") { if (TryParseTargetMode(val, out var parsed)) T4Type = parsed; }
+                else if (key == "T5TYPE") { if (TryParseTargetMode(val, out var parsed)) T5Type = parsed; }
+                else if (key == "STR") {
+                    if (double.TryParse(val, out double v)) {
+                        string vmReason;
+                        if (!ValidateIpcMultiplier(v, out vmReason))
+                            Print($"[IPC REJECT] STR multiplier {v} rejected: {vmReason}");
+                        else if (configMode == "RMA") RMAStopATRMultiplier = v; else StopMultiplier = v;
+                    }
+                }
+                else if (key == "MAX") {
+                    if (double.TryParse(val, out double v)) {
+                        MaxRiskAmount = v;
+                        RiskPerTrade = v;
+                    }
+                }
+                else if (key == "COUNT") {
+                    if (int.TryParse(val, out int v)) {
+                        // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
+                        int clamped = Math.Max(1, Math.Min(5, v));
+                        lock (stateLock) { activeTargetCount = clamped; }
+                    }
+                }
+                else if (key == "TRMA") { isTrendRmaMode = (val == "1"); }
+                else if (key == "RRMA") { isRetestRmaMode = (val == "1"); }
+            }
+            Print(string.Format("[V12] Sync All CONFIG ({0}) Applied: {1}", configMode, configContent));
+        }
+
+        /// <summary>
+        /// Handles TOGGLE_ACCOUNT — enables or disables a specific account in the fleet.
+        /// Build 935 [B935-P1]: Resolves UI aliases (F01, F02) via ResolveAccountName before
+        /// writing to activeFleetAccounts. Returns early with a rejection log on null resolve.
+        /// Format: TOGGLE_ACCOUNT|&lt;alias_or_name&gt;|&lt;0|1&gt;
+        /// </summary>
+        private void HandleToggleAccountCommand(string[] parts)
+        {
+            if (parts.Length <= 2)
+            {
+                Print($"V12 IPC REJECT: TOGGLE_ACCOUNT requires 3 parts, got {parts.Length}");
+                return;
+            }
+
+            // Build 935 [B935-P1]: Resolve alias → real account name. Guard null before any broker call.
+            string resolvedName = ResolveAccountName(parts[1]);
+            if (resolvedName == null)
+            {
+                // ResolveAccountName already logged the rejection; add caller context.
+                Print($"V12 IPC REJECT: TOGGLE_ACCOUNT aborted — unresolvable alias '{parts[1]}'");
+                return;
+            }
+
+            bool active = parts[2] == "1";
+            // V12.1101E [A-2]: Lock IPC writes to activeFleetAccounts — this dict is also
+            // read by the strategy thread (ExecuteMultiAccountMarket) without a lock.
+            lock (stateLock)
+            {
+                activeFleetAccounts[resolvedName] = active;
+            }
+            Print($"[V12.2] TOGGLE_ACCOUNT: {resolvedName} (resolved from '{parts[1]}') | Active={active}");
+        }
+
+        /// <summary>
+        /// Handles fleet-level commands: GET_FLEET, SET_SIMA, DIAG_FLEET,
+        /// SET_LEADER_ACCOUNT, REQUEST_FLEET_STATE.
+        /// </summary>
+        private void HandleFleetCommand(string action, string[] parts)
+        {
+            if (action.StartsWith("GET_FLEET", StringComparison.OrdinalIgnoreCase))
+            {
+                var fleetAccounts = GetFleetAccountsSnapshot();
+                var aliasMap = BuildFleetAliasMap(fleetAccounts);
+                StringBuilder sb = new StringBuilder("CONFIG|FLEET");
+                sb.Append("|COUNT:").Append(fleetAccounts.Count);
+                foreach (var acct in fleetAccounts)
+                    sb.Append('|').Append(GetIpcFleetIdentity(acct.Name, aliasMap));
+                SendResponseToRemote(sb.ToString());
+                Print("[SIMA] GET_FLEET → Responded with account list");
+            }
+            else if (action == "SET_SIMA")
+            {
+                if (parts.Length > 1)
+                {
+                    bool enable = parts[1].Trim().ToUpper() == "ON";
+                    ApplySimaState(enable);
+                    Print($"V12.Phase6: SET_SIMA = {enable} (lifecycle applied)");
+                }
+            }
+            else if (action == "DIAG_FLEET")
+            {
+                Print("[DIAG] ══════════════════════════════════════════════════");
+                Print($"[DIAG] EnableSIMA = {EnableSIMA}");
+                Print($"[DIAG] AccountPrefix = \"{AccountPrefix}\"");
+                int total = 0;
+                int active = 0;
+                foreach (Account acct in Account.All)
+                {
+                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        total++;
+                        bool isActive = false;
+                        activeFleetAccounts.TryGetValue(acct.Name, out isActive);
+                        if (isActive) active++;
+                        Print($"[DIAG]   {acct.Name} -> {(isActive ? "✓ ACTIVE" : "✗ INACTIVE")}");
+                    }
+                }
+                Print($"[DIAG] TOTAL: {total} accounts | {active} ACTIVE");
+                Print("[DIAG] ══════════════════════════════════════════════════");
+            }
+            else if (action == "SET_LEADER_ACCOUNT")
+            {
+                if (parts.Length > 1)
+                {
+                    string newLeader = parts[1].Trim();
+                    Print($"V12.25 IPC: Leader Account synced to [{newLeader}]");
+                }
+            }
+            else if (action == "REQUEST_FLEET_STATE")
+            {
+                StringBuilder fsb = new StringBuilder("FLEET_STATE|");
+                fsb.Append(Instrument.FullName).Append("|");
+                fsb.Append(Position.MarketPosition).Append("|");
+
+                var fleetAccounts = GetFleetAccountsSnapshot();
+                var aliasMap = BuildFleetAliasMap(fleetAccounts);
+                List<string> acctStates = new List<string>();
+                foreach (Account acct in fleetAccounts)
+                {
+                    var bPos = acct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+                    int act = 0;
+                    if (bPos != null && bPos.MarketPosition != MarketPosition.Flat)
+                    {
+                        act = (bPos.MarketPosition == MarketPosition.Long) ? (int)bPos.Quantity : -(int)bPos.Quantity;
+                    }
+                    int exp = 0;
+                    expectedPositions?.TryGetValue(ExpKey(acct.Name), out exp);
+                    acctStates.Add($"{GetIpcFleetIdentity(acct.Name, aliasMap)}:{act}:{exp}");
+                }
+                fsb.Append(string.Join(";", acctStates));
+                SendResponseToRemote(fsb.ToString());
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
 
         private void SendResponseToRemote(string response)
         {
