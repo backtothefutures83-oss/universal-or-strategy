@@ -1,0 +1,36 @@
+name: 'Claude Code Review'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@beta
+        with:
+          model: claude-sonnet-4-6
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are a "Strict Auditor" for the Universal OR Strategy (V12) — a high-integrity institutional fleet trading strategy for NinjaTrader 8.
+            Read and strictly enforce all rules from CLAUDE.md.
+            Focus on:
+            1. Zero-Trust IPC (Loopback binding, allowlist validation, UTF-8 bounds).
+            2. SIMA dispatch synchronicity (_dispatchSyncPendingExpKeys barriers).
+            3. Callback ghost-prevention (Signed delta rollbacks, NOT blanket zeroing).
+            4. REAPER Safety Fencing (per-account fill-grace, ATR + tick bounds).
+            5. Symmetry anchor gating (follower brackets must wait for master anchor).
+            Post inline comments for every violation found. Do NOT approve if any Zero-Trust or fleet safety protocol is violated.

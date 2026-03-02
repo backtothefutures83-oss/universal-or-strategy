@@ -1,0 +1,11 @@
+# Cursor Indexing Shield
+.agent/
+.agents/
+.mcp/
+node_modules/
+bin/
+obj/
+*.bak*
+*.tmp
+*.log
+.git/

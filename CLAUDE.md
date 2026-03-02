@@ -1,50 +1,19 @@
-# NinjaScript V12 Project Standards
+# CLAUDE.md - BMad Project Standards & Safety Guide
 
-- **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
-- **Concurrency**: All state mutations (activePositions, expectedPositions) MUST be guarded by lock(stateLock).
-- **Lifecycle**: Semaphores (_simaToggleSem) MUST be released in finally blocks.
-- **Refactoring**: Prefer explicit FirstOrDefault logic for instrument lookups (Reaper parity).
-- **Style**: Use PascalCase for methods, camelCase for local variables. Avoid dense one-liners; prioritize "Metabolic Elegance."
+## 🚩 Project Overview
+**Universal OR Strategy (V12)**: A high-integrity institutional fleet trading strategy for NinjaTrader 8.
 
-## 🛡️ Protocol Hardening (V12.Phase7)
+## 🛡️ Zero-Trust Protocols (MANDATORY)
+1. **IPC Security**: All listeners must bind to Loopback (`127.0.0.1`). Malformed input must be rejected with `V12 IPC REJECT` logs.
+2. **Input Validation**: Never trust incoming network payloads. Use strict UTF-8 decoding and bounded command lengths.
+3. **Fleet Privacy**: Obscure sensitive account names using BMad aliases (`F01`, `F02`, etc.) in all external-facing responses.
 
-### 1. Scope Control
-- **Discovery Guard**: AI agents MUST automatically ignore all backups (`*.bak`), archives (`ARCHIVE_*`), and date-stamped files from global scans. Reference **[.agent/rules/zero_waste_discovery.md](file:///.agent/rules/zero_waste_discovery.md)** for the full exclusion patterns.
-- **Surgical Edits**: AI agents MUST restrict code modifications to the specific files requested in the Mission Brief. NEVER refactor unrelated files without explicit Director authorization.
-- **Zero-Trust Planning**: Always generate an `implementation_plan.md` before applying code changes to local files.
+## 🦍 Logic Integrity (FLEET SAFETY)
+1. **SIMA Synchronicity**: All fleet dispatches must use the `_dispatchSyncPendingExpKeys` barrier.
+2. **Ghost-Order Prevention**: Use **Signed Delta Rollbacks** for expected position cleanup; never use blanket zeroing.
+3. **REAPER Bounds**: Repairs must be capped by both ATR-volatility and hard tick fences.
+4. **Symmetry Gating**: Follower brackets must wait for the master "Anchor" price before submission.
 
-### 2. WPF/UI Guardrails
-- **Escalation**: If a UI layout or positioning task enters a loop (more than 2 failed attempts), the agent MUST halt and escalate to the Director for manual layout review.
-- **Headless Mode**: Prefer headless execution for batch logic updates; do not attempt complex UI re-styling without a visual brief.
-
-### 3. Path & Deployment Management
-- **Source Truth**: All primary NinjaScript logic resides in `src/`.
-- **Deployment**: Local builds MUST be synced to `C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\` using the `./deploy-sync.ps1` script (or `/deploy` skill).
-
-## 🏁 Environment Truths (NinjaScript/NT8)
-
-- **Execution Context**: Codes executes in NinjaTrader 8. `Print()` outputs ONLY to the NT8 UI Output Window, not to local logs on disk.
-- **Built-in Indicators**: Managed by the NT8 installer; DO NOT attempt to modify or fix built-in indicator files via code.
-- **WPF Layouts**: Chart Trader panels REQUIRE hard-coded pixel widths. Do NOT attempt relative layouts (Star, Stretch) as they fail in the injected window context.
-- **Large Files**: For `.cs` files >500 lines, use `grep` and chunked reads. Never attempt to replace the entire file content.
-
-## ⚛️ Atomic Session Protocol
-
-- **One Patch Per Session**: Apply only one major patch (e.g., 1102Q) per AI session.
-- **Regression Audit**: Every patch MUST be followed by a `/audit` command to check for downstream side-effects before declaring completion.
-- **Scope Discipline**: Confirm the exact file list before editing. NEVER expand scope to configs/docs unless explicitly instructed.
-
-### 4. Repo Hygiene
-- **Zero-Delta Start**: Every new phase MUST begin with a 0-delta `main` branch to prevent context debt.
-- **Atomic Merging**: Merge and delete feature branches immediately after successful F5 compilation and initial testing.
-- **Binary Guard**: DO NOT commit `.exe`, `.log`, or `.bak` files. Use stashing or `.gitignore`.
-- **Clean Dashboard**: All agents (Claude, Gemini, Antigravity) MUST ensure the repo is clean before starting new missions.
-
-## 🕹️ Director Commands ($)
-
-- **$PLAN_AUDIT**: Use `read_terminal` on the active Claude/Antigravity PID to ingest Sonnet's implementation plan. Perform a forensic logic audit before recommending approval to the Director.
-- **$MISSION**: Initialize a new project phase via a Mission Brief artifact.
-- **$AUDIT**: Trigger the `/audit` skill to scan the `src/` directory.
-
-## Agent Synchronization
-AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini, Rovo Dev) MUST follow the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** as the primary source of truth for architectural standards and safety protocols.
+## 🏷️ Naming Conventions
+- **Build Tags**: Must be incremented in `V12_002.Properties.cs` for every production delivery.
+- **Prefixes**: All files and primary classes use `V12_001` (Panel) or `V12_002` (Strategy).

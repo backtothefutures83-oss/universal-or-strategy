@@ -283,6 +283,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int IpcPort { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Expose Fleet Identity Over IPC", Description = "When false (default), IPC uses aliases (F01/F02) instead of real account names.", GroupName = "12. SIMA", Order = 3)]
+        public bool IpcExposeSensitiveFleetIdentity { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Enable Path B", GroupName = "12. SIMA", Order = 4)]
         public bool EnablePathB { get; set; }
 
