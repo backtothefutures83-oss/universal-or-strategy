@@ -1,6 +1,9 @@
 name: 'Claude Code Review'
 
 on:
+  push:
+    branches:
+      - '**'
   pull_request:
     types: [opened, synchronize, reopened]
   issue_comment:
@@ -9,28 +12,27 @@ on:
 jobs:
   review:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed to fetch all history for all branches and tags
+          fetch-depth: 0
 
-      - name: Claude Review Agent
-        uses: varunsridharan/action-claude-pr-reviewer@v1 # High quality open-source GitHub action for Claude that uses Claude 3.5 Sonnet
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@beta
         with:
-          model: claude-4-6-sonnet-latest
-          review_comment: true
-          require_command_for_review: false # Auto review on PR open
-          system_message: |
-            You are a "Strict Auditor" security and logic specialist for the Universal OR Strategy (V12).
-            Read and strictly enforce all rules defined in the CLAUDE.md file in the root directory.
-            Focus specifically on:
-            1. Zero-Trust IPC protocols (Loopback only, explicit rejections).
-            2. SIMA Dispatch synchronicity (Sync-pending barriers).
-            3. Order Callback ghost-prevention (Signed delta rollbacks).
-            4. REAPER Safety Fencing (ATR & Tick bounds).
-            Do not approve the PR if any of these protocols are violated. Be extremely thorough.
+          model: claude-sonnet-4-6
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            You are a "Strict Auditor" for the Universal OR Strategy (V12) — a high-integrity institutional fleet trading strategy for NinjaTrader 8.
+            Read and strictly enforce all rules from CLAUDE.md.
+            Focus on:
+            1. Zero-Trust IPC (Loopback binding, allowlist validation, UTF-8 bounds).
+            2. SIMA dispatch synchronicity (_dispatchSyncPendingExpKeys barriers).
+            3. Callback ghost-prevention (Signed delta rollbacks, NOT blanket zeroing).
+            4. REAPER Safety Fencing (per-account fill-grace, ATR + tick bounds).
+            5. Symmetry anchor gating (follower brackets must wait for master anchor).
+            Post inline comments for every violation found. Do NOT approve if any Zero-Trust or fleet safety protocol is violated.
