@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Interlocked.Exchange(ref ipcQueuedCommandCount, 0);
 
                 // V12.2: Multi-Client Support
-                connectedClients = new ConcurrentDictionary<int, TcpClient>();
+                // connectedClients = new ConcurrentDictionary<int, TcpClient>(); // Moved to class member declaration
 
                 ipcThread = new Thread(ListenForRemote);
                 ipcThread.IsBackground = true;
@@ -142,110 +142,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 using (NetworkStream stream = client.GetStream())
                 {
-                    System.Text.StringBuilder lineBuffer = new System.Text.StringBuilder();
-                    byte[] buffer = new byte[4096];
-                    // Build 935 [IPC-B935-UTF8]: Stateful decoder per client — carries incomplete
-                    // multibyte sequences across TCP reads. StrictUtf8.GetString() was stateless
-                    // and would throw DecoderFallbackException on split-packet UTF-8, disconnecting
-                    // a valid client unnecessarily.
-                    // Build 935 [B935-P1]: Strict instance — throwOnInvalidBytes:true rejects
-                    // malformed payloads with DecoderFallbackException instead of '?' substitution.
-                    Decoder utf8Decoder = new UTF8Encoding(false, true).GetDecoder();
-                    char[] charBuf = new char[4096];
-
-                    while (isIpcRunning && client.Connected)
-                    {
-                         if (!stream.DataAvailable)
-                        {
-                            Thread.Sleep(50);
-                            continue;
-                        }
-
-                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                        if (bytesRead == 0) break; // Disconnected
-
-                        string chunk;
-                        try
-                        {
-                            int charCount = utf8Decoder.GetChars(buffer, 0, bytesRead, charBuf, 0, false);
-                            chunk = new string(charBuf, 0, charCount);
-                        }
-                        catch (DecoderFallbackException)
-                        {
-                            Print($"V12 IPC: Invalid UTF-8 payload from client {clientId}; disconnecting.");
-                            break;
-                        }
-                        lineBuffer.Append(chunk);
-
-                        if (lineBuffer.Length > IpcMaxBufferedChars)
-                        {
-                            Print($"V12 IPC: Client {clientId} exceeded max buffered payload ({IpcMaxBufferedChars}); disconnecting.");
-                            break;
-                        }
-
-                        string accumulated = lineBuffer.ToString();
-                        int lastNewline = accumulated.LastIndexOf('\n');
-                        if (lastNewline < 0) continue;
-
-                        string completeLines = accumulated.Substring(0, lastNewline);
-                        lineBuffer.Clear();
-                        if (lastNewline + 1 < accumulated.Length)
-                        {
-                            lineBuffer.Append(accumulated.Substring(lastNewline + 1));
-                            if (lineBuffer.Length > IpcMaxBufferedChars)
-                            {
-                                Print($"V12 IPC: Client {clientId} residue exceeded max buffered payload ({IpcMaxBufferedChars}); disconnecting.");
-                                break;
-                            }
-                        }
-
-                        string[] commands = completeLines.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (string rawCmd in commands)
-                        {
-                            string message = rawCmd.Trim();
-                            if (string.IsNullOrEmpty(message)) continue;
-
-                            // Handle GET_LAYOUT (Synchronous Response to THIS client only)
-                            if (message.StartsWith("GET_LAYOUT"))
-                            {
-                                // V12.Hardening: Read strategy state under stateLock to prevent data race with strategy thread
-                                string configResponse;
-                                lock (stateLock)
-                                {
-                                    string mode = isRMAModeActive ? "RMA" : "OR";
-                                    double stopValue = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
-                                    configResponse = string.Format(
-                                        "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
-                                        mode, activeTargetCount, Target1Value, ToIpcTargetMode(T1Type),
-                                        Target2Value, ToIpcTargetMode(T2Type),
-                                        Target3Value, ToIpcTargetMode(T3Type),
-                                        Target4Value, ToIpcTargetMode(T4Type),
-                                        Target5Value, ToIpcTargetMode(T5Type),
-                                        stopValue, MaxRiskAmount, ChaseIfTouchPoints ?? "0",
-                                        isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
-                                }
-                                byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
-                                stream.Write(responseBytes, 0, responseBytes.Length);
-                                stream.Flush();
-                                continue;
-                            }
-
-                            // Enqueue for processing
-                            if (!TryEnqueueIpcCommand(message, out string enqueueReason))
-                            {
-                                Print(string.Format("V12 IPC REJECT [client={0}] {1}: {2}", clientId, message, enqueueReason));
-                                continue;
-                            }
-                            Print(string.Format("V12.1 IPC ENQUEUE [client={0}] {1}", clientId, message));
-
-                            // Trigger processing
-                            try
-                            {
-                                TriggerCustomEvent(o => ProcessIpcCommands(), null);
-                            }
-                            catch { }
-                        }
-                    }
+                    ProcessClientStream(clientId, client, stream);
                 }
             }
             catch (Exception ex)
@@ -259,6 +156,112 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print($"V12 IPC: Client Disconnected [id={clientId}]");
                 try { client.Close(); } catch { }
             }
+        }
+
+        private void ProcessClientStream(int clientId, TcpClient client, NetworkStream stream)
+        {
+            StringBuilder lineBuffer = new StringBuilder();
+            byte[] buffer = new byte[4096];
+            Decoder utf8Decoder = new UTF8Encoding(false, true).GetDecoder();
+            char[] charBuf = new char[4096];
+
+            while (isIpcRunning && client.Connected)
+            {
+                if (!stream.DataAvailable)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                if (bytesRead == 0) break;
+
+                string chunk;
+                try
+                {
+                    int charCount = utf8Decoder.GetChars(buffer, 0, bytesRead, charBuf, 0, false);
+                    chunk = new string(charBuf, 0, charCount);
+                }
+                catch (DecoderFallbackException)
+                {
+                    Print($"V12 IPC: Invalid UTF-8 payload from client {clientId}; disconnecting.");
+                    break;
+                }
+                lineBuffer.Append(chunk);
+
+                if (lineBuffer.Length > IpcMaxBufferedChars)
+                {
+                    Print($"V12 IPC: Client {clientId} exceeded max buffered payload ({IpcMaxBufferedChars}); disconnecting.");
+                    break;
+                }
+
+                string accumulated = lineBuffer.ToString();
+                int lastNewline = accumulated.LastIndexOf('\n');
+                if (lastNewline < 0) continue;
+
+                string completeLines = accumulated.Substring(0, lastNewline);
+                lineBuffer.Clear();
+                if (lastNewline + 1 < accumulated.Length)
+                {
+                    lineBuffer.Append(accumulated.Substring(lastNewline + 1));
+                    if (lineBuffer.Length > IpcMaxBufferedChars)
+                    {
+                        Print($"V12 IPC: Client {clientId} residue exceeded max buffered payload ({IpcMaxBufferedChars}); disconnecting.");
+                        break;
+                    }
+                }
+
+                string[] lines = completeLines.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string line in lines)
+                {
+                    HandleIncomingIpcLine(clientId, stream, line);
+                }
+            }
+        }
+
+        private void HandleIncomingIpcLine(int clientId, NetworkStream stream, string line)
+        {
+            string message = line.Trim();
+            if (string.IsNullOrEmpty(message)) return;
+
+            // Handle GET_LAYOUT (Synchronous Response to THIS client only)
+            if (message.StartsWith("GET_LAYOUT"))
+            {
+                string configResponse;
+                lock (stateLock)
+                {
+                    string mode = isRMAModeActive ? "RMA" : "OR";
+                    double stopValue = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
+                    configResponse = string.Format(
+                        "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
+                        mode, activeTargetCount, Target1Value, ToIpcTargetMode(T1Type),
+                        Target2Value, ToIpcTargetMode(T2Type),
+                        Target3Value, ToIpcTargetMode(T3Type),
+                        Target4Value, ToIpcTargetMode(T4Type),
+                        Target5Value, ToIpcTargetMode(T5Type),
+                        stopValue, MaxRiskAmount, ChaseIfTouchPoints ?? "0",
+                        isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                }
+                byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
+                stream.Write(responseBytes, 0, responseBytes.Length);
+                stream.Flush();
+                return;
+            }
+
+            // Enqueue for processing
+            if (!TryEnqueueIpcCommand(message, out string enqueueReason))
+            {
+                Print(string.Format("V12 IPC REJECT [client={0}] {1}: {2}", clientId, message, enqueueReason));
+                return;
+            }
+            Print(string.Format("V12.1 IPC ENQUEUE [client={0}] {1}", clientId, message));
+
+            // Trigger processing
+            try
+            {
+                TriggerCustomEvent(o => ProcessIpcCommands(), null);
+            }
+            catch { }
         }
 
         private void StopIpcServer()
