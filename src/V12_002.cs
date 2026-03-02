@@ -707,24 +707,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // IPC Queue
                 ipcCommandQueue = new ConcurrentQueue<string>();
+                connectedClients = new ConcurrentDictionary<int, TcpClient>(); // Build 935 [Fix-1]: prevent NullReferenceException in StopIpcServer
 
                 // V12 SIMA: Initialize expected positions tracking
                 expectedPositions = new ConcurrentDictionary<string, int>(2, 20); // Up to 20 accounts
 
-                // V12.1: Initialize Compliance Hub
-                string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
-                if (!System.IO.Directory.Exists(logsDir)) System.IO.Directory.CreateDirectory(logsDir);
-                complianceLogPath = System.IO.Path.Combine(logsDir, "ApexPerformance.json");
-                dailySummaryCsvPath = System.IO.Path.Combine(logsDir, "DailySummaries.csv");
-                EnsureDailySummaryCsv();
+                // V12.1: Initialize Compliance Hub — create log directory early (idempotent).
+                // Build 935 [Fix-2/3]: Symbol-specific log paths and LogicAudit moved to DataLoaded.
+                string logsDirInit = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
+                if (!System.IO.Directory.Exists(logsDirInit)) System.IO.Directory.CreateDirectory(logsDirInit);
 
                 // Add data series for MTF RMA Intelligence (Phase 9.2)
                 AddDataSeries(BarsPeriodType.Minute, 5);  // Index 1 (Primary for ATR)
                 AddDataSeries(BarsPeriodType.Minute, 10); // Index 2
                 AddDataSeries(BarsPeriodType.Minute, 15); // Index 3
 
-                // V12.002: Run Risk Logic Audit (The Testing Rig) on startup
-                ExecuteRiskLogicAudit();
             }
             else if (State == State.DataLoaded)
             {
@@ -792,6 +789,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("TREND: Enabled={0} E1Stop={1}xATR E2Trail={2}xATR", TRENDEnabled, TRENDEntry1ATRMultiplier, TRENDEntry2ATRMultiplier));
                 Print(string.Format("FFMA: Enabled={0} Distance={1}pt RSI={2}/{3}", FFMAEnabled, FFMAEMADistance, FFMARSIOversold, FFMARSIOverbought));
                 Print(string.Format("V12 SIMA: {0} | AccountPrefix: \"{1}\"", EnableSIMA ? "ENABLED - Fleet mode" : "DISABLED - Single account", AccountPrefix));
+
+                // Build 935 [Fix-2]: Symbol-specific log paths prevent file-lock collisions
+                // when MES and MCL instances run concurrently on the same machine.
+                string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
+                complianceLogPath   = System.IO.Path.Combine(logsDir, $"ApexPerformance_{symbol}.json");
+                dailySummaryCsvPath = System.IO.Path.Combine(logsDir, $"DailySummaries_{symbol}.csv");
+                EnsureDailySummaryCsv();
+
+                // Build 935 [Fix-3]: Run Risk Logic Audit here (DataLoaded) so instrument properties
+                // (tickSize, pointValue, minContracts, maxContracts) are populated before audit runs.
+                ExecuteRiskLogicAudit();
 
             }
             else if (State == State.Realtime)

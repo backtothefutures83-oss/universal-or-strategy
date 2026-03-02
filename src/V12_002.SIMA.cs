@@ -572,20 +572,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double loopMs   = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
 
                 var report = new StringBuilder(1024);
-                report.AppendLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+                report.AppendLine("â•”==============================================================â•—");
                 report.AppendLine("â•‘          â±  FORENSIC PULSE REPORT â€” Phase 7.2 Latency        â•‘");
-                report.AppendLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+                report.AppendLine("â• ==============================================================â•£");
                 report.AppendLine(string.Format("â•‘  Signal   : {0,-10}  Action : {1,-10}  Qty : {2,-5}        â•‘",
                     tradeType, action, quantity));
                 report.AppendLine(string.Format("â•‘  Total MS : {0,8:F3}   Setup MS : {1,8:F3}   Loop MS : {2,8:F3}  â•‘",
                     totalMs, setupMs, loopMs));
                 report.AppendLine(string.Format("â•‘  Fleet    : {0,3} accounts  |  Dispatched : {1,3}                    â•‘",
                     fleet.Count, rmaCount));
-                report.AppendLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+                report.AppendLine("â• ==============================================================â•£");
                 report.AppendLine("â•‘  TYPE | ACCOUNT                       | ORDER TYPE   |   RTT  â•‘");
-                report.AppendLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+                report.AppendLine("â• ==============================================================â•£");
                 report.Append(dispatchLog.ToString());
-                report.AppendLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+                report.AppendLine("â•š==============================================================â•");
                 Print(report.ToString().TrimEnd());
             }
             catch (Exception ex)
@@ -753,10 +753,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             UnsubscribeFromFleetAccounts(); // V12.1101E [A-4]: Always unsub first â€” idempotent guard against handler accumulation
             simaAccountCount = 0;
-            Print("[SIMA] â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+            Print("[SIMA] ===================================================");
             Print("[SIMA] V12.12 - Fleet Symmetry & Safety Hardening Initializing");
             Print($"[SIMA] Account Prefix Filter: \"{AccountPrefix}\"");
-            Print("[SIMA] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
+            Print("[SIMA] ---------------------------------------------------");
 
             foreach (Account acct in Account.All)
             {
@@ -775,7 +775,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     _subscribedAccountNames.Add(acct.Name); // V12.Phase6 [UNSUB-TRACK]: Track for deterministic unsubscribe
                     if (EnableComplianceHub)
                     {
-                        Print($"[SIMA] âœ“ {acct.Name} | COMPLIANCE MONITORING ACTIVE");
+                        Print($"[SIMA] [OK] {acct.Name} | COMPLIANCE MONITORING ACTIVE");
                     }
                     else
                     {
@@ -784,10 +784,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            Print("[SIMA] â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
+            Print("[SIMA] ---------------------------------------------------");
             Print($"[SIMA] TOTAL ACCOUNTS DETECTED: {simaAccountCount} | ALL INACTIVE by default");
             Print("[SIMA] FLEET INACTIVE - MANUAL ENABLE REQUIRED"); // V12.Phase10 [DEFAULT-FIX]
-            Print("[SIMA] â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+            Print("[SIMA] ===================================================");
 
             // V12.Phase6 [HYDRATE]: Seed expectedPositions from live broker state
             HydrateExpectedPositionsFromBroker();
@@ -1031,9 +1031,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 Print($"[SIMA RMA V2] {direction} @ {price} | Stop: {stopPrice} | T1: {t1Price} | T2: {t2Price} | T3: {t3Price} | T4: {t4Price} | T5: {t5Price} | Qty: {qty}");
 
-                // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                // =======================================================
                 // 1. LOCAL ACCOUNT: SubmitOrderUnmanaged (chart-visible)
-                // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                // =======================================================
                 string localKey = baseSignal;
                 Order entryOrder = SubmitOrderUnmanaged(0, entryAction, OrderType.Limit, qty, price, 0, "", localKey);
                 if (entryOrder != null)
@@ -1083,9 +1083,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("[SIMA RMA V2] ERROR: Local entry returned null");
                 }
 
-                // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                // =======================================================
                 // 2. SIMA FLEET: Iterate Account.All for followers
-                // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+                // =======================================================
                 if (!EnableSIMA)
                 {
                     Print("[SIMA RMA V2] âš ï¸ EnableSIMA is FALSE - Fleet dispatch SKIPPED. Enable SIMA in strategy parameters or send SET_SIMA|ON via IPC.");
@@ -1224,9 +1224,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (dispatchLog.Length > 0)
                 {
-                    Print("â•â• SIMA RMA V2 WARNINGS â•â•");
+                    Print("== SIMA RMA V2 WARNINGS ==");
                     Print(dispatchLog.ToString().TrimEnd());
-                    Print("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+                    Print("==========================");
                 }
 
                 Print($"[SIMA RMA V2] Fleet: {fleetOk} dispatched, {fleetSkip} skipped");
@@ -1249,7 +1249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
             try
             {
-                Print("[SIMA] â•â•â•â•â•â• GLOBAL FLATTEN START â•â•â•â•â•â•");
+                Print("[SIMA] ====== GLOBAL FLATTEN START ======");
                 int flattenCount = 0;
                 int totalCount = 0;
 
@@ -1299,7 +1299,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (closedCount > 0)
                             {
                                 flattenCount++;
-                                Print($"[SIMA] âœ“ Flattened {closedCount} position(s) on {acct.Name}");
+                                Print($"[SIMA] [OK] Flattened {closedCount} position(s) on {acct.Name}");
                             }
 
                             // Reset expected position
@@ -1369,7 +1369,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                Print($"[SIMA] â•â•â•â•â•â• GLOBAL FLATTEN COMPLETE: {flattenCount} flattened across {totalCount} accounts â•â•â•â•â•â•");
+                Print($"[SIMA] ====== GLOBAL FLATTEN COMPLETE: {flattenCount} flattened across {totalCount} accounts ======");
             }
             finally
             {
@@ -1461,7 +1461,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             isFlattenRunning = true;
             try
             {
-                Print("[SIMA] â•â•â•â•â•â• GLOBAL POSITIONS CLOSE START (System Protection Orders Swept; Limit/Stop Brackets Preserved) â•â•â•â•â•â•");
+                Print("[SIMA] ====== GLOBAL POSITIONS CLOSE START (System Protection Orders Swept; Limit/Stop Brackets Preserved) ======");
                 int closeCount = 0;
                 int totalCount = 0;
 
@@ -1472,7 +1472,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     totalCount++;
                     try
                     {
-                        // â”€â”€ V12.Phase10 [ZOMBIE-STOP-FIX]: Zombie Sweep â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                        // -- V12.Phase10 [ZOMBIE-STOP-FIX]: Zombie Sweep ------------------------------
                         // EMERGENCY_STOP_ orders are submitted by REAPER to guard naked positions.
                         // They are NOT OCO-linked and NOT part of any bracket structure, so they survive
                         // FLATTEN_ONLY and become Zombies â€” reversal-fill risk after the position closes.
@@ -1496,7 +1496,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             acct.Cancel(zombieOrders); // V12.Phase10 [ZOMBIE-STOP-FIX]
                             Print($"[SIMA][ZOMBIE-STOP-FIX] {acct.Name}: swept {zombieOrders.Count} system protection order(s). Deck cleared.");
                         }
-                        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                        // -----------------------------------------------------------------------------
 
                         foreach (Position position in acct.Positions)
                         {
@@ -1512,7 +1512,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 TimeInForce.Gtc, qty, 0, 0, "", signalName, null);
                             acct.Submit(new[] { closeOrder });
                             closeCount++;
-                            Print($"[SIMA] âœ“ Graceful Close: {qty} {position.MarketPosition} on {acct.Name}");
+                            Print($"[SIMA] [OK] Graceful Close: {qty} {position.MarketPosition} on {acct.Name}");
                         }
 
                         SetExpectedPositionLocked(ExpKey(acct.Name), 0);
@@ -1560,7 +1560,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (masterClose != null)
                         {
                             closeCount++;
-                            Print($"[SIMA] âœ“ Graceful Close: Master {qty} {position.MarketPosition}");
+                            Print($"[SIMA] [OK] Graceful Close: Master {qty} {position.MarketPosition}");
                         }
                         else
                         {
@@ -1570,7 +1570,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     SetExpectedPositionLocked(ExpKey(Account.Name), 0);
                 }
 
-                Print($"[SIMA] â•â•â•â•â•â• GLOBAL POSITIONS CLOSE COMPLETE: {closeCount} positions closed â•â•â•â•â•â•");
+                Print($"[SIMA] ====== GLOBAL POSITIONS CLOSE COMPLETE: {closeCount} positions closed ======");
             }
             finally
             {
