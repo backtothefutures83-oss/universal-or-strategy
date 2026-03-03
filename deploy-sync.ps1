@@ -58,7 +58,7 @@ $Mappings = @(
 Write-Host "`n--- ASCII GATE: Scanning source files ---" -ForegroundColor Yellow
 $srcDir = Join-Path $RepoRoot "src"
 $gatePass = $true
-foreach ($csFile in (Get-ChildItem $srcDir -Filter "*.cs")) {
+foreach ($csFile in (Get-ChildItem $srcDir -Filter "*.cs" -Recurse)) {
     $bytes = [System.IO.File]::ReadAllBytes($csFile.FullName)
     $badBytes = $bytes | Where-Object { $_ -gt 127 }
     if ($badBytes.Count -gt 0) {

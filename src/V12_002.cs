@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "939";  // V12.939: P0 thread-safety hardening -- Account.Get marshal + Positions.ToArray + CI repair
+        public const string BUILD_TAG = "940";  // V12.940: OCO stable hash + REAPER lock finally + ASCII gate recurse
 
         #region Variables
 

@@ -614,6 +614,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // 4. Mark in-flight to prevent double-repair
                 lock (stateLock) { _repairInFlight.Add(repairKey); }
 
+                try  // Build 940 [FIX-2]: Inner try/finally guarantees _repairInFlight cleanup on all exit paths.
+                {
                 // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern
                 OrderAction action = repairPos.Direction == MarketPosition.Long
                     ? OrderAction.Buy : OrderAction.SellShort;
@@ -635,7 +637,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (repairEntry == null)
                 {
                     Print($"[REAPER REPAIR] \u2717 CreateOrder returned null for {accountName}");
-                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
                     return;
                 }
 
@@ -646,7 +647,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print($"[REAPER REPAIR] (!) RACE GUARD ABORT for {accountName}: " +
                           $"expectedPositions cleared to 0 while repair was in queue. Discarding repair order.");
-                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
                     return;
                 }
 
@@ -670,14 +670,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RemoveDrawObject(desyncTag);
                 }
                 catch { }
-
-                // 7. Clear in-flight flag
-                lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                }
+                finally
+                {
+                    // 7. Clear in-flight flag -- guaranteed on all exit paths (return, throw, or normal).
+                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                }
             }
             catch (Exception ex)
             {
                 Print($"[REAPER REPAIR] \u2717 FAILED for {accountName}: {ex.Message}");
-                lock (stateLock) { _repairInFlight.Remove(repairKey); }
             }
         }
 

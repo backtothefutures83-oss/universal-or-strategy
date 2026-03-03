@@ -275,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CurrentTrailLevel = 0,
                     IsRMATrade = true,
                     // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
-                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
+                    OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -393,7 +393,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Target5Price = target5Price,
                     IsRMATrade = true,
                     // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
-                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
+                    OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 ApplyTargetLadderGuard(pos);
 
