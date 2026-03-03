@@ -88,7 +88,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double StopThresholdPoints { get; set; }
 
         /// <summary>SLIP-01: Points reserved as a slippage buffer when sizing follower contracts.
-        /// Ensures follower dollar risk stays ≤ MaxRiskAmount even if entry fills at a worse price than master.
+        /// Ensures follower dollar risk stays <= MaxRiskAmount even if entry fills at a worse price than master.
         /// Default = 1.0 pt. Set to 0 to disable.</summary>
         [NinjaScriptProperty]
         [Range(0, 10)]
@@ -318,7 +318,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // GHOST-FIX-2 [Build 922Z]: Grace window before REAPER fires emergency stop on naked position.
         // 3 seconds covers the normal bracket-order broker-confirmation lag after a fill.
-        // Set to 0 to disable the grace window (immediate fire — legacy behaviour).
+        // Set to 0 to disable the grace window (immediate fire -- legacy behaviour).
         [NinjaScriptProperty]
         [Range(0, 10)]
         [Display(Name = "Naked Position Grace (sec)", Description = "Seconds REAPER waits before declaring a no-stop position a true emergency. Default: 3. Prevents false EF_ during bracket confirmation lag.", GroupName = "12. SIMA", Order = 10)]
@@ -331,7 +331,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         [NinjaScriptProperty]
         [Range(1, 100)]
-        [Display(Name = "Fleet Parity Multiplier", Description = "Lot-size scaling for followers (e.g. 10 for ES→MES)", GroupName = "12. SIMA", Order = 12)]
+        [Display(Name = "Fleet Parity Multiplier", Description = "Lot-size scaling for followers (e.g. 10 for ES->MES)", GroupName = "12. SIMA", Order = 12)]
         public int FleetParityMultiplier { get; set; }
 
         [NinjaScriptProperty]

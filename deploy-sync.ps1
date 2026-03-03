@@ -37,11 +37,43 @@ $Mappings = @(
     @{ src = "V12_002.Trailing.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.cs" },
     @{ src = "V12_002.Properties.cs"; dst = Join-Path $NtStrategyDir "V12_002.Properties.cs" },
     
+    # Strategy Components
+    @{ src = "V12_002.Constants.cs"; dst = Join-Path $NtStrategyDir "V12_002.Constants.cs" },
+    @{ src = "V12_002.Atm.cs"; dst = Join-Path $NtStrategyDir "V12_002.Atm.cs" },
+    @{ src = "V12_002.AccountUpdate.cs"; dst = Join-Path $NtStrategyDir "V12_002.AccountUpdate.cs" },
+    @{ src = "V12_002.Data.cs"; dst = Join-Path $NtStrategyDir "V12_002.Data.cs" },
+
     # Shared Components
     @{ src = "SignalBroadcaster.cs"; dst = Join-Path $NtStrategyDir "SignalBroadcaster.cs" }
 )
 
-Write-Host "`n--- WSGTA DEPLOY SYNC: Hardening Environment ---" -ForegroundColor Cyan
+
+# =============================================================================
+# ASCII PRE-DEPLOY GATE (Build Protocol v2)
+# Scans ALL .cs source files for non-ASCII bytes BEFORE touching NT8.
+# Any byte > 127 (emoji, curly quotes, em-dashes, box-drawing) will ABORT
+# the deploy. This prevents the encoding bug that caused cascading C# errors.
+# Fix: run C:\tmp\byte_purge.py, then re-run deploy-sync.ps1
+# =============================================================================
+Write-Host "`n--- ASCII GATE: Scanning source files ---" -ForegroundColor Yellow
+$srcDir = Join-Path $RepoRoot "src"
+$gatePass = $true
+foreach ($csFile in (Get-ChildItem $srcDir -Filter "*.cs")) {
+    $bytes = [System.IO.File]::ReadAllBytes($csFile.FullName)
+    $badBytes = $bytes | Where-Object { $_ -gt 127 }
+    if ($badBytes.Count -gt 0) {
+        Write-Host "ASCII GATE FAIL: $($csFile.Name) has $($badBytes.Count) non-ASCII bytes" -ForegroundColor Red
+        Write-Host "  Fix: python C:\tmp\byte_purge.py  then re-run deploy-sync.ps1" -ForegroundColor Red
+        $gatePass = $false
+    }
+}
+if (-not $gatePass) {
+    Write-Host "`nDEPLOY ABORTED - Fix encoding errors first (see above)" -ForegroundColor Red
+    exit 1
+}
+Write-Host "ASCII GATE PASS - all source files are clean`n" -ForegroundColor Green
+
+Write-Host "--- WSGTA DEPLOY SYNC: Hardening Environment ---" -ForegroundColor Cyan
 
 foreach ($map in $Mappings) {
     if ($map.src -match "Indicator") {

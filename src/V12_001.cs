@@ -1,4 +1,4 @@
-﻿// V12 STANDARD EDITION - NinjaTrader 8 Vertical Sidebar Control Surface
+// V12 STANDARD EDITION - NinjaTrader 8 Vertical Sidebar Control Surface
 // RELIABILITY FIRST: Uses standard UserControlCollection API (no injection)
 // Docks to RIGHT side of chart as a vertical sidebar (~240px wide)
 //
@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         private volatile bool isShuttingDown = false;
         private System.Threading.Timer reconnectTimer;
         private ConcurrentQueue<string> responseQueue = new ConcurrentQueue<string>();
-        // [Build 934]: Throttle IPC retry log spam — print on 1st failure then once per 60 s
+        // [Build 934]: Throttle IPC retry log spam -- print on 1st failure then once per 60 s
         private int      _ipcRetryCount    = 0;
         private DateTime _lastRetryLogTime = DateTime.MinValue;
 
@@ -839,7 +839,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void UpdateTargetCountVisual(int count)
         {
-            // V14 FIX: Must run on UI thread � may be called from TCP background thread
+            // V14 FIX: Must run on UI thread ? may be called from TCP background thread
             if (!Dispatcher.CheckAccess())
             {
                 Dispatcher.Invoke(() => UpdateTargetCountVisual(count));
@@ -1781,7 +1781,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             trim50Button.Click += (s, e) => { SendCommand("TRIM_50"); TriggerGlow(OrangeFg); };
             rightCol.Children.Add(trim50Button);
 
-            // BE row: Input (ticks offset) + Button � mirrors TRAIL row layout
+            // BE row: Input (ticks offset) + Button ? mirrors TRAIL row layout
             Grid beRow = new Grid { Margin = new Thickness(0, 2, 0, 0) };
             beRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) }); // SYNC: Matches trailDistInput width
             beRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -2309,7 +2309,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             // V12.45: Save SYNCED count (not clicked count) as sticky for the OLD mode
             if (lastSyncedCountPerMode.ContainsKey(selectedConfigMode))
                 fullConfig.LastUsedCountPerMode[selectedConfigMode] = lastSyncedCountPerMode[selectedConfigMode];
-            // else: don't overwrite — keep whatever was previously persisted
+            // else: don't overwrite -- keep whatever was previously persisted
 
             // Switch to new mode
             selectedConfigMode = mode;
@@ -2356,7 +2356,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
             // Switch count
             selectedTargetCount = count;
-            // V12.45: Removed sticky write here — count is only committed on SyncAll_Click
+            // V12.45: Removed sticky write here -- count is only committed on SyncAll_Click
             SendCommand($"SET_TARGETS|{count}");
 
             foreach (var btn in new[] { cnt1, cnt2, cnt3, cnt4, cnt5 })
@@ -2380,7 +2380,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         public void UpdateTargetVisibility(int count)
         {
-            // V14 FIX: Must run on UI thread � called from TCP background thread via SYNC_TARGET_STATE
+            // V14 FIX: Must run on UI thread ? called from TCP background thread via SYNC_TARGET_STATE
             if (!Dispatcher.CheckAccess())
             {
                 Dispatcher.Invoke(() => UpdateTargetVisibility(count));
@@ -2464,7 +2464,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 case "FFMA":
                     if (ffmaButton != null) ffmaButton.Visibility = Visibility.Visible;
                     if (ffmaManualButton != null) ffmaManualButton.Visibility = Visibility.Visible;
-                    // V12.27: FFMA hides manual entry row � M.FFMA auto-detects direction
+                    // V12.27: FFMA hides manual entry row ? M.FFMA auto-detects direction
                     if (manualEntryRow != null) manualEntryRow.Visibility = Visibility.Collapsed;
                     break;
                 case "TREND":
@@ -2782,7 +2782,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
         }
 
-        // V12.20: "One Click = One Order" � Reset all execution mode toggles after any order dispatch
+        // V12.20: "One Click = One Order" ? Reset all execution mode toggles after any order dispatch
         // Trading Rule: Every single trade requires a fresh click of the mode button.
         private void ResetExecutionMode()
         {
@@ -2814,7 +2814,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 if (retestRmaToggle != null) retestRmaToggle.Opacity = 0.5;
             }
 
-            Print("V12.20: ResetExecutionMode � all modes reset including R toggles (One Click = One Order)");
+            Print("V12.20: ResetExecutionMode ? all modes reset including R toggles (One Click = One Order)");
         }
 
         // V12.14: Helper to sync RMA button visual from IPC state
@@ -2977,7 +2977,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 lastSyncedCountPerMode[selectedConfigMode] = selectedTargetCount;
             }
             SaveConfig();
-            Print($"V12.45: SYNC committed → {selectedConfigMode} sticky count = {selectedTargetCount}");
+            Print($"V12.45: SYNC committed -> {selectedConfigMode} sticky count = {selectedTargetCount}");
         }
 
         #endregion
@@ -3000,7 +3000,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     _ipcRetryCount    = 0;
                     _lastRetryLogTime = DateTime.MinValue;
 
-                    Print($"V12 Panel: Strategy connected on port {IpcPort} ✓");
+                    Print($"V12 Panel: Strategy connected on port {IpcPort} ?");
 
                     if (ChartControl != null)
                     {
@@ -3028,7 +3028,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 // [Build 934]: Log only on first failure and then at most once per 60 seconds
                 if (_ipcRetryCount == 1 || (DateTime.Now - _lastRetryLogTime).TotalSeconds >= 60)
                 {
-                    Print($"V12 Panel: Strategy offline — retrying in background (attempt #{_ipcRetryCount})");
+                    Print($"V12 Panel: Strategy offline -- retrying in background (attempt #{_ipcRetryCount})");
                     _lastRetryLogTime = DateTime.Now;
                 }
 
@@ -3166,7 +3166,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         }
 
         // V12.14: Auto-reconnect after unexpected disconnect
-        // V12.1101E [B-8]: Refactored to non-recursive — reuses a single timer object via .Change()
+        // V12.1101E [B-8]: Refactored to non-recursive -- reuses a single timer object via .Change()
         // instead of Dispose + new Timer on each failure. Prevents timer object accumulation and
         // eliminates recursive call stack growth under sustained disconnection.
         private readonly object _reconnectLock = new object();
@@ -3179,7 +3179,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 if (reconnectTimer != null)
                 {
-                    // Reset the existing timer to fire again in 3 s — no new allocation needed
+                    // Reset the existing timer to fire again in 3 s -- no new allocation needed
                     reconnectTimer.Change(3000, Timeout.Infinite);
                     return;
                 }
@@ -3189,13 +3189,13 @@ namespace NinjaTrader.NinjaScript.Indicators
                 {
                     if (isShuttingDown || isConnected) return;
 
-                    // [Build 934]: Removed per-attempt "Auto-reconnect attempting..." print — now throttled in ConnectToStrategy() catch block
+                    // [Build 934]: Removed per-attempt "Auto-reconnect attempting..." print -- now throttled in ConnectToStrategy() catch block
                     try
                     {
                         ConnectToStrategy();
                         if (isConnected)
                         {
-                            Print("V12 Panel: Strategy came online — connected ✓");
+                            Print("V12 Panel: Strategy came online -- connected ?");
                             lock (_reconnectLock) { reconnectTimer = null; }
                         }
                         else
@@ -3205,7 +3205,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     }
                     catch (Exception ex)
                     {
-                        // [Build 934]: Logging is throttled inside ConnectToStrategy() catch — no extra print here
+                        // [Build 934]: Logging is throttled inside ConnectToStrategy() catch -- no extra print here
                         ScheduleReconnect();
                     }
                 }, null, 3000, Timeout.Infinite);

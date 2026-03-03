@@ -17,3 +17,10 @@
 ## 🏷️ Naming Conventions
 - **Build Tags**: Must be incremented in `V12_002.Properties.cs` for every production delivery.
 - **Prefixes**: All files and primary classes use `V12_001` (Panel) or `V12_002` (Strategy).
+
+
+## CRITICAL: ASCII-Only in All C# String Literals
+- NEVER use emoji, curly quotes, em-dashes, Unicode arrows, or box-drawing in Print() or any string literal.
+- Non-ASCII inside C# strings breaks the NinjaTrader compiler with 300+ cascading errors (Build 936 incident).
+- Allowed substitutions: (!) not emoji, -- not em-dash, -> not arrow, straight " not curly " "
+- See .agent/standards_manifesto.md Section 7 for the full rule table and emergency fix sequence.

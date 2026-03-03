@@ -1,4 +1,4 @@
-// V12.Phase7 MODULAR: MOMO Entry Node (Split from Entries.cs — Phase 7 Partition)
+// V12.Phase7 MODULAR: MOMO Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: ExecuteMOMOEntry, ActivateMOMOMode, DeactivateMOMOMode
 using System;
 using System.Collections.Generic;
@@ -137,7 +137,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CurrentTrailLevel = 0,
                     EntryOrderType = OrderType.StopMarket,
                     IsRMATrade = false,
-                    IsMOMOTrade = true  // V8.6: Mark as MOMO trade
+                    IsMOMOTrade = true,  // V8.6: Mark as MOMO trade
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -147,7 +149,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int masterDeltaMOMO = (direction == MarketPosition.Long) ? contracts : -contracts;
                 AddExpectedPositionDeltaLocked(ExpKey(Account.Name), masterDeltaMOMO);
 
-                // V12.Hardening: Use StopMarket (was StopLimit with limitPrice==stopPrice — never fills on fast breakouts)
+                // V12.Hardening: Use StopMarket (was StopLimit with limitPrice==stopPrice -- never fills on fast breakouts)
                 Order entryOrder = direction == MarketPosition.Long
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.StopMarket, contracts, 0, entryPrice, "", entryName)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.StopMarket, contracts, 0, entryPrice, "", entryName);
@@ -155,7 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaMOMO);
-                    Print("[ERROR][1102Y-V3] MOMO SubmitOrderUnmanaged NULL for " + entryName + " — rolled back.");
+                    Print("[ERROR][1102Y-V3] MOMO SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
                 }
 
                 entryOrders[entryName] = entryOrder;

@@ -1,10 +1,10 @@
-// V12.Phase7 STUB: Entry Engine Module — all logic partitioned into mode-specific nodes.
-// FFMA  → Entries.FFMA.cs
-// OR    → Entries.OR.cs
-// RMA   → Entries.RMA.cs
-// MOMO  → Entries.MOMO.cs
-// TREND → Entries.Trend.cs
-// RETEST→ Entries.Retest.cs
+// V12.Phase7 STUB: Entry Engine Module -- all logic partitioned into mode-specific nodes.
+// FFMA  -> Entries.FFMA.cs
+// OR    -> Entries.OR.cs
+// RMA   -> Entries.RMA.cs
+// MOMO  -> Entries.MOMO.cs
+// TREND -> Entries.Trend.cs
+// RETEST-> Entries.Retest.cs
 using System;
 using NinjaTrader.NinjaScript.Strategies;
 

@@ -68,7 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Audit Case 3: Target Distribution (Priority Fill)
                 // [BUILD 926 FIX]: Test all 5 count scenarios explicitly.
-                // activeTargetCount is useless here — this audit fires at startup BEFORE the IPC
+                // activeTargetCount is useless here -- this audit fires at startup BEFORE the IPC
                 // app connects and pushes COUNT:n. Testing all counts makes this timing-independent.
                 Print("[AUDIT] CASE 3: TARGET DISTRIBUTION (ALL COUNT SCENARIOS)");
                 int[] auditCounts = { 1, 2, 3, 4, 5 };
@@ -96,7 +96,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         TargetMode tnMode = GetTargetMode(tn);
                         if (tnMode == TargetMode.Runner)
                         {
-                            Print(string.Format("  T{0}: Runner — no limit order", tn));
+                            Print(string.Format("  T{0}: Runner -- no limit order", tn));
                             continue;
                         }
                         double mag = GetConfiguredTargetMagnitude(tn);
@@ -291,10 +291,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                         lock (stateLock) { expectedPositions[acctName] = driftedQty; }
                         Print(string.Format("  [DESYNC]  Account {0}: expectedPositions drifted {1} -> {2}", acctName, realQty, driftedQty));
 
-                        // Restore immediately — this is a read-only probe, not a live corruption test
+                        // Restore immediately -- this is a read-only probe, not a live corruption test
                         lock (stateLock) { expectedPositions[acctName] = realQty; }
                         Print(string.Format("  [RESTORE] Account {0}: expectedPositions restored to {1}", acctName, realQty));
-                        Print(string.Format("  [VERIFY]  Reaper heartbeat = {0}ms — any unrestored drift would be detected on next AuditApexPositions() cycle.", ReaperIntervalMs));
+                        Print(string.Format("  [VERIFY]  Reaper heartbeat = {0}ms -- any unrestored drift would be detected on next AuditApexPositions() cycle.", ReaperIntervalMs));
                         driftCount++;
                     }
                     Print(string.Format("  CASE 9 RESULT: {0} account(s) drift-probed and restored. Reaper window = {1}ms.",

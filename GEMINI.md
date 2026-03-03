@@ -34,3 +34,10 @@
 
 ## Agent Synchronization
 AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini) MUST follow the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** as the primary source of truth for architectural standards and safety protocols.
+
+
+## CRITICAL: ASCII-Only in All C# String Literals
+- NEVER use emoji, curly quotes, em-dashes, Unicode arrows, or box-drawing in Print() or any string literal.
+- Non-ASCII inside C# strings breaks the NinjaTrader compiler with 300+ cascading errors (Build 936 incident).
+- Allowed substitutions: (!) not emoji, -- not em-dash, -> not arrow, straight " not curly " "
+- See .agent/standards_manifesto.md Section 7 for the full rule table and emergency fix sequence.

@@ -48,3 +48,36 @@ claude
 
 ---
 *Status: Alpha Files Successfully Relocated to `src/`*
+
+---
+
+## 6. ASCII-Only Protocol (MANDATORY — Build Protocol v2)
+
+**Why this exists:** AI agents wrote Unicode decorators in log messages (emoji, em-dashes, curly quotes).
+Cleanup scripts converted curly closing-quote `"` to straight `"` — which TERMINATED C# strings early.
+One broken quote in `SIMA.cs` caused 300+ cascading compile errors across all files. This cost 2 days.
+
+### Hard Rules — All AI Agents Must Follow
+
+| NEVER in string literals | Use instead |
+|---|---|
+| `⚠️` `✅` `❌` (emoji) | `(!)` `[OK]` `[X]` |
+| `—` `–` (em/en dash) | `--` |
+| `"` `"` (curly quotes) | `"` (straight) |
+| `→` `←` (arrows) | `->` `<-` |
+| `╔═╗` (box drawing) | `+--+` |
+
+### Automatic Deploy Gate
+`deploy-sync.ps1` scans every `.cs` file for non-ASCII bytes **before** touching NT8.
+Gate FAIL = deploy aborted + dirty filename printed.
+
+### Emergency Fix Sequence
+```
+1. python C:\tmp\byte_purge.py       # nuclear byte-level purge
+2. Search all .cs files for:  ?"     # any match in a Print/string line = broken string
+3. Replace ?" with:  --              # or (!) as appropriate  
+4. Run deploy-sync.ps1 again         # gate will confirm clean
+```
+
+> **Avoid OneDrive**: Never launch agents from `OneDrive\Desktop` paths.
+> Source of truth is always `C:\WSGTA\universal-or-strategy\src\`

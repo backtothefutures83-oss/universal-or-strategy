@@ -1,4 +1,4 @@
-// V12.Phase7 MODULAR: TREND Entry Node (Split from Entries.cs — Phase 7 Partition)
+// V12.Phase7 MODULAR: TREND Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: ExecuteTRENDEntry, CreateTRENDPosition, ActivateTRENDMode,
 //           DeactivateTRENDMode, ExecuteTRENDManualEntry
 using System;
@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Calculates the weighted-average ATR stop distance used for TREND position sizing.
         /// E1 uses TRENDEntry1ATRMultiplier (or RMAStopATRMultiplier in RMA mode), weighted 1/3.
         /// E2 uses TRENDEntry2ATRMultiplier (or RMAStopATRMultiplier in RMA mode), weighted 2/3.
-        /// Pure math on indicator/property values — no side effects, safe to call from UI layer.
+        /// Pure math on indicator/property values -- no side effects, safe to call from UI layer.
         /// </summary>
         private double CalculateTRENDStopDistance()
         {
@@ -167,7 +167,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 int totalContracts = contracts;
 
-                // TREND-SPLIT-FIX: Strict floor — E1 (EMA9) gets ⌊Total/3⌋, E2 (EMA15) gets remainder.
+                // TREND-SPLIT-FIX: Strict floor -- E1 (EMA9) gets ?Total/3?, E2 (EMA15) gets remainder.
                 // Prevents risk budget overrun when Math.Ceiling pushes E1 past 1/3 of total contracts.
                 int entry1Qty = Math.Max(1, totalContracts / 3);
                 int entry2Qty = Math.Max(1, totalContracts - entry1Qty);
@@ -229,7 +229,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder1 == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaE1);
-                    Print("[ERROR][1102Y-V3] TREND E1 SubmitOrderUnmanaged NULL for " + entry1Name + " — rolled back.");
+                    Print("[ERROR][1102Y-V3] TREND E1 SubmitOrderUnmanaged NULL for " + entry1Name + " -- rolled back.");
                 }
                 entryOrders[entry1Name] = entryOrder1;
 
@@ -245,7 +245,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder2 == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaE2);
-                    Print("[ERROR][1102Y-V3] TREND E2 SubmitOrderUnmanaged NULL for " + entry2Name + " — rolled back.");
+                    Print("[ERROR][1102Y-V3] TREND E2 SubmitOrderUnmanaged NULL for " + entry2Name + " -- rolled back.");
                 }
                 entryOrders[entry2Name] = entryOrder2;
 
@@ -328,7 +328,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsTRENDTrade = true,
                 IsTRENDEntry1 = isEntry1,
                 IsTRENDEntry2 = !isEntry1,
-                LinkedTRENDGroup = groupId
+                LinkedTRENDGroup = groupId,
+                // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
             };
             return tPos;
         }
@@ -409,7 +411,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaTMNL);
-                    Print("[ERROR][1102Y-V3] TRENDManual SubmitOrderUnmanaged NULL for " + entryName + " — rolled back.");
+                    Print("[ERROR][1102Y-V3] TRENDManual SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
                 }
                 entryOrders[entryName] = entryOrder;
 

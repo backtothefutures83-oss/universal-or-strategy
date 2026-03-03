@@ -1,4 +1,4 @@
-// V12.Phase7 MODULAR: RMA Entry Node (Split from Entries.cs — Phase 7 Partition)
+// V12.Phase7 MODULAR: RMA Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: ExecuteTrendSplitEntry, GetRmaAnchorPrice, ExecuteRMAEntry,
 //           ExecuteRMAEntryCustom, ActivateRMAMode, DeactivateRMAMode
 using System;
@@ -65,7 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 OrderAction entryAction = isLongTrend ? OrderAction.Buy : OrderAction.SellShort;
 
                 // TREND_RMA is risk-sized from MaxRiskAmount (default $200), then split across EMA9/EMA15.
-                // V12.1101E [B-1]: Decouple per-leg multipliers — mirror the standard TREND entry logic.
+                // V12.1101E [B-1]: Decouple per-leg multipliers -- mirror the standard TREND entry logic.
                 // E1 (EMA9 leg) uses TRENDEntry1ATRMultiplier; E2 (EMA15 leg) uses TRENDEntry2ATRMultiplier.
                 // When isTrendRmaMode is ON, both legs fall back to RMAStopATRMultiplier (same as standard TREND).
                 double e1Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
@@ -75,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double weightedStopDist = (stop9Dist * (1.0 / 3.0)) + (stop15Dist * (2.0 / 3.0));
 
                 int totalQty = CalculatePositionSize(weightedStopDist);
-                // TREND-SPLIT-FIX: Strict floor — EMA9 gets ⌊Total/3⌋, EMA15 gets remainder.
+                // TREND-SPLIT-FIX: Strict floor -- EMA9 gets ?Total/3?, EMA15 gets remainder.
                 // Matches the (1/3, 2/3) weights in weightedStopDist; prevents risk budget overrun.
                 int qty9  = Math.Max(1, totalQty / 3);
                 int qty15 = Math.Max(0, totalQty - qty9);
@@ -273,7 +273,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     BracketSubmitted = false,
                     ExtremePriceSinceEntry = entryPrice,
                     CurrentTrailLevel = 0,
-                    IsRMATrade = true
+                    IsRMATrade = true,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -298,9 +300,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    // Build 1102Y-V3 [MS-01 ROLLBACK]: Submit failed — undo reservation to prevent ghost position.
+                    // Build 1102Y-V3 [MS-01 ROLLBACK]: Submit failed -- undo reservation to prevent ghost position.
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRMA);
-                    Print("[ERROR][1102Y-V3] SubmitOrderUnmanaged returned NULL for " + entryName + " — Master expected rolled back.");
+                    Print("[ERROR][1102Y-V3] SubmitOrderUnmanaged returned NULL for " + entryName + " -- Master expected rolled back.");
                     Draw.Text(this, "Debug_Fail_" + entryName, "ORDER FAILED", 0, entryPrice, Brushes.Red);
                 }
 
@@ -389,7 +391,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Target3Price = target3Price,
                     Target4Price = target4Price,
                     Target5Price = target5Price,
-                    IsRMATrade = true
+                    IsRMATrade = true,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -406,9 +410,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (entryOrderCustom == null)
                 {
-                    // Build 1102Y-V3 [MS-02 ROLLBACK]: Submit failed — undo reservation.
+                    // Build 1102Y-V3 [MS-02 ROLLBACK]: Submit failed -- undo reservation.
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRMACustom);
-                    Print("[ERROR][1102Y-V3] RMACustom SubmitOrderUnmanaged returned NULL for " + entryName + " — Master expected rolled back.");
+                    Print("[ERROR][1102Y-V3] RMACustom SubmitOrderUnmanaged returned NULL for " + entryName + " -- Master expected rolled back.");
                 }
 
                 Print(string.Format("IPC EXEC: {0} {1} contracts at MKT (Ref: {2:F2})", direction, contracts, entryPrice));

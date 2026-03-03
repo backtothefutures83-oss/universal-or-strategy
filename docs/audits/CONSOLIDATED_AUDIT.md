@@ -105,25 +105,24 @@
     2.  **Alternative**: Use `StopLimit` with a 2-4 tick buffer (Limit = Stop +/- 4 ticks).
 
 #### 3. MEDIUM: SIMA Thread-Safety (IPC Race Condition)
-- **File**: `UniversalORStrategyV12_002_Dev.UI.cs`
-- **Location**: `ListenForRemote` -> `HandleClient` -> `GET_LAYOUT` (Line 328)
-- **Issue**: The `ipcThread` (Background Thread) reads strategy state variables (`minContracts`, `Target1FixedPoints`, `isTrendRmaMode`) directly to construct the configuration string.
-- **Risk**: While unlikely to crash, reading state variables from a background thread while the main logic thread potentially modifies them (e.g., via `ToggleStrategyMode`) is a Race Condition. On 32-bit runtimes, 64-bit double reads are not atomic.
-- **Fix**: Marshal the `GET_LAYOUT` response generation to the generic Dispatcher or Strategy thread using `TriggerCustomEvent` or `Dispatcher.Invoke`.
+- **File**: `V12_002.UI.IPC.cs`
+- **Issue**: The `HandleClient` background thread reads strategy state variables (`isRMAModeActive`, `Target1FixedPoints`) directly to build responses.
+- **Risk**: Potential race condition or memory visibility issues on non-atomic types during rapid UI updates.
+- **Fix**: Snapshot state onto the Strategy thread via `TriggerCustomEvent` before building IPC strings.
 
-#### 4. MEDIUM: Logic Clashing (Mode Toggles)
-- **File**: `UniversalORStrategyV12_002_Dev.UI.cs`
-- **Location**: `ToggleStrategyMode` (Line 1253)
-- **Issue**: IPC commands toggle modes independently (`isRMAModeActive = !isRMAModeActive`). The logic does not enforce strict mutual exclusivity at the toggle level (except for `ActivateMOMOMode` in `Entries.cs`).
-- **Risk**: A user could accidentally activate `RMA` via IPC while `MOMO` is active, leading to "Ghost Mode" signals where clicks trigger unintended logic.
-- **Fix**: Implement a centralized `SetMode(string mode)` helper that sets the target mode to `true` and **explicitly sets all others to false**.
+#### 4. MEDIUM: Sizing Math (NaN & Zero-Point Persistence)
+- **File**: `V12_002.UI.Sizing.cs`
+- **Location**: `CalculatePositionSize` (Line 85)
+- **Issue**: The method checks `stopDistanceRaw <= 0` but lacks guards for `pointValue <= 0` or `double.IsNaN(stopDistanceRaw)`.
+- **Risk**: Division by zero or NaN propagation into `SubmitOrder`, which can crash the strategy or trigger broker rejections.
+- **Fix**: Add `if (pointValue <= 0 || double.IsNaN(stopDistanceRaw)) return minContracts;`.
 
-#### 5. LOW: Sizing Math (NaN weakness)
-- **File**: `UniversalORStrategyV12_002_Dev.UI.cs`
-- **Location**: `CalculatePositionSize` (Line 1790)
-- **Issue**: The method guards against `stopDollars <= 0` but does not explicitly handle `NaN` or `pointValue == 0` (though `stopDollars` check covers 0). `Math.Floor(risk / NaN)` behavior in C# needs explicit handling to avoid passing invalid quantities to `SubmitOrder`.
-- **Risk**: Defaulting to `minContracts` on error might trigger a trade with unintended size during data feed glitches.
-- **Fix**: Add `if (pointValue <= 0 || double.IsNaN(stopDistanceRaw)) return 0;` and explicitly log a warning if sizing fails.
+#### 5. HIGH: SIMA Dispatch Desync on Submit Failure
+- **File**: `V12_002.SIMA.cs`
+- **Location**: `ExecuteSmartDispatchEntry` (Line 495)
+- **Issue**: The code calls `acct.Submit()` outside the `stateLock`. If `Submit` throws an exception *after* `MarkDispatchSyncPending` and `AddExpectedPositionDeltaLocked` but *before* `ClearDispatchSyncPending`, the `syncPending` flag logic in the catch block (Line 540) handles it, but there is a slim window where REAPER might observe the pending state without a backup.
+- **Risk**: Transient Desync alerts during broker connection drops.
+- **Fix**: Move `MarkDispatchSyncPending` closer to the `Submit` call and ensure the `catch` block perfectly reverses all three states: `expectedPositions`, `_dispatchSyncPendingExpKeys`, and tracking dicts.
 # Consolidated Audit Log: Universal OR Strategy V12.002_Dev
 **Start Time:** 2026-02-15 14:59 EST
 **Phase:** Round 1 - Redundant Discovery

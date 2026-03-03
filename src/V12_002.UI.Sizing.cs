@@ -37,7 +37,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // IS-01: Iron Shield Target Distribution [V12.BEYOND-BUG]
         // Replaces percentage-based engine with count-based integer division.
         // Source of truth: activeTargetCount (mirrors dashboard selection exactly).
-        // Ghost targets eliminated — T4/T5 are always 0 when count < 4/5.
+        // Ghost targets eliminated -- T4/T5 are always 0 when count < 4/5.
         // FIX-B [Build 1102Z]: Added targetCountOverride optional parameter.
         // When a caller passes a pre-snapshotted count (e.g., dispatchTargetCount from SIMA),
         // it is used instead of the live activeTargetCount global read. This prevents the
@@ -49,13 +49,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             t1 = 0; t2 = 0; t3 = 0; t4 = 0; t5 = 0;
             if (contracts <= 0) return;
 
-            // IS-01: Clamp active target count (Source of Truth — mirrors dashboard selection).
+            // IS-01: Clamp active target count (Source of Truth -- mirrors dashboard selection).
             // Use caller snapshot when provided; fall through to live activeTargetCount for all other call sites.
             int count = (targetCountOverride >= 1 && targetCountOverride <= 5)
                 ? targetCountOverride
                 : Math.Max(1, Math.Min(5, activeTargetCount));
 
-            // IS-02: Integer-Division Distribution (remainder to T1 first — scalp anchor)
+            // IS-02: Integer-Division Distribution (remainder to T1 first -- scalp anchor)
             int[] buckets = new int[5];
             int baseQty   = contracts / count;
             int remainder = contracts % count;
@@ -77,16 +77,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// V12.30: ATR Auto-Sizing Engine — Core Sizing Method
-        /// 1. stopDistanceRaw → Ceiling to whole point
-        /// 2. Quantity → Floor(MaxRisk / (ceilingStop * pointValue))
+        /// V12.30: ATR Auto-Sizing Engine -- Core Sizing Method
+        /// 1. stopDistanceRaw -> Ceiling to whole point
+        /// 2. Quantity -> Floor(MaxRisk / (ceilingStop * pointValue))
         /// 3. Clamp to [minContracts, max]
         /// </summary>
         private int CalculatePositionSize(double stopDistanceRaw)
         {
             if (stopDistanceRaw <= 0) return Math.Max(1, minContracts);
 
-            // STEP 1: CEILING to whole POINT (e.g. 2.3 → 3.0, 4.0 → 4.0)
+            // STEP 1: CEILING to whole POINT (e.g. 2.3 -> 3.0, 4.0 -> 4.0)
             double stopPoints = Math.Ceiling(stopDistanceRaw);
 
             double riskToUse = MaxRiskAmount;
@@ -95,36 +95,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // SLIP-01: Subtract slippage cushion from risk budget before sizing.
             // Followers may fill at worse prices than master (entry slippage); their stop
-            // is at the same absolute level → actual dollar risk = (fillPrice - stop) × qty × pv.
-            // Cushion ensures worst-case follower risk stays ≤ MaxRiskAmount.
+            // is at the same absolute level -> actual dollar risk = (fillPrice - stop) x qty x pv.
+            // Cushion ensures worst-case follower risk stays <= MaxRiskAmount.
             double slippageCushionDollars = SlippageCushionPoints * pointValue;
             double effectiveRisk = riskToUse - slippageCushionDollars;
 
             // STEP 2: FLOOR the quantity (never exceed $MaxRisk after slippage reserve)
             // [923A-P2b-OVF]: checked{} guards against astronomically low stopDollars (near-zero ATR)
-            // producing a double→int overflow. Clamps to maxContracts on overflow rather than silent wrap.
+            // producing a double->int overflow. Clamps to maxContracts on overflow rather than silent wrap.
             int contracts;
             try   { contracts = checked((int)Math.Floor(effectiveRisk / stopDollars)); }
             catch (OverflowException)
             {
-                Print($"[923A-OVF] Sizing overflow — stop={stopDollars:F4} effectiveRisk={effectiveRisk:F0} — clamping to maxContracts ({maxContracts})");
+                Print($"[923A-OVF] Sizing overflow -- stop={stopDollars:F4} effectiveRisk={effectiveRisk:F0} -- clamping to maxContracts ({maxContracts})");
                 contracts = maxContracts;
             }
 
-            // V12.Phase8.3: Diagnostic warning when ATR/Risk math produces 0 — makes risk-floor fallbacks visible
+            // V12.Phase8.3: Diagnostic warning when ATR/Risk math produces 0 -- makes risk-floor fallbacks visible
             if (contracts == 0)
-                Print($"[SIZING] Risk/Stop math resulted in 0 — falling back to minContracts floor ({minContracts}). Risk=${riskToUse:F0}, StopDollars=${stopDollars:F0}");
+                Print($"[SIZING] Risk/Stop math resulted in 0 -- falling back to minContracts floor ({minContracts}). Risk=${riskToUse:F0}, StopDollars=${stopDollars:F0}");
 
-            // V12.1101E [B-9]: Clamp to [minContracts, maxContracts] — prevents runaway sizing on
+            // V12.1101E [B-9]: Clamp to [minContracts, maxContracts] -- prevents runaway sizing on
             // tiny ATR values (e.g., flat market) from hitting broker limits or compliance thresholds.
             contracts = Math.Max(minContracts, Math.Min(contracts, maxContracts));
 
-            Print($"[V12.30 SIZING] RawStop={stopDistanceRaw:F2} → Ceiling={stopPoints:F0}pt | Risk=${riskToUse:F0} | Cushion=${slippageCushionDollars:F0} | EffRisk=${effectiveRisk:F0} | StopDollars=${stopDollars:F0} | Qty={contracts} | Clamp=[{minContracts},{maxContracts}]");
+            Print($"[V12.30 SIZING] RawStop={stopDistanceRaw:F2} -> Ceiling={stopPoints:F0}pt | Risk=${riskToUse:F0} | Cushion=${slippageCushionDollars:F0} | EffRisk=${effectiveRisk:F0} | StopDollars=${stopDollars:F0} | Qty={contracts} | Clamp=[{minContracts},{maxContracts}]");
             return contracts;
         }
 
         /// <summary>
-        /// V12.30: ATR Auto-Sizing Engine — Centralized Stop Distance Calculator
+        /// V12.30: ATR Auto-Sizing Engine -- Centralized Stop Distance Calculator
         /// Returns ATR-based stop rounded UP to nearest whole point.
         /// Replaces all inline "currentATR * multiplier" patterns.
         /// </summary>
@@ -138,7 +138,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// V12.45: Live Sync Engine — Updates unfilled entry orders when ATR
+        /// V12.45: Live Sync Engine -- Updates unfilled entry orders when ATR
         /// causes ceiling-stop or floor-qty to change.
         /// FLICKER PROTECTION HARDENING:
         /// 1. Order State Guard: Only sync orders in Accepted/Working state (blocks ChangePending)
@@ -178,7 +178,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.45 ORDER STATE GUARD: Only modify orders in stable states
                 // Accepted = broker acknowledged, waiting for fill
                 // Working  = actively in the order book
-                // ChangePending = a ChangeOrder is already in-flight — DO NOT send another
+                // ChangePending = a ChangeOrder is already in-flight -- DO NOT send another
                 OrderState currentState = entryOrder.OrderState;
                 if (currentState != OrderState.Accepted && currentState != OrderState.Working)
                 {
@@ -207,13 +207,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     double oldCeilingStop = Math.Ceiling(Math.Abs(pos.EntryPrice - pos.CurrentStopPrice));
                     double stopDelta      = Math.Abs(newStopDist - oldCeilingStop);
                     if (stopDelta < tickSize && newQty == pos.TotalContracts)
-                        continue;  // No material change — skip (releases lock before continuing)
+                        continue;  // No material change -- skip (releases lock before continuing)
 
                     double newStopPrice = pos.Direction == MarketPosition.Long
                         ? pos.EntryPrice - newStopDist
                         : pos.EntryPrice + newStopDist;
 
-                    // Stop prices update immediately — they reflect intent and are safe before broker confirmation.
+                    // Stop prices update immediately -- they reflect intent and are safe before broker confirmation.
                     pos.CurrentStopPrice = newStopPrice;
                     pos.InitialStopPrice = newStopPrice;
 
@@ -230,10 +230,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                         acctName        = (pos.IsFollower && pos.ExecutingAccount != null)
                                             ? pos.ExecutingAccount.Name : Account.Name;
                     }
-                    syncLog = $"[V12.45 SYNC] {entryName}: Stop {oldCeilingStop:F0}→{newStopDist:F0}pt | Qty {entryOrder.Quantity}→{newQty} | ATR={currentATR:F2}";
+                    syncLog = $"[V12.45 SYNC] {entryName}: Stop {oldCeilingStop:F0}->{newStopDist:F0}pt | Qty {entryOrder.Quantity}->{newQty} | ATR={currentATR:F2}";
                 }
 
-                // ChangeOrder must be called outside stateLock — broker API call.
+                // ChangeOrder must be called outside stateLock -- broker API call.
                 try
                 {
                     if (needsQtyChange)
@@ -252,7 +252,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // V12.45 RETRY COOLDOWN: Record failure time to prevent hammering
                     _lastSyncFailureTime = DateTime.Now;
-                    Print($"[V12.45 SYNC] ERROR syncing {entryName}: {ex.Message} — cooldown 500ms");
+                    Print($"[V12.45 SYNC] ERROR syncing {entryName}: {ex.Message} -- cooldown 500ms");
                 }
             }
         }

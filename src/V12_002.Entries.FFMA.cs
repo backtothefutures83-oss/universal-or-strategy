@@ -1,4 +1,4 @@
-// V12.Phase7 MODULAR: FFMA Entry Node (Split from Entries.cs — Phase 7 Partition)
+// V12.Phase7 MODULAR: FFMA Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: CheckFFMAConditions, ExecuteFFMAEntry, DeactivateFFMAMode,
 //           ExecuteFFMALimitEntry, ExecuteFFMAManualMarketEntry
 using System;
@@ -86,7 +86,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ExecuteFFMAEntry(MarketPosition direction)
         {
-            // V12.Phase7 [C-09]: Compliance enforcement gate — abort if drawdown or daily cap breached.
+            // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
             if (!IsOrderAllowed()) return;
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
             if (isFlattenRunning) return;
@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     stopDistance = tickSize * 2;
                 }
 
-                // V12.Hardening: Final stop-distance guard — prevent CalculatePositionSize(0) → ∞ contracts
+                // V12.Hardening: Final stop-distance guard -- prevent CalculatePositionSize(0) -> ? contracts
                 if (stopDistance <= 0)
                 {
                     Print("[FFMA REJECT] Stop distance is zero (doji candle or tickSize=0). Aborting entry.");
@@ -165,7 +165,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CurrentTrailLevel = 0,
                     EntryOrderType = OrderType.Market,
                     IsRMATrade = false,
-                    IsFFMATrade = true
+                    IsFFMATrade = true,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 activePositions[entryName] = pos;
 
@@ -206,7 +208,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             isFFMAModeArmed = false;
             // V12.24: Notify panel to reset FFMA Smart Toggle visual
             SendResponseToRemote("FFMA_DISARMED");
-            Print("V12.24: FFMA disarmed — sent FFMA_DISARMED to panel");
+            Print("V12.24: FFMA disarmed -- sent FFMA_DISARMED to panel");
         }
 
         #endregion
@@ -249,7 +251,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     stopDistance = tickSize * 2;
                 }
 
-                // V12.44: Final stop-distance guard — prevent CalculatePositionSize(0) → ∞ contracts
+                // V12.44: Final stop-distance guard -- prevent CalculatePositionSize(0) -> ? contracts
                 if (stopDistance <= 0)
                 {
                     Print("[FFMA_LIMIT REJECT] Stop distance is zero after ATR calc. Aborting entry.");
@@ -298,7 +300,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CurrentTrailLevel = 0,
                     EntryOrderType = OrderType.Limit,
                     IsRMATrade = false,
-                    IsFFMATrade = true
+                    IsFFMATrade = true,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 activePositions[entryName] = pos;
 
@@ -327,7 +331,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// V12.27: FFMA Manual Market entry — instant market order, direction toward 9 EMA.
+        /// V12.27: FFMA Manual Market entry -- instant market order, direction toward 9 EMA.
         /// Stop at entry candle high/low (same as Auto FFMA).
         /// </summary>
         private void ExecuteFFMAManualMarketEntry()
@@ -386,7 +390,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     stopDistance = tickSize * 2;
                 }
 
-                // V12.44: Final stop-distance guard — prevent CalculatePositionSize(0) → ∞ contracts
+                // V12.44: Final stop-distance guard -- prevent CalculatePositionSize(0) -> ? contracts
                 if (stopDistance <= 0)
                 {
                     Print("[FFMA_MANUAL_MARKET REJECT] Stop distance is zero (doji candle?). Aborting entry.");
@@ -435,7 +439,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CurrentTrailLevel = 0,
                     EntryOrderType = OrderType.Market,
                     IsRMATrade = false,
-                    IsFFMATrade = true
+                    IsFFMATrade = true,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 activePositions[entryName] = pos;
 

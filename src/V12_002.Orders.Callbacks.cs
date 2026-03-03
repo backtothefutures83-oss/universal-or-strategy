@@ -92,24 +92,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         // instead of the master-local CancelOrder() API. CancelOrder() is a NinjaScript-managed
         // call that only works for orders submitted via SubmitOrderUnmanaged(). Fleet follower
         // stops are submitted via acct.Submit(), so they require the broker-level Account.Cancel()
-        // API — identical to the pattern already proven correct in CleanupPosition() [BUG-2a].
+        // API -- identical to the pattern already proven correct in CleanupPosition() [BUG-2a].
         private void RequestStopCancelLifecycleSafe(string entryName)
         {
             if (string.IsNullOrEmpty(entryName)) return;
             if (!stopOrders.TryGetValue(entryName, out var stopOrder) || stopOrder == null) return;
 
-            // V12.1101H [COLLIDE-01]: Include ChangePending/ChangeSubmitted — stops in these transient
+            // V12.1101H [COLLIDE-01]: Include ChangePending/ChangeSubmitted -- stops in these transient
             // states were previously ignored by this function, leaving them live at the broker after FlattenAll.
             if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted
                 || stopOrder.OrderState == OrderState.ChangePending || stopOrder.OrderState == OrderState.ChangeSubmitted)
             {
-                // [BUILD 925 - P1 Fix]: Check if this is a fleet follower — use its account context.
+                // [BUILD 925 - P1 Fix]: Check if this is a fleet follower -- use its account context.
                 bool isFollowerStop = activePositions.TryGetValue(entryName, out var posRef)
                     && posRef != null && posRef.IsFollower && posRef.ExecutingAccount != null;
 
                 if (isFollowerStop)
                 {
-                    // Fleet follower stop: must use Account API — CancelOrder() targets master account only.
+                    // Fleet follower stop: must use Account API -- CancelOrder() targets master account only.
                     Print(string.Format("[925-P1] Follower stop cancel routed via ExecutingAccount.Cancel() for {0} on {1}",
                         entryName, posRef.ExecutingAccount.Name));
                     posRef.ExecutingAccount.Cancel(new[] { stopOrder });
@@ -323,7 +323,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
-                        Print(string.Format("âš ï¸ CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
+                        Print(string.Format("?? ?? CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
                         stopOrders.TryRemove(kvp.Key, out _);
                         CreateNewStopOrder(kvp.Key, kvp.Value.RemainingContracts, kvp.Value.CurrentStopPrice, kvp.Value.Direction);
                         return true;
@@ -412,6 +412,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         if (quantity > 0 && quantity != kvp.Value.TotalContracts)
                         {
+                            // [937-FIX] Sync expectedPositions with broker-confirmed qty.
+                            // Without this, RollbackExpectedPosition uses stale TotalContracts -> desync.
+                            int qtyDiff = quantity - kvp.Value.TotalContracts;
+                            string fixAcct = (kvp.Value.IsFollower && kvp.Value.ExecutingAccount != null)
+                                ? kvp.Value.ExecutingAccount.Name : Account.Name;
+                            int expDelta = (kvp.Value.Direction == MarketPosition.Long) ? qtyDiff : -qtyDiff;
+                            DeltaExpectedPositionLocked(ExpKey(fixAcct), expDelta);
+                            Print(string.Format("[937-FIX] expectedPositions adjusted on qty change: {0} delta={1}", fixAcct, expDelta));
                             lock (stateLock)
                             {
                                 kvp.Value.TotalContracts = quantity;
@@ -448,6 +456,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
         }
 
+        // Build 935 [R-02]: Cap per-drain budget to prevent strategy-thread starvation
+        // under high-velocity broker event bursts. Mirrors IpcMaxCommandsPerDrain pattern.
+        private const int MaxAccountOrdersPerDrain = 8;
+
         private void ProcessAccountOrderQueue()
         {
             // V12.Phase7 [THREAD-01a]: Buffer-and-wait during flatten (symmetric with ProcessAccountExecutionQueue).
@@ -457,8 +469,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            int drainedCount = 0;
             QueuedAccountOrderUpdate item;
-            while (_accountOrderQueue.TryDequeue(out item))
+            while (drainedCount < MaxAccountOrdersPerDrain && _accountOrderQueue.TryDequeue(out item))
             {
                 if (isFlattenRunning)
                 {
@@ -466,9 +479,100 @@ namespace NinjaTrader.NinjaScript.Strategies
                     try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
                     return;
                 }
-
+                drainedCount++;
                 ProcessQueuedAccountOrder(item);
             }
+            // If items remain after budget exhausted, reschedule for next strategy-thread slice.
+            if (!_accountOrderQueue.IsEmpty)
+                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+        }
+
+        // Build 935 [R-01]: Returns true if 'order' belongs to 'entryKey' position.
+        // Encapsulates the 7-way compound OR so the outer search loop stays trivial.
+        private bool TryFindOrderInPosition(Order order, string entryKey, out string matchedEntry)
+        {
+            matchedEntry = null;
+            if ((entryOrders.TryGetValue(entryKey,   out var eOrder)  && (eOrder  == order || (eOrder  != null && eOrder.OrderId  == order.OrderId))) ||
+                (stopOrders.TryGetValue(entryKey,    out var sOrder)  && (sOrder  == order || (sOrder  != null && sOrder.OrderId  == order.OrderId))) ||
+                (target1Orders.TryGetValue(entryKey, out var t1Order) && (t1Order == order || (t1Order != null && t1Order.OrderId == order.OrderId))) ||
+                (target2Orders.TryGetValue(entryKey, out var t2Order) && (t2Order != null && t2Order.OrderId == order.OrderId)) ||
+                (target3Orders.TryGetValue(entryKey, out var t3Order) && (t3Order != null && t3Order.OrderId == order.OrderId)) ||
+                (target4Orders.TryGetValue(entryKey, out var t4Order) && (t4Order != null && t4Order.OrderId == order.OrderId)) ||
+                (target5Orders.TryGetValue(entryKey, out var t5Order) && (t5Order != null && t5Order.OrderId == order.OrderId)))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            return false;
+        }
+
+        // Build 935 [R-01]: Handles a follower order positively matched to an active position.
+        // Entry-not-filled -> rollback + desync label. Entry-filled or stop/target -> ghost log + cleanup.
+        private void HandleMatchedFollowerOrder(string matchedEntry, PositionInfo matchedPos, Order order, string acctName, string reason)
+        {
+            if (entryOrders.TryGetValue(matchedEntry, out var entryOrder) &&
+                (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
+                !matchedPos.EntryFilled)
+            {
+                entryOrders.TryRemove(matchedEntry, out _);
+                int gfExp = 0;
+                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
+                if (gfExp == 0) return;
+
+                Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
+                Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
+            }
+            else
+            {
+                Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
+                RemoveGhostOrderRef(order, reason);
+            }
+        }
+
+        // Build 935 [R-01]: SIMA cascade cleanup for unmatched master-cancel events.
+        // Receives pre-computed snapshot -- eliminates the second activePositions.ToArray() allocation.
+        private void ExecuteFollowerCascadeCleanup(bool enableSima, Order order, string reason, KeyValuePair<string, PositionInfo>[] snapshot)
+        {
+            // V12.18 SIMA CASCADE: If a master-account order was cancelled,
+            // check if any follower positions share the same base signal and tear them down.
+            if (enableSima && order.OrderState == OrderState.Cancelled && order.Account == this.Account)
+            {
+                string orderSignal = order.Name;
+                foreach (var kvp in snapshot)
+                {
+                    PositionInfo cascadePos = kvp.Value;
+                    if (!cascadePos.IsFollower) continue;
+                    if (kvp.Key.Contains(orderSignal) || orderSignal.Contains(kvp.Key))
+                    {
+                        string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
+                        if (!cascadePos.EntryFilled)
+                        {
+                            Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
+                                orderSignal, kvp.Key, cascadeAcctName));
+                            CleanupPosition(kvp.Key);
+
+                            if (cascadePos.ExecutingAccount != null)
+                            {
+                                int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
+                                DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
+                                ClearDispatchSyncPending(ExpKey(cascadeAcctName));
+                                try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
+                            }
+                        }
+                        else
+                        {
+                            Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} -- follower {1} on {2} is FILLED. Issuing emergency flatten.",
+                                orderSignal, kvp.Key, cascadeAcctName));
+                            if (cascadePos.ExecutingAccount != null)
+                            {
+                                Account filledFollowerAcct = cascadePos.ExecutingAccount;
+                                TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
+                            }
+                        }
+                    }
+                }
+            }
+            RemoveGhostOrderRef(order, reason);
         }
 
         private void ProcessQueuedAccountOrder(QueuedAccountOrderUpdate item)
@@ -481,89 +585,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             string acctName = item.Account != null ? item.Account.Name : "UNKNOWN";
             Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
 
+            // Build 935 [R-01]: Single snapshot -- reused by both identity search and cascade cleanup,
+            // eliminating the second activePositions.ToArray() allocation in the cascade path.
+            var snapshot = activePositions.ToArray();
+
             string matchedEntry = null;
-            foreach (var kvp in activePositions.ToArray())
+            PositionInfo matchedPos = null;
+            foreach (var kvp in snapshot)
             {
                 if (!activePositions.ContainsKey(kvp.Key)) continue;
                 PositionInfo pos = kvp.Value;
                 if (!pos.IsFollower || pos.ExecutingAccount == null || pos.ExecutingAccount != item.Account) continue;
-
-                if ((entryOrders.TryGetValue(kvp.Key, out var eOrder) && (eOrder == order || (eOrder != null && eOrder.OrderId == order.OrderId))) ||
-                    (stopOrders.TryGetValue(kvp.Key, out var sOrder) && (sOrder == order || (sOrder != null && sOrder.OrderId == order.OrderId))) ||
-                    (target1Orders.TryGetValue(kvp.Key, out var t1Order) && (t1Order == order || (t1Order != null && t1Order.OrderId == order.OrderId))) ||
-                    (target2Orders.TryGetValue(kvp.Key, out var t2Order) && (t2Order != null && t2Order.OrderId == order.OrderId)) ||
-                    (target3Orders.TryGetValue(kvp.Key, out var t3Order) && (t3Order != null && t3Order.OrderId == order.OrderId)) ||
-                    (target4Orders.TryGetValue(kvp.Key, out var t4Order) && (t4Order != null && t4Order.OrderId == order.OrderId)) ||
-                    (target5Orders.TryGetValue(kvp.Key, out var t5Order) && (t5Order != null && t5Order.OrderId == order.OrderId)))
+                if (TryFindOrderInPosition(order, kvp.Key, out matchedEntry))
                 {
-                    matchedEntry = kvp.Key;
+                    matchedPos = pos;
                     break;
                 }
             }
 
-            if (!string.IsNullOrEmpty(matchedEntry) && activePositions.TryGetValue(matchedEntry, out var matchedPos))
-            {
-                if (entryOrders.TryGetValue(matchedEntry, out var entryOrder) &&
-                    (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
-                    !matchedPos.EntryFilled)
-                {
-                    entryOrders.TryRemove(matchedEntry, out _);
-                    int gfExp = 0;
-                    lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
-                    if (gfExp == 0) return;
-
-                    Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
-                    Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "⚠ FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
-                }
-                else
-                {
-                    Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
-                    RemoveGhostOrderRef(order, reason);
-                }
-            }
+            if (!string.IsNullOrEmpty(matchedEntry) && matchedPos != null && activePositions.ContainsKey(matchedEntry))
+                HandleMatchedFollowerOrder(matchedEntry, matchedPos, order, acctName, reason);
             else
-            {
-                // V12.18 SIMA CASCADE: If a master-account order was cancelled,
-                // check if any follower positions share the same base signal and tear them down.
-                if (EnableSIMA && order.OrderState == OrderState.Cancelled && order.Account == this.Account)
-                {
-                    string orderSignal = order.Name;
-                    foreach (var kvp in activePositions.ToArray())
-                    {
-                        PositionInfo cascadePos = kvp.Value;
-                        if (!cascadePos.IsFollower) continue;
-                        if (kvp.Key.Contains(orderSignal) || orderSignal.Contains(kvp.Key))
-                        {
-                            string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
-                            if (!cascadePos.EntryFilled)
-                            {
-                                Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
-                                    orderSignal, kvp.Key, cascadeAcctName));
-                                CleanupPosition(kvp.Key);
-
-                                if (cascadePos.ExecutingAccount != null)
-                                {
-                                    int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
-                                    DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
-                                    ClearDispatchSyncPending(ExpKey(cascadeAcctName));
-                                    try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
-                                }
-                            }
-                            else
-                            {
-                                Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} — follower {1} on {2} is FILLED. Issuing emergency flatten.",
-                                    orderSignal, kvp.Key, cascadeAcctName));
-                                if (cascadePos.ExecutingAccount != null)
-                                {
-                                    Account filledFollowerAcct = cascadePos.ExecutingAccount;
-                                    TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
-                                }
-                            }
-                        }
-                    }
-                }
-                RemoveGhostOrderRef(order, reason);
-            }
+                ExecuteFollowerCascadeCleanup(EnableSIMA, order, reason, snapshot);
         }
 
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
@@ -625,7 +668,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string skipReason = hasPendingEntry
                         ? "pending entry in flight"
                         : (hasActivePositionForAcct ? "activePositions metadata present" : "dispatch sync pending");
-                    Print($"[OnPositionUpdate] H-14 SKIP: {flatExpKey} broker=Flat but {skipReason} — not resetting expectedPositions");
+                    Print($"[OnPositionUpdate] H-14 SKIP: {flatExpKey} broker=Flat but {skipReason} -- not resetting expectedPositions");
                 }
                 else
                 {
@@ -707,7 +750,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string orderName = execution.Order.Name;
                 if (string.IsNullOrEmpty(orderName)) return;
 
-                // V12.Phase7 [C-01]: Dedup guard — prevent double-decrement if OnOrderUpdate + OnExecutionUpdate both fire for same fill.
+                // V12.Phase7 [C-01]: Dedup guard -- prevent double-decrement if OnOrderUpdate + OnExecutionUpdate both fire for same fill.
                 // CRITICAL FIX: Use stateLock (same lock as ApplyTargetFill/OnOrderUpdate) to ensure mutual exclusion.
                 // Previously used separate executionDeduplicateLock which allowed both threads to proceed concurrently.
                 if (!string.IsNullOrEmpty(executionId))
@@ -747,10 +790,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // V12.12: Compliance tracking for single-account mode
+                // [939-P0]: Marshal Account.Get() off broker thread via TriggerCustomEvent.
                 if (EnableComplianceHub && !EnableSIMA)
                 {
                     TrackTradeEntry(Account, execution);
-                    UpdateAccountMetricsFromAccount(Account);
+                    TriggerCustomEvent(o => UpdateAccountMetricsFromAccount(Account), null);
                     LogApexPerformance();
                 }
 
@@ -845,7 +889,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ApplyTargetFill(pos, targetNum, quantity, terminalFill, out alreadyProcessed, out appliedQty, out remainingAfter);
                         if (alreadyProcessed)
                         {
-                            Print(string.Format("[1101E GUARD] T{0} already processed for {1} — skipping duplicate OnExecutionUpdate fill", targetNum, entryName));
+                            Print(string.Format("[1101E GUARD] T{0} already processed for {1} -- skipping duplicate OnExecutionUpdate fill", targetNum, entryName));
                             if (terminalFill)
                             {
                                 var tDict = GetTargetOrdersDictionary(targetNum);
@@ -881,7 +925,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ============================================================
                 // 5. TRIM EXECUTION - V10.3.1: Enhanced Stop Integrity
                 // ============================================================
-                // ðŸ"¥ CRITICAL: When a TRIM executes, we MUST reduce the stop order quantity
+                // ??"? CRITICAL: When a TRIM executes, we MUST reduce the stop order quantity
                 // to match the new position size. If we don't, hitting the stop after a trim
                 // would close more contracts than we hold, creating an unintended REVERSE position.
                 // Example: Long 4 contracts, stop at 4. Trim 2 (now Long 2). If stop stays at 4,
@@ -900,7 +944,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             remainingAfterTrim = pos.RemainingContracts;
                         }
 
-                        Print(string.Format("TRIM EXECUTION: {0} contracts closed for {1}. Position: {2} â†' {3}",
+                        Print(string.Format("TRIM EXECUTION: {0} contracts closed for {1}. Position: {2} ??' {3}",
                             quantity, entryName, previousQty, remainingAfterTrim));
 
                         // V10.3.1 FIX: MANDATORY stop quantity reduction to prevent reverse position
@@ -948,7 +992,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (!EnableSIMA || masterOrder == null || masterOrder.Account != this.Account) return;
 
-            // [BUILD 924 – Fix C] Raise propagation flag before dispatch; finally block clears it.
+            // [BUILD 924 -- Fix C] Raise propagation flag before dispatch; finally block clears it.
             _propagationActive = true;
             try
             {
@@ -1009,19 +1053,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // --- Step 2: Resolve follower entry names via Symmetry dispatch context ---
 
-            // [BUILD 926 – Codex P1 Fix]: Derive master TradeType from boolean flags.
+            // [BUILD 926 -- Codex P1 Fix]: Derive master TradeType from boolean flags.
             // Master boolean flags ARE accurate (master positions set IsTRENDTrade, IsRMATrade etc. correctly).
             // Only FOLLOWER flags are contaminated (IsRMATrade=true on ALL followers for trailing behavior).
-            // Follower type discrimination uses SignalName parsing instead — see fallback scan below.
+            // Follower type discrimination uses SignalName parsing instead -- see fallback scan below.
             string masterTradeType = null;
             if (activePositions.TryGetValue(masterEntryName, out var masterPosForType))
             {
-                // [BUILD 928 – Codex P2 Fix]: IsRetestTrade MUST be checked before IsRMATrade.
+                // [BUILD 928 -- Codex P2 Fix]: IsRetestTrade MUST be checked before IsRMATrade.
                 // RETEST positions set both IsRetestTrade=true AND IsRMATrade=true (uses RMA trailing).
-                // Old order checked IsRMATrade first → RETEST master classified as "RMA" → fallback
+                // Old order checked IsRMATrade first -> RETEST master classified as "RMA" -> fallback
                 // propagation targets RMA followers and silently skips RETEST followers.
                 if      (masterPosForType.IsTRENDTrade)  masterTradeType = "TREND";
-                else if (masterPosForType.IsRetestTrade) masterTradeType = "RETEST"; // ← before RMA
+                else if (masterPosForType.IsRetestTrade) masterTradeType = "RETEST"; // <- before RMA
                 else if (masterPosForType.IsRMATrade)    masterTradeType = "RMA";
                 else if (masterPosForType.IsMOMOTrade)   masterTradeType = "MOMO";
                 else if (masterPosForType.IsFFMATrade)   masterTradeType = "FFMA";
@@ -1038,7 +1082,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                // [BUILD 926 – Codex P1 Fix]: Fallback type match now uses SignalName parsing.
+                // [BUILD 926 -- Codex P1 Fix]: Fallback type match now uses SignalName parsing.
                 //
                 // ROOT CAUSE: IsRMATrade=true is stamped on ALL fleet followers (ExecuteSmartDispatchEntry
                 // line 434) to enforce point-based trailing. Using IsRMATrade as a type discriminator
@@ -1049,7 +1093,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //   Format: "Fleet_<AccountName>_<TRADETYPE>_<Index>"
                 //   Example: "Fleet_PA-APEX-422136-05_OR_0", "Fleet_APEX-09_RMA_1"
                 //
-                // [BUILD 927 – Codex P2 Fix]: Do NOT use Contains("_TYPE_") — if an account name
+                // [BUILD 927 -- Codex P2 Fix]: Do NOT use Contains("_TYPE_") -- if an account name
                 // itself contains a trade-type substring (e.g. _RMA_, _OR_), Contains() misclassifies
                 // the follower by matching the account name token instead of the TRADETYPE segment.
                 //
@@ -1058,8 +1102,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //   lastUnderscore      = before the numeric Index
                 //   secondLastUnderscore = before the TRADETYPE token
                 // Example: "Fleet_SimApexSim_02_OR_0"
-                //   lastUs  → before "0"    → remaining = "Fleet_SimApexSim_02_OR"
-                //   typeUs  → before "OR"   → extracted = "OR"  ✓
+                //   lastUs  -> before "0"    -> remaining = "Fleet_SimApexSim_02_OR"
+                //   typeUs  -> before "OR"   -> extracted = "OR"  ?
                 var fallback = new List<string>();
                 foreach (var kvp in activePositions)
                 {
@@ -1080,11 +1124,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (typeUs >= 0)
                         {
                             string extracted = sig.Substring(typeUs + 1, lastUs - typeUs - 1);
-                            // Validate against known set — rejects garbage from unusual account names
+                            // Validate against known set -- rejects garbage from unusual account names
                             if (extracted == "OR"     || extracted == "RMA"  ||
                                 extracted == "TREND"  || extracted == "RETEST" ||
                                 extracted == "MOMO"   || extracted == "FFMA"  ||
-                                // Build 930 Fix P2: Suffix-marker support — FFMA_MNL, FFMA_MNL_MKT, OR_RETEST etc.
+                                // Build 930 Fix P2: Suffix-marker support -- FFMA_MNL, FFMA_MNL_MKT, OR_RETEST etc.
                                 extracted.StartsWith("FFMA_") || extracted.StartsWith("MOMO_") ||
                                 extracted.StartsWith("OR_")   || extracted.StartsWith("RMA_")  ||
                                 extracted.StartsWith("TREND_") || extracted.StartsWith("RETEST_"))
@@ -1092,7 +1136,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
 
-                    // Fallback: segment parsing failed — use boolean flags (RMA/OR ambiguity defaults to RMA)
+                    // Fallback: segment parsing failed -- use boolean flags (RMA/OR ambiguity defaults to RMA)
                     if (followerType == null)
                     {
                         if      (kvp.Value.IsTRENDTrade)  followerType = "TREND";
@@ -1120,7 +1164,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Passing newLimit=0 to PropagateMasterEntryMove caused the tick guard to silently no-op
                     // on every user-drag, and historically resubmitted Limit followers at price 0.
                     double effectiveEntryPrice = newLimit > 0 ? newLimit : newStop;
-                    if (effectiveEntryPrice <= 0) continue; // both zero — NT8 callback race, skip safely
+                    if (effectiveEntryPrice <= 0) continue; // both zero -- NT8 callback race, skip safely
                     PropagateMasterEntryMove(fleetEntryName, pos, effectiveEntryPrice, newMasterQty);
                 }
                 else if (isStopMove)
@@ -1131,7 +1175,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             } // end try
             finally
             {
-                // [BUILD 924 – Fix C] Always clear propagation flag, even on exception.
+                // [BUILD 924 -- Fix C] Always clear propagation flag, even on exception.
                 _propagationActive = false;
             }
         }
@@ -1139,7 +1183,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12.MOVE-SYNC: Propagate master stop price move to follower.
         /// Delegates to UpdateStopOrder which uses cancel/resubmit via follower Account API
-        /// (per V12.10 pattern — ChangeOrder is master-local only).
+        /// (per V12.10 pattern -- ChangeOrder is master-local only).
         /// </summary>
         private void PropagateMasterStopMove(string fleetEntryName, PositionInfo pos, double newStop)
         {
@@ -1188,7 +1232,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Order replacement = pos.ExecutingAccount.CreateOrder(
                     Instrument, exitAction, OrderType.Limit, TimeInForce.Gtc,
                     qty, roundedLimit, 0,
-                    // [923A-P1b-GUID]: 8-char GUID fragment replaces Ticks — eliminates collision risk at high resubmit frequency
+                    // [923A-P1b-GUID]: 8-char GUID fragment replaces Ticks -- eliminates collision risk at high resubmit frequency
                     "MGT_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                     signalName, null);
 
@@ -1207,7 +1251,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// V12.MOVE-SYNC / 1102Z-D: Propagate master entry price move to follower (pre-fill orders).
-        /// Account.Change() removed — it completes silently on Apex/Tradovate but is a broker-side no-op.
+        /// Account.Change() removed -- it completes silently on Apex/Tradovate but is a broker-side no-op.
         /// Cancel + CreateOrder + Submit is the sole path, consistent with PropagateMasterTargetMove
         /// and UpdateStopOrder throughout this codebase.
         /// StampReaperMoveGrace() is called before Cancel to open a 5-second REAPER suppression window
@@ -1227,7 +1271,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [QTY-SYNC]: Scale master quantity for this follower.
             // Fallback to fEntry.Quantity if no quantity signal (pure price-change callback, or qty=0 noise).
             // [923A-P2a-OVF]: checked{} forces explicit OverflowException vs silent int truncation on extreme parity ratios
-            // (e.g., 1 NQ → 10 MES with very high master qty). Clamps to maxContracts on overflow.
+            // (e.g., 1 NQ -> 10 MES with very high master qty). Clamps to maxContracts on overflow.
             int scaledQty;
             try
             {
@@ -1237,7 +1281,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (OverflowException)
             {
-                Print(string.Format("[923A-OVF] Parity scalar overflow for {0} — clamping to maxContracts ({1})", fleetEntryName, maxContracts));
+                Print(string.Format("[923A-OVF] Parity scalar overflow for {0} -- clamping to maxContracts ({1})", fleetEntryName, maxContracts));
                 scaledQty = maxContracts;
             }
 
@@ -1248,11 +1292,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print(string.Format("[MOVE-SYNC] Entry move: {0} on {1}: {2:F2} -> {3:F2} x{4}",
                 fleetEntryName, pos.ExecutingAccount.Name, fEffectivePrice, roundedLimit, scaledQty));
 
-            // 1102Z-D: Stamp grace BEFORE Cancel — opens 5-second REAPER suppression window covering the cancel gap.
+            // 1102Z-D: Stamp grace BEFORE Cancel -- opens 5-second REAPER suppression window covering the cancel gap.
             StampReaperMoveGrace();
 
             // 1102Z-D [Protected Resubmit]: Cancel + CreateOrder + Submit is the sole path.
-            // Account.Change() was removed — it is a silent no-op on Apex/Tradovate.
+            // Account.Change() was removed -- it is a silent no-op on Apex/Tradovate.
             try
             {
                 pos.ExecutingAccount.Cancel(new[] { fEntry });
@@ -1262,9 +1306,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // [GHOST-FIX-1 Build 922Z]: Preserve original fleetEntryName as signal name.
                 // The identity chain MUST be: activePositions key == entryOrders key == order signal name.
                 // The old code appended a random "_MGE_" + timestamp suffix, which broke the chain:
-                //   → OnAccountExecutionUpdate could not find the key in entryOrders on fill
-                //   → SubmitBracketOrders was never called → position was naked (no stop, no target)
-                //   → REAPER saw naked position and fired emergency flatten, causing the ghost entry cascade.
+                //   -> OnAccountExecutionUpdate could not find the key in entryOrders on fill
+                //   -> SubmitBracketOrders was never called -> position was naked (no stop, no target)
+                //   -> REAPER saw naked position and fired emergency flatten, causing the ghost entry cascade.
                 // Using fleetEntryName directly restores the chain and ensures brackets are submitted on fill.
                 string signalName = fleetEntryName;
 
@@ -1274,7 +1318,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Order newEntry = pos.ExecutingAccount.CreateOrder(
                     Instrument, entryAction, fEntry.OrderType, TimeInForce.Gtc,
                     scaledQty, limitPx, stopPx,
-                    // [923A-P1-GUID]: 8-char hex GUID fragment replaces Ticks — eliminates collision risk
+                    // [923A-P1-GUID]: 8-char hex GUID fragment replaces Ticks -- eliminates collision risk
                     // at extreme resubmit frequency. ocoId only; signalName = fleetEntryName unchanged (GHOST-FIX-1).
                     "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                     signalName, null);

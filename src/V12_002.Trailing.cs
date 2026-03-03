@@ -251,7 +251,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             newStopPrice = manualBEStop;
                             newTrailLevel = 1; // Same as automatic breakeven
                             pos.ManualBreakevenTriggered = true;
-                            Print(string.Format("★ MANUAL BREAKEVEN TRIGGERED: {0} → Stop moved to {1:F2} (Entry + {2} tick)", 
+                            Print(string.Format("? MANUAL BREAKEVEN TRIGGERED: {0} -> Stop moved to {1:F2} (Entry + {2} tick)", 
                                 entryName, manualBEStop, BreakEvenOffsetTicks));
                         }
                     }
@@ -400,9 +400,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         leaderShortMaxLevel = Math.Max(leaderShortMaxLevel, ldr.CurrentTrailLevel);
                 }
 
-                // V12.12: Diagnostic — log leader trail levels for fleet sync visibility
+                // V12.12: Diagnostic -- log leader trail levels for fleet sync visibility
                 if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
-                    Print($"[SIMA] Fleet Sync: Leader trail levels — Long={leaderLongMaxLevel}, Short={leaderShortMaxLevel}");
+                    Print($"[SIMA] Fleet Sync: Leader trail levels -- Long={leaderLongMaxLevel}, Short={leaderShortMaxLevel}");
 
                 // Phase 2: Sync lagging followers UP to the leader's level
                 if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
@@ -420,10 +420,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ? leaderLongMaxLevel
                             : leaderShortMaxLevel;
 
-                        // V12.12: Guard — skip if no leader exists for this direction (targetLevel==0)
+                        // V12.12: Guard -- skip if no leader exists for this direction (targetLevel==0)
                         if (targetLevel == 0) continue;
 
-                        // Only sync UP — never regress a follower already at a higher level
+                        // Only sync UP -- never regress a follower already at a higher level
                         if (fol.CurrentTrailLevel >= targetLevel) continue;
 
                         double syncStopPrice = CalculateStopForLevel(fol, targetLevel);
@@ -477,7 +477,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // V12.44: ChangeStop() removed — dead code, only caller was MoveStopsToBreakevenPlusOne (also removed)
+        // V12.44: ChangeStop() removed -- dead code, only caller was MoveStopsToBreakevenPlusOne (also removed)
 
         private void UpdateStopOrder(string entryName, PositionInfo pos, double newStopPrice, int newTrailLevel)
         {
@@ -578,7 +578,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     pos.CurrentTrailLevel = newTrailLevel;
 
                     string levelName = newTrailLevel <= 0 ? "Initial" : (newTrailLevel == 1 ? "BE" : "T" + (newTrailLevel - 1));
-                    Print(string.Format("STOP UPDATED: {0} → {1:F2} (Level: {2})", entryName, validatedStopPrice, levelName));
+                    Print(string.Format("STOP UPDATED: {0} -> {1:F2} (Level: {2})", entryName, validatedStopPrice, levelName));
                     return;
                 }
 
@@ -604,14 +604,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (newStop == null)
                 {
-                    Print(string.Format("⚠️ CRITICAL ERROR: Stop order submission returned NULL for {0}!", entryName));
-                    Print(string.Format("⚠️ POSITION UNPROTECTED: {0} {1} contracts @ {2:F2}",
+                    Print(string.Format("(!) CRITICAL ERROR: Stop order submission returned NULL for {0}!", entryName));
+                    Print(string.Format("(!) POSITION UNPROTECTED: {0} {1} contracts @ {2:F2}",
                         pos.Direction == MarketPosition.Long ? "LONG" : "SHORT",
                         pos.RemainingContracts,
                         pos.EntryPrice));
-                    Print(string.Format("⚠️ Attempted stop price: {0:F2} | Current price: {1:F2}", validatedStopPrice, Close[0]));
+                    Print(string.Format("(!) Attempted stop price: {0:F2} | Current price: {1:F2}", validatedStopPrice, Close[0]));
 
-                    Print(string.Format("⚠️ Attempting emergency flatten for {0}...", entryName));
+                    Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
                     FlattenPositionByName(entryName);
                     return;
                 }
@@ -621,28 +621,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 pos.CurrentTrailLevel = newTrailLevel;
 
                 string levelName2 = newTrailLevel == 1 ? "BE" : "T" + (newTrailLevel - 1);
-                Print(string.Format("STOP UPDATED: {0} → {1:F2} (Level: {2})", entryName, validatedStopPrice, levelName2));
+                Print(string.Format("STOP UPDATED: {0} -> {1:F2} (Level: {2})", entryName, validatedStopPrice, levelName2));
 
             }
             catch (Exception ex)
             {
-                Print(string.Format("⚠️ ERROR UpdateStopOrder for {0}: {1}", entryName, ex.Message));
-                Print(string.Format("⚠️ POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
+                Print(string.Format("(!) ERROR UpdateStopOrder for {0}: {1}", entryName, ex.Message));
+                Print(string.Format("(!) POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
                 
                 // Attempt emergency flatten
                 try
                 {
-                    Print(string.Format("⚠️ Attempting emergency flatten for {0}...", entryName));
+                    Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
                     FlattenPositionByName(entryName);
                 }
                 catch (Exception flattenEx)
                 {
-                    Print(string.Format("⚠️⚠️ EMERGENCY FLATTEN FAILED: {0}", flattenEx.Message));
+                    Print(string.Format("(!)(!) EMERGENCY FLATTEN FAILED: {0}", flattenEx.Message));
                 }
             }
         }
 
-        // V12.10: Fleet Symmetry — calculates the correct stop price for a given trail level
+        // V12.10: Fleet Symmetry -- calculates the correct stop price for a given trail level
         // using the position's own entry/extreme prices. Pure calculation, no side effects.
         private double CalculateStopForLevel(PositionInfo pos, int level)
         {
@@ -806,7 +806,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                     // V12.10: Use UpdateStopOrder for proper Master/Follower routing
-                    // (ChangeOrder only works for Master — followers were silently skipped)
+                    // (ChangeOrder only works for Master -- followers were silently skipped)
                     UpdateStopOrder(entryName, pos, newStopPrice, 1);
                     pos.ManualBreakevenTriggered = true;
                     Print(string.Format("BE+{0} MOVED: {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
@@ -854,7 +854,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 
                 // Find the target order for this position
-                // [1102Z-F]: Search the correct account — follower orders live on their own account,
+                // [1102Z-F]: Search the correct account -- follower orders live on their own account,
                 // not on the Master account from which Account.Orders is sourced.
                 string targetOrderName = $"T{targetNum}_{entryName}";
                 Order targetOrder = null;
@@ -929,7 +929,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (pos.IsFollower && pos.ExecutingAccount != null)
                     {
-                        // [1102Z-F]: Fleet follower path — cancel old limit, resubmit at new price
+                        // [1102Z-F]: Fleet follower path -- cancel old limit, resubmit at new price
                         pos.ExecutingAccount.Cancel(new[] { targetOrder });
 
                         OrderAction exitAct = pos.Direction == MarketPosition.Long
@@ -945,16 +945,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         movedCount++;
                         double profitFromEntryF = Math.Abs(newTargetPrice - entryPrice);
-                        Print($"[SIMA] MoveSpecificTarget T{targetNum}: Follower {entryName} on {pos.ExecutingAccount.Name} → {newTargetPrice:F2} (+{profitFromEntryF:F2})");
+                        Print($"[SIMA] MoveSpecificTarget T{targetNum}: Follower {entryName} on {pos.ExecutingAccount.Name} -> {newTargetPrice:F2} (+{profitFromEntryF:F2})");
                     }
                     else
                     {
-                        // Master path — ChangeOrder is fine for NinjaScript-managed orders
+                        // Master path -- ChangeOrder is fine for NinjaScript-managed orders
                         ChangeOrder(targetOrder, targetOrder.Quantity, newTargetPrice, 0);
                         movedCount++;
 
                         double profitFromEntry = Math.Abs(newTargetPrice - entryPrice);
-                        Print($"[V14] MoveSpecificTarget T{targetNum}: {entryName} → {newTargetPrice:F2} (+{profitFromEntry:F2} from entry {entryPrice:F2})");
+                        Print($"[V14] MoveSpecificTarget T{targetNum}: {entryName} -> {newTargetPrice:F2} (+{profitFromEntry:F2} from entry {entryPrice:F2})");
                     }
                 }
                 catch (Exception ex)

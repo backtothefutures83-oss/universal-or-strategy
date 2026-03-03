@@ -60,7 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ? MarketPosition.Long : MarketPosition.Short;
 
             // V12.Audit [Q4-001]: Atomic read-check-write to eliminate TOCTOU in duplicate dispatch guard.
-            // Phase 7 [H-11] left the loop and insertion unguarded — two concurrent callers could both
+            // Phase 7 [H-11] left the loop and insertion unguarded -- two concurrent callers could both
             // pass the "no existing dispatch" check and insert competing contexts. The entire compound
             // check-then-insert is now serialised under stateLock so the operation is atomic.
             lock (stateLock)
@@ -78,7 +78,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         !existing.IsResolved &&
                         (now - existing.CreatedUtc) < SymmetryDispatchTtl)
                     {
-                        Print(string.Format("[SYMMETRY] Duplicate dispatch suppressed: {0} {1} — reusing {2}", normalizedType, direction, existing.DispatchId));
+                        Print(string.Format("[SYMMETRY] Duplicate dispatch suppressed: {0} {1} -- reusing {2}", normalizedType, direction, existing.DispatchId));
                         return existing.DispatchId;
                     }
                 }
@@ -215,7 +215,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool shouldSubmitImmediately = false;
                 // [ANCHOR-01] V12.Phase7.1: Pre-check master anchor before initial bracket submission.
                 // If master already filled (anchor resolved), apply it now so the broker receives
-                // master-anchored prices on the FIRST submission — eliminates the "wrong-prices-first
+                // master-anchored prices on the FIRST submission -- eliminates the "wrong-prices-first
                 // + retarget" double round-trip that causes transient drift in volatile bursts.
                 if (symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var preCheckId) &&
                     symmetryDispatchById.TryGetValue(preCheckId, out var preCheckCtx))
@@ -229,7 +229,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     if (anchorReady && preCheckAnchor > 0)
                     {
-                        Print(string.Format("[ANCHOR-01] Pre-applying master anchor {0:F2} for {1} — bracket will use master fill price",
+                        Print(string.Format("[ANCHOR-01] Pre-applying master anchor {0:F2} for {1} -- bracket will use master fill price",
                             preCheckAnchor, fleetEntryName));
                         SymmetryGuardApplyMasterAnchor(followerPos, preCheckAnchor);
                         shouldSubmitImmediately = true;
@@ -352,7 +352,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // [ANCHOR-02] V12.Phase7.1: Capture entry price before anchor application to detect
             // whether ANCHOR-01 already submitted the bracket with master-anchored prices.
-            // If priorEntryPrice ≈ masterAnchor (within 1 tick), the bracket is already correct
+            // If priorEntryPrice ? masterAnchor (within 1 tick), the bracket is already correct
             // and the retarget cancel+replace round-trip can be skipped.
             double priorEntryPrice;
             lock (stateLock) { priorEntryPrice = pos.EntryPrice; }
@@ -365,7 +365,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (alreadyAnchored)
                 {
                     Print(string.Format(
-                        "[ANCHOR-02] Bracket already anchor-aligned for {0} (prior={1:F2} anchor={2:F2}) — retarget skipped",
+                        "[ANCHOR-02] Bracket already anchor-aligned for {0} (prior={1:F2} anchor={2:F2}) -- retarget skipped",
                         fleetEntryName, priorEntryPrice, masterAnchor));
                 }
                 else
@@ -433,7 +433,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             OrderAction exitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
             double validatedStop = ValidateStopPrice(pos.Direction, pos.CurrentStopPrice);
-            string ocoId = "SG_" + DateTime.UtcNow.Ticks.ToString();
+            // Build 936 [FIX-2]: Use deterministic OcoGroupId from PositionInfo for broker-native OCO bracket protection.
+            // Previously "SG_" + ticks was non-deterministic -- changed on every NT8 restart, preventing broker re-linkage.
+            // pos.OcoGroupId = "V12_" + fleetEntryName hash, set at position creation in ExecuteSmartDispatchEntry.
+            string ocoId = !string.IsNullOrEmpty(pos.OcoGroupId) ? pos.OcoGroupId : ("SG_" + DateTime.UtcNow.Ticks.ToString());
 
             var ordersToSubmit = new List<Order>();
 
@@ -466,7 +469,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                // [PARITY-01] V12.Phase7.1: Explicit tick rounding on limit price — defensive guard
+                // [PARITY-01] V12.Phase7.1: Explicit tick rounding on limit price -- defensive guard
                 // against broker "Price Rejected" when target arithmetic crosses a tick boundary
                 // (e.g., MYM 1.0-tick or cross-instrument parity adjustments).
                 double roundedTargetPrice = Instrument.MasterInstrument.RoundToTickSize(targetPrice);
@@ -659,7 +662,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Build 929 Fix3 [P1]: PR #2 Image 3 — Capture follower list before cleanup.
+        /// Build 929 Fix3 [P1]: PR #2 Image 3 -- Capture follower list before cleanup.
         /// Cancels all follower entry orders linked to this master BEFORE CleanupPosition
         /// destroys the dispatch map. Without this, followers stay alive as zombie Limit orders.
         /// </summary>
@@ -671,7 +674,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             string[] followers;
             lock (ctx.Sync) { followers = ctx.FollowerEntries.ToArray(); }
 
-            Print(string.Format("[CASCADE] Master {0} cancelled — terminating {1} linked follower(s).", masterEntryName, followers.Length));
+            Print(string.Format("[CASCADE] Master {0} cancelled -- terminating {1} linked follower(s).", masterEntryName, followers.Length));
 
             foreach (string followerName in followers)
             {
@@ -737,7 +740,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             // V12.Phase8 [F-04]: activePositions is a ConcurrentDictionary but
                             // ContainsKey here is used alongside ctx.FollowerEntries iteration under
-                            // ctx.Sync — acquire stateLock for the read to prevent torn observations
+                            // ctx.Sync -- acquire stateLock for the read to prevent torn observations
                             // when ExecuteSmartDispatchEntry commits or removes entries concurrently.
                             bool exists;
                             lock (stateLock) { exists = activePositions.ContainsKey(follower); }

@@ -1,6 +1,6 @@
 // V12.17 THREADING FIX: Reaper (Safety Hub) Module
 // REAPER Module (Extracted)
-// FIX: acct.Flatten() calls moved from background thread → strategy thread via TriggerCustomEvent
+// FIX: acct.Flatten() calls moved from background thread -> strategy thread via TriggerCustomEvent
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -15,15 +15,15 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region V12 REAPER Audit Logic
 
-        // V12.17: Queue for flatten requests marshaled from background thread → strategy thread
+        // V12.17: Queue for flatten requests marshaled from background thread -> strategy thread
         private ConcurrentQueue<string> _reaperFlattenQueue = new ConcurrentQueue<string>();
 
-        // V12.Phase8.2: Queue for repair requests marshaled from background thread → strategy thread
+        // V12.Phase8.2: Queue for repair requests marshaled from background thread -> strategy thread
         private ConcurrentQueue<string> _reaperRepairQueue = new ConcurrentQueue<string>();
         // V12.Phase8.2: Prevents double-repair for the same account while an order is in-flight
         private readonly HashSet<string> _repairInFlight = new HashSet<string>();
 
-        // Build 1102R: Queue for naked-position emergency stop requests (background → strategy thread)
+        // Build 1102R: Queue for naked-position emergency stop requests (background -> strategy thread)
         private ConcurrentQueue<(string AccountName, MarketPosition Direction, int Qty)> _reaperNakedStopQueue
             = new ConcurrentQueue<(string, MarketPosition, int)>();
         // Build 1102R: Prevents duplicate emergency stops while broker confirmation is pending (mirrors _repairInFlight)
@@ -133,7 +133,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Thread.Sleep(ReaperIntervalMs);
                     if (!isReaperRunning) break;
 
-                    // V12.Phase8 [F-05]: Skip first cycle after startup — grace period for in-flight flattens.
+                    // V12.Phase8 [F-05]: Skip first cycle after startup -- grace period for in-flight flattens.
                     if (firstCycle)
                     {
                         firstCycle = false;
@@ -144,7 +144,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.8: Pause auditing while a flatten is actively running to prevent race conditions
                     if (isFlattenRunning) continue;
 
-                    // V12.Hardening: Only audit in live/realtime — skip historical replay
+                    // V12.Hardening: Only audit in live/realtime -- skip historical replay
                     if (State != State.Realtime) continue;
 
                     AuditApexPositions();
@@ -166,7 +166,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void AuditApexPositions()
         {
-            bool shouldLog = (DateTime.Now - lastReaperLog).TotalSeconds >= 30;
+            bool shouldLog = (DateTime.UtcNow - lastReaperLog).TotalSeconds >= 30;
             int auditedCount = 0;
             int activeCount = 0;
 
@@ -193,7 +193,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print($"[REAPER] Heartbeat: All {auditedCount} accounts flat.");
                 else
                     Print($"[REAPER] Heartbeat: {activeCount}/{auditedCount} accounts with positions.");
-                lastReaperLog = DateTime.Now;
+                lastReaperLog = DateTime.UtcNow;
             }
         }
 
@@ -226,10 +226,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (actualQty == 0 && expectedQty != 0)
                 {
-                    // GHOST-FIX-3: Skip repair for Master — it uses SubmitOrderUnmanaged, not follower path.
+                    // GHOST-FIX-3: Skip repair for Master -- it uses SubmitOrderUnmanaged, not follower path.
                     if (acct.Name == Account.Name)
                     {
-                        if (shouldLog) Print($"[REAPER] {acct.Name} is the Master account — skipping follower repair.");
+                        if (shouldLog) Print($"[REAPER] {acct.Name} is the Master account -- skipping follower repair.");
                         return hasState;
                     }
 
@@ -277,7 +277,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (!hasWorkingEntry)
                         {
-                            if (shouldLog) Print($"[REAPER] 🔧 REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
+                            if (shouldLog) Print($"[REAPER] * REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
                             _reaperRepairQueue.Enqueue(acct.Name);
                             try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); } catch { }
                         }
@@ -295,7 +295,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                     else if (shouldLog)
-                        Print($"[REAPER] {acct.Name} repair already in-flight — skipping.");
+                        Print($"[REAPER] {acct.Name} repair already in-flight -- skipping.");
 
                     return hasState;
                 }
@@ -305,10 +305,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (isCriticalDesync)
                 {
-                    if (shouldLog) Print($"[REAPER] 🚨 CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+                    if (shouldLog) Print($"[REAPER] * CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
                     if (AutoFlattenDesync)
                     {
-                        if (shouldLog) Print($"[REAPER] 💀 QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
+                        if (shouldLog) Print($"[REAPER] * QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
                         _reaperFlattenQueue.Enqueue(acct.Name);
                         try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
                     }
@@ -317,7 +317,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print($"[REAPER] Minor Desync on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
             }
 
-            // ── NAKED POSITION AUDIT (Build 1102R) ──────────────────────────────────
+            // ?? NAKED POSITION AUDIT (Build 1102R) ??????????????????????????????????
             if (actualQty != 0)
             {
                 bool hasWorkingStop = acct.Orders.Any(o =>
@@ -333,7 +333,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
                     {
                         _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
-                        Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked — starting {2}s grace window.",
+                        Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked -- starting {2}s grace window.",
                             acct.Name, actualQty, graceSeconds));
                     }
                     else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
@@ -393,7 +393,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                          (Math.Sign(masterActualQty) != Math.Sign(masterExpectedQty) && masterExpectedQty != 0));
 
                     if (inFillGrace && shouldLog)
-                        Print($"[REAPER] {Account.Name} (Master): Fill grace active — desync check suppressed.");
+                        Print($"[REAPER] {Account.Name} (Master): Fill grace active -- desync check suppressed.");
 
                     if (isCriticalDesync)
                     {
@@ -417,7 +417,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12.17 FIX: Processes queued flatten requests on the strategy thread.
         /// Called via TriggerCustomEvent from the Reaper background thread.
-        /// This is the SAFE way to call Account.Flatten() — same pattern as IPC.
+        /// This is the SAFE way to call Account.Flatten() -- same pattern as IPC.
         /// </summary>
         private void ProcessReaperFlattenQueue()
         {
@@ -484,22 +484,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Order closeOrder = targetAcct.CreateOrder(Instrument, closeAction, OrderType.Market, TimeInForce.Gtc, qty, 0, 0, "", signalName, null);
                                 targetAcct.Submit(new[] { closeOrder });
                             }
-                            Print($"[REAPER] ✓ Emergency Market Close: {qty} contracts on {accountName}");
+                            Print($"[REAPER] ? Emergency Market Close: {qty} contracts on {accountName}");
                         }
 
                         // V12.1101E [F-06]: Serialize expectedPositions mutation under stateLock.
                         // Build 1102U [BUG-1]: Composite key for instrument-scoped clear.
                         SetExpectedPositionLocked(ExpKey(accountName), 0);
-                        Print($"[REAPER] ✓ MARSHAL-FLATTEN (Unmanaged) executed on strategy thread for {accountName}");
+                        Print($"[REAPER] ? MARSHAL-FLATTEN (Unmanaged) executed on strategy thread for {accountName}");
                     }
                     else
                     {
-                        Print($"[REAPER] ✗ Could not find account '{accountName}' for marshal-flatten");
+                        Print($"[REAPER] [X] Could not find account '{accountName}' for marshal-flatten");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Print($"[REAPER] ✗ MARSHAL-FLATTEN FAILED for {accountName}: {ex.Message}");
+                    Print($"[REAPER] [X] MARSHAL-FLATTEN FAILED for {accountName}: {ex.Message}");
                 }
             }
         }
@@ -523,190 +523,161 @@ namespace NinjaTrader.NinjaScript.Strategies
             string repairKey = accountName + "_" + Instrument.FullName;
             try
             {
-                    // 1. Find the stored PositionInfo for this account in activePositions
-                    PositionInfo repairPos = null;
-                    string repairEntryName = null;
-                    foreach (var kvp in activePositions.ToArray())
-                    {
-                        PositionInfo pi = kvp.Value;
-                        if (pi.IsFollower && pi.ExecutingAccount != null
-                            && pi.ExecutingAccount.Name == accountName)
-                        {
-                            repairPos = pi;
-                            repairEntryName = kvp.Key;
-                            break;
-                        }
-                    }
-
-                    if (repairPos == null)
-                    {
-                        Print($"[REAPER REPAIR] \u2717 No PositionInfo found for {accountName} — cannot repair.");
-                        continue;
-                    }
-
-                    OrderType repairOrderType = repairPos.EntryOrderType;
-                    double repairEntryPrice = Instrument.MasterInstrument.RoundToTickSize(repairPos.EntryPrice);
-                    double repairLimitPrice = 0;
-                    double repairStopPrice = 0;
-
-                    if (repairOrderType == OrderType.Limit)
-                    {
-                        repairLimitPrice = repairEntryPrice;
-                    }
-                    else if (repairOrderType == OrderType.StopMarket)
-                    {
-                        repairStopPrice = repairEntryPrice;
-                    }
-                    else if (repairOrderType == OrderType.StopLimit)
-                    {
-                        repairLimitPrice = repairEntryPrice;
-                        repairStopPrice = repairEntryPrice;
-                    }
-
-                    // Build 935: hard risk gate for ALL repair order types.
-                    // Repairs must remain inside the tighter of ATR-derived distance and tick fence distance.
-                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                    if (currentPrice <= 0)
-                    {
-                        Print($"[REAPER] REPAIR BLOCKED: invalid currentPrice={currentPrice:F4} for {accountName}.");
-                        continue;
-                    }
-
-                    if (!TryGetRepairDistanceLimitPoints(out double repairLimitPoints))
-                    {
-                        Print($"[REAPER] REPAIR BLOCKED: unable to derive repair distance bound for {accountName}.");
-                        continue;
-                    }
-
-                    double hardBoundDiff = Math.Abs(currentPrice - repairEntryPrice);
-                    if (hardBoundDiff > repairLimitPoints)
-                    {
-                        Print($"[REAPER] REPAIR BLOCKED: {accountName} {repairOrderType} exceeds hard bound. " +
-                              $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, Diff={hardBoundDiff:F4} > Limit={repairLimitPoints:F4}.");
-                        continue;
-                    }
-
-                    // 2. Safety Fence: enforce only when repair submits a Market order.
-                    if (repairOrderType == OrderType.Market)
-                    {
-                        // Legacy market-fence check retained as a secondary guard.
-                        // currentPrice already validated above.
-                        double priceDiff = Math.Abs(currentPrice - repairEntryPrice);
-                        double fenceDistance = RepairTickFence * tickSize;
-
-                        if (priceDiff > fenceDistance)
-                        {
-                            // V12.Phase8.3: Actionable diagnostic — tells trader how to override if needed
-                            Print($"[REAPER] REPAIR BLOCKED: Price fence exceeded for {accountName}. " +
-                                  $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, " +
-                                  $"Diff={priceDiff:F4} > Fence={fenceDistance:F4} ({RepairTickFence} ticks). " +
-                                  $"Adjust RepairTickFence if you want to force entry.");
-                            continue;
-                        }
-                    }
-
-                    // 3. Resolve account object
-                    Account targetAcct = repairPos.ExecutingAccount;
-                    if (targetAcct == null)
-                    {
-                        Print($"[REAPER REPAIR] \u2717 ExecutingAccount is null for {accountName}");
-                        continue;
-                    }
-
-                    // 4. Mark in-flight to prevent double-repair
-                    // V12.Phase8.3: Key includes instrument for cross-chart uniqueness
-                    lock (stateLock) { _repairInFlight.Add(repairKey); }
-
-                    // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern
-                    OrderAction action = repairPos.Direction == MarketPosition.Long
-                        ? OrderAction.Buy : OrderAction.SellShort;
-                    int quantity = repairPos.TotalContracts;
-                    // FIX-C1 [Build 1102Z]: Use the original activePositions key as the NT8 signal name.
-                    // The old "Repair_" prefix diverged the signal name from the key, breaking the
-                    // identity chain: activePositions key == entryOrders key == order signal name.
-                    // OnOrderUpdate.entryOrders.Values.Contains(order) would return false on fill,
-                    // SubmitBracketOrders would never be called, and the position would be naked.
-                    string repairSignal = repairEntryName;
-
-                    Order repairEntry = targetAcct.CreateOrder(
-                        Instrument,
-                        action,
-                        repairOrderType,
-                        TimeInForce.Gtc,
-                        quantity,
-                        repairLimitPrice,
-                        repairStopPrice,
-                        "",
-                        repairSignal,
-                        null);
-
-                    if (repairEntry == null)
-                    {
-                        Print($"[REAPER REPAIR] \u2717 CreateOrder returned null for {accountName}");
-                        lock (stateLock) { _repairInFlight.Remove(repairKey); }
-                        continue;
-                    }
-
-                    // NOTE: expectedPositions are ALREADY preserved from Phase 8.1 (the original
-                    // dispatch reserved them and the Ghost Fix intentionally kept them). Do NOT
-                    // call AddExpectedPositionDeltaLocked here — that would double-count.
-
-                    // V12.Phase8.2 [RACE-GUARD]: Re-verify expectedPositions immediately before
-                    // order submission. A manual flatten may have zeroed expectedPositions while
-                    // this repair was sitting in the queue — submitting into a flat account would
-                    // create a "Phantom Repair" (ghost long/short with no corresponding Risk stop).
-                    // Build 1102U [BUG-1]: Composite key + stateLock guard (was unguarded on background thread).
-                    int currentExpected = 0;
-                    lock (stateLock) { expectedPositions.TryGetValue(ExpKey(accountName), out currentExpected); }
-                    if (currentExpected == 0)
-                    {
-                        Print($"[REAPER REPAIR] ⚠ RACE GUARD ABORT for {accountName}: " +
-                              $"expectedPositions cleared to 0 while repair was in queue. Discarding repair order.");
-                        lock (stateLock) { _repairInFlight.Remove(repairKey); }
-                        continue;
-                    }
-
-                    // FIX-C2 [Build 1102Z]: Register repair order under the ORIGINAL activePositions key
-                    // and reset BracketSubmitted so OnOrderUpdate will call SubmitBracketOrders on fill.
-                    //
-                    // Without this:
-                    //   1. entryOrders[repairEntryName] still references the OLD (cancelled/missing) entry.
-                    //   2. OnOrderUpdate's entryOrders.Values.Contains(repairEntry) returns false.
-                    //   3. SubmitBracketOrders is never called → position is naked (no stop, no targets).
-                    //
-                    // BracketSubmitted = false is required for Market-entry repair: the original bracket
-                    // orders were co-submitted at dispatch time and are now gone (account was desync'd).
-                    // For Limit/StopMarket repairs it was already false, so this is a safe no-op there.
-                    lock (stateLock)
-                    {
-                        repairPos.BracketSubmitted = false;
-                        entryOrders[repairEntryName] = repairEntry;
-                    }
-
-                    targetAcct.Submit(new[] { repairEntry });
-
-                    Print($"[REAPER REPAIR] \u2713 Repair order submitted for {accountName} under key={repairEntryName}: " +
-                          $"{action} {quantity} {repairOrderType} " +
-                          $"{(repairOrderType == OrderType.Market ? "@ Market" : "@ " + repairEntryPrice.ToString("F2"))} " +
-                          $"(original entry={repairEntryPrice:F2})");
-
-                    // 6. Clear DESYNC chart label for this account (defensive — label may or may not exist)
-                    try
-                    {
-                        string desyncTag = "SIMA_DESYNC_" + accountName;
-                        RemoveDrawObject(desyncTag);
-                    }
-                    catch { }
-
-                    // 7. Clear in-flight flag (order is now submitted; execution callbacks manage state)
-                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
-                }
-                catch (Exception ex)
+                // 1. Find the stored PositionInfo for this account in activePositions
+                PositionInfo repairPos = null;
+                string repairEntryName = null;
+                foreach (var kvp in activePositions.ToArray())
                 {
-                    Print($"[REAPER REPAIR] \u2717 FAILED for {accountName}: {ex.Message}");
-                    // Roll back in-flight flag so retry is possible on next audit cycle
-                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                    PositionInfo pi = kvp.Value;
+                    if (pi.IsFollower && pi.ExecutingAccount != null
+                        && pi.ExecutingAccount.Name == accountName)
+                    {
+                        repairPos = pi;
+                        repairEntryName = kvp.Key;
+                        break;
+                    }
                 }
+
+                if (repairPos == null)
+                {
+                    Print($"[REAPER REPAIR] \u2717 No PositionInfo found for {accountName} -- cannot repair.");
+                    return;
+                }
+
+                OrderType repairOrderType = repairPos.EntryOrderType;
+                double repairEntryPrice = Instrument.MasterInstrument.RoundToTickSize(repairPos.EntryPrice);
+                double repairLimitPrice = 0;
+                double repairStopPrice = 0;
+
+                if (repairOrderType == OrderType.Limit)
+                {
+                    repairLimitPrice = repairEntryPrice;
+                }
+                else if (repairOrderType == OrderType.StopMarket)
+                {
+                    repairStopPrice = repairEntryPrice;
+                }
+                else if (repairOrderType == OrderType.StopLimit)
+                {
+                    repairLimitPrice = repairEntryPrice;
+                    repairStopPrice = repairEntryPrice;
+                }
+
+                // Build 935: hard risk gate for ALL repair order types.
+                // Repairs must remain inside the tighter of ATR-derived distance and tick fence distance.
+                double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                if (currentPrice <= 0)
+                {
+                    Print($"[REAPER] REPAIR BLOCKED: invalid currentPrice={currentPrice:F4} for {accountName}.");
+                    return;
+                }
+
+                if (!TryGetRepairDistanceLimitPoints(out double repairLimitPoints))
+                {
+                    Print($"[REAPER] REPAIR BLOCKED: unable to derive repair distance bound for {accountName}.");
+                    return;
+                }
+
+                double hardBoundDiff = Math.Abs(currentPrice - repairEntryPrice);
+                if (hardBoundDiff > repairLimitPoints)
+                {
+                    Print($"[REAPER] REPAIR BLOCKED: {accountName} {repairOrderType} exceeds hard bound. " +
+                          $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, Diff={hardBoundDiff:F4} > Limit={repairLimitPoints:F4}.");
+                    return;
+                }
+
+                // 2. Safety Fence: enforce only when repair submits a Market order.
+                if (repairOrderType == OrderType.Market)
+                {
+                    // Legacy market-fence check retained as a secondary guard.
+                    double priceDiff = Math.Abs(currentPrice - repairEntryPrice);
+                    double fenceDistance = RepairTickFence * tickSize;
+
+                    if (priceDiff > fenceDistance)
+                    {
+                        Print($"[REAPER] REPAIR BLOCKED: Price fence exceeded for {accountName}. " +
+                              $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, " +
+                              $"Diff={priceDiff:F4} > Fence={fenceDistance:F4} ({RepairTickFence} ticks). " +
+                              $"Adjust RepairTickFence if you want to force entry.");
+                        return;
+                    }
+                }
+
+                // 3. Resolve account object
+                Account targetAcct = repairPos.ExecutingAccount;
+                if (targetAcct == null)
+                {
+                    Print($"[REAPER REPAIR] \u2717 ExecutingAccount is null for {accountName}");
+                    return;
+                }
+
+                // 4. Mark in-flight to prevent double-repair
+                lock (stateLock) { _repairInFlight.Add(repairKey); }
+
+                // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern
+                OrderAction action = repairPos.Direction == MarketPosition.Long
+                    ? OrderAction.Buy : OrderAction.SellShort;
+                int quantity = repairPos.TotalContracts;
+                string repairSignal = repairEntryName;
+
+                Order repairEntry = targetAcct.CreateOrder(
+                    Instrument,
+                    action,
+                    repairOrderType,
+                    TimeInForce.Gtc,
+                    quantity,
+                    repairLimitPrice,
+                    repairStopPrice,
+                    "",
+                    repairSignal,
+                    null);
+
+                if (repairEntry == null)
+                {
+                    Print($"[REAPER REPAIR] \u2717 CreateOrder returned null for {accountName}");
+                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                    return;
+                }
+
+                // V12.Phase8.2 [RACE-GUARD]: Re-verify expectedPositions immediately before order submission.
+                int currentExpected = 0;
+                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(accountName), out currentExpected); }
+                if (currentExpected == 0)
+                {
+                    Print($"[REAPER REPAIR] (!) RACE GUARD ABORT for {accountName}: " +
+                          $"expectedPositions cleared to 0 while repair was in queue. Discarding repair order.");
+                    lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                    return;
+                }
+
+                lock (stateLock)
+                {
+                    repairPos.BracketSubmitted = false;
+                    entryOrders[repairEntryName] = repairEntry;
+                }
+
+                targetAcct.Submit(new[] { repairEntry });
+
+                Print($"[REAPER REPAIR] \u2713 Repair order submitted for {accountName} under key={repairEntryName}: " +
+                      $"{action} {quantity} {repairOrderType} " +
+                      $"{(repairOrderType == OrderType.Market ? "@ Market" : "@ " + repairEntryPrice.ToString("F2"))} " +
+                      $"(original entry={repairEntryPrice:F2})");
+
+                // 6. Clear DESYNC chart label
+                try
+                {
+                    string desyncTag = "SIMA_DESYNC_" + accountName;
+                    RemoveDrawObject(desyncTag);
+                }
+                catch { }
+
+                // 7. Clear in-flight flag
+                lock (stateLock) { _repairInFlight.Remove(repairKey); }
+            }
+            catch (Exception ex)
+            {
+                Print($"[REAPER REPAIR] \u2717 FAILED for {accountName}: {ex.Message}");
+                lock (stateLock) { _repairInFlight.Remove(repairKey); }
             }
         }
 
@@ -724,12 +695,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Account acct = Account.All.FirstOrDefault(a => a.Name == item.AccountName);
                     if (acct == null)
                     {
-                        Print(string.Format("[REAPER][NAKED_STOP] Account {0} not found — skipping.", item.AccountName));
+                        Print(string.Format("[REAPER][NAKED_STOP] Account {0} not found -- skipping.", item.AccountName));
                         continue;
                     }
 
                     // Compute emergency stop price: MaximumStop ticks from current close.
-                    // Close[0] is safe here — ProcessReaperNakedStopQueue runs on strategy thread
+                    // Close[0] is safe here -- ProcessReaperNakedStopQueue runs on strategy thread
                     // via TriggerCustomEvent.
                     double emergencyStopDist = MaximumStop;
                     double atrBound = CalculateATRStopDistance(RMAStopATRMultiplier);

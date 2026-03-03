@@ -42,6 +42,29 @@ This document provides the immutable technical standards for all AI agents (Anth
 *   **Binary & Log Purge**: Never commit `.exe`, `.log`, `.bak`, or legacy backup folders to source control. They should be stashed, deleted, or added to `.gitignore`.
 *   **Dashboard Cleanup**: Before ending a session, the agent MUST ensure all work is either Committed or the user has been guided to Merge. The goal is a +0/-0 dashboard between missions.
 
+## 7. ASCII-Only Encoding Protocol (BUILD SAFETY — MANDATORY)
+
+**Why this rule exists:** In Build 936, AI agents added Unicode decorators to C# log messages (emoji, em-dashes, curly quotes). A cleanup script converted curly closing-quote `"` (U+201D) to straight `"`, which TERMINATED C# string literals early. One broken quote in `SIMA.cs` caused 300+ cascading compile errors across all partial-class files and cost 2 days of trading time.
+
+**HARD RULE: All C# string literals must use ASCII-only characters.**
+
+| NEVER use in string literals | Use this instead |
+|---|---|
+| `⚠️` `✅` `❌` `🔴` (any emoji) | `(!)` `[OK]` `[X]` `[ERR]` |
+| `—` `–` (em/en dash) | `--` |
+| `"` `"` (curly/smart quotes) | `"` (straight double quote) |
+| `'` `'` (curly apostrophes) | `'` (straight apostrophe) |
+| `→` `←` `↑` `↓` (arrows) | `->` `<-` `^` `v` |
+| `╔═╗ ║` (box-drawing chars) | `+--+ |` |
+| `…` (ellipsis) | `...` |
+
+**Emergency fix if non-ASCII bytes appear in source:**
+1. Run `python C:\tmp\byte_purge.py` (nuclear byte-level purge)  
+2. Search all `.cs` files for the pattern `?"` in non-comment lines — each match is a broken string
+3. Replace `?"` with `--` or `(!)` as appropriate
+4. Run `deploy-sync.ps1` — the ASCII gate will confirm clean before touching NT8
+
 ---
+
 > [!NOTE]
 > This document defines **Permanent Standards**. For current active refactoring goals (e.g. Phase 6.0 Simplification), refer to the specific **Implementation Plan** or **Refactoring Roadmap** files.

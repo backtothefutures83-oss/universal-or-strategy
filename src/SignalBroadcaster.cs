@@ -217,7 +217,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception)
                 {
-                    // Swallow — subscriber isolation; don't break fan-out for other listeners
+                    // Swallow -- subscriber isolation; don't break fan-out for other listeners
                 }
             }
             sw.Stop();

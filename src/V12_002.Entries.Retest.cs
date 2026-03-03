@@ -1,4 +1,4 @@
-// V12.Phase7 MODULAR: RETEST Entry Node (Split from Entries.cs — Phase 7 Partition)
+// V12.Phase7 MODULAR: RETEST Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: ExecuteRetestEntry, ActivateRetestMode, DeactivateRetestMode, ExecuteRetestManualEntry
 using System;
 using System.Collections.Generic;
@@ -60,11 +60,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // V12.1101E [B-2]: Session-scoped latch — one RETEST entry per OR session maximum.
+            // V12.1101E [B-2]: Session-scoped latch -- one RETEST entry per OR session maximum.
             // Resets automatically in ResetOR() at the start of each new session.
             if (retestFiredThisSession)
             {
-                Print("RETEST: Already fired this session — latch active, ignoring duplicate arm");
+                Print("RETEST: Already fired this session -- latch active, ignoring duplicate arm");
                 return;
             }
 
@@ -165,7 +165,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     IsRMATrade = isRetestRmaMode,
                     IsTRENDTrade = false,
                     IsRetestTrade = true,              // V8.4: Mark as retest trade
-                    RetestTrailActivated = false       // V8.4: Trail not activated yet
+                    RetestTrailActivated = false,      // V8.4: Trail not activated yet
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -183,11 +185,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetest);
-                    Print("[ERROR][1102Y-V3] RETEST SubmitOrderUnmanaged NULL for " + entryName + " — rolled back.");
+                    Print("[ERROR][1102Y-V3] RETEST SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
                 }
 
                 entryOrders[entryName] = entryOrder;
-                retestFiredThisSession = true;  // V12.1101E [B-2]: Arm latch — no further RETEST entries this session
+                retestFiredThisSession = true;  // V12.1101E [B-2]: Arm latch -- no further RETEST entries this session
 
                 Print(string.Format("RETEST ENTRY ORDER: {0} {1}@{2:F2} | ATR: {3:F2}", signalName, contracts, entryPrice, currentATR));
                 Print(string.Format("RETEST STOP: {0:F2} ({1:F2}x ATR = {2:F2}pts)",
@@ -303,7 +305,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Limit,
                     IsRMATrade = true,  // Uses RMA targets
                     IsRetestTrade = true,
-                    RetestTrailActivated = false
+                    RetestTrailActivated = false,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -321,7 +325,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetestMnl);
-                    Print("[ERROR][1102Y-V3] RETEST_MANUAL SubmitOrderUnmanaged NULL for " + entryName + " — rolled back.");
+                    Print("[ERROR][1102Y-V3] RETEST_MANUAL SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
                 }
                 entryOrders[entryName] = entryOrder;
 

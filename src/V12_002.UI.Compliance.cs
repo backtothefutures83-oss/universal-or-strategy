@@ -140,13 +140,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnsureDailySummaryCsv();
             }
 
-            // V12.40 FREEZE FIX: Fire-and-forget async write — never blocks UI thread
+            // V12.40 FREEZE FIX: Fire-and-forget async write -- never blocks UI thread
             string pathCopy = dailySummaryCsvPath;
             string lineCopy = line + Environment.NewLine;
             Task.Run(() =>
             {
                 try { System.IO.File.AppendAllText(pathCopy, lineCopy); }
-                catch { /* swallow — daily summary is best-effort */ }
+                catch { /* swallow -- daily summary is best-effort */ }
             });
         }
 
@@ -371,7 +371,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12.Phase7 [C-09]: Compliance enforcement gate.
         /// Returns false if the account has breached any hard compliance limit (severity 2).
-        /// Call this at the START of every entry method — if false, abort and do not submit orders.
+        /// Call this at the START of every entry method -- if false, abort and do not submit orders.
         /// Severity levels: 0 = OK, 1 = warning, 2 = hard block (drawdown breached or flat rule).
         /// </summary>
         private bool IsOrderAllowed(string accountName = null)
@@ -491,8 +491,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 }
                                 else if (isStressTestEnabled && activePositions.TryGetValue(fleetKey, out var dupPos) && dupPos.IsFollower && dupPos.EntryFilled)
                                 {
-                                    // [STRESS_BURST] Dedup guard caught a duplicate burst signal — bracket already submitted.
-                                    Print(string.Format("[STRESS_BURST] DedupGuard HIT: {0} already EntryFilled — duplicate bracket blocked.", fleetKey));
+                                    // [STRESS_BURST] Dedup guard caught a duplicate burst signal -- bracket already submitted.
+                                    Print(string.Format("[STRESS_BURST] DedupGuard HIT: {0} already EntryFilled -- duplicate bracket blocked.", fleetKey));
                                 }
                                 break;
                             }
@@ -520,7 +520,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             (execOrder.OrderAction == OrderAction.Buy || execOrder.OrderAction == OrderAction.SellShort);
                         if (isEntryFill)
                         {
-                            Print($"[ProcessAccountExecutionQueue] [1102Y-V4] Entry fill for {fleetAcct.Name} — Persistence Gate active, flat-check skipped.");
+                            Print($"[ProcessAccountExecutionQueue] [1102Y-V4] Entry fill for {fleetAcct.Name} -- Persistence Gate active, flat-check skipped.");
                         }
                         else
                         {
@@ -529,7 +529,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (nowFlat && !IsDispatchSyncPending(ExpKey(fleetAcct.Name)))
                             {
                                 SetExpectedPositionLocked(ExpKey(fleetAcct.Name), 0);
-                                Print($"[ProcessAccountExecutionQueue] Fleet {fleetAcct.Name} is Flat — expectedPositions cleared for {Instrument.FullName}");
+                                Print($"[ProcessAccountExecutionQueue] Fleet {fleetAcct.Name} is Flat -- expectedPositions cleared for {Instrument.FullName}");
                             }
                         }
                     }
@@ -607,14 +607,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 sbCompliance.AppendLine("\n  ]");
                 sbCompliance.AppendLine("}");
 
-                // V12.40 FREEZE FIX: Fire-and-forget async write — never blocks UI thread
+                // V12.40 FREEZE FIX: Fire-and-forget async write -- never blocks UI thread
                 string jsonPayload = sbCompliance.ToString();
                 string path = complianceLogPath;
                 lastComplianceLog = DateTime.Now;
                 Task.Run(() =>
                 {
                     try { if (path != null) System.IO.File.WriteAllText(path, jsonPayload); }
-                    catch { /* swallow — compliance log is best-effort */ }
+                    catch { /* swallow -- compliance log is best-effort */ }
                 });
             }
             catch (Exception ex)

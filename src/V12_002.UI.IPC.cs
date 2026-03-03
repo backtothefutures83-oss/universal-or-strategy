@@ -227,21 +227,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Handle GET_LAYOUT (Synchronous Response to THIS client only)
             if (message.StartsWith("GET_LAYOUT"))
             {
-                string configResponse;
+                // Build 935 [R-04]: Snapshot scalar state under lock; format string outside
+                // to minimize critical section duration (removes string allocation from lock).
+                string snapMode; double snapStop; int snapCount;
+                double snapT1, snapT2, snapT3, snapT4, snapT5;
+                TargetMode snapT1Type, snapT2Type, snapT3Type, snapT4Type, snapT5Type;
+                string snapCit; bool snapTrma, snapRrma;
                 lock (stateLock)
                 {
-                    string mode = isRMAModeActive ? "RMA" : "OR";
-                    double stopValue = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
-                    configResponse = string.Format(
-                        "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
-                        mode, activeTargetCount, Target1Value, ToIpcTargetMode(T1Type),
-                        Target2Value, ToIpcTargetMode(T2Type),
-                        Target3Value, ToIpcTargetMode(T3Type),
-                        Target4Value, ToIpcTargetMode(T4Type),
-                        Target5Value, ToIpcTargetMode(T5Type),
-                        stopValue, MaxRiskAmount, ChaseIfTouchPoints ?? "0",
-                        isTrendRmaMode ? "1" : "0", isRetestRmaMode ? "1" : "0");
+                    snapMode   = isRMAModeActive ? "RMA" : "OR";
+                    snapStop   = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
+                    snapCount  = activeTargetCount;
+                    snapT1     = Target1Value; snapT1Type = T1Type;
+                    snapT2     = Target2Value; snapT2Type = T2Type;
+                    snapT3     = Target3Value; snapT3Type = T3Type;
+                    snapT4     = Target4Value; snapT4Type = T4Type;
+                    snapT5     = Target5Value; snapT5Type = T5Type;
+                    snapCit    = ChaseIfTouchPoints ?? "0";
+                    snapTrma   = isTrendRmaMode;
+                    snapRrma   = isRetestRmaMode;
                 }
+                string configResponse = string.Format(
+                    "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
+                    snapMode, snapCount, snapT1, ToIpcTargetMode(snapT1Type),
+                    snapT2, ToIpcTargetMode(snapT2Type),
+                    snapT3, ToIpcTargetMode(snapT3Type),
+                    snapT4, ToIpcTargetMode(snapT4Type),
+                    snapT5, ToIpcTargetMode(snapT5Type),
+                    snapStop, MaxRiskAmount, snapCit,
+                    snapTrma ? "1" : "0", snapRrma ? "1" : "0");
                 byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
                 stream.Write(responseBytes, 0, responseBytes.Length);
                 stream.Flush();
@@ -416,7 +430,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Build 935 [B935-P1]: Reverse alias resolver — maps a UI alias (F01, F02…) or a raw
+        /// Build 935 [B935-P1]: Reverse alias resolver -- maps a UI alias (F01, F02...) or a raw
         /// account name back to the real broker account name. Returns null if the identity cannot
         /// be matched; callers MUST null-check the return value before passing to broker APIs.
         /// </summary>
@@ -433,7 +447,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (direct != null)
                 return direct.Name;
 
-            // Reverse alias lookup: F01 → real name via BuildFleetAliasMap
+            // Reverse alias lookup: F01 -> real name via BuildFleetAliasMap
             var aliasMap = BuildFleetAliasMap(accounts);
             foreach (var kv in aliasMap)
             {
@@ -495,7 +509,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     string targetSymbol = parts.Length > 1 ? parts[1] : "Global";
 
-                    // V12.9: Global commands bypass symbol filter entirely — these are account/fleet-level, not instrument-level
+                    // V12.9: Global commands bypass symbol filter entirely -- these are account/fleet-level, not instrument-level
                     // [1102Z-F] MOVE_TARGET and LOCK_50 use parts[1] for parameters (not symbol), so they must bypass
                     // the symbol filter. Each handler internally filters by activePositions so only charts with live
                     // positions act. This is the correct fix for the "For Me? False [target=T1]" rejection.
@@ -569,7 +583,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
                                     UpdateStopOrder(entryName, pos, newStopPrice, pos.CurrentTrailLevel);
                                     trailCount++;
-                                    Print(string.Format("[V12] SET_TRAIL: {0} → Stop @ {1:F2} (Price: {2:F2}, Dist: {3})",
+                                    Print(string.Format("[V12] SET_TRAIL: {0} -> Stop @ {1:F2} (Price: {2:F2}, Dist: {3})",
                                         entryName, newStopPrice, currentPrice, trailDistance));
                                 }
 
@@ -591,9 +605,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else if (action == "LOCK_50")
                     {
-                        // [1102Z-F]: IPC LOCK_50 — Lock 50% of unrealized profit on all active positions.
+                        // [1102Z-F]: IPC LOCK_50 -- Lock 50% of unrealized profit on all active positions.
                         // Delegates to ExecuteRunnerAction which already handles all account routing.
-                        Print("[IPC LOCK_50] Received — routing to ExecuteRunnerAction(lock50)");
+                        Print("[IPC LOCK_50] Received -- routing to ExecuteRunnerAction(lock50)");
                         ExecuteRunnerAction("lock50");
                     }
                     else if (action == "BE" || action == "BE_CUSTOM" || action == "BE_PLUS_2" || action == "BE_PLUS_1") // V12.23: +BE_CUSTOM with dynamic ticks
@@ -601,7 +615,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         double beOffset;
                         if (action == "BE_CUSTOM" && parts.Length >= 2)
                         {
-                            // V12.23: Dynamic ticks from panel input — syncs auto-trail BE too
+                            // V12.23: Dynamic ticks from panel input -- syncs auto-trail BE too
                             int customTicks;
                             if (!int.TryParse(parts[1].Trim(), out customTicks) || customTicks < 0)
                                 customTicks = BreakEvenOffsetTicks; // fallback to default
@@ -619,12 +633,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // V12.21: Flatten Only (Close Positions) - preserve pending orders
                         if (EnableSIMA)
                         {
-                            Print("[SIMA] IPC FLATTEN_ONLY → Closing all open positions (Pending orders preserved)");
+                            Print("[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
                             ClosePositionsOnlyApexAccounts(); // V12.21: Use new non-cancelling helper
                         }
                         else
                         {
-                            Print("[V12] FLATTEN_ONLY → Closing all open positions (Pending orders preserved)");
+                            Print("[V12] FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
                             // CloseAllPositions(); // Native NT8 method closes positions and cancels orders usually?
                             // NT8 Flatten() cancels orders. We must use Close() on each position instead.
 
@@ -645,7 +659,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // V12 SIMA: Use multi-account flatten when enabled
                         if (EnableSIMA)
                         {
-                            Print("[SIMA] IPC FLATTEN → Broadcasting to all Apex accounts");
+                            Print("[SIMA] IPC FLATTEN -> Broadcasting to all Apex accounts");
                             FlattenAllApexAccounts();
                         }
                         else
@@ -660,7 +674,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             int cancelled = 0;
 
-                            // ── V12.10: Cancel local account orders FIRST ──
+                            // ?? V12.10: Cancel local account orders FIRST ??
                             foreach (Order order in Account.Orders)
                             {
                                 if (order != null && order.Instrument.FullName == Instrument.FullName &&
@@ -668,7 +682,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                      order.OrderState == OrderState.Accepted ||
                                      order.OrderState == OrderState.Submitted))
                                 {
-                                    // V12.13c: Skip stops and targets on active positions — only cancel pending entries
+                                    // V12.13c: Skip stops and targets on active positions -- only cancel pending entries
                                     string oName = order.Name;
                                     if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                         oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
@@ -680,7 +694,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 }
                             }
 
-                            // ── Fleet accounts ──
+                            // ?? Fleet accounts ??
                             foreach (Account acct in Account.All)
                             {
                                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -693,7 +707,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                              order.OrderState == OrderState.Accepted ||
                                              order.OrderState == OrderState.Submitted))
                                         {
-                                            // V12.13c: Skip stops and targets — only cancel pending entries
+                                            // V12.13c: Skip stops and targets -- only cancel pending entries
                                             string oName = order.Name;
                                             if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                                 oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
@@ -706,7 +720,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     }
                                 }
                             }
-                            Print($"[SIMA] CANCEL_ALL → Cancelled {cancelled} pending entry orders (local + fleet)");
+                            Print($"[SIMA] CANCEL_ALL -> Cancelled {cancelled} pending entry orders (local + fleet)");
                         }
                         else
                         {
@@ -718,7 +732,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                      order.OrderState == OrderState.Accepted ||
                                      order.OrderState == OrderState.Submitted))
                                 {
-                                    // V12.13c: Skip stops and targets — only cancel pending entries
+                                    // V12.13c: Skip stops and targets -- only cancel pending entries
                                     string oName = order.Name;
                                     if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                         oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
@@ -729,7 +743,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     cancelled++;
                                 }
                             }
-                            Print($"[V12] CANCEL_ALL → Cancelled {cancelled} pending entry orders");
+                            Print($"[V12] CANCEL_ALL -> Cancelled {cancelled} pending entry orders");
                         }
 
                         // V1102Z-HARDEN: Ghost Memory Teardown
@@ -822,12 +836,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                             if (EnablePathB)
                             {
-                                Print($"[SIMA] PATH B {action} → Broadcasting {qty} contracts with FIXED BRACKETS to all Apex accounts");
+                                Print($"[SIMA] PATH B {action} -> Broadcasting {qty} contracts with FIXED BRACKETS to all Apex accounts");
                                 ExecuteMultiAccountBracket(orderAction, qty, "PATHB_" + action, PathBStopPoints, PathBTargetPoints);
                             }
                             else
                             {
-                                Print($"[SIMA] IPC {action} → Broadcasting {qty} contracts to all Apex accounts");
+                                Print($"[SIMA] IPC {action} -> Broadcasting {qty} contracts to all Apex accounts");
                                 ExecuteMultiAccountMarket(orderAction, qty, "SIMA_" + action);
                             }
                         }
@@ -836,13 +850,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // Original single-account logic
                             MarketPosition direction = action == "LONG" ? MarketPosition.Long : MarketPosition.Short;
                             double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                            // [923B-FIX-C]: Guard against zero price — Close[0] returns 0 if the strategy
+                            // [923B-FIX-C]: Guard against zero price -- Close[0] returns 0 if the strategy
                             // has just loaded and bars have not yet been initialized (pre-session or fresh attach).
                             // Passing currentPrice=0 to ExecuteRMAEntryV2 would submit a Limit @ 0, which
-                            // Apex/Tradovate treats as a Market order → instant fill without price touching level.
+                            // Apex/Tradovate treats as a Market order -> instant fill without price touching level.
                             if (currentPrice <= 0)
                             {
-                                Print("[IPC] ABORT RMA dispatch: currentPrice=0 — lastKnownPrice and Close[0] both invalid. Skipping command, continuing queue drain.");
+                                Print("[IPC] ABORT RMA dispatch: currentPrice=0 -- lastKnownPrice and Close[0] both invalid. Skipping command, continuing queue drain.");
                                 continue; // Build 929 Fix1 [P2]: skip bad-price command, keep draining queue
                             }
                             double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
@@ -1009,7 +1023,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                     // V12.5: SET_TARGETS|count - Panel is sole source of truth
-                    // V12.Phase8.3: Now writes to activeTargetCount — minContracts is symbol-specific risk floor only
+                    // V12.Phase8.3: Now writes to activeTargetCount -- minContracts is symbol-specific risk floor only
                     else if (action == "SET_TARGETS")
                     {
                         if (parts.Length > 1 && int.TryParse(parts[1], out int targetCount))
@@ -1018,22 +1032,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                             int clamped = Math.Max(1, Math.Min(5, targetCount));
                             lock (stateLock) { activeTargetCount = clamped; }
                             Print(string.Format("V12.Phase8.3: SET_TARGETS = {0} targets (clamped from {1}; minContracts preserved at {2})", clamped, targetCount, minContracts));
-                            // V12.25: CONFIG broadcast REMOVED — Panel is sole source of truth.
+                            // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
                             // Sending CONFIG back here caused the Ping-Pong overwrite bug.
-                            // Build 1102Y [U-02]: Immediately sync panel visibility — panel needs the count, not a CONFIG echo.
+                            // Build 1102Y [U-02]: Immediately sync panel visibility -- panel needs the count, not a CONFIG echo.
                             SendResponseToRemote($"SYNC_TARGET_STATE|{clamped}");
                         }
                     }
-                    // Phase 9.1: MKT_SYNC — Toggle ToS Armed Mode (Top button)
+                    // Phase 9.1: MKT_SYNC -- Toggle ToS Armed Mode (Top button)
                     else if (action == "MKT_SYNC")
                     {
                         isTosSyncMode = !isTosSyncMode;
                         Print(string.Format("[SYNC] ToS Sync Mode: {0}", isTosSyncMode));
                     }
-                    // Phase 9.1: SYNC_ALL — Refresh active target orders to match current panel config (Bottom button)
+                    // Phase 9.1: SYNC_ALL -- Refresh active target orders to match current panel config (Bottom button)
                     else if (action == "SYNC_ALL")
                     {
-                        Print("[SYNC_ALL] Refresh triggered — recalculating active target orders");
+                        Print("[SYNC_ALL] Refresh triggered -- recalculating active target orders");
                         RefreshActivePositionOrders();
                     }
                     // V12.5: SET_MODE|mode - Panel is sole source of truth
@@ -1043,7 +1057,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             string newMode = parts[1].Trim().ToUpper();
 
-                            // V12.20: Atomic mode transition — prevents partial state reads during switch
+                            // V12.20: Atomic mode transition -- prevents partial state reads during switch
                             lock (stateLock)
                             {
                                 isRMAModeActive = false;
@@ -1080,11 +1094,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
                                 newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
 
-                            // V12.25: CONFIG broadcast REMOVED — Panel is sole source of truth.
+                            // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
                             // Sending CONFIG back here caused the Ping-Pong overwrite bug.
                         }
                     }
-                    // V12.25: SET_LEADER_ACCOUNT|accountName — Panel tells strategy which account is the leader
+                    // V12.25: SET_LEADER_ACCOUNT|accountName -- Panel tells strategy which account is the leader
                     else if (action == "SET_LEADER_ACCOUNT")
                         HandleFleetCommand(action, parts);
                     else if (action == "REQUEST_FLEET_STATE")
@@ -1167,8 +1181,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else if (action == "FFMA_MANUAL_MARKET")
                     {
-                        // V12.27: M.FFMA button — instant market, direction toward 9 EMA
-                        Print("V12.27 IPC: FFMA_MANUAL_MARKET — auto-direction toward EMA9");
+                        // V12.27: M.FFMA button -- instant market, direction toward 9 EMA
+                        Print("V12.27 IPC: FFMA_MANUAL_MARKET -- auto-direction toward EMA9");
                         ExecuteFFMAManualMarketEntry();
                     }
                     else if (action.StartsWith("MODE_") || action.StartsWith("EXEC_") || action == "FFMA_DISARM")
@@ -1200,10 +1214,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // ── Build 935 [B935-P2]: Extracted IPC sub-handlers ──────────────────────────────
+        // ?? Build 935 [B935-P2]: Extracted IPC sub-handlers ??????????????????????????????
 
         /// <summary>
-        /// Handles TRIM_25 / TRIM_50 — partial position close by percentage.
+        /// Handles TRIM_25 / TRIM_50 -- partial position close by percentage.
         /// </summary>
         private void HandleTrimCommand(string action, string[] parts)
         {
@@ -1236,7 +1250,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Instrument, trimAction, OrderType.Market, TimeInForce.Gtc,
                                 rawQty, 0, 0, "", trimSig, null);
                             pos.ExecutingAccount.Submit(new[] { trimOrder });
-                            Print(string.Format("[SIMA] TRIM {0}%: Follower {1} → {2} closing {3} contracts",
+                            Print(string.Format("[SIMA] TRIM {0}%: Follower {1} -> {2} closing {3} contracts",
                                 (int)(percent * 100), pos.SignalName, pos.ExecutingAccount.Name, rawQty));
                         }
                         else
@@ -1264,7 +1278,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Handles CONFIG — syncs T1-T5 values/types, stop multiplier, risk, and target count.
+        /// Handles CONFIG -- syncs T1-T5 values/types, stop multiplier, risk, and target count.
         /// Format: CONFIG|Mode|COUNT:3;T1:1.0;T1TYPE:Points;T2:0.5;T2TYPE:ATR;...
         /// </summary>
         private void HandleConfigCommand(string[] parts)
@@ -1351,7 +1365,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Handles TOGGLE_ACCOUNT — enables or disables a specific account in the fleet.
+        /// Handles TOGGLE_ACCOUNT -- enables or disables a specific account in the fleet.
         /// Build 935 [B935-P1]: Resolves UI aliases (F01, F02) via ResolveAccountName before
         /// writing to activeFleetAccounts. Returns early with a rejection log on null resolve.
         /// Format: TOGGLE_ACCOUNT|&lt;alias_or_name&gt;|&lt;0|1&gt;
@@ -1364,17 +1378,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // Build 935 [B935-P1]: Resolve alias → real account name. Guard null before any broker call.
+            // Build 935 [B935-P1]: Resolve alias -> real account name. Guard null before any broker call.
             string resolvedName = ResolveAccountName(parts[1]);
             if (resolvedName == null)
             {
                 // ResolveAccountName already logged the rejection; add caller context.
-                Print($"V12 IPC REJECT: TOGGLE_ACCOUNT aborted — unresolvable alias '{parts[1]}'");
+                Print($"V12 IPC REJECT: TOGGLE_ACCOUNT aborted -- unresolvable alias '{parts[1]}'");
                 return;
             }
 
             bool active = parts[2] == "1";
-            // V12.1101E [A-2]: Lock IPC writes to activeFleetAccounts — this dict is also
+            // V12.1101E [A-2]: Lock IPC writes to activeFleetAccounts -- this dict is also
             // read by the strategy thread (ExecuteMultiAccountMarket) without a lock.
             lock (stateLock)
             {
@@ -1398,7 +1412,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 foreach (var acct in fleetAccounts)
                     sb.Append('|').Append(GetIpcFleetIdentity(acct.Name, aliasMap));
                 SendResponseToRemote(sb.ToString());
-                Print("[SIMA] GET_FLEET → Responded with account list");
+                Print("[SIMA] GET_FLEET -> Responded with account list");
             }
             else if (action == "SET_SIMA")
             {
@@ -1411,7 +1425,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (action == "DIAG_FLEET")
             {
-                Print("[DIAG] ══════════════════════════════════════════════════");
+                Print("[DIAG] ##################################################");
                 Print($"[DIAG] EnableSIMA = {EnableSIMA}");
                 Print($"[DIAG] AccountPrefix = \"{AccountPrefix}\"");
                 int total = 0;
@@ -1424,11 +1438,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         bool isActive = false;
                         activeFleetAccounts.TryGetValue(acct.Name, out isActive);
                         if (isActive) active++;
-                        Print($"[DIAG]   {acct.Name} -> {(isActive ? "✓ ACTIVE" : "✗ INACTIVE")}");
+                        Print($"[DIAG]   {acct.Name} -> {(isActive ? "? ACTIVE" : "[X] INACTIVE")}");
                     }
                 }
                 Print($"[DIAG] TOTAL: {total} accounts | {active} ACTIVE");
-                Print("[DIAG] ══════════════════════════════════════════════════");
+                Print("[DIAG] ##################################################");
             }
             else if (action == "SET_LEADER_ACCOUNT")
             {
@@ -1464,7 +1478,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // ─────────────────────────────────────────────────────────────────────────────
+        // ?????????????????????????????????????????????????????????????????????????????
 
         private void SendResponseToRemote(string response)
         {
@@ -1509,9 +1523,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // V12.13-D: SendToExternalApp REMOVED — it connected to port 5001 (the strategy's own listener),
+        // V12.13-D: SendToExternalApp REMOVED -- it connected to port 5001 (the strategy's own listener),
         // causing infinite flood loops. All callers now use SendResponseToRemote() or direct client stream writes.
-        // V12.44: MoveStopsToBreakevenPlusOne() removed — dead code, replaced by MoveStopsToBreakevenWithOffset()
+        // V12.44: MoveStopsToBreakevenPlusOne() removed -- dead code, replaced by MoveStopsToBreakevenWithOffset()
 
         /// <summary>
         /// V10.3: Close a specific target (T1..T5) at market for all active positions
@@ -1590,11 +1604,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                  else if (action == "MODE_FFMA")
                  {
                      isFFMAModeArmed = true;
-                     Print("V12.24: FFMA AUTO armed — reversal scanner active");
+                     Print("V12.24: FFMA AUTO armed -- reversal scanner active");
                  }
                  else if (action == "MODE_M")
                  {
-                     Print("V12.24: MODE_M received — immediate FFMA entry pending");
+                     Print("V12.24: MODE_M received -- immediate FFMA entry pending");
                  }
                  else if (action == "FFMA_DISARM")
                  {
@@ -1648,7 +1662,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                  double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
                  double ema9Value = _ema9Val;
                  MarketPosition direction = currentPrice > ema9Value ? MarketPosition.Short : MarketPosition.Long;
-                 Print(string.Format("V12.24: MODE_M firing — Price={0:F2} vs EMA9={1:F2} → {2}", currentPrice, ema9Value, direction));
+                 Print(string.Format("V12.24: MODE_M firing -- Price={0:F2} vs EMA9={1:F2} -> {2}", currentPrice, ema9Value, direction));
                  ExecuteFFMAEntry(direction);
              }
 

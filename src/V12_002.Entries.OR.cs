@@ -1,4 +1,4 @@
-// V12.Phase7 MODULAR: OR Entry Node (Split from Entries.cs — Phase 7 Partition)
+// V12.Phase7 MODULAR: OR Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: ExecuteLong, ExecuteShort, EnterORPosition, CalculateORStopDistance
 using System;
 using System.Collections.Generic;
@@ -36,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ExecuteLong(int contracts)
         {
-            // V12.Phase7 [C-09]: Compliance enforcement gate — abort if drawdown or daily cap breached.
+            // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
             if (!IsOrderAllowed()) return;
             if (contracts <= 0)
             {
@@ -79,7 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ExecuteShort(int contracts)
         {
-            // V12.Phase7 [C-09]: Compliance enforcement gate — abort if drawdown or daily cap breached.
+            // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
             if (!IsOrderAllowed()) return;
             if (contracts <= 0)
             {
@@ -122,7 +122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void EnterORPosition(MarketPosition direction, double entryPrice, double stopPrice, int contracts)
         {
-            // V12.Phase7 [C-09]: Compliance enforcement gate — abort if drawdown or daily cap breached.
+            // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
             if (!IsOrderAllowed()) return;
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
             if (isFlattenRunning) return;
@@ -197,7 +197,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ExtremePriceSinceEntry = entryPrice,
                     CurrentTrailLevel = 0,
                     EntryOrderType = OrderType.StopMarket,
-                    IsRMATrade = false
+                    IsRMATrade = false,
+                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
+                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
                 ApplyTargetLadderGuard(pos);
 
@@ -218,11 +220,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (entryOrder == null)
                 {
-                    // Build 1102Y-V3 [MS-03 ROLLBACK]: Submit failed — undo Order Ledger reservation.
+                    // Build 1102Y-V3 [MS-03 ROLLBACK]: Submit failed -- undo Order Ledger reservation.
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaOR);
-                    Print("[ERROR][1102Y-V3] OR SubmitOrderUnmanaged returned NULL for " + entryName + " — Master expected rolled back. Fleet dispatch aborted.");
+                    Print("[ERROR][1102Y-V3] OR SubmitOrderUnmanaged returned NULL for " + entryName + " -- Master expected rolled back. Fleet dispatch aborted.");
                     // [FIX-OR-E]: Must abort here. Without an early return, ExecuteSmartDispatchEntry
-                    // dispatches fleet followers for a master entry that does not exist → phantom fleet entries.
+                    // dispatches fleet followers for a master entry that does not exist -> phantom fleet entries.
                     activePositions.TryRemove(entryName, out _);
                     return;
                 }
@@ -240,7 +242,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // [923A-P0-OR]: StopMarket prevents immediate "marketable limit" fill.
                     // OR Long entry price is ABOVE current market; a Limit order there is immediately
                     // marketable on Apex/Tradovate (fills at current ask). StopMarket activates only
-                    // when price actually reaches/breaks the OR High/Low — matching master behavior.
+                    // when price actually reaches/breaks the OR High/Low -- matching master behavior.
                     ExecuteSmartDispatchEntry("OR", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.StopMarket);
                 }
             }
