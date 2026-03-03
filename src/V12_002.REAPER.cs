@@ -40,6 +40,43 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ConcurrentDictionary<string, DateTime> _repairBlockedLastLogged
             = new ConcurrentDictionary<string, DateTime>();
 
+        // Build 935 [REAPER-B935-002]: Per-account fill-grace timestamps.
+        // Replaces single global _lastExpectedPositionSetTicks which incorrectly blocked ALL account repairs
+        // whenever ANY account had a fill. Now each account tracks its own fill-grace window independently.
+        private readonly ConcurrentDictionary<string, long> _accountFillGraceTicks
+            = new ConcurrentDictionary<string, long>();
+
+        // Stamps per-account fill grace. Call from SetExpectedPositionLocked when applying a non-zero delta.
+        private void StampAccountFillGrace(string expKey)
+        {
+            _accountFillGraceTicks[expKey] = DateTime.UtcNow.Ticks;
+        }
+
+        private bool IsReaperFillGraceActive(string expKey)
+        {
+            if (_accountFillGraceTicks.TryGetValue(expKey, out long stampTicks))
+                return stampTicks > 0 && (DateTime.UtcNow.Ticks - stampTicks) < ReaperFillGraceTicks;
+            // Fallback: check legacy global stamp (covers master account path)
+            long globalStamp = Interlocked.Read(ref _lastExpectedPositionSetTicks);
+            return globalStamp > 0 && (DateTime.UtcNow.Ticks - globalStamp) < ReaperFillGraceTicks;
+        }
+
+
+        private bool TryGetRepairDistanceLimitPoints(out double limitPoints)
+        {
+            limitPoints = 0;
+            double atrLimit = CalculateATRStopDistance(RMAStopATRMultiplier);
+            if (atrLimit <= 0)
+                atrLimit = MinimumStop;
+
+            double fenceLimit = (RepairTickFence > 0 && tickSize > 0)
+                ? RepairTickFence * tickSize
+                : atrLimit;
+
+            limitPoints = Math.Min(Math.Abs(atrLimit), Math.Abs(fenceLimit));
+            return limitPoints > 0;
+        }
+
         /// <summary>
         /// V12 SIMA: Start the Reaper audit background thread
         /// </summary>
@@ -129,7 +166,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void AuditApexPositions()
         {
-            // Throttle logging to once per 30 seconds
             bool shouldLog = (DateTime.Now - lastReaperLog).TotalSeconds >= 30;
             int auditedCount = 0;
             int activeCount = 0;
@@ -139,282 +175,243 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     auditedCount++;
-
-                    // Get actual position on this instrument
-                    Position pos = acct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
-                    int actualQty = 0;
-
-                    if (pos != null && pos.MarketPosition != MarketPosition.Flat)
-                    {
-                        actualQty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
-                    }
-
-                    // Compare with expected
-                    // Build 1102U [BUG-1]: Composite key + stateLock guard (reads were previously unguarded on background thread).
-                    int expectedQty = 0;
-                    lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acct.Name), out expectedQty); }
-
-                    // V12.9: Only log individual accounts when they have non-zero state (reduces spam)
-                    if (shouldLog && (expectedQty != 0 || actualQty != 0))
-                    {
-                        Print($"[REAPER] {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
-                        activeCount++;
-                    }
-
-                    // Desync detection (V12.1 Path B: Hybrid Recovery)
-                    if (expectedQty != actualQty)
-                    {
-                        // V12.1: Filter Legal Desyncs
-                        // If Follower is FLAT but Master is POSITIVE (Expected), this is a "Legal Pull" (Path B target hit).
-                        // We do NOT flatten or panic here.
-                        if (actualQty == 0 && expectedQty != 0)
-                        {
-                            // GHOST-FIX-3 [Build 922Z]: Skip repair for the Master chart account.
-                            // When AccountPrefix matches the Master account name (e.g. "PA-APEX-422136-06" contains "Apex"),
-                            // REAPER incorrectly treats it as a desynced follower and tries to repair it every second.
-                            // The Master uses SubmitOrderUnmanaged — there is never a IsFollower=true PositionInfo for it —
-                            // so ProcessReaperRepairQueue always prints "No PositionInfo found" and loops forever.
-                            if (acct.Name == Account.Name)
-                            {
-                                if (shouldLog) Print($"[REAPER] {acct.Name} is the Master account — skipping follower repair (uses SubmitOrderUnmanaged path).");
-                                continue;
-                            }
-
-                            // V12.Phase8.2: Follower is FLAT but expected position exists — candidate for auto-repair.
-                            // V12.Phase8.3: Repair identity includes instrument to prevent cross-chart collisions
-                            string repairKey = acct.Name + "_" + Instrument.FullName;
-                            bool alreadyInFlight;
-                            lock (stateLock) { alreadyInFlight = _repairInFlight.Contains(repairKey); }
-
-                            if (!alreadyInFlight)
-                            {
-                                // Check: is there already a working entry order for this account? (no double-entries)
-                                // [M8.2 REPAIR-01]: Track blocking order identity for zombie diagnostics.
-                                bool hasWorkingEntry     = false;
-                                string blockingOrderName  = null;
-                                OrderState blockingState  = OrderState.Unknown;
-
-                                // Build 931 [REAPER-SNAPSHOT]: Thread-safe snapshot prevents torn-reads on background thread.
-                                Dictionary<string, PositionInfo> activeSnapshot;
-                                lock (stateLock) { activeSnapshot = new Dictionary<string, PositionInfo>(activePositions); }
-
-                                foreach (var kvp in entryOrders.ToArray())
-                                {
-                                    Order ord = kvp.Value;
-                                    if (ord == null) continue;
-
-                                    OrderState ordState = ord.OrderState;
-                                    // [M8.2 REPAIR-01]: Skip terminal/zombie states — they must never block a
-                                    // legitimate repair even if the order object is still in the dictionary.
-                                    if (IsOrderTerminal(ordState)) continue;
-
-                                    if (activeSnapshot.TryGetValue(kvp.Key, out var pi)
-                                        && pi.IsFollower && pi.ExecutingAccount != null
-                                        && pi.ExecutingAccount.Name == acct.Name
-                                        && (ordState == OrderState.Working
-                                            || ordState == OrderState.Submitted
-                                            || ordState == OrderState.Accepted
-                                            || ordState == OrderState.ChangePending  // 1102Z-C [RR-2a]: Order alive during Account.Change() round-trip — no cancel gap
-                                            || ordState == OrderState.Unknown      // V12.Phantom-Fix [FIX-2]: guards T1→T3 race residual (entry in dict before broker ACK)
-                                            || ordState == OrderState.Initialized)) // V12.Phantom-Fix [FIX-2]: guards very-new orders before first state transition
-                                    {
-                                        hasWorkingEntry   = true;
-                                        blockingOrderName  = string.IsNullOrEmpty(ord.Name) ? kvp.Key : ord.Name;
-                                        blockingState      = ordState;
-                                        break;
-                                    }
-                                }
-
-                                if (!hasWorkingEntry)
-                                {
-                                    if (shouldLog) Print($"[REAPER] \U0001f527 REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
-                                    _reaperRepairQueue.Enqueue(acct.Name);
-                                    try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); } catch { }
-                                }
-                                else
-                                {
-                                    // [922Z-THROTTLE]: Only log once per 30s per blocking order to avoid Output flood
-                                    // during intentional long-sitting limit orders (e.g. test orders far from market).
-                                    string throttleKey = blockingOrderName ?? acct.Name;
-                                    DateTime lastLogged;
-                                    bool shouldLogBlocked = !_repairBlockedLastLogged.TryGetValue(throttleKey, out lastLogged)
-                                                            || (DateTime.UtcNow - lastLogged).TotalSeconds >= 30;
-                                    if (shouldLogBlocked)
-                                    {
-                                        _repairBlockedLastLogged[throttleKey] = DateTime.UtcNow;
-                                        Print($"[REAPER] Repair BLOCKED by {blockingOrderName} in state {blockingState} (throttled: next log in 30s)");
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (shouldLog) Print($"[REAPER] {acct.Name} repair already in-flight — skipping.");
-                            }
-                            continue;
-                        }
-
-                        // CRITICAL: Opposite direction or Ghost position (Active but shouldn't be)
-                        bool isCriticalDesync = (actualQty != 0 && expectedQty == 0) || (Math.Sign(actualQty) != Math.Sign(expectedQty) && expectedQty != 0);
-
-                        if (isCriticalDesync)
-                        {
-                            // V12.8: Throttle CRITICAL DESYNC logging to same shouldLog cadence to prevent output spam
-                            if (shouldLog)
-                                Print($"[REAPER] 🚨 CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
-
-                            if (AutoFlattenDesync)
-                            {
-                                if (shouldLog)
-                                    Print($"[REAPER] 💀 QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
-                                // V12.17 FIX: Queue flatten for strategy thread (was: acct.Flatten() on background thread = DEADLOCK)
-                                _reaperFlattenQueue.Enqueue(acct.Name);
-                                try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
-                            }
-                        }
-                        else
-                        {
-                            // Minor qty mismatch or other non-critical state
-                            if (shouldLog) Print($"[REAPER] Minor Desync on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
-                        }
-                    }
-
-                    // ── NAKED POSITION AUDIT (Build 1102R) ──────────────────────────────────
-                    // A position is "naked" if the broker holds contracts but has no working stop.
-                    // acct.Orders is broker-side — safe to read from REAPER background thread without stateLock.
-                    if (actualQty != 0)
-                    {
-                        bool hasWorkingStop = acct.Orders.Any(o =>
-                            o.Instrument?.FullName == Instrument?.FullName &&
-                            (o.OrderState == OrderState.Working || o.OrderState == OrderState.Accepted) &&
-                            (o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit) &&
-                            (o.OrderAction == OrderAction.Sell || o.OrderAction == OrderAction.BuyToCover));
-
-                        if (!hasWorkingStop)
-                        {
-                            // GHOST-FIX-2 [Build 922Z]: Grace-delay guard before emergency action.
-                            // Bracket orders (stop + targets) take 0–3 seconds to reach the broker after a fill.
-                            // Firing immediately causes false EF_ / EMERGENCY_STOP_ during that normal window.
-                            // Only trigger after NakedPositionGraceSec seconds of confirmed naked state.
-                            DateTime firstSeen;
-                            int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
-                            if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
-                            {
-                                // First time we see this account naked — start the grace clock.
-                                _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
-                                Print(string.Format(
-                                    "[REAPER][NAKED_POSITION] {0}: {1}ct naked — starting {2}s grace window (bracket confirmation delay).",
-                                    acct.Name, actualQty, graceSeconds));
-                            }
-                            else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
-                            {
-                                // Grace window expired — naked state is real and persistent. Fire emergency.
-                                // BUG-M2: Dedup guard — prevents duplicate emergency stops across REAPER cycles
-                                bool alreadyNakedInFlight;
-                                lock (stateLock) { alreadyNakedInFlight = _reaperNakedStopInFlight.Contains(acct.Name); }
-
-                                if (!alreadyNakedInFlight)
-                                {
-                                    lock (stateLock) { _reaperNakedStopInFlight.Add(acct.Name); }
-                                    Print(string.Format(
-                                        "[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
-                                        acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
-                                    _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
-                                    // BUG-I2: TriggerCustomEvent wrapped in try/catch (matches repair/flatten pattern)
-                                    try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
-                                    catch (Exception tcEx) { Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed: {0}", tcEx.Message)); }
-                                }
-                            }
-                            // else: still within grace window — wait, do not fire
-                        }
-                        else
-                        {
-                            // Position now has a working stop — clear the naked grace clock for this account.
-                            // This resets the timer so a future naked episode gets a full fresh grace window.
-                            _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
-                        }
-
-                    }
+                    if (AuditSingleFleetAccount(acct, shouldLog)) activeCount++;
                 }
             }
 
-            // V12.12: Explicitly audit the Master account if it was NOT covered by the prefix filter.
-            // Bug fix: Master "Sim101" with AccountPrefix "Apex" was invisible to the Reaper.
+            // V12.12: Explicitly audit the Master account if not covered by the prefix filter.
             bool masterAudited = Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
             if (!masterAudited)
             {
                 auditedCount++;
-
-                Position masterPos = Account.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
-                int masterActualQty = 0;
-                if (masterPos != null && masterPos.MarketPosition != MarketPosition.Flat)
-                {
-                    masterActualQty = masterPos.MarketPosition == MarketPosition.Long ? masterPos.Quantity : -masterPos.Quantity;
-                }
-
-                int masterExpectedQty = 0;
-                // Build 1102U [BUG-1]: Composite key + stateLock guard.
-                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(Account.Name), out masterExpectedQty); }
-
-                if (shouldLog && (masterExpectedQty != 0 || masterActualQty != 0))
-                {
-                    Print($"[REAPER] {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
-                    activeCount++;
-                }
-
-                if (masterExpectedQty != masterActualQty)
-                {
-                    if (masterActualQty == 0 && masterExpectedQty != 0)
-                    {
-                        if (shouldLog) Print($"[REAPER] {Account.Name} (Master) is Flat (Target/Stop hit). Expected was {masterExpectedQty}.");
-                    }
-                    else
-                    {
-                        // REAP-01: Suppress critical-desync evaluation within ReaperFillGraceTicks of a
-                        // fresh expectedPositions reservation. During the broker-fill confirmation lag
-                        // (expectedPositions = N, broker actual still = 0), REAPER would otherwise see
-                        // a ghost position and queue a spurious flatten of the Master account.
-                        long stampTicks = Interlocked.Read(ref _lastExpectedPositionSetTicks);
-                        bool inFillGrace = stampTicks > 0 &&
-                            (DateTime.UtcNow.Ticks - stampTicks) < ReaperFillGraceTicks;
-
-                        bool isCriticalDesync = !inFillGrace &&
-                            ((masterActualQty != 0 && masterExpectedQty == 0) ||
-                             (Math.Sign(masterActualQty) != Math.Sign(masterExpectedQty) && masterExpectedQty != 0));
-
-                        if (inFillGrace && shouldLog)
-                            Print($"[REAPER] {Account.Name} (Master): Fill grace active ({(DateTime.UtcNow.Ticks - stampTicks) / TimeSpan.TicksPerMillisecond}ms elapsed) — desync check suppressed.");
-
-                        if (isCriticalDesync)
-                        {
-                            if (shouldLog)
-                                Print($"[REAPER] CRITICAL DESYNC on {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
-
-                            if (AutoFlattenDesync)
-                            {
-                                if (shouldLog)
-                                    Print($"[REAPER] QUEUING FLATTEN for {Account.Name} (Master) - Emergency Re-sync!");
-                                // V12.17 FIX: Queue flatten for strategy thread (was: Account.Flatten() on background thread = DEADLOCK)
-                                _reaperFlattenQueue.Enqueue(Account.Name);
-                                try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
-                            }
-                        }
-                        else
-                        {
-                            if (shouldLog) Print($"[REAPER] Minor Desync on {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
-                        }
-                    }
-                }
+                if (AuditMasterAccountIfNeeded(shouldLog)) activeCount++;
             }
 
             if (shouldLog)
             {
-                // V12.9: Single summary line instead of 12 "Expected=0, Actual=0" per cycle
                 if (activeCount == 0)
                     Print($"[REAPER] Heartbeat: All {auditedCount} accounts flat.");
                 else
                     Print($"[REAPER] Heartbeat: {activeCount}/{auditedCount} accounts with positions.");
                 lastReaperLog = DateTime.Now;
             }
+        }
+
+        // Build 935 [REAPER-B935-003]: Per-account audit logic extracted from AuditApexPositions.
+        // Returns true if the account has non-zero state (for heartbeat counter).
+        private bool AuditSingleFleetAccount(Account acct, bool shouldLog)
+        {
+            Position pos = acct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+            int actualQty = 0;
+            if (pos != null && pos.MarketPosition != MarketPosition.Flat)
+                actualQty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
+
+            // Build 1102U [BUG-1]: Composite key + stateLock guard.
+            string expectedKey = ExpKey(acct.Name);
+            int expectedQty = 0;
+            bool syncPending = false;
+            lock (stateLock)
+            {
+                expectedPositions.TryGetValue(expectedKey, out expectedQty);
+                syncPending = _dispatchSyncPendingExpKeys.Contains(expectedKey);
+            }
+            // Build 935 [REAPER-B935-002]: Per-account grace prevents Account A fill blocking Account B repair.
+            bool inFillGrace = IsReaperFillGraceActive(expectedKey);
+
+            bool hasState = expectedQty != 0 || actualQty != 0;
+            if (shouldLog && hasState)
+                Print($"[REAPER] {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+
+            if (expectedQty != actualQty)
+            {
+                if (actualQty == 0 && expectedQty != 0)
+                {
+                    // GHOST-FIX-3: Skip repair for Master — it uses SubmitOrderUnmanaged, not follower path.
+                    if (acct.Name == Account.Name)
+                    {
+                        if (shouldLog) Print($"[REAPER] {acct.Name} is the Master account — skipping follower repair.");
+                        return hasState;
+                    }
+
+                    if (syncPending || inFillGrace)
+                    {
+                        if (shouldLog)
+                        {
+                            string reason = syncPending ? "dispatch sync pending" : "fill grace active";
+                            Print($"[REAPER] {acct.Name}: repair deferred ({reason}) while expected={expectedQty}, actual=0.");
+                        }
+                        return hasState;
+                    }
+
+                    string repairKey = acct.Name + "_" + Instrument.FullName;
+                    bool alreadyInFlight;
+                    lock (stateLock) { alreadyInFlight = _repairInFlight.Contains(repairKey); }
+
+                    if (!alreadyInFlight)
+                    {
+                        bool hasWorkingEntry = false;
+                        string blockingOrderName = null;
+                        OrderState blockingState = OrderState.Unknown;
+                        Dictionary<string, PositionInfo> activeSnapshot;
+                        lock (stateLock) { activeSnapshot = new Dictionary<string, PositionInfo>(activePositions); }
+
+                        foreach (var kvp in entryOrders.ToArray())
+                        {
+                            Order ord = kvp.Value;
+                            if (ord == null) continue;
+                            OrderState ordState = ord.OrderState;
+                            if (IsOrderTerminal(ordState)) continue;
+                            if (activeSnapshot.TryGetValue(kvp.Key, out var pi)
+                                && pi.IsFollower && pi.ExecutingAccount != null
+                                && pi.ExecutingAccount.Name == acct.Name
+                                && (ordState == OrderState.Working || ordState == OrderState.Submitted
+                                    || ordState == OrderState.Accepted || ordState == OrderState.ChangePending
+                                    || ordState == OrderState.Unknown || ordState == OrderState.Initialized))
+                            {
+                                hasWorkingEntry = true;
+                                blockingOrderName = string.IsNullOrEmpty(ord.Name) ? kvp.Key : ord.Name;
+                                blockingState = ordState;
+                                break;
+                            }
+                        }
+
+                        if (!hasWorkingEntry)
+                        {
+                            if (shouldLog) Print($"[REAPER] 🔧 REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
+                            _reaperRepairQueue.Enqueue(acct.Name);
+                            try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); } catch { }
+                        }
+                        else
+                        {
+                            string throttleKey = blockingOrderName ?? acct.Name;
+                            DateTime lastLogged;
+                            bool shouldLogBlocked = !_repairBlockedLastLogged.TryGetValue(throttleKey, out lastLogged)
+                                                    || (DateTime.UtcNow - lastLogged).TotalSeconds >= 30;
+                            if (shouldLogBlocked)
+                            {
+                                _repairBlockedLastLogged[throttleKey] = DateTime.UtcNow;
+                                Print($"[REAPER] Repair BLOCKED by {blockingOrderName} in state {blockingState} (throttled: next log in 30s)");
+                            }
+                        }
+                    }
+                    else if (shouldLog)
+                        Print($"[REAPER] {acct.Name} repair already in-flight — skipping.");
+
+                    return hasState;
+                }
+
+                bool isCriticalDesync = (actualQty != 0 && expectedQty == 0)
+                    || (Math.Sign(actualQty) != Math.Sign(expectedQty) && expectedQty != 0);
+
+                if (isCriticalDesync)
+                {
+                    if (shouldLog) Print($"[REAPER] 🚨 CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+                    if (AutoFlattenDesync)
+                    {
+                        if (shouldLog) Print($"[REAPER] 💀 QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
+                        _reaperFlattenQueue.Enqueue(acct.Name);
+                        try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
+                    }
+                }
+                else if (shouldLog)
+                    Print($"[REAPER] Minor Desync on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+            }
+
+            // ── NAKED POSITION AUDIT (Build 1102R) ──────────────────────────────────
+            if (actualQty != 0)
+            {
+                bool hasWorkingStop = acct.Orders.Any(o =>
+                    o.Instrument?.FullName == Instrument?.FullName &&
+                    (o.OrderState == OrderState.Working || o.OrderState == OrderState.Accepted) &&
+                    (o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit) &&
+                    (o.OrderAction == OrderAction.Sell || o.OrderAction == OrderAction.BuyToCover));
+
+                if (!hasWorkingStop)
+                {
+                    DateTime firstSeen;
+                    int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
+                    if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
+                    {
+                        _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
+                        Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked — starting {2}s grace window.",
+                            acct.Name, actualQty, graceSeconds));
+                    }
+                    else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
+                    {
+                        bool alreadyNakedInFlight;
+                        lock (stateLock) { alreadyNakedInFlight = _reaperNakedStopInFlight.Contains(acct.Name); }
+                        if (!alreadyNakedInFlight)
+                        {
+                            lock (stateLock) { _reaperNakedStopInFlight.Add(acct.Name); }
+                            Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                                acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
+                            _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
+                            try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                            catch (Exception tcEx) { Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed: {0}", tcEx.Message)); }
+                        }
+                    }
+                }
+                else
+                    _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+            }
+
+            return hasState;
+        }
+
+        // Build 935 [REAPER-B935-004]: Audit the Master account when it isn't covered by AccountPrefix.
+        // Returns true if the master account has non-zero state.
+        private bool AuditMasterAccountIfNeeded(bool shouldLog)
+        {
+            Position masterPos = Account.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+            int masterActualQty = 0;
+            if (masterPos != null && masterPos.MarketPosition != MarketPosition.Flat)
+                masterActualQty = masterPos.MarketPosition == MarketPosition.Long ? masterPos.Quantity : -masterPos.Quantity;
+
+            int masterExpectedQty = 0;
+            // Build 1102U [BUG-1]: Composite key + stateLock guard.
+            lock (stateLock) { expectedPositions.TryGetValue(ExpKey(Account.Name), out masterExpectedQty); }
+
+            bool hasState = masterExpectedQty != 0 || masterActualQty != 0;
+            if (shouldLog && hasState)
+                Print($"[REAPER] {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
+
+            if (masterExpectedQty != masterActualQty)
+            {
+                if (masterActualQty == 0 && masterExpectedQty != 0)
+                {
+                    if (shouldLog) Print($"[REAPER] {Account.Name} (Master) is Flat (Target/Stop hit). Expected was {masterExpectedQty}.");
+                }
+                else
+                {
+                    // REAP-01: Suppress critical-desync within ReaperFillGraceTicks of a fresh reservation.
+                    long stampTicks = Interlocked.Read(ref _lastExpectedPositionSetTicks);
+                    bool inFillGrace = stampTicks > 0 &&
+                        (DateTime.UtcNow.Ticks - stampTicks) < ReaperFillGraceTicks;
+
+                    bool isCriticalDesync = !inFillGrace &&
+                        ((masterActualQty != 0 && masterExpectedQty == 0) ||
+                         (Math.Sign(masterActualQty) != Math.Sign(masterExpectedQty) && masterExpectedQty != 0));
+
+                    if (inFillGrace && shouldLog)
+                        Print($"[REAPER] {Account.Name} (Master): Fill grace active — desync check suppressed.");
+
+                    if (isCriticalDesync)
+                    {
+                        if (shouldLog)
+                            Print($"[REAPER] CRITICAL DESYNC on {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
+                        if (AutoFlattenDesync)
+                        {
+                            if (shouldLog) Print($"[REAPER] QUEUING FLATTEN for {Account.Name} (Master) - Emergency Re-sync!");
+                            _reaperFlattenQueue.Enqueue(Account.Name);
+                            try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
+                        }
+                    }
+                    else if (shouldLog)
+                        Print($"[REAPER] Minor Desync on {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
+                }
+            }
+
+            return hasState;
         }
 
         /// <summary>
@@ -510,17 +507,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12.Phase8.2: Processes queued repair requests on the strategy thread.
         /// Re-issues the original entry order for a desynced follower account.
-        /// Uses the stored EntryOrderType for symmetrical repairs.
-        /// RepairTickFence is enforced only for Market repairs (chasing price).
+        /// Build 935: Per-repair logic extracted to ExecuteReaperRepair (CS-R1140 compliance).
         /// </summary>
         private void ProcessReaperRepairQueue()
         {
             string accountName;
             while (_reaperRepairQueue.TryDequeue(out accountName))
+                ExecuteReaperRepair(accountName);
+        }
+
+        // Build 935 [REAPER-B935-005]: Single-repair body extracted from ProcessReaperRepairQueue.
+        // Threading: runs on strategy thread (via TriggerCustomEvent). All stateLock usages unchanged.
+        private void ExecuteReaperRepair(string accountName)
+        {
+            string repairKey = accountName + "_" + Instrument.FullName;
+            try
             {
-                string repairKey = accountName + "_" + Instrument.FullName;
-                try
-                {
                     // 1. Find the stored PositionInfo for this account in activePositions
                     PositionInfo repairPos = null;
                     string repairEntryName = null;
@@ -561,10 +563,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                         repairStopPrice = repairEntryPrice;
                     }
 
+                    // Build 935: hard risk gate for ALL repair order types.
+                    // Repairs must remain inside the tighter of ATR-derived distance and tick fence distance.
+                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                    if (currentPrice <= 0)
+                    {
+                        Print($"[REAPER] REPAIR BLOCKED: invalid currentPrice={currentPrice:F4} for {accountName}.");
+                        continue;
+                    }
+
+                    if (!TryGetRepairDistanceLimitPoints(out double repairLimitPoints))
+                    {
+                        Print($"[REAPER] REPAIR BLOCKED: unable to derive repair distance bound for {accountName}.");
+                        continue;
+                    }
+
+                    double hardBoundDiff = Math.Abs(currentPrice - repairEntryPrice);
+                    if (hardBoundDiff > repairLimitPoints)
+                    {
+                        Print($"[REAPER] REPAIR BLOCKED: {accountName} {repairOrderType} exceeds hard bound. " +
+                              $"Current={currentPrice:F2}, Entry={repairEntryPrice:F2}, Diff={hardBoundDiff:F4} > Limit={repairLimitPoints:F4}.");
+                        continue;
+                    }
+
                     // 2. Safety Fence: enforce only when repair submits a Market order.
                     if (repairOrderType == OrderType.Market)
                     {
-                        double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                        // Legacy market-fence check retained as a secondary guard.
+                        // currentPrice already validated above.
                         double priceDiff = Math.Abs(currentPrice - repairEntryPrice);
                         double fenceDistance = RepairTickFence * tickSize;
 
@@ -705,17 +731,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Compute emergency stop price: MaximumStop ticks from current close.
                     // Close[0] is safe here — ProcessReaperNakedStopQueue runs on strategy thread
                     // via TriggerCustomEvent.
+                    double emergencyStopDist = MaximumStop;
+                    double atrBound = CalculateATRStopDistance(RMAStopATRMultiplier);
+                    if (atrBound > 0)
+                        emergencyStopDist = Math.Min(emergencyStopDist, atrBound);
+                    if (emergencyStopDist <= 0)
+                        emergencyStopDist = Math.Max(tickSize, MinimumStop);
+
                     double stopPrice;
                     OrderAction closeAction;
 
                     if (item.Direction == MarketPosition.Long)
                     {
-                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] - MaximumStop);
+                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] - emergencyStopDist);
                         closeAction = OrderAction.Sell;
                     }
                     else
                     {
-                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] + MaximumStop);
+                        stopPrice   = Instrument.MasterInstrument.RoundToTickSize(Close[0] + emergencyStopDist);
                         closeAction = OrderAction.BuyToCover;
                     }
 
@@ -730,8 +763,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // BUG-M2: Clear in-flight guard after successful submission
                     lock (stateLock) { _reaperNakedStopInFlight.Remove(item.AccountName); }
                     Print(string.Format(
-                        "[REAPER][EMERGENCY_STOP] Submitted StopMarket for {0}: {1} {2}ct @ {3:F2}",
-                        item.AccountName, closeAction, item.Qty, stopPrice));
+                        "[REAPER][EMERGENCY_STOP] Submitted StopMarket for {0}: {1} {2}ct @ {3:F2} (Dist={4:F2})",
+                        item.AccountName, closeAction, item.Qty, stopPrice, emergencyStopDist));
                 }
                 catch (Exception ex)
                 {

@@ -526,7 +526,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             var brokerPos = fleetAcct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
                             bool nowFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
-                            if (nowFlat)
+                            if (nowFlat && !IsDispatchSyncPending(ExpKey(fleetAcct.Name)))
                             {
                                 SetExpectedPositionLocked(ExpKey(fleetAcct.Name), 0);
                                 Print($"[ProcessAccountExecutionQueue] Fleet {fleetAcct.Name} is Flat — expectedPositions cleared for {Instrument.FullName}");

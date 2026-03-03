@@ -212,6 +212,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!followerPos.BracketSubmitted)
             {
+                bool shouldSubmitImmediately = false;
                 // [ANCHOR-01] V12.Phase7.1: Pre-check master anchor before initial bracket submission.
                 // If master already filled (anchor resolved), apply it now so the broker receives
                 // master-anchored prices on the FIRST submission — eliminates the "wrong-prices-first
@@ -231,9 +232,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print(string.Format("[ANCHOR-01] Pre-applying master anchor {0:F2} for {1} — bracket will use master fill price",
                             preCheckAnchor, fleetEntryName));
                         SymmetryGuardApplyMasterAnchor(followerPos, preCheckAnchor);
+                        shouldSubmitImmediately = true;
                     }
                 }
-                SymmetryGuardSubmitFollowerBracket(fleetEntryName, followerPos);
+                if (shouldSubmitImmediately)
+                {
+                    SymmetryGuardSubmitFollowerBracket(fleetEntryName, followerPos);
+                }
+                else
+                {
+                    Print(string.Format("[ANCHOR-GATE] Delaying follower bracket for {0} until master anchor resolves.", fleetEntryName));
+                }
             }
 
             var pending = new PendingFollowerFill

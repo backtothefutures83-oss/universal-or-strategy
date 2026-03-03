@@ -193,7 +193,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly object stateLock = new object();  // V12.20: Atomic mode transitions
         private ConcurrentQueue<string> ipcCommandQueue;
         // V12.2: Multi-Client Support
-        private ConcurrentBag<TcpClient> connectedClients;
+        private ConcurrentDictionary<int, TcpClient> connectedClients;
 
         // V12 SIMA: Multi-Account Execution Engine
         private Thread reaperThread;
@@ -212,6 +212,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.Audit [H-10]: Tracks a toggle that could not complete due to semaphore timeout.
         // ApplySimaState retries the pending toggle at the top of its next invocation.
         private volatile bool _simaTogglePending = false;
+        // Build 935: Tracks accounts with reserved expectedPositions whose follower dispatch is still syncing.
+        // Key = ExpKey(accountName). Used to suppress false REAPER repairs and flat-clears during submit windows.
+        private readonly HashSet<string> _dispatchSyncPendingExpKeys = new HashSet<string>();
 
         // REAP-01: UTC ticks captured each time expectedPositions is set to a non-zero value.
         // REAPER uses this to suppress false "Critical Desync" alerts within a 5-second grace window
@@ -596,6 +599,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinimumStop = 4.0;  // 1102Z-A F2: raised floor from 1.0 to 4.0 for current volatility
                 MaximumStop = 15.0;  // V8.31: Increased from 8.0
                 IpcPort = 5001;
+                IpcExposeSensitiveFleetIdentity = false;
 
 
                 // V12.1101E: 5-target system with configurable runner selection
