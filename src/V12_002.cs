@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "944";  // V12.944: Deferred bot review resolutions (culture-safe IPC + routing fixes)
+        public const string BUILD_TAG = "945";  // V12.945: HandleConfigCommand refactor + IPC routing fixes
 
         #region Variables
 

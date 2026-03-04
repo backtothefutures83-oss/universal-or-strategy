@@ -530,7 +530,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                                            action == "FLATTEN" || action == "SYNC_ALL" || action == "MKT_SYNC" ||
                                            action == "REQUEST_FLEET_STATE" || action == "RESET_MEMORY" ||
                                            action == "DIAG_IPC" ||
-                                           action.StartsWith("MOVE_TARGET") || action == "LOCK_50"; // [1102Z-F]
+                                           action.StartsWith("MOVE_TARGET") || action == "LOCK_50" || // [1102Z-F]
+                                           action == "SET_TARGETS" || action == "SET_TRAIL" ||        // [Build 945] numeric parts[1] bypasses symbol filter
+                                           action == "SET_CIT"     || action == "BE_CUSTOM";          // [Build 945] numeric parts[1] bypasses symbol filter
 
                     // V10.3: Robust Symbol Matching (Matches MGC to GC/MGC, MES to ES/MES, etc.)
                     string mySym = Instrument.MasterInstrument.Name.ToUpperInvariant();
@@ -651,6 +653,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// Handles CONFIG -- syncs T1-T5 values/types, stop multiplier, risk, and target count.
         /// Format: CONFIG|Mode|COUNT:3;T1:1.0;T1TYPE:Points;T2:0.5;T2TYPE:ATR;...
+        /// Build 945: Refactored into sub-handlers to reduce cyclomatic complexity (CS-R1140).
         /// </summary>
         private void HandleConfigCommand(string[] parts)
         {
@@ -668,71 +671,98 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (kv.Length < 2) continue;
                 string key = kv[0].ToUpperInvariant();
                 string val = kv[1];
-
-                if (key == "T1") { if (double.TryParse(val, out double v)) Target1Value = v; }
-                else if (key == "CIT") { ChaseIfTouchPoints = val; }
-                else if (key == "T2") {
-                    if (double.TryParse(val, out double v)) {
-                        string vmReason;
-                        if (!ValidateIpcMultiplier(v, out vmReason))
-                            Print($"[IPC REJECT] T2 value {v} rejected: {vmReason}");
-                        else Target2Value = v;
-                    }
-                }
-                else if (key == "T3") {
-                    if (double.TryParse(val, out double v)) {
-                        string vmReason;
-                        if (!ValidateIpcMultiplier(v, out vmReason))
-                            Print($"[IPC REJECT] T3 value {v} rejected: {vmReason}");
-                        else Target3Value = v;
-                    }
-                }
-                else if (key == "T4") {
-                    if (double.TryParse(val, out double v)) {
-                        string vmReason;
-                        if (!ValidateIpcMultiplier(v, out vmReason))
-                            Print($"[IPC REJECT] T4 value {v} rejected: {vmReason}");
-                        else Target4Value = v;
-                    }
-                }
-                else if (key == "T5") {
-                    if (double.TryParse(val, out double v)) {
-                        string vmReason;
-                        if (!ValidateIpcMultiplier(v, out vmReason))
-                            Print($"[IPC REJECT] T5 value {v} rejected: {vmReason}");
-                        else Target5Value = v;
-                    }
-                }
-                else if (key == "T1TYPE") { if (TryParseTargetMode(val, out var parsed)) T1Type = parsed; }
-                else if (key == "T2TYPE") { if (TryParseTargetMode(val, out var parsed)) T2Type = parsed; }
-                else if (key == "T3TYPE") { if (TryParseTargetMode(val, out var parsed)) T3Type = parsed; }
-                else if (key == "T4TYPE") { if (TryParseTargetMode(val, out var parsed)) T4Type = parsed; }
-                else if (key == "T5TYPE") { if (TryParseTargetMode(val, out var parsed)) T5Type = parsed; }
-                else if (key == "STR") {
-                    if (double.TryParse(val, out double v)) {
-                        string vmReason;
-                        if (!ValidateIpcMultiplier(v, out vmReason))
-                            Print($"[IPC REJECT] STR multiplier {v} rejected: {vmReason}");
-                        else if (configMode == "RMA") RMAStopATRMultiplier = v; else StopMultiplier = v;
-                    }
-                }
-                else if (key == "MAX") {
-                    if (double.TryParse(val, out double v)) {
-                        MaxRiskAmount = v;
-                        RiskPerTrade = v;
-                    }
-                }
-                else if (key == "COUNT") {
-                    if (int.TryParse(val, out int v)) {
-                        // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
-                        int clamped = Math.Max(1, Math.Min(5, v));
-                        lock (stateLock) { activeTargetCount = clamped; }
-                    }
-                }
-                else if (key == "TRMA") { isTrendRmaMode = (val == "1"); }
-                else if (key == "RRMA") { isRetestRmaMode = (val == "1"); }
+                if (TryApplyConfigTargets(key, val)) continue;
+                if (TryApplyConfigRisk(key, val, configMode)) continue;
+                TryApplyConfigMode(key, val);
             }
             Print(string.Format("[V12] Sync All CONFIG ({0}) Applied: {1}", configMode, configContent));
+        }
+
+        /// <summary>Build 945: Config sub-handler -- target values and types (T1-T5, COUNT, CIT).</summary>
+        private bool TryApplyConfigTargets(string key, string val)
+        {
+            if (key == "T1") { if (double.TryParse(val, out double v)) Target1Value = v; return true; }
+            if (key == "CIT") { ChaseIfTouchPoints = val; return true; }
+            if (key == "T2") {
+                if (double.TryParse(val, out double v)) {
+                    string vmReason;
+                    if (!ValidateIpcMultiplier(v, out vmReason))
+                        Print($"[IPC REJECT] T2 value {v} rejected: {vmReason}");
+                    else Target2Value = v;
+                }
+                return true;
+            }
+            if (key == "T3") {
+                if (double.TryParse(val, out double v)) {
+                    string vmReason;
+                    if (!ValidateIpcMultiplier(v, out vmReason))
+                        Print($"[IPC REJECT] T3 value {v} rejected: {vmReason}");
+                    else Target3Value = v;
+                }
+                return true;
+            }
+            if (key == "T4") {
+                if (double.TryParse(val, out double v)) {
+                    string vmReason;
+                    if (!ValidateIpcMultiplier(v, out vmReason))
+                        Print($"[IPC REJECT] T4 value {v} rejected: {vmReason}");
+                    else Target4Value = v;
+                }
+                return true;
+            }
+            if (key == "T5") {
+                if (double.TryParse(val, out double v)) {
+                    string vmReason;
+                    if (!ValidateIpcMultiplier(v, out vmReason))
+                        Print($"[IPC REJECT] T5 value {v} rejected: {vmReason}");
+                    else Target5Value = v;
+                }
+                return true;
+            }
+            if (key == "T1TYPE") { if (TryParseTargetMode(val, out var parsed)) T1Type = parsed; return true; }
+            if (key == "T2TYPE") { if (TryParseTargetMode(val, out var parsed)) T2Type = parsed; return true; }
+            if (key == "T3TYPE") { if (TryParseTargetMode(val, out var parsed)) T3Type = parsed; return true; }
+            if (key == "T4TYPE") { if (TryParseTargetMode(val, out var parsed)) T4Type = parsed; return true; }
+            if (key == "T5TYPE") { if (TryParseTargetMode(val, out var parsed)) T5Type = parsed; return true; }
+            if (key == "COUNT") {
+                if (int.TryParse(val, out int v)) {
+                    // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
+                    int clamped = Math.Max(1, Math.Min(5, v));
+                    lock (stateLock) { activeTargetCount = clamped; }
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Build 945: Config sub-handler -- risk parameters (STR, MAX).</summary>
+        private bool TryApplyConfigRisk(string key, string val, string configMode)
+        {
+            if (key == "STR") {
+                if (double.TryParse(val, out double v)) {
+                    string vmReason;
+                    if (!ValidateIpcMultiplier(v, out vmReason))
+                        Print($"[IPC REJECT] STR multiplier {v} rejected: {vmReason}");
+                    else if (configMode == "RMA") RMAStopATRMultiplier = v; else StopMultiplier = v;
+                }
+                return true;
+            }
+            if (key == "MAX") {
+                if (double.TryParse(val, out double v)) {
+                    MaxRiskAmount = v;
+                    RiskPerTrade = v;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Build 945: Config sub-handler -- mode flags (TRMA, RRMA).</summary>
+        private bool TryApplyConfigMode(string key, string val)
+        {
+            if (key == "TRMA") { isTrendRmaMode = (val == "1"); return true; }
+            if (key == "RRMA") { isRetestRmaMode = (val == "1"); return true; }
+            return false;
         }
 
         /// <summary>
