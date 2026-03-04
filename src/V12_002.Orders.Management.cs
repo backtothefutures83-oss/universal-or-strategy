@@ -699,6 +699,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Order order = kvp.Value;
                 if (order == null || order.OrderState != OrderState.Working) continue;
                 if (order.OrderType != OrderType.Limit) continue; // only chase limit entries
+                if (_citNudgedKeys.ContainsKey(key)) continue;    // [BUILD 949] one-shot: already nudged
 
                 // [BUILD 948 CIT FIX] Correct directional bar-price logic:
                 // - LONG entry (Buy): price must DROP DOWN to the limit -> compare Low[0] <= limitPrice
@@ -748,6 +749,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print($"[CIT] LOCAL nudge: {key} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)");
                         ChangeOrder(order, order.Quantity, newLimitPrice, 0);
                     }
+                    _citNudgedKeys.TryAdd(key, true); // [BUILD 949] one-shot: mark as nudged
                 }
                 catch (Exception ex)
                 {
@@ -1124,7 +1126,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (eOrder != null)
                 {
                     if (IsOrderTerminal(eOrder.OrderState))
+                    {
                         entryOrders.TryRemove(entryName, out _);
+                        _citNudgedKeys.TryRemove(entryName, out _);
+                    }
                     else
                     {
                         if (isFollowerForCleanup)
@@ -1135,7 +1140,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
                 else
+                {
                     entryOrders.TryRemove(entryName, out _);
+                    _citNudgedKeys.TryRemove(entryName, out _);
+                }
             }
 
             if (pendingStopReplacements.TryRemove(entryName, out _))

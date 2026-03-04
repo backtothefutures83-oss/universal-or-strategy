@@ -274,6 +274,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentDictionary<string, FollowerReplaceSpec>
             _followerReplaceSpecs = new ConcurrentDictionary<string, FollowerReplaceSpec>();
 
+        // [BUILD 949] CIT one-shot guard: tracks keys that have already been nudged.
+        // Prevents re-nudging on subsequent bars after the first limit move.
+        private readonly ConcurrentDictionary<string, bool> _citNudgedKeys
+            = new ConcurrentDictionary<string, bool>();
+
         #endregion
 
         #region Position Info Class
