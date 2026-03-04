@@ -533,9 +533,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                                            action.StartsWith("MOVE_TARGET") || action == "LOCK_50"; // [1102Z-F]
 
                     // V10.3: Robust Symbol Matching (Matches MGC to GC/MGC, MES to ES/MES, etc.)
-                    string mySym = Instrument.MasterInstrument.Name.ToUpper();
-                    string myFull = Instrument.FullName.ToUpper();
-                    string target = targetSymbol.Trim().ToUpper();
+                    string mySym = Instrument.MasterInstrument.Name.ToUpperInvariant();
+                    string myFull = Instrument.FullName.ToUpperInvariant();
+                    string target = targetSymbol.Trim().ToUpperInvariant();
 
                     bool isForMe = isGlobalCommand ||  // V12.9: SIMA/Fleet commands always pass through
                                    target == "GLOBAL" ||
@@ -666,7 +666,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (string.IsNullOrEmpty(setting)) continue;
                 string[] kv = setting.Split(':');
                 if (kv.Length < 2) continue;
-                string key = kv[0].ToUpper();
+                string key = kv[0].ToUpperInvariant();
                 string val = kv[1];
 
                 if (key == "T1") { if (double.TryParse(val, out double v)) Target1Value = v; }
@@ -1007,9 +1007,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "SET_MANUAL_PRICE")
             {
-                // Format: SET_MANUAL_PRICE|<price>|<symbol> - price is in parts[1] (after split by |)
-                // Note: The command comes as "SET_MANUAL_PRICE" with price in parts[1] if sent as SET_MANUAL_PRICE|1234.50|MGC
-                if (parts.Length > 1 && double.TryParse(parts[1], out double manualPrice))
+                // Format: SET_MANUAL_PRICE|<symbol>|<price>  (symbol in parts[1] for router, price in parts[2])
+                // NOTE: External callers must use the new symbol-first format (updated Build 944).
+                if (parts.Length > 2 && double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double manualPrice))
                 {
                     cachedMnlPrice = manualPrice;
                     currentRmaAnchor = RmaAnchorType.Manual;
@@ -1345,12 +1345,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.27: Manual entry commands from Contextual UI Submit button
             if (action == "TREND_MANUAL_LIMIT")
             {
-                // Format: TREND_MANUAL_LIMIT|LONG|1234.50
-                if (parts.Length > 2)
+                // Format: TREND_MANUAL_LIMIT|<symbol>|<direction>|<price>  (symbol in parts[1] for router)
+                if (parts.Length > 3)
                 {
-                    string dir = parts[1].Trim().ToUpperInvariant();
+                    string dir = parts[2].Trim().ToUpperInvariant();
                     MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                    if (double.TryParse(parts[2], out double price) && price > 0)
+                    if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
                         Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double trendDist   = CalculateTRENDStopDistance();
@@ -1366,12 +1366,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "RETEST_MANUAL_LIMIT")
             {
-                // Format: RETEST_MANUAL_LIMIT|LONG|1234.50
-                if (parts.Length > 2)
+                // Format: RETEST_MANUAL_LIMIT|<symbol>|<direction>|<price>  (symbol in parts[1] for router)
+                if (parts.Length > 3)
                 {
-                    string dir = parts[1].Trim().ToUpperInvariant();
+                    string dir = parts[2].Trim().ToUpperInvariant();
                     MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                    if (double.TryParse(parts[2], out double price) && price > 0)
+                    if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
                         Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double retestDist   = CalculateRetestStopDistance();
@@ -1387,12 +1387,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "FFMA_MANUAL_LIMIT")
             {
-                // Format: FFMA_MANUAL_LIMIT|LONG|1234.50
-                if (parts.Length > 2)
+                // Format: FFMA_MANUAL_LIMIT|<symbol>|<direction>|<price>  (symbol in parts[1] for router)
+                if (parts.Length > 3)
                 {
-                    string dir = parts[1].Trim().ToUpperInvariant();
+                    string dir = parts[2].Trim().ToUpperInvariant();
                     MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                    if (double.TryParse(parts[2], out double price) && price > 0)
+                    if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
                         Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         ExecuteFFMALimitEntry(price, mp);
@@ -1554,7 +1554,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (parts.Length > 1)
                 {
-                    bool enable = parts[1].Trim().ToUpper() == "ON";
+                    bool enable = parts[1].Trim().ToUpperInvariant() == "ON";
                     ApplySimaState(enable);
                     Print($"V12.Phase6: SET_SIMA = {enable} (lifecycle applied)");
                 }
