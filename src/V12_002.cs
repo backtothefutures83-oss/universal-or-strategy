@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "942";  // V12.942: Extended NaN guards + IPC complexity reduction (bot fixes)
+        public const string BUILD_TAG = "943";  // V12.943: ProcessIpcCommands complexity reduction (CS-R1140 resolved)
 
         #region Variables
 

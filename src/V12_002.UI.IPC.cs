@@ -565,655 +565,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Build 942 [FIX-2]: Diag commands handled here; removes 2 branches from chain below (CS-R1140)
                     if (TryHandleDiagCommand(action, parts)) continue;
 
-                    if (action == "TRIM_25" || action == "TRIM_50")
-                        HandleTrimCommand(action, parts);
-                    else if (action == "CONFIG")
-                        HandleConfigCommand(parts);
-                    else if (action == "SET_TRAIL")
-                    {
-                        // V12 PRO: Dynamic trail - move stop to current price +/- distance
-                        if (parts.Length >= 2 && double.TryParse(parts[1], out double trailDistance))
-                        {
-                            if (activePositions.Count == 0)
-                            {
-                                Print("[V12] SET_TRAIL: No active positions");
-                            }
-                            else
-                            {
-                                double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                                int trailCount = 0;
-
-                                foreach (var kvp in activePositions.ToArray())
-                                {
-                                    if (!activePositions.ContainsKey(kvp.Key)) continue;
-                                    PositionInfo pos = kvp.Value;
-                                    string entryName = kvp.Key;
-
-                                    if (!pos.EntryFilled) continue;
-
-                                    // Calculate new stop: Longs = Price - Distance, Shorts = Price + Distance
-                                    double newStopPrice = pos.Direction == MarketPosition.Long
-                                        ? currentPrice - trailDistance
-                                        : currentPrice + trailDistance;
-
-                                    newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
-                                    UpdateStopOrder(entryName, pos, newStopPrice, pos.CurrentTrailLevel);
-                                    trailCount++;
-                                    Print(string.Format("[V12] SET_TRAIL: {0} -> Stop @ {1:F2} (Price: {2:F2}, Dist: {3})",
-                                        entryName, newStopPrice, currentPrice, trailDistance));
-                                }
-
-                                Print(string.Format("[V12] SET_TRAIL COMPLETE: Updated {0} position(s) with {1} pt trail", trailCount, trailDistance));
-                            }
-                        }
-                        else
-                        {
-                            Print("[V12] SET_TRAIL: Invalid distance parameter");
-                        }
-                    }
-                    else if (action == "SET_CIT")
-                    {
-                        if (parts.Length >= 2)
-                        {
-                            ChaseIfTouchPoints = parts[1].Trim();
-                            Print($"[V12] CIT updated: {ChaseIfTouchPoints}");
-                        }
-                    }
-                    else if (action == "LOCK_50")
-                    {
-                        // [1102Z-F]: IPC LOCK_50 -- Lock 50% of unrealized profit on all active positions.
-                        // Delegates to ExecuteRunnerAction which already handles all account routing.
-                        Print("[IPC LOCK_50] Received -- routing to ExecuteRunnerAction(lock50)");
-                        ExecuteRunnerAction("lock50");
-                    }
-                    else if (action == "BE" || action == "BE_CUSTOM" || action == "BE_PLUS_2" || action == "BE_PLUS_1") // V12.23: +BE_CUSTOM with dynamic ticks
-                    {
-                        double beOffset;
-                        if (action == "BE_CUSTOM" && parts.Length >= 2)
-                        {
-                            // V12.23: Dynamic ticks from panel input -- syncs auto-trail BE too
-                            int customTicks;
-                            if (!int.TryParse(parts[1].Trim(), out customTicks) || customTicks < 0)
-                                customTicks = BreakEvenOffsetTicks; // fallback to default
-                            BreakEvenOffsetTicks = customTicks; // V12.23: Sync auto-trail + fleet symmetry
-                            beOffset = customTicks * tickSize;
-                        }
-                        else if (action == "BE" || action == "BE_PLUS_2")
-                            beOffset = BreakEvenOffsetTicks * tickSize;
-                        else
-                            beOffset = 1 * tickSize; // Legacy BE_PLUS_1
-                        MoveStopsToBreakevenWithOffset(beOffset);
-                    }
-                    else if (action == "FLATTEN_ONLY")
-                    {
-                        // V12.21: Flatten Only (Close Positions) - preserve pending orders
-                        if (EnableSIMA)
-                        {
-                            Print("[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
-                            ClosePositionsOnlyApexAccounts(); // V12.21: Use new non-cancelling helper
-                        }
-                        else
-                        {
-                            Print("[V12] FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
-                            // CloseAllPositions(); // Native NT8 method closes positions and cancels orders usually?
-                            // NT8 Flatten() cancels orders. We must use Close() on each position instead.
-
-                            foreach (Position pos in Account.Positions)
-                            {
-                                if (pos.Instrument.FullName == Instrument.FullName && pos.MarketPosition != MarketPosition.Flat)
-                                {
-                                    if (pos.MarketPosition == MarketPosition.Long)
-                                        SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, pos.Quantity, 0, 0, "", "FlattenOnly_ExitLong");
-                                    else
-                                        SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, pos.Quantity, 0, 0, "", "FlattenOnly_ExitShort");
-                                }
-                            }
-                        }
-                    }
-                    else if (action == "FLATTEN")
-                    {
-                        // V12 SIMA: Use multi-account flatten when enabled
-                        if (EnableSIMA)
-                        {
-                            Print("[SIMA] IPC FLATTEN -> Broadcasting to all Apex accounts");
-                            FlattenAllApexAccounts();
-                        }
-                        else
-                        {
-                            FlattenAll();
-                        }
-                    }
-                    else if (action == "CANCEL_ALL")
-                    {
-                        // V12.13c: Only cancels pending entry orders (stops/targets on active positions are preserved)
-                        if (EnableSIMA)
-                        {
-                            int cancelled = 0;
-
-                            // ?? V12.10: Cancel local account orders FIRST ??
-                            foreach (Order order in Account.Orders)
-                            {
-                                if (order != null && order.Instrument.FullName == Instrument.FullName &&
-                                    (order.OrderState == OrderState.Working ||
-                                     order.OrderState == OrderState.Accepted ||
-                                     order.OrderState == OrderState.Submitted))
-                                {
-                                    // V12.13c: Skip stops and targets on active positions -- only cancel pending entries
-                                    string oName = order.Name;
-                                    if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
-                                        oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                        oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
-                                        continue;
-
-                                    CancelOrder(order);
-                                    cancelled++;
-                                }
-                            }
-
-                            // ?? Fleet accounts ??
-                            foreach (Account acct in Account.All)
-                            {
-                                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
-                                {
-                                    if (acct == this.Account) continue; // already cancelled above
-                                    foreach (Order order in acct.Orders)
-                                    {
-                                        if (order != null && order.Instrument.FullName == Instrument.FullName &&
-                                            (order.OrderState == OrderState.Working ||
-                                             order.OrderState == OrderState.Accepted ||
-                                             order.OrderState == OrderState.Submitted))
-                                        {
-                                            // V12.13c: Skip stops and targets -- only cancel pending entries
-                                            string oName = order.Name;
-                                            if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
-                                                oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                                oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
-                                                continue;
-
-                                            acct.Cancel(new[] { order });
-                                            cancelled++;
-                                        }
-                                    }
-                                }
-                            }
-                            Print($"[SIMA] CANCEL_ALL -> Cancelled {cancelled} pending entry orders (local + fleet)");
-                        }
-                        else
-                        {
-                            int cancelled = 0;
-                            foreach (Order order in Account.Orders)
-                            {
-                                if (order != null && order.Instrument.FullName == Instrument.FullName &&
-                                    (order.OrderState == OrderState.Working ||
-                                     order.OrderState == OrderState.Accepted ||
-                                     order.OrderState == OrderState.Submitted))
-                                {
-                                    // V12.13c: Skip stops and targets -- only cancel pending entries
-                                    string oName = order.Name;
-                                    if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
-                                        oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                        oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
-                                        continue;
-
-                                    CancelOrder(order);
-                                    cancelled++;
-                                }
-                            }
-                            Print($"[V12] CANCEL_ALL -> Cancelled {cancelled} pending entry orders");
-                        }
-
-                        // V1102Z-HARDEN: Ghost Memory Teardown
-                        // We must sweep ALL matching accounts and zero their expectedPositions for THIS instrument.
-                        // Relying on activePositions.Values iteration is insufficient as failed dispatches leave entries in
-                        // expectedPositions with no corresponding activePositions object.
-                        int resetAcctCount = 0;
-                        foreach (Account acct in Account.All)
-                        {
-                            if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 || acct == this.Account)
-                            {
-                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                                resetAcctCount++;
-                            }
-                        }
-                        Print($"[V1102Z] Ghost Memory Purge: Zeroed expectedPositions for {resetAcctCount} accounts on {Instrument.FullName}");
-
-                        // Clean up local position objects for anything not filled
-                        foreach (var kvp in activePositions.ToArray())
-                        {
-                            if (!kvp.Value.EntryFilled)
-                            {
-                                CleanupPosition(kvp.Key);
-                                Print(string.Format("V12.13b: CANCEL_ALL cleaned unfilled memory entry: {0}", kvp.Key));
-                            }
-                        }
-                    }
-                    else if (action == "RESET_MEMORY")
-                    {
-                        // V1102Z: Manual emergency reset of all expectedPositions for this instrument
-                        int resetAcctCount = 0;
-                        foreach (Account acct in Account.All)
-                        {
-                            if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 || acct == this.Account)
-                            {
-                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                                resetAcctCount++;
-                            }
-                        }
-                        Print($"[V1102Z] RESET_MEMORY: Zeroed all fleet/master expectedPositions for {Instrument.FullName} across {resetAcctCount} accounts.");
-                        SendResponseToRemote("MSG|Memory Reset Complete");
-                    }
-                    else if (action == "LONG" || action == "SHORT")
-                    {
-                        // V12.2: Handle Sync Mode
-                        if (isTosSyncMode)
-                        {
-                            bool armed = (action == "LONG") ? isLongArmed : isShortArmed;
-                            if (!armed)
-                            {
-                                Print($"[SYNC] ToS Signal IGNORED: {action} received but {action} is not ARMED locally.");
-                                continue;
-                            }
-                            else
-                            {
-                                Print($"[SYNC] ToS Handshake Received -> Executing {action} Fleet Entry");
-                                // Reset armed flag after firing
-                                if (action == "LONG") isLongArmed = false; else isShortArmed = false;
-                            }
-                        }
-
-                        // V12 SIMA: Broadcast to all Apex accounts when enabled
-                        if (EnableSIMA)
-                        {
-                            OrderAction orderAction = action == "LONG" ? OrderAction.Buy : OrderAction.SellShort;
-
-                            // [Phase 8.2 Part 3 - IPC SIZING]: Calculate ATR-sized quantity to match
-                            // what ExecuteRMAEntryV2 would use, instead of defaulting to minContracts (= 1).
-                            // This ensures manual LONG/SHORT button entries enter at the correct fleet size.
-                            int qty;
-                            try
-                            {
-                                // [Phase 8.2 Part 4 - IPC SIZING FIX]: Use RMAStopATRMultiplier to match
-                                // the actual RMA engine risk model. StopMultiplier caused incorrect stop
-                                // distances on high-value instruments (ES/NQ), flooring qty to 1.
-                                double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
-                                if (stopDist <= 0)
-                                {
-                                    stopDist = MinimumStop;
-                                    Print($"[IPC SIZING] ATR latency detected. Falling back to MinimumStop={MinimumStop:F4}");
-                                }
-                                qty = stopDist > 0 ? CalculatePositionSize(stopDist) : Math.Max(1, minContracts);
-                                Print($"[IPC SIZING] Calculation: StopDist={stopDist:F4}, Risk={MaxRiskAmount}, TargetQty={qty}");
-                            }
-                            catch
-                            {
-                                qty = Math.Max(1, minContracts);
-                            }
-                            qty = Math.Max(1, qty); // safety floor
-
-                            if (EnablePathB)
-                            {
-                                Print($"[SIMA] PATH B {action} -> Broadcasting {qty} contracts with FIXED BRACKETS to all Apex accounts");
-                                ExecuteMultiAccountBracket(orderAction, qty, "PATHB_" + action, PathBStopPoints, PathBTargetPoints);
-                            }
-                            else
-                            {
-                                Print($"[SIMA] IPC {action} -> Broadcasting {qty} contracts to all Apex accounts");
-                                ExecuteMultiAccountMarket(orderAction, qty, "SIMA_" + action);
-                            }
-                        }
-                        else
-                        {
-                            // Original single-account logic
-                            MarketPosition direction = action == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                            double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                            // [923B-FIX-C]: Guard against zero price -- Close[0] returns 0 if the strategy
-                            // has just loaded and bars have not yet been initialized (pre-session or fresh attach).
-                            // Passing currentPrice=0 to ExecuteRMAEntryV2 would submit a Limit @ 0, which
-                            // Apex/Tradovate treats as a Market order -> instant fill without price touching level.
-                            if (currentPrice <= 0)
-                            {
-                                Print("[IPC] ABORT RMA dispatch: currentPrice=0 -- lastKnownPrice and Close[0] both invalid. Skipping command, continuing queue drain.");
-                                continue; // Build 929 Fix1 [P2]: skip bad-price command, keep draining queue
-                            }
-                            double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
-                            int contracts    = CalculatePositionSize(stopDist);
-                            ExecuteRMAEntryV2(currentPrice, direction, contracts);
-                        }
-                    }
-                    // V10.3: OR Breakout Entry Commands
-                    else if (action == "OR_LONG")
-                    {
-                        // V12.2: Handle Sync Mode
-                        if (isTosSyncMode)
-                        {
-                            if (isLongArmed)
-                            {
-                                Print("[SYNC] ToS Handshake Received -> Executing OR_LONG");
-                                double orStopDist = CalculateORStopDistance();
-                                int orContracts   = CalculatePositionSize(orStopDist);
-                                ExecuteLong(orContracts);
-                                isLongArmed = false;
-                            }
-                            else
-                            {
-                                Print("[SYNC] ToS Signal IGNORED: OR_LONG received but Long is not ARMED locally.");
-                            }
-                        }
-                        else
-                        {
-                            double orStopDist = CalculateORStopDistance();
-                            int orContracts   = CalculatePositionSize(orStopDist);
-                            ExecuteLong(orContracts);
-                            Print("V10.3: OR_LONG executed via IPC");
-                        }
-                    }
-                    else if (action == "OR_SHORT")
-                    {
-                        // V12.2: Handle Sync Mode
-                        if (isTosSyncMode)
-                        {
-                            if (isShortArmed)
-                            {
-                                Print("[SYNC] ToS Handshake Received -> Executing OR_SHORT");
-                                double orStopDist = CalculateORStopDistance();
-                                int orContracts   = CalculatePositionSize(orStopDist);
-                                ExecuteShort(orContracts);
-                                isShortArmed = false;
-                            }
-                            else
-                            {
-                                Print("[SYNC] ToS Signal IGNORED: OR_SHORT received but Short is not ARMED locally.");
-                            }
-                        }
-                        else
-                        {
-                            double orStopDist = CalculateORStopDistance();
-                            int orContracts   = CalculatePositionSize(orStopDist);
-                            ExecuteShort(orContracts);
-                            Print("V10.3: OR_SHORT executed via IPC");
-                        }
-                    }
-                    // V10.3: Target-Specific Close Commands
-                    else if (action.StartsWith("CLOSE_T"))
-                    {
-                        int targetNum = 0;
-                        if (action.Length > 7 && int.TryParse(action.Substring(7, 1), out targetNum))
-                        {
-                            FlattenSpecificTarget(targetNum);
-                        }
-                    }
-                    // V14: MOVE_TARGET command - Surgical target price adjustment
-                    else if (action.StartsWith("MOVE_TARGET"))
-                    {
-                        // Format: MOVE_TARGET|T1|1pt  or  MOVE_TARGET|T2|2pt
-                        if (parts.Length >= 3)
-                        {
-                            string targetId = parts[1].Trim().ToUpper(); // "T1", "T2", etc.
-                            string distance = parts[2].Trim().ToLower(); // "1pt" or "2pt"
-
-                            // Parse distance
-                            double profitPoints = 0;
-                            if (distance == "1pt") profitPoints = 1.0;
-                            else if (distance == "2pt") profitPoints = 2.0;
-                            else
-                            {
-                                Print($"[V14] MOVE_TARGET: Invalid distance '{distance}' - expected '1pt' or '2pt'");
-                                continue;
-                            }
-
-                            // Extract target number (T1 -> 1, T2 -> 2, etc.)
-                            int targetNum = 0;
-                            if (targetId.Length >= 2 && targetId.StartsWith("T"))
-                            {
-                                if (!int.TryParse(targetId.Substring(1), out targetNum) || targetNum < 1 || targetNum > 5)
-                                {
-                                    Print($"[V14] MOVE_TARGET: Invalid target '{targetId}' - expected T1-T5");
-                                    continue;
-                                }
-                            }
-                            else
-                            {
-                                Print($"[V14] MOVE_TARGET: Invalid target format '{targetId}'");
-                                continue;
-                            }
-
-                            Print($"[V14] MOVE_TARGET: Command received for {targetId} to +{profitPoints}pt profit");
-
-                            // Call the move handler (implemented in Orders.cs)
-                            MoveSpecificTarget(targetNum, profitPoints);
-                        }
-                        else
-                        {
-                            Print("[V14] MOVE_TARGET: Invalid format - expected MOVE_TARGET|TX|1pt or MOVE_TARGET|TX|2pt");
-                        }
-                    }
-                    else if (action.StartsWith("GET_FLEET"))
-                        HandleFleetCommand(action, parts);
-                    else if (action.StartsWith("SET_MAX_RISK"))
-                    {
-                        if (parts.Length > 2 && double.TryParse(parts[2], out double val))
-                        {
-                            MaxRiskAmount = val;
-                            RiskPerTrade = val; // Sync legacy property
-                            Print($"[V12.2] SET_MAX_RISK: {val}");
-                        }
-                    }
-                    else if (action.StartsWith("TOGGLE_ACCOUNT"))
-                        HandleToggleAccountCommand(parts);
-                    // V12.6: SET_SIMA|ON or SET_SIMA|OFF - Remote SIMA toggle from external panel
-                    // V12.Phase6 [LIFECYCLE]: Uses centralized ApplySimaState for full lifecycle management
-                    else if (action == "SET_SIMA")
-                        HandleFleetCommand(action, parts);
-                    else if (action.StartsWith("SET_ANCHOR"))
-                    {
-                        // V11: SET_ANCHOR|EMA30|Global
-                        if (parts.Length > 2)
-                        {
-                            string anchorStr = parts[1];
-                            SetRmaAnchorFromIpc(anchorStr);
-                        }
-                    }
-                    // V12.4: SET_RMA_MODE|ON or SET_RMA_MODE|OFF - Toggle chart-click RMA mode from Panel
-                    else if (action == "SET_RMA_MODE")
-                    {
-                        if (parts.Length > 1)
-                        {
-                            bool enable = parts[1].Trim().ToUpper() == "ON";
-                            isRMAModeActive = enable;
-                            isRMAButtonClicked = enable;
-                            Print(string.Format("V12.4: SET_RMA_MODE = {0} (Chart-Click RMA {1})", enable, enable ? "ENABLED" : "DISABLED"));
-                        }
-                    }
-                    // V12.2: SYNC_MODE|{MODE} - Relay mode sync from chart panel to external app
-                    else if (action == "SYNC_MODE")
-                    {
-                        if (parts.Length > 1)
-                        {
-                            string syncMode = parts[1].Trim().ToUpper();
-                            // V12.13-D: Broadcast SYNC_MODE to all connected panel clients
-                            SendResponseToRemote($"SYNC_MODE|{syncMode}");
-                            Print(string.Format("V12.2: SYNC_MODE Relay -> {0}", syncMode));
-                        }
-                    }
-                    // V12.5: SET_TARGETS|count - Panel is sole source of truth
-                    // V12.Phase8.3: Now writes to activeTargetCount -- minContracts is symbol-specific risk floor only
-                    else if (action == "SET_TARGETS")
-                    {
-                        if (parts.Length > 1 && int.TryParse(parts[1], out int targetCount))
-                        {
-                            // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
-                            int clamped = Math.Max(1, Math.Min(5, targetCount));
-                            lock (stateLock) { activeTargetCount = clamped; }
-                            Print(string.Format("V12.Phase8.3: SET_TARGETS = {0} targets (clamped from {1}; minContracts preserved at {2})", clamped, targetCount, minContracts));
-                            // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
-                            // Sending CONFIG back here caused the Ping-Pong overwrite bug.
-                            // Build 1102Y [U-02]: Immediately sync panel visibility -- panel needs the count, not a CONFIG echo.
-                            SendResponseToRemote($"SYNC_TARGET_STATE|{clamped}");
-                        }
-                    }
-                    // Phase 9.1: MKT_SYNC -- Toggle ToS Armed Mode (Top button)
-                    else if (action == "MKT_SYNC")
-                    {
-                        isTosSyncMode = !isTosSyncMode;
-                        Print(string.Format("[SYNC] ToS Sync Mode: {0}", isTosSyncMode));
-                    }
-                    // Phase 9.1: SYNC_ALL -- Refresh active target orders to match current panel config (Bottom button)
-                    else if (action == "SYNC_ALL")
-                    {
-                        Print("[SYNC_ALL] Refresh triggered -- recalculating active target orders");
-                        RefreshActivePositionOrders();
-                    }
-                    // V12.5: SET_MODE|mode - Panel is sole source of truth
-                    else if (action == "SET_MODE")
-                    {
-                        if (parts.Length > 1)
-                        {
-                            string newMode = parts[1].Trim().ToUpper();
-
-                            // V12.20: Atomic mode transition -- prevents partial state reads during switch
-                            lock (stateLock)
-                            {
-                                isRMAModeActive = false;
-                                isRMAButtonClicked = false;
-                                isRetestModeActive = false;
-                                isTRENDModeActive = false;
-                                isMOMOModeActive = false;
-                                isFFMAModeArmed = false;
-
-                                if (newMode == "RMA")
-                                {
-                                    isRMAModeActive = true;
-                                    isRMAButtonClicked = true;
-                                }
-                                else if (newMode == "RETEST")
-                                {
-                                    isRetestModeActive = true;
-                                }
-                                else if (newMode == "TREND")
-                                {
-                                    isTRENDModeActive = true;
-                                }
-                                else if (newMode == "MOMO")
-                                {
-                                    isMOMOModeActive = true;
-                                }
-                                else if (newMode == "FFMA")
-                                {
-                                    isFFMAModeArmed = true;
-                                }
-                                // ORB/OR = all modes off (already deactivated above)
-                            }
-
-                            Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
-                                newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
-
-                            // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
-                            // Sending CONFIG back here caused the Ping-Pong overwrite bug.
-                        }
-                    }
-                    // V12.25: SET_LEADER_ACCOUNT|accountName -- Panel tells strategy which account is the leader
-                    else if (action == "SET_LEADER_ACCOUNT")
-                        HandleFleetCommand(action, parts);
-                    else if (action == "REQUEST_FLEET_STATE")
-                        HandleFleetCommand(action, parts);
-                    else if (action == "SET_MANUAL_PRICE")
-                    {
-                        // Format: SET_MANUAL_PRICE|<price>|<symbol> - price is in parts[1] (after split by |)
-                        // Note: The command comes as "SET_MANUAL_PRICE" with price in parts[1] if sent as SET_MANUAL_PRICE|1234.50|MGC
-                        if (parts.Length > 1 && double.TryParse(parts[1], out double manualPrice))
-                        {
-                            cachedMnlPrice = manualPrice;
-                            currentRmaAnchor = RmaAnchorType.Manual;
-                            // V12.1101E [D-02]: Legacy isMnlArmed flag purged; cachedMnlPrice + anchor state is authoritative.
-
-                            Print(string.Format("IPC SET_MANUAL_PRICE: {0:F2} | Anchor set to MANUAL", manualPrice));
-                        }
-                        else
-                        {
-                            Print(string.Format("IPC SET_MANUAL_PRICE: Invalid price format in command: {0}", command));
-                        }
-                    }
-                    // V12.27: Manual entry commands from Contextual UI Submit button
-                    else if (action == "TREND_MANUAL_LIMIT")
-                    {
-                        // Format: TREND_MANUAL_LIMIT|LONG|1234.50
-                        if (parts.Length > 2)
-                        {
-                            string dir = parts[1].Trim().ToUpper();
-                            MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                            if (double.TryParse(parts[2], out double price) && price > 0)
-                            {
-                                Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                                double trendDist   = CalculateTRENDStopDistance();
-                                int trendContracts = CalculatePositionSize(trendDist);
-                                ExecuteTRENDManualEntry(price, mp, trendContracts);
-                            }
-                            else
-                            {
-                                Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT invalid price: {0}", command));
-                            }
-                        }
-                    }
-                    else if (action == "RETEST_MANUAL_LIMIT")
-                    {
-                        // Format: RETEST_MANUAL_LIMIT|LONG|1234.50
-                        if (parts.Length > 2)
-                        {
-                            string dir = parts[1].Trim().ToUpper();
-                            MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                            if (double.TryParse(parts[2], out double price) && price > 0)
-                            {
-                                Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                                double retestDist   = CalculateRetestStopDistance();
-                                int retestContracts = CalculatePositionSize(retestDist);
-                                ExecuteRetestManualEntry(price, mp, retestContracts);
-                            }
-                            else
-                            {
-                                Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT invalid price: {0}", command));
-                            }
-                        }
-                    }
-                    else if (action == "FFMA_MANUAL_LIMIT")
-                    {
-                        // Format: FFMA_MANUAL_LIMIT|LONG|1234.50
-                        if (parts.Length > 2)
-                        {
-                            string dir = parts[1].Trim().ToUpper();
-                            MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
-                            if (double.TryParse(parts[2], out double price) && price > 0)
-                            {
-                                Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                                ExecuteFFMALimitEntry(price, mp);
-                            }
-                            else
-                            {
-                                Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT invalid price: {0}", command));
-                            }
-                        }
-                    }
-                    else if (action == "FFMA_MANUAL_MARKET")
-                    {
-                        // V12.27: M.FFMA button -- instant market, direction toward 9 EMA
-                        Print("V12.27 IPC: FFMA_MANUAL_MARKET -- auto-direction toward EMA9");
-                        ExecuteFFMAManualMarketEntry();
-                    }
-                    else if (action.StartsWith("MODE_") || action.StartsWith("EXEC_") || action == "FFMA_DISARM")
-                    {
-                        ToggleStrategyMode(action);
-                    }
-                    // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
-                    else if (action == "GET_LAYOUT")
-                    {
-                        string mode = isRMAModeActive ? "RMA" : "OR";
-                        Print(string.Format("V12 GET_LAYOUT: Mode={0} Count={1} T1={2}({3}) T2={4}({5}) T3={6}({7}) T4={8}({9}) T5={10}({11})",
-                            mode, activeTargetCount,
-                            Target1Value, T1Type,
-                            Target2Value, T2Type,
-                            Target3Value, T3Type,
-                            Target4Value, T4Type,
-                            Target5Value, T5Type));
-                    }
+                    // Build 943: Sub-handler routing -- CS-R1140 complexity reduction
+                    if (TryHandleModeCommand(action, parts))       continue;
+                    if (TryHandleRiskCommand(action, parts))       continue;
+                    if (TryHandleFleetCommand(action, parts))      continue;
+                    if (TryHandleConfigCommand(action, parts))     continue;
+                    if (TryHandleComplianceCommand(action, parts)) continue;
+                    Print(string.Format("[IPC] WARNING: Unhandled IPC action '{0}' -- parts: {1}", action, parts != null ? string.Join("|", parts) : "<none>"));
                 }
                 catch (Exception ex)
                 {
@@ -1227,7 +585,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // ?? Build 935 [B935-P2]: Extracted IPC sub-handlers ??????????????????????????????
+        // Build 935 [B935-P2]: Extracted IPC sub-handlers
 
         /// <summary>
         /// Handles TRIM_25 / TRIM_50 -- partial position close by percentage.
@@ -1428,6 +786,750 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("[DIAG_IPC] Queue depth peak      : " + _ipcQueueDepthPeak);
                 return true;
             }
+            return false;
+        }
+
+        // Build 943: Sub-handlers extracted from ProcessIpcCommands (CS-R1140)
+
+        /// <summary>
+        /// Handles mode-switching commands: SET_RMA_MODE, SYNC_MODE, MKT_SYNC,
+        /// SYNC_ALL, SET_MODE, MODE_*, EXEC_*, FFMA_DISARM.
+        /// </summary>
+        private bool TryHandleModeCommand(string action, string[] parts)
+        {
+            if (action == "SET_RMA_MODE")
+            {
+                if (parts.Length > 1)
+                {
+                    bool enable = parts[1].Trim().ToUpperInvariant() == "ON";
+                    isRMAModeActive = enable;
+                    isRMAButtonClicked = enable;
+                    Print(string.Format("V12.4: SET_RMA_MODE = {0} (Chart-Click RMA {1})", enable, enable ? "ENABLED" : "DISABLED"));
+                }
+                return true;
+            }
+            // V12.2: SYNC_MODE|{MODE} - Relay mode sync from chart panel to external app
+            if (action == "SYNC_MODE")
+            {
+                if (parts.Length > 1)
+                {
+                    string syncMode = parts[1].Trim().ToUpperInvariant();
+                    // V12.13-D: Broadcast SYNC_MODE to all connected panel clients
+                    SendResponseToRemote($"SYNC_MODE|{syncMode}");
+                    Print(string.Format("V12.2: SYNC_MODE Relay -> {0}", syncMode));
+                }
+                return true;
+            }
+            // Phase 9.1: MKT_SYNC -- Toggle ToS Armed Mode (Top button)
+            if (action == "MKT_SYNC")
+            {
+                isTosSyncMode = !isTosSyncMode;
+                Print(string.Format("[SYNC] ToS Sync Mode: {0}", isTosSyncMode));
+                return true;
+            }
+            // Phase 9.1: SYNC_ALL -- Refresh active target orders to match current panel config (Bottom button)
+            if (action == "SYNC_ALL")
+            {
+                Print("[SYNC_ALL] Refresh triggered -- recalculating active target orders");
+                RefreshActivePositionOrders();
+                return true;
+            }
+            // V12.5: SET_MODE|mode - Panel is sole source of truth
+            if (action == "SET_MODE")
+            {
+                if (parts.Length > 1)
+                {
+                    string newMode = parts[1].Trim().ToUpperInvariant();
+
+                    // V12.20: Atomic mode transition -- prevents partial state reads during switch
+                    lock (stateLock)
+                    {
+                        isRMAModeActive = false;
+                        isRMAButtonClicked = false;
+                        isRetestModeActive = false;
+                        isTRENDModeActive = false;
+                        isMOMOModeActive = false;
+                        isFFMAModeArmed = false;
+
+                        if (newMode == "RMA")
+                        {
+                            isRMAModeActive = true;
+                            isRMAButtonClicked = true;
+                        }
+                        else if (newMode == "RETEST")
+                        {
+                            isRetestModeActive = true;
+                        }
+                        else if (newMode == "TREND")
+                        {
+                            isTRENDModeActive = true;
+                        }
+                        else if (newMode == "MOMO")
+                        {
+                            isMOMOModeActive = true;
+                        }
+                        else if (newMode == "FFMA")
+                        {
+                            isFFMAModeArmed = true;
+                        }
+                        // ORB/OR = all modes off (already deactivated above)
+                    }
+
+                    Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
+                        newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
+
+                    // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
+                    // Sending CONFIG back here caused the Ping-Pong overwrite bug.
+                }
+                return true;
+            }
+            if (action.StartsWith("MODE_") || action.StartsWith("EXEC_") || action == "FFMA_DISARM")
+            {
+                ToggleStrategyMode(action);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Handles risk and position parameter commands: SET_TRAIL, SET_CIT,
+        /// BE variants, SET_MAX_RISK, SET_ANCHOR, SET_TARGETS, SET_MANUAL_PRICE.
+        /// </summary>
+        private bool TryHandleRiskCommand(string action, string[] parts)
+        {
+            if (action == "SET_TRAIL")
+            {
+                // V12 PRO: Dynamic trail - move stop to current price +/- distance
+                if (parts.Length >= 2 && double.TryParse(parts[1], out double trailDistance))
+                {
+                    if (activePositions.Count == 0)
+                    {
+                        Print("[V12] SET_TRAIL: No active positions");
+                    }
+                    else
+                    {
+                        double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                        int trailCount = 0;
+
+                        foreach (var kvp in activePositions.ToArray())
+                        {
+                            if (!activePositions.ContainsKey(kvp.Key)) continue;
+                            PositionInfo pos = kvp.Value;
+                            string entryName = kvp.Key;
+
+                            if (!pos.EntryFilled) continue;
+
+                            // Calculate new stop: Longs = Price - Distance, Shorts = Price + Distance
+                            double newStopPrice = pos.Direction == MarketPosition.Long
+                                ? currentPrice - trailDistance
+                                : currentPrice + trailDistance;
+
+                            newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
+                            UpdateStopOrder(entryName, pos, newStopPrice, pos.CurrentTrailLevel);
+                            trailCount++;
+                            Print(string.Format("[V12] SET_TRAIL: {0} -> Stop @ {1:F2} (Price: {2:F2}, Dist: {3})",
+                                entryName, newStopPrice, currentPrice, trailDistance));
+                        }
+
+                        Print(string.Format("[V12] SET_TRAIL COMPLETE: Updated {0} position(s) with {1} pt trail", trailCount, trailDistance));
+                    }
+                }
+                else
+                {
+                    Print("[V12] SET_TRAIL: Invalid distance parameter");
+                }
+                return true;
+            }
+            if (action == "SET_CIT")
+            {
+                if (parts.Length >= 2)
+                {
+                    ChaseIfTouchPoints = parts[1].Trim();
+                    Print($"[V12] CIT updated: {ChaseIfTouchPoints}");
+                }
+                return true;
+            }
+            if (action == "BE" || action == "BE_CUSTOM" || action == "BE_PLUS_2" || action == "BE_PLUS_1") // V12.23: +BE_CUSTOM with dynamic ticks
+            {
+                double beOffset;
+                if (action == "BE_CUSTOM" && parts.Length >= 2)
+                {
+                    // V12.23: Dynamic ticks from panel input -- syncs auto-trail BE too
+                    int customTicks;
+                    if (!int.TryParse(parts[1].Trim(), out customTicks) || customTicks < 0)
+                        customTicks = BreakEvenOffsetTicks; // fallback to default
+                    BreakEvenOffsetTicks = customTicks; // V12.23: Sync auto-trail + fleet symmetry
+                    beOffset = customTicks * tickSize;
+                }
+                else if (action == "BE" || action == "BE_PLUS_2")
+                    beOffset = BreakEvenOffsetTicks * tickSize;
+                else
+                    beOffset = 1 * tickSize; // Legacy BE_PLUS_1
+                MoveStopsToBreakevenWithOffset(beOffset);
+                return true;
+            }
+            if (action.StartsWith("SET_MAX_RISK"))
+            {
+                if (parts.Length > 2 && double.TryParse(parts[2], out double val))
+                {
+                    MaxRiskAmount = val;
+                    RiskPerTrade = val; // Sync legacy property
+                    Print($"[V12.2] SET_MAX_RISK: {val}");
+                }
+                return true;
+            }
+            if (action.StartsWith("SET_ANCHOR"))
+            {
+                // V11: SET_ANCHOR|EMA30|Global
+                if (parts.Length > 2)
+                {
+                    string anchorStr = parts[1];
+                    SetRmaAnchorFromIpc(anchorStr);
+                }
+                return true;
+            }
+            // V12.5: SET_TARGETS|count - Panel is sole source of truth
+            // V12.Phase8.3: Now writes to activeTargetCount -- minContracts is symbol-specific risk floor only
+            if (action == "SET_TARGETS")
+            {
+                if (parts.Length > 1 && int.TryParse(parts[1], out int targetCount))
+                {
+                    // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
+                    int clamped = Math.Max(1, Math.Min(5, targetCount));
+                    lock (stateLock) { activeTargetCount = clamped; }
+                    Print(string.Format("V12.Phase8.3: SET_TARGETS = {0} targets (clamped from {1}; minContracts preserved at {2})", clamped, targetCount, minContracts));
+                    // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
+                    // Sending CONFIG back here caused the Ping-Pong overwrite bug.
+                    // Build 1102Y [U-02]: Immediately sync panel visibility -- panel needs the count, not a CONFIG echo.
+                    SendResponseToRemote($"SYNC_TARGET_STATE|{clamped}");
+                }
+                return true;
+            }
+            if (action == "SET_MANUAL_PRICE")
+            {
+                // Format: SET_MANUAL_PRICE|<price>|<symbol> - price is in parts[1] (after split by |)
+                // Note: The command comes as "SET_MANUAL_PRICE" with price in parts[1] if sent as SET_MANUAL_PRICE|1234.50|MGC
+                if (parts.Length > 1 && double.TryParse(parts[1], out double manualPrice))
+                {
+                    cachedMnlPrice = manualPrice;
+                    currentRmaAnchor = RmaAnchorType.Manual;
+                    // V12.1101E [D-02]: Legacy isMnlArmed flag purged; cachedMnlPrice + anchor state is authoritative.
+
+                    Print(string.Format("IPC SET_MANUAL_PRICE: {0:F2} | Anchor set to MANUAL", manualPrice));
+                }
+                else
+                {
+                    Print(string.Format("IPC SET_MANUAL_PRICE: Invalid price format in command: {0}", string.Join("|", parts)));
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Handles fleet execution commands: TRIM variants, LOCK_50, FLATTEN variants, CANCEL_ALL,
+        /// RESET_MEMORY, LONG/SHORT entries, OR entries, manual limit entries, CLOSE_T*, MOVE_TARGET*,
+        /// GET_FLEET*, TOGGLE_ACCOUNT, SET_SIMA, SET_LEADER_ACCOUNT, REQUEST_FLEET_STATE.
+        /// </summary>
+        private bool TryHandleFleetCommand(string action, string[] parts)
+        {
+            if (action == "TRIM_25" || action == "TRIM_50")
+            {
+                HandleTrimCommand(action, parts);
+                return true;
+            }
+            if (action == "LOCK_50")
+            {
+                // [1102Z-F]: IPC LOCK_50 -- Lock 50% of unrealized profit on all active positions.
+                // Delegates to ExecuteRunnerAction which already handles all account routing.
+                Print("[IPC LOCK_50] Received -- routing to ExecuteRunnerAction(lock50)");
+                ExecuteRunnerAction("lock50");
+                return true;
+            }
+            if (action == "FLATTEN_ONLY")
+            {
+                // V12.21: Flatten Only (Close Positions) - preserve pending orders
+                if (EnableSIMA)
+                {
+                    Print("[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
+                    ClosePositionsOnlyApexAccounts(); // V12.21: Use new non-cancelling helper
+                }
+                else
+                {
+                    Print("[V12] FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
+                    // CloseAllPositions(); // Native NT8 method closes positions and cancels orders usually?
+                    // NT8 Flatten() cancels orders. We must use Close() on each position instead.
+
+                    foreach (Position pos in Account.Positions)
+                    {
+                        if (pos.Instrument.FullName == Instrument.FullName && pos.MarketPosition != MarketPosition.Flat)
+                        {
+                            if (pos.MarketPosition == MarketPosition.Long)
+                                SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, pos.Quantity, 0, 0, "", "FlattenOnly_ExitLong");
+                            else
+                                SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, pos.Quantity, 0, 0, "", "FlattenOnly_ExitShort");
+                        }
+                    }
+                }
+                return true;
+            }
+            if (action == "FLATTEN")
+            {
+                // V12 SIMA: Use multi-account flatten when enabled
+                if (EnableSIMA)
+                {
+                    Print("[SIMA] IPC FLATTEN -> Broadcasting to all Apex accounts");
+                    FlattenAllApexAccounts();
+                }
+                else
+                {
+                    FlattenAll();
+                }
+                return true;
+            }
+            if (action == "CANCEL_ALL")
+            {
+                // V12.13c: Only cancels pending entry orders (stops/targets on active positions are preserved)
+                if (EnableSIMA)
+                {
+                    int cancelled = 0;
+
+                    // ?? V12.10: Cancel local account orders FIRST ??
+                    foreach (Order order in Account.Orders)
+                    {
+                        if (order != null && order.Instrument.FullName == Instrument.FullName &&
+                            (order.OrderState == OrderState.Working ||
+                             order.OrderState == OrderState.Accepted ||
+                             order.OrderState == OrderState.Submitted))
+                        {
+                            // V12.13c: Skip stops and targets on active positions -- only cancel pending entries
+                            string oName = order.Name;
+                            if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
+                                oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
+                                oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
+                                continue;
+
+                            CancelOrder(order);
+                            cancelled++;
+                        }
+                    }
+
+                    // ?? Fleet accounts ??
+                    foreach (Account acct in Account.All)
+                    {
+                        if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            if (acct == this.Account) continue; // already cancelled above
+                            foreach (Order order in acct.Orders)
+                            {
+                                if (order != null && order.Instrument.FullName == Instrument.FullName &&
+                                    (order.OrderState == OrderState.Working ||
+                                     order.OrderState == OrderState.Accepted ||
+                                     order.OrderState == OrderState.Submitted))
+                                {
+                                    // V12.13c: Skip stops and targets -- only cancel pending entries
+                                    string oName = order.Name;
+                                    if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
+                                        oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
+                                        oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
+                                        continue;
+
+                                    acct.Cancel(new[] { order });
+                                    cancelled++;
+                                }
+                            }
+                        }
+                    }
+                    Print($"[SIMA] CANCEL_ALL -> Cancelled {cancelled} pending entry orders (local + fleet)");
+                }
+                else
+                {
+                    int cancelled = 0;
+                    foreach (Order order in Account.Orders)
+                    {
+                        if (order != null && order.Instrument.FullName == Instrument.FullName &&
+                            (order.OrderState == OrderState.Working ||
+                             order.OrderState == OrderState.Accepted ||
+                             order.OrderState == OrderState.Submitted))
+                        {
+                            // V12.13c: Skip stops and targets -- only cancel pending entries
+                            string oName = order.Name;
+                            if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
+                                oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
+                                oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
+                                continue;
+
+                            CancelOrder(order);
+                            cancelled++;
+                        }
+                    }
+                    Print($"[V12] CANCEL_ALL -> Cancelled {cancelled} pending entry orders");
+                }
+
+                // V1102Z-HARDEN: Ghost Memory Teardown
+                // We must sweep ALL matching accounts and zero their expectedPositions for THIS instrument.
+                // Relying on activePositions.Values iteration is insufficient as failed dispatches leave entries in
+                // expectedPositions with no corresponding activePositions object.
+                int resetAcctCount = 0;
+                foreach (Account acct in Account.All)
+                {
+                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 || acct == this.Account)
+                    {
+                        SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                        resetAcctCount++;
+                    }
+                }
+                Print($"[V1102Z] Ghost Memory Purge: Zeroed expectedPositions for {resetAcctCount} accounts on {Instrument.FullName}");
+
+                // Clean up local position objects for anything not filled
+                foreach (var kvp in activePositions.ToArray())
+                {
+                    if (!kvp.Value.EntryFilled)
+                    {
+                        CleanupPosition(kvp.Key);
+                        Print(string.Format("V12.13b: CANCEL_ALL cleaned unfilled memory entry: {0}", kvp.Key));
+                    }
+                }
+                return true;
+            }
+            if (action == "RESET_MEMORY")
+            {
+                // V1102Z: Manual emergency reset of all expectedPositions for this instrument
+                int resetAcctCount = 0;
+                foreach (Account acct in Account.All)
+                {
+                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 || acct == this.Account)
+                    {
+                        SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                        resetAcctCount++;
+                    }
+                }
+                Print($"[V1102Z] RESET_MEMORY: Zeroed all fleet/master expectedPositions for {Instrument.FullName} across {resetAcctCount} accounts.");
+                SendResponseToRemote("MSG|Memory Reset Complete");
+                return true;
+            }
+            if (action == "LONG" || action == "SHORT")
+            {
+                // V12.2: Handle Sync Mode
+                if (isTosSyncMode)
+                {
+                    bool armed = (action == "LONG") ? isLongArmed : isShortArmed;
+                    if (!armed)
+                    {
+                        Print($"[SYNC] ToS Signal IGNORED: {action} received but {action} is not ARMED locally.");
+                        return true;
+                    }
+                    else
+                    {
+                        Print($"[SYNC] ToS Handshake Received -> Executing {action} Fleet Entry");
+                        // Reset armed flag after firing
+                        if (action == "LONG") isLongArmed = false; else isShortArmed = false;
+                    }
+                }
+
+                // V12 SIMA: Broadcast to all Apex accounts when enabled
+                if (EnableSIMA)
+                {
+                    OrderAction orderAction = action == "LONG" ? OrderAction.Buy : OrderAction.SellShort;
+
+                    // [Phase 8.2 Part 3 - IPC SIZING]: Calculate ATR-sized quantity to match
+                    // what ExecuteRMAEntryV2 would use, instead of defaulting to minContracts (= 1).
+                    // This ensures manual LONG/SHORT button entries enter at the correct fleet size.
+                    int qty;
+                    try
+                    {
+                        // [Phase 8.2 Part 4 - IPC SIZING FIX]: Use RMAStopATRMultiplier to match
+                        // the actual RMA engine risk model. StopMultiplier caused incorrect stop
+                        // distances on high-value instruments (ES/NQ), flooring qty to 1.
+                        double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+                        if (stopDist <= 0)
+                        {
+                            stopDist = MinimumStop;
+                            Print($"[IPC SIZING] ATR latency detected. Falling back to MinimumStop={MinimumStop:F4}");
+                        }
+                        qty = stopDist > 0 ? CalculatePositionSize(stopDist) : Math.Max(1, minContracts);
+                        Print($"[IPC SIZING] Calculation: StopDist={stopDist:F4}, Risk={MaxRiskAmount}, TargetQty={qty}");
+                    }
+                    catch
+                    {
+                        qty = Math.Max(1, minContracts);
+                    }
+                    qty = Math.Max(1, qty); // safety floor
+
+                    if (EnablePathB)
+                    {
+                        Print($"[SIMA] PATH B {action} -> Broadcasting {qty} contracts with FIXED BRACKETS to all Apex accounts");
+                        ExecuteMultiAccountBracket(orderAction, qty, "PATHB_" + action, PathBStopPoints, PathBTargetPoints);
+                    }
+                    else
+                    {
+                        Print($"[SIMA] IPC {action} -> Broadcasting {qty} contracts to all Apex accounts");
+                        ExecuteMultiAccountMarket(orderAction, qty, "SIMA_" + action);
+                    }
+                }
+                else
+                {
+                    // Original single-account logic
+                    MarketPosition direction = action == "LONG" ? MarketPosition.Long : MarketPosition.Short;
+                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                    // [923B-FIX-C]: Guard against zero price -- Close[0] returns 0 if the strategy
+                    // has just loaded and bars have not yet been initialized (pre-session or fresh attach).
+                    // Passing currentPrice=0 to ExecuteRMAEntryV2 would submit a Limit @ 0, which
+                    // Apex/Tradovate treats as a Market order -> instant fill without price touching level.
+                    if (currentPrice <= 0)
+                    {
+                        Print("[IPC] ABORT RMA dispatch: currentPrice=0 -- lastKnownPrice and Close[0] both invalid. Skipping command, continuing queue drain.");
+                        return true; // Build 929 Fix1 [P2]: skip bad-price command, keep draining queue
+                    }
+                    double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
+                    int contracts    = CalculatePositionSize(stopDist);
+                    ExecuteRMAEntryV2(currentPrice, direction, contracts);
+                }
+                return true;
+            }
+            // V10.3: OR Breakout Entry Commands
+            if (action == "OR_LONG")
+            {
+                // V12.2: Handle Sync Mode
+                if (isTosSyncMode)
+                {
+                    if (isLongArmed)
+                    {
+                        Print("[SYNC] ToS Handshake Received -> Executing OR_LONG");
+                        double orStopDist = CalculateORStopDistance();
+                        int orContracts   = CalculatePositionSize(orStopDist);
+                        ExecuteLong(orContracts);
+                        isLongArmed = false;
+                    }
+                    else
+                    {
+                        Print("[SYNC] ToS Signal IGNORED: OR_LONG received but Long is not ARMED locally.");
+                    }
+                }
+                else
+                {
+                    double orStopDist = CalculateORStopDistance();
+                    int orContracts   = CalculatePositionSize(orStopDist);
+                    ExecuteLong(orContracts);
+                    Print("V10.3: OR_LONG executed via IPC");
+                }
+                return true;
+            }
+            if (action == "OR_SHORT")
+            {
+                // V12.2: Handle Sync Mode
+                if (isTosSyncMode)
+                {
+                    if (isShortArmed)
+                    {
+                        Print("[SYNC] ToS Handshake Received -> Executing OR_SHORT");
+                        double orStopDist = CalculateORStopDistance();
+                        int orContracts   = CalculatePositionSize(orStopDist);
+                        ExecuteShort(orContracts);
+                        isShortArmed = false;
+                    }
+                    else
+                    {
+                        Print("[SYNC] ToS Signal IGNORED: OR_SHORT received but Short is not ARMED locally.");
+                    }
+                }
+                else
+                {
+                    double orStopDist = CalculateORStopDistance();
+                    int orContracts   = CalculatePositionSize(orStopDist);
+                    ExecuteShort(orContracts);
+                    Print("V10.3: OR_SHORT executed via IPC");
+                }
+                return true;
+            }
+            // V12.27: Manual entry commands from Contextual UI Submit button
+            if (action == "TREND_MANUAL_LIMIT")
+            {
+                // Format: TREND_MANUAL_LIMIT|LONG|1234.50
+                if (parts.Length > 2)
+                {
+                    string dir = parts[1].Trim().ToUpperInvariant();
+                    MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
+                    if (double.TryParse(parts[2], out double price) && price > 0)
+                    {
+                        Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
+                        double trendDist   = CalculateTRENDStopDistance();
+                        int trendContracts = CalculatePositionSize(trendDist);
+                        ExecuteTRENDManualEntry(price, mp, trendContracts);
+                    }
+                    else
+                    {
+                        Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT invalid price: {0}", string.Join("|", parts)));
+                    }
+                }
+                return true;
+            }
+            if (action == "RETEST_MANUAL_LIMIT")
+            {
+                // Format: RETEST_MANUAL_LIMIT|LONG|1234.50
+                if (parts.Length > 2)
+                {
+                    string dir = parts[1].Trim().ToUpperInvariant();
+                    MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
+                    if (double.TryParse(parts[2], out double price) && price > 0)
+                    {
+                        Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
+                        double retestDist   = CalculateRetestStopDistance();
+                        int retestContracts = CalculatePositionSize(retestDist);
+                        ExecuteRetestManualEntry(price, mp, retestContracts);
+                    }
+                    else
+                    {
+                        Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT invalid price: {0}", string.Join("|", parts)));
+                    }
+                }
+                return true;
+            }
+            if (action == "FFMA_MANUAL_LIMIT")
+            {
+                // Format: FFMA_MANUAL_LIMIT|LONG|1234.50
+                if (parts.Length > 2)
+                {
+                    string dir = parts[1].Trim().ToUpperInvariant();
+                    MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
+                    if (double.TryParse(parts[2], out double price) && price > 0)
+                    {
+                        Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
+                        ExecuteFFMALimitEntry(price, mp);
+                    }
+                    else
+                    {
+                        Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT invalid price: {0}", string.Join("|", parts)));
+                    }
+                }
+                return true;
+            }
+            if (action == "FFMA_MANUAL_MARKET")
+            {
+                // V12.27: M.FFMA button -- instant market, direction toward 9 EMA
+                Print("V12.27 IPC: FFMA_MANUAL_MARKET -- auto-direction toward EMA9");
+                ExecuteFFMAManualMarketEntry();
+                return true;
+            }
+            // V10.3: Target-Specific Close Commands
+            if (action.StartsWith("CLOSE_T"))
+            {
+                int targetNum = 0;
+                if (action.Length > 7 && int.TryParse(action.Substring(7, 1), out targetNum))
+                {
+                    FlattenSpecificTarget(targetNum);
+                }
+                return true;
+            }
+            // V14: MOVE_TARGET command - Surgical target price adjustment
+            if (action.StartsWith("MOVE_TARGET"))
+            {
+                // Format: MOVE_TARGET|T1|1pt  or  MOVE_TARGET|T2|2pt
+                if (parts.Length >= 3)
+                {
+                    string targetId = parts[1].Trim().ToUpperInvariant(); // "T1", "T2", etc.
+                    string distance = parts[2].Trim().ToLowerInvariant(); // "1pt" or "2pt"
+
+                    // Parse distance
+                    double profitPoints = 0;
+                    if (distance == "1pt") profitPoints = 1.0;
+                    else if (distance == "2pt") profitPoints = 2.0;
+                    else
+                    {
+                        Print($"[V14] MOVE_TARGET: Invalid distance '{distance}' - expected '1pt' or '2pt'");
+                        return true;
+                    }
+
+                    // Extract target number (T1 -> 1, T2 -> 2, etc.)
+                    int targetNum = 0;
+                    if (targetId.Length >= 2 && targetId.StartsWith("T"))
+                    {
+                        if (!int.TryParse(targetId.Substring(1), out targetNum) || targetNum < 1 || targetNum > 5)
+                        {
+                            Print($"[V14] MOVE_TARGET: Invalid target '{targetId}' - expected T1-T5");
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        Print($"[V14] MOVE_TARGET: Invalid target format '{targetId}'");
+                        return true;
+                    }
+
+                    Print($"[V14] MOVE_TARGET: Command received for {targetId} to +{profitPoints}pt profit");
+
+                    // Call the move handler (implemented in Orders.cs)
+                    MoveSpecificTarget(targetNum, profitPoints);
+                }
+                else
+                {
+                    Print("[V14] MOVE_TARGET: Invalid format - expected MOVE_TARGET|TX|1pt or MOVE_TARGET|TX|2pt");
+                }
+                return true;
+            }
+            if (action.StartsWith("GET_FLEET"))
+            {
+                HandleFleetCommand(action, parts);
+                return true;
+            }
+            if (action.StartsWith("TOGGLE_ACCOUNT"))
+            {
+                HandleToggleAccountCommand(parts);
+                return true;
+            }
+            // V12.6: SET_SIMA|ON or SET_SIMA|OFF - Remote SIMA toggle from external panel
+            // V12.Phase6 [LIFECYCLE]: Uses centralized ApplySimaState for full lifecycle management
+            if (action == "SET_SIMA")
+            {
+                HandleFleetCommand(action, parts);
+                return true;
+            }
+            // V12.25: SET_LEADER_ACCOUNT|accountName -- Panel tells strategy which account is the leader
+            if (action == "SET_LEADER_ACCOUNT")
+            {
+                HandleFleetCommand(action, parts);
+                return true;
+            }
+            if (action == "REQUEST_FLEET_STATE")
+            {
+                HandleFleetCommand(action, parts);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Handles configuration sync commands: CONFIG (full target/risk sync), GET_LAYOUT (fallback logger).
+        /// </summary>
+        private bool TryHandleConfigCommand(string action, string[] parts)
+        {
+            if (action == "CONFIG")
+            {
+                HandleConfigCommand(parts);
+                return true;
+            }
+            // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
+            if (action == "GET_LAYOUT")
+            {
+                string mode = isRMAModeActive ? "RMA" : "OR";
+                Print(string.Format("V12 GET_LAYOUT: Mode={0} Count={1} T1={2}({3}) T2={4}({5}) T3={6}({7}) T4={8}({9}) T5={10}({11})",
+                    mode, activeTargetCount,
+                    Target1Value, T1Type,
+                    Target2Value, T2Type,
+                    Target3Value, T3Type,
+                    Target4Value, T4Type,
+                    Target5Value, T5Type));
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Stub for future compliance commands (GET_COMPLIANCE, etc.).
+        /// Build 943: Established per router architecture.
+        /// </summary>
+        private bool TryHandleComplianceCommand(string action, string[] parts)
+        {
             return false;
         }
 
