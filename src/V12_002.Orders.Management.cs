@@ -700,12 +700,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (order == null || order.OrderState != OrderState.Working) continue;
                 if (order.OrderType != OrderType.Limit) continue; // only chase limit entries
 
-                double currentPrice = (order.OrderAction == OrderAction.Buy) ? High[0] : Low[0];
+                // [BUILD 948 CIT FIX] Correct directional bar-price logic:
+                // - LONG entry (Buy): price must DROP DOWN to the limit -> compare Low[0] <= limitPrice
+                // - SHORT entry (Sell): price must RISE UP to the limit -> compare High[0] >= limitPrice
+                // Previous bug: Short used Low[0] <= limitPrice which is ALWAYS true when clicking
+                // far above the current market, causing instant market conversion on every click.
+                double currentPrice = (order.OrderAction == OrderAction.Buy) ? Low[0] : High[0];
                 double limitPrice = order.LimitPrice;
 
                 bool triggerChase = (order.OrderAction == OrderAction.Buy)
-                    ? (currentPrice >= limitPrice)
-                    : (currentPrice <= limitPrice);
+                    ? (currentPrice <= limitPrice)   // Long: bar low touched or pierced the limit
+                    : (currentPrice >= limitPrice);  // Short: bar high touched or pierced the limit
+
 
                 if (!triggerChase) continue;
 
