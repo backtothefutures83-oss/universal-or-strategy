@@ -440,9 +440,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        // [BUILD 948] Cap per-invocation drain to prevent strategy-thread starvation during broker replay bursts.
+        private const int MaxAccountExecutionsPerDrain = 16;
+
         /// <summary>
         /// V12.Phase6 [CONCURRENCY-01]: Processes queued account execution events on the STRATEGY THREAD.
-        /// Drains the entire queue each invocation to prevent starvation under heavy fill bursts.
+        /// [BUILD 948] Drain is capped at MaxAccountExecutionsPerDrain per invocation; remaining items
+        /// are rescheduled via TriggerCustomEvent to yield the strategy thread between bursts.
         /// </summary>
         private void ProcessAccountExecutionQueue()
         {
@@ -454,92 +458,108 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            int drained = 0;
             QueuedAccountExecution item;
-            while (_accountExecutionQueue.TryDequeue(out item))
+            while (drained < MaxAccountExecutionsPerDrain && _accountExecutionQueue.TryDequeue(out item))
             {
+                drained++;
                 if (isFlattenRunning)
                 {
                     _accountExecutionQueue.Enqueue(item);
                     try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
                     return;
                 }
-
-                if (EnableComplianceHub)
-                    Print(string.Format("[COMPLIANCE] Execution Update received for account."));
-
-                if (EnableComplianceHub && item.Account != null)
-                {
-                    TrackTradeEntry(item.Account, item.EventArgs.Execution);
-                    UpdateAccountMetricsFromAccount(item.Account);
-                }
-
-                // V12.7: Check if this fill is for a fleet entry with deferred brackets
-                try
-                {
-                    Order filledOrder = item.EventArgs.Execution?.Order;
-                    if (filledOrder != null && filledOrder.OrderState == OrderState.Filled)
-                    {
-                        foreach (var kvp in entryOrders.ToArray())
-                        {
-                            if (kvp.Value == filledOrder)
-                            {
-                                string fleetKey = kvp.Key;
-                                if (activePositions.TryGetValue(fleetKey, out var pos) && pos.IsFollower && !pos.EntryFilled)
-                                {
-                                    double fleetFillPrice = item.EventArgs.Execution != null ? item.EventArgs.Execution.Price : 0;
-                                    SymmetryGuardOnFollowerFill(fleetKey, pos, fleetFillPrice);
-                                }
-                                else if (isStressTestEnabled && activePositions.TryGetValue(fleetKey, out var dupPos) && dupPos.IsFollower && dupPos.EntryFilled)
-                                {
-                                    // [STRESS_BURST] Dedup guard caught a duplicate burst signal -- bracket already submitted.
-                                    Print(string.Format("[STRESS_BURST] DedupGuard HIT: {0} already EntryFilled -- duplicate bracket blocked.", fleetKey));
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Print($"[SIMA V12.7] Error in fleet bracket submission: {ex.Message}");
-                }
-
-                // EMERGENCY FIX [H-15]: After any fleet execution, check if the account is now flat.
-                // Syncs expectedPositions when position is closed externally (e.g., manual UI flatten).
-                // [1102Y-V4 PERSISTENCE GATE]: Skip flat-clear for entry fills. The broker Positions
-                // collection may not yet reflect the new position at this point in the callback,
-                // producing a stale-flat read that wipes expectedPositions during fill registration.
-                // Only exit fills (Sell / BuyToCover) are safe to use as flat-check triggers.
-                try
-                {
-                    Account fleetAcct = item.Account;
-                    if (fleetAcct != null && expectedPositions != null && expectedPositions.ContainsKey(ExpKey(fleetAcct.Name)))
-                    {
-                        Order execOrder = item.EventArgs?.Execution?.Order;
-                        bool isEntryFill = execOrder != null &&
-                            (execOrder.OrderAction == OrderAction.Buy || execOrder.OrderAction == OrderAction.SellShort);
-                        if (isEntryFill)
-                        {
-                            Print($"[ProcessAccountExecutionQueue] [1102Y-V4] Entry fill for {fleetAcct.Name} -- Persistence Gate active, flat-check skipped.");
-                        }
-                        else
-                        {
-                            var brokerPos = fleetAcct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
-                            bool nowFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
-                            if (nowFlat && !IsDispatchSyncPending(ExpKey(fleetAcct.Name)))
-                            {
-                                SetExpectedPositionLocked(ExpKey(fleetAcct.Name), 0);
-                                Print($"[ProcessAccountExecutionQueue] Fleet {fleetAcct.Name} is Flat -- expectedPositions cleared for {Instrument.FullName}");
-                            }
-                        }
-                    }
-                }
-                catch { }
+                ProcessQueuedExecution(item);
             }
+
+            // [BUILD 948] Reschedule if items remain after hitting the drain cap
+            if (!_accountExecutionQueue.IsEmpty)
+                try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
 
             // Update the compliance log once after draining all queued events
             if (EnableComplianceHub && !isFlattenRunning)
                 LogApexPerformance();
+        }
+
+        /// <summary>
+        /// Processes a single dequeued account execution event on the strategy thread.
+        /// Handles compliance tracking, fleet bracket submission (V12.7), and
+        /// flat-clear sync [H-15] with Persistence Gate [1102Y-V4].
+        /// </summary>
+        private void ProcessQueuedExecution(QueuedAccountExecution item)
+        {
+            if (EnableComplianceHub)
+                Print(string.Format("[COMPLIANCE] Execution Update received for account."));
+
+            if (EnableComplianceHub && item.Account != null)
+            {
+                TrackTradeEntry(item.Account, item.EventArgs.Execution);
+                UpdateAccountMetricsFromAccount(item.Account);
+            }
+
+            // V12.7: Check if this fill is for a fleet entry with deferred brackets
+            try
+            {
+                Order filledOrder = item.EventArgs.Execution?.Order;
+                if (filledOrder != null && filledOrder.OrderState == OrderState.Filled)
+                {
+                    foreach (var kvp in entryOrders.ToArray())
+                    {
+                        if (kvp.Value == filledOrder)
+                        {
+                            string fleetKey = kvp.Key;
+                            if (activePositions.TryGetValue(fleetKey, out var pos) && pos.IsFollower && !pos.EntryFilled)
+                            {
+                                double fleetFillPrice = item.EventArgs.Execution != null ? item.EventArgs.Execution.Price : 0;
+                                SymmetryGuardOnFollowerFill(fleetKey, pos, fleetFillPrice);
+                            }
+                            else if (isStressTestEnabled && activePositions.TryGetValue(fleetKey, out var dupPos) && dupPos.IsFollower && dupPos.EntryFilled)
+                            {
+                                // [STRESS_BURST] Dedup guard caught a duplicate burst signal -- bracket already submitted.
+                                Print(string.Format("[STRESS_BURST] DedupGuard HIT: {0} already EntryFilled -- duplicate bracket blocked.", fleetKey));
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Print(string.Format("[SIMA V12.7] Error in fleet bracket submission: {0}", ex.Message));
+            }
+
+            // EMERGENCY FIX [H-15]: After any fleet execution, check if the account is now flat.
+            // Syncs expectedPositions when position is closed externally (e.g., manual UI flatten).
+            // [1102Y-V4 PERSISTENCE GATE]: Skip flat-clear for entry fills. The broker Positions
+            // collection may not yet reflect the new position at this point in the callback,
+            // producing a stale-flat read that wipes expectedPositions during fill registration.
+            // Only exit fills (Sell / BuyToCover) are safe to use as flat-check triggers.
+            try
+            {
+                Account fleetAcct = item.Account;
+                if (fleetAcct != null && expectedPositions != null && expectedPositions.ContainsKey(ExpKey(fleetAcct.Name)))
+                {
+                    Order execOrder = item.EventArgs?.Execution?.Order;
+                    bool isEntryFill = execOrder != null &&
+                        (execOrder.OrderAction == OrderAction.Buy || execOrder.OrderAction == OrderAction.SellShort);
+                    if (isEntryFill)
+                    {
+                        Print(string.Format("[ProcessQueuedExecution] [1102Y-V4] Entry fill for {0} -- Persistence Gate active, flat-check skipped.", fleetAcct.Name));
+                    }
+                    else
+                    {
+                        var brokerPos = fleetAcct.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+                        bool nowFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
+                        if (nowFlat && !IsDispatchSyncPending(ExpKey(fleetAcct.Name)))
+                        {
+                            SetExpectedPositionLocked(ExpKey(fleetAcct.Name), 0);
+                            Print(string.Format("[ProcessQueuedExecution] Fleet {0} is Flat -- expectedPositions cleared for {1}",
+                                fleetAcct.Name, Instrument.FullName));
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         /// <summary>

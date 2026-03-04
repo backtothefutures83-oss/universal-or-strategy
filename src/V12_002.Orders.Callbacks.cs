@@ -517,7 +517,61 @@ namespace NinjaTrader.NinjaScript.Strategies
                 entryOrders.TryRemove(matchedEntry, out _);
                 int gfExp = 0;
                 lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
-                if (gfExp == 0) return;
+                if (gfExp == 0)
+                {
+                    // Build 947: clean up any in-flight FSM spec to avoid orphaned state
+                    _followerReplaceSpecs.TryRemove(matchedEntry, out _);
+                    return;
+                }
+
+                // Build 947 FSM: if this cancel was our PendingCancel, submit replacement instead of DESYNC
+                FollowerReplaceSpec fsm;
+                if (_followerReplaceSpecs.TryGetValue(matchedEntry, out fsm)
+                    && fsm.State == FollowerReplaceState.PendingCancel
+                    && fsm.CancellingOrderId == order.OrderId)
+                {
+                    // Fill-during-gap guard: if master already has a live filled position, let REAPER handle
+                    PositionInfo masterPos;
+                    bool masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
+                        && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
+                        && masterPos != null
+                        && masterPos.EntryFilled
+                        && masterPos.RemainingContracts > 0;
+
+                    if (masterFilled)
+                    {
+                        Print("[FSM] Master filled during cancel wait -- routing "
+                            + fsm.SignalName + " to repair instead of replace.");
+                        _followerReplaceSpecs.TryRemove(fsm.SignalName, out _);
+                        return;
+                    }
+
+                    // Snapshot latest spec values, transition to Submitting, schedule on strategy thread
+                    int    qty      = fsm.PendingQty;
+                    double price    = fsm.PendingPrice;
+                    string acctNameCapture = fsm.AccountName;
+                    string sigName  = fsm.SignalName;
+                    FollowerReplaceSpec fsmCapture = fsm;
+                    fsm.State = FollowerReplaceState.Submitting;
+
+                    try
+                    {
+                        TriggerCustomEvent(o =>
+                        {
+                            // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
+                            // ATR tick absorption may have updated PendingPrice/PendingQty after the
+                            // lambda was scheduled -- using stale captures would submit wrong values.
+                            SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
+                            _followerReplaceSpecs.TryRemove(sigName, out _);
+                        }, null);
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
+                        _followerReplaceSpecs.TryRemove(sigName, out _);
+                    }
+                    return; // FSM-controlled cancel -- not a real desync
+                }
 
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
@@ -1302,62 +1356,144 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print(string.Format("[MOVE-SYNC] Entry move: {0} on {1}: {2:F2} -> {3:F2} x{4}",
                 fleetEntryName, pos.ExecutingAccount.Name, fEffectivePrice, roundedLimit, scaledQty));
 
-            // 1102Z-D: Stamp grace BEFORE Cancel -- opens 5-second REAPER suppression window covering the cancel gap.
+            // 1102Z-D: Stamp grace BEFORE cancel -- opens 5-second REAPER suppression window.
             StampReaperMoveGrace();
 
-            // 1102Z-D [Protected Resubmit]: Cancel + CreateOrder + Submit is the sole path.
-            // Account.Change() was removed -- it is a silent no-op on Apex/Tradovate.
+            // Build 947 FSM: derive master signal name for fill-during-gap detection.
+            // Uses same key-contains pattern as cascade cleanup to find the master activePositions entry.
+            string masterSignalName = string.Empty;
+            foreach (var kvp in activePositions)
+            {
+                if (!kvp.Value.IsFollower &&
+                    (fleetEntryName.Contains(kvp.Key) || kvp.Key.Contains(fleetEntryName)))
+                {
+                    masterSignalName = kvp.Key;
+                    break;
+                }
+            }
+
+            // Build 947 FSM: two-phase replace -- wait for broker cancel confirmation before resubmit.
+            // [GHOST-FIX-1 Build 922Z]: identity chain (fleetEntryName = signal name) preserved in FSM.
+            // [FIX-PM-02c]: order type + direction threaded through FSM spec for StopMarket and Short support.
+            OrderAction entryAction = pos.Direction == MarketPosition.Long
+                ? OrderAction.Buy : OrderAction.SellShort;
+
+            PropagateFollowerEntryReplace(
+                fleetEntryName, masterSignalName,
+                pos.ExecutingAccount.Name, pos.ExecutingAccount,
+                roundedLimit, scaledQty,
+                entryAction, fEntry.OrderType, isStopTypeEntry);
+        }
+
+        // Build 947: PropagateFollowerEntryReplace -- FSM entry point for two-phase cancel+resubmit.
+        // Called from PropagateMasterEntryMove instead of the old inline cancel+submit block.
+        // If a replace is already in-flight (PendingCancel or Submitting), ATR ticks are absorbed
+        // by updating PendingQty/PendingPrice without firing a second cancel.
+        private void PropagateFollowerEntryReplace(
+            string fleetEntryName, string masterSignalName,
+            string accountName, Account acct,
+            double newPrice, int newQty,
+            OrderAction entryAction, OrderType entryOrderType, bool isStopType)
+        {
+            Order currentEntry = null;
+
+            lock (stateLock)
+            {
+                FollowerReplaceSpec existing;
+                if (_followerReplaceSpecs.TryGetValue(fleetEntryName, out existing))
+                {
+                    // Already in PendingCancel or Submitting -- absorb ATR tick into latest spec.
+                    existing.PendingQty   = newQty;
+                    existing.PendingPrice = newPrice;
+                    Print("[FSM] Replace spec updated (in-flight): "
+                        + fleetEntryName + " qty=" + newQty + " price=" + newPrice);
+                    return;
+                }
+
+                if (!entryOrders.TryGetValue(fleetEntryName, out currentEntry) || currentEntry == null)
+                {
+                    Print("[FSM] SKIP replace: no tracked entry for " + fleetEntryName);
+                    return;
+                }
+
+                var spec = new FollowerReplaceSpec
+                {
+                    State             = FollowerReplaceState.PendingCancel,
+                    CancellingOrderId = currentEntry.OrderId,
+                    PendingQty        = newQty,
+                    PendingPrice      = newPrice,
+                    AccountName       = accountName,
+                    SignalName        = fleetEntryName,
+                    MasterSignalName  = masterSignalName,
+                    EntryAction       = entryAction,
+                    EntryOrderType    = entryOrderType,
+                    IsStopType        = isStopType
+                };
+                _followerReplaceSpecs[fleetEntryName] = spec;
+            }
+
+            // Cancel outside lock -- currentEntry captured inside lock above
             try
             {
-                pos.ExecutingAccount.Cancel(new[] { fEntry });
+                acct.Cancel(new[] { currentEntry });
+                Print("[FSM] Cancel sent for " + fleetEntryName
+                    + " OrderId=" + currentEntry.OrderId);
+            }
+            catch (Exception ex)
+            {
+                Print("[FSM] Cancel failed for " + fleetEntryName + ": " + ex.Message);
+                _followerReplaceSpecs.TryRemove(fleetEntryName, out _);
+            }
+        }
 
-                OrderAction entryAction = pos.Direction == MarketPosition.Long
-                    ? OrderAction.Buy : OrderAction.SellShort;
-                // [GHOST-FIX-1 Build 922Z]: Preserve original fleetEntryName as signal name.
-                // The identity chain MUST be: activePositions key == entryOrders key == order signal name.
-                // The old code appended a random "_MGE_" + timestamp suffix, which broke the chain:
-                //   -> OnAccountExecutionUpdate could not find the key in entryOrders on fill
-                //   -> SubmitBracketOrders was never called -> position was naked (no stop, no target)
-                //   -> REAPER saw naked position and fired emergency flatten, causing the ghost entry cascade.
-                // Using fleetEntryName directly restores the chain and ensures brackets are submitted on fill.
-                string signalName = fleetEntryName;
+        // Build 947: SubmitFollowerReplacement -- called on strategy thread via TriggerCustomEvent
+        // after broker confirms the PendingCancel. Uses spec fields to preserve direction + order type.
+        private void SubmitFollowerReplacement(
+            string fleetSignalName, string accountName,
+            double price, int qty, FollowerReplaceSpec spec)
+        {
+            Account acct = Account.All.FirstOrDefault(
+                a => string.Equals(a.Name, accountName, StringComparison.OrdinalIgnoreCase));
+            if (acct == null)
+            {
+                Print("[FSM] SUBMIT FAIL: account not found: " + accountName);
+                return;
+            }
 
-                // [FIX-PM-02c]: Preserve original order type so StopMarket followers remain StopMarket.
-                double limitPx = (!isStopTypeEntry) ? roundedLimit : 0;
-                double stopPx  = ( isStopTypeEntry) ? roundedLimit : 0;
-                Order newEntry = pos.ExecutingAccount.CreateOrder(
-                    Instrument, entryAction, fEntry.OrderType, TimeInForce.Gtc,
-                    scaledQty, limitPx, stopPx,
-                    // [923A-P1-GUID]: 8-char hex GUID fragment replaces Ticks -- eliminates collision risk
-                    // at extreme resubmit frequency. ocoId only; signalName = fleetEntryName unchanged (GHOST-FIX-1).
-                    "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
-                    signalName, null);
+            // [FIX-PM-02c]: preserve order type so StopMarket followers remain StopMarket.
+            double limitPx = !spec.IsStopType ? price : 0;
+            double stopPx  =  spec.IsStopType ? price : 0;
 
-                pos.ExecutingAccount.Submit(new[] { newEntry });
-                entryOrders[fleetEntryName] = newEntry;
+            // [923A-P1-GUID]: 8-char GUID fragment as ocoId; signal name = fleetSignalName (GHOST-FIX-1).
+            Order newEntry = acct.CreateOrder(
+                Instrument, spec.EntryAction, spec.EntryOrderType, TimeInForce.Gtc,
+                qty, limitPx, stopPx,
+                "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                fleetSignalName, null);
+            acct.Submit(new[] { newEntry });
+
+            lock (stateLock)
+            {
+                entryOrders[fleetSignalName] = newEntry;
 
                 // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
-                lock (stateLock)
+                PositionInfo pos;
+                if (activePositions.TryGetValue(fleetSignalName, out pos) && pos != null)
                 {
-                    pos.TotalContracts     = scaledQty;
-                    pos.RemainingContracts = scaledQty;
+                    pos.TotalContracts     = qty;
+                    pos.RemainingContracts = qty;
                     int ft1, ft2, ft3, ft4, ft5;
-                    GetTargetDistribution(scaledQty, out ft1, out ft2, out ft3, out ft4, out ft5);
+                    GetTargetDistribution(qty, out ft1, out ft2, out ft3, out ft4, out ft5);
                     pos.T1Contracts = ft1;
                     pos.T2Contracts = ft2;
                     pos.T3Contracts = ft3;
                     pos.T4Contracts = ft4;
                     pos.T5Contracts = ft5;
                 }
+            }
 
-                Print(string.Format("[MOVE-SYNC] Entry resubmitted (protected): {0} @ {1:F2} x{2}",
-                    fleetEntryName, roundedLimit, scaledQty));
-            }
-            catch (Exception ex)
-            {
-                Print(string.Format("[MOVE-SYNC] ERROR PropagateMasterEntryMove {0}: {1}",
-                    fleetEntryName, ex.Message));
-            }
+            Print("[FSM] Replacement submitted: " + fleetSignalName
+                + " @ " + price + " x" + qty);
         }
 
         #endregion

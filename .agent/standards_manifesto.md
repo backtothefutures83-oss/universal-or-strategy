@@ -24,8 +24,8 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 - **Advisor (Antigravity):** The **"General Manager."** Handles high-level brainstorming, diagnosing market issues, and engineering the core "Mission Prompt."
 - **Desk Supervisor & Lab (Gemini CLI):** The **"Quant & Compliance."** Uses **Conductor/ODIN** to turn Antigravity prompts into rigid technical plans. Uses the **Sandbox** to test math/logic in Python before implementation. Runs local security/lint audits.
-- **Lead Engineer (Claude Code):** The **"Execution Specialist."** Performs high-speed implementing with **Simultaneous Auditing**.
-- **Forensic Auditor (Codex):** The **"Deep Logic Inspector."** Performs a 360-degree forensic scan for logic traps/leaks.
+- **Lead Engineer (Claude/Sonnet):** The **"Execution Specialist."** Use **Sonnet** (latest) for all implementation. Sonnet is faster and optimized for code generation. Reserve Opus for architectural deep-dives only (complex broker-native design, multi-phase FSM design).
+- **Forensic Auditor (Codex):** The **"Deep Logic Inspector."** Performs a 360-degree forensic scan for logic traps/leaks. Code trace only — never ask Codex for patches.
 - **Secondary Auditor (Cursor AI):** The **"Peer Reviewer."** Performed by the Cursor agent to provide a cross-verification audit from a different model perspective.
 - **Maintenance Inspector (Human):** The **"Final Sign-off."** Used by the Fund Manager in Cursor to perform visual review and manual polish.
 - **Context Layer (OneContext):** The **"Order Book."** Maintains a shared trajectory of all agent thoughts and actions.
@@ -66,7 +66,7 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 **Emergency fix if non-ASCII bytes appear in source:**
 
-1. Run `python C:\tmp\byte_purge.py` (nuclear byte-level purge)
+1. Run `python <repo_root>\scripts\byte_purge.py` (nuclear byte-level purge)
 2. Search all `.cs` files for the pattern `?"` in non-comment lines — each match is a broken string
 3. Replace `?"` with `--` or `(!)` as appropriate
 4. Run `deploy-sync.ps1` — the ASCII gate will confirm clean before touching NT8
@@ -98,6 +98,63 @@ This document provides the immutable technical standards for all AI agents (Anth
 4. **Role separation:** Codex = diagnosis. Sonnet = implementation. Never reverse these roles.
 
 **Workflow file:** `.agent/workflows/live-bug-triage.md`
+
+---
+
+## 10. Autonomous Evidence Discovery (ALL Agents — Mandatory)
+
+**Every agent on every platform MUST locate logs and data autonomously. Quote only minimal relevant excerpts from discovered logs when escalating to human review or Codex forensic audit.**
+
+### NT8 Application Logs
+
+```
+%USERPROFILE%\Documents\NinjaTrader 8\log\
+  log.YYYYMMDD.00000.txt   <- premarket session
+  log.YYYYMMDD.00001.txt   <- main session
+  log.YYYYMMDD.00002.txt   <- post-restart session
+```
+
+### NT8 Trace Logs (Rithmic Adapter — Low Level)
+
+```
+%USERPROFILE%\Documents\NinjaTrader 8\trace\
+  trace.YYYYMMDD.00001.txt  <- main session (most detail)
+  trace.YYYYMMDD.00002.txt  <- post-restart (order replay here)
+```
+
+Contains: `OnLineInfo` (replayed orders), `ReplayDataSeen` (count of replayed orders per account), `OnExecutionUpdate`, connection events.
+
+### SIMA Performance Logs
+
+```
+%USERPROFILE%\Documents\NinjaTrader 8\SIMA_Logs\
+  ApexPerformance_MES.json  <- ActualQty, ExpectedQty, Balance, Connection per account
+  DailySummaries.csv        <- daily P&L
+```
+
+### Strategy Source Files
+
+```
+<repo_root>\src\
+  V12_002.SIMA.cs           <- fleet dispatch, ExecuteSmartDispatchEntry, PumpFleetDispatch
+  V12_002.REAPER.cs         <- audit loop, Thread.Sleep(ReaperIntervalMs)
+  V12_001.cs                <- reconnectTimer, glowTimer, OnConnectionStatusChange
+  V12_002.UI.IPC.cs         <- ReceiveLoop, Thread.Sleep(50/100)
+  SignalBroadcaster.cs      <- SafeInvoke, 1ms latency probe
+  Orders.Management.cs      <- order cancel/submit/replace lifecycle
+```
+
+### Key Search Markers
+
+```
+[GHOST-AUDIT]              <- order state mismatch
+[REAPER] Repair BLOCKED    <- repair suppressed by Working order
+ReplayDataSeen: N accounts <- N orders replayed at reconnect
+ExpectedQty != ActualQty   <- SIMA desync
+OnLineInfo ... status=open <- live untracked GTC order at broker
+```
+
+**Full discovery steps:** See `.agent/workflows/live-bug-triage.md` Section 0.
 
 ---
 

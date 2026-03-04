@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "946";  // V12.946: expectedPositions purge-race guard + REAPER self-heal
+        public const string BUILD_TAG = "948";  // V12.948: Freeze Prevention (GTC Sweep + Order Adoption + Burst Cap)
 
         #region Variables
 
@@ -125,6 +125,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.1101E [TM-01]: Marshal broker-thread account order events to strategy thread.
         private struct QueuedAccountOrderUpdate { public Account Account; public OrderEventArgs EventArgs; }
         private readonly ConcurrentQueue<QueuedAccountOrderUpdate> _accountOrderQueue = new ConcurrentQueue<QueuedAccountOrderUpdate>();
+
+        // [BUILD 948] Order adoption gate -- REAPER skips audit cycles until working orders have been re-adopted.
+        private volatile bool _orderAdoptionComplete = false;
 
         // RMA Mode tracking
         private volatile bool isRMAModeActive;
@@ -251,7 +254,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         // limit entries before the propagation sync cycle completes.
         private volatile bool _propagationActive = false;
 
-        // CIT (Chase If Touch) -- uses ChaseIfTouchPoints property (NinjaScriptProperty)
+        // Build 947: Two-phase FSM for follower entry replace (ghost-order prevention)
+        private enum FollowerReplaceState { Idle, PendingCancel, Submitting }
+
+        private class FollowerReplaceSpec
+        {
+            public FollowerReplaceState State;
+            public string CancellingOrderId;
+            public int    PendingQty;
+            public double PendingPrice;
+            public string AccountName;
+            public string SignalName;
+            public string MasterSignalName;
+            public OrderAction EntryAction;    // captured from pos.Direction at spec creation
+            public OrderType   EntryOrderType; // captured from fEntry.OrderType at spec creation
+            public bool        IsStopType;     // true when EntryOrderType is StopMarket or StopLimit
+        }
+
+        private readonly ConcurrentDictionary<string, FollowerReplaceSpec>
+            _followerReplaceSpecs = new ConcurrentDictionary<string, FollowerReplaceSpec>();
 
         #endregion
 
@@ -853,6 +874,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     });
                 }
 
+                // [BUILD 948] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
+                // Must run while dicts are still populated and accounts still subscribed.
+                // force=true: hard terminate, cancel regardless of open positions.
+                CancelAllV12GtcOrders(true);
+
                 // Stop IPC Server
                 StopIpcServer();
                 
@@ -893,6 +919,32 @@ namespace NinjaTrader.NinjaScript.Strategies
                 accountTradingDays?.Clear();
                 accountLastSummaryDate?.Clear();
 
+            }
+        }
+
+        #endregion
+
+        #region OnConnectionStatusUpdate - Build 948: Mid-session re-adoption on Rithmic reconnect
+
+        protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs connectionStatusUpdate)
+        {
+            base.OnConnectionStatusUpdate(connectionStatusUpdate);
+
+            if (!EnableSIMA || State != State.Realtime) return;
+
+            ConnectionStatus status = connectionStatusUpdate.Status;
+
+            if (status == ConnectionStatus.Disconnecting || status == ConnectionStatus.ConnectionLost)
+            {
+                // Gate REAPER until re-adoption completes after reconnect
+                _orderAdoptionComplete = false;
+                Print("[BUILD 948] Connection lost -- order adoption gate reset, REAPER paused.");
+            }
+            else if (status == ConnectionStatus.Connected)
+            {
+                // Re-adopt working orders after reconnect; runs on strategy thread via TriggerCustomEvent
+                Print("[BUILD 948] Reconnected -- scheduling working order re-adoption.");
+                try { TriggerCustomEvent(o => HydrateWorkingOrdersFromBroker(), null); } catch { }
             }
         }
 

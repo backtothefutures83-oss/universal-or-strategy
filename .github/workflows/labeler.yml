@@ -1,0 +1,25 @@
+# [BUILD 948] PR Labeler
+# Automatically applies labels to Pull Requests based on which files were changed.
+# Labels like "SIMA / Fleet", "REAPER", "Orders / Callbacks" will appear on every PR.
+# Config file: .github/labeler.yml
+
+name: "PR Labeler"
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  label:
+    name: Label PR by changed files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Apply Labels
+        uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          configuration-path: .github/labeler.yml

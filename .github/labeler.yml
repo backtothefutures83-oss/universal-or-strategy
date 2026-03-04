@@ -1,0 +1,39 @@
+# Labeler configuration -- maps changed files to Pull Request labels.
+# Labels are auto-applied by the PR Labeler workflow when files in these paths are modified.
+
+"SIMA / Fleet":
+  - changed-files:
+      - any-glob-to-any-file: "src/V12_002.SIMA.cs"
+
+"Orders / Callbacks":
+  - changed-files:
+      - any-glob-to-any-file: "src/V12_002.Orders.Callbacks.cs"
+
+"UI / Compliance":
+  - changed-files:
+      - any-glob-to-any-file: "src/V12_002.UI.Compliance.cs"
+
+"Core Strategy":
+  - changed-files:
+      - any-glob-to-any-file: "src/V12_002.cs"
+
+"REAPER":
+  - changed-files:
+      - any-glob-to-any-file: "src/V12_002.REAPER.cs"
+
+"IPC":
+  - changed-files:
+      - any-glob-to-any-file: "src/V12_002.IPC.cs"
+      - any-glob-to-any-file: "src/V12_002.UI.IPC.cs"
+
+"Deploy / Scripts":
+  - changed-files:
+      - any-glob-to-any-file: "*.ps1"
+
+"Workflows / CI":
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+"Agent / Manifesto":
+  - changed-files:
+      - any-glob-to-any-file: ".agent/**"
