@@ -2851,19 +2851,19 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 // TREND manual: 100% risk allocation at manual price
                 string dir = direction.Contains("LONG") ? "LONG" : "SHORT";
-                cmd = $"TREND_MANUAL_LIMIT|{dir}|{price}";
+                cmd = $"TREND_MANUAL_LIMIT|{activeSymbol}|{dir}|{price}";
             }
             else if (mode == "RETEST")
             {
                 // RETEST manual: Limit order at manual price with RMA targets
                 string dir = direction.Contains("LONG") ? "LONG" : "SHORT";
-                cmd = $"RETEST_MANUAL_LIMIT|{dir}|{price}";
+                cmd = $"RETEST_MANUAL_LIMIT|{activeSymbol}|{dir}|{price}";
             }
             else if (mode == "FFMA")
             {
                 // FFMA manual: Limit order at manual price
                 string dir = direction.Contains("LONG") ? "LONG" : "SHORT";
-                cmd = $"FFMA_MANUAL_LIMIT|{dir}|{price}";
+                cmd = $"FFMA_MANUAL_LIMIT|{activeSymbol}|{dir}|{price}";
             }
             else
             {
