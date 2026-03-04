@@ -35,11 +35,11 @@ jobs:
             paths:
               - src/
 
-      - name: Build C# Strategy (MSBuild)
-        run: |
-          echo "Building NinjaScript strategy source for CodeQL analysis..."
-          # CodeQL hooks into the compiler -- a successful build = full analysis
-          dotnet build src/ --nologo --verbosity minimal || true
+      - name: Build C# Strategy (AutoBuild)
+        uses: github/codeql-action/autobuild@v3
+        # AutoBuild handles NinjaScript partial-class files gracefully.
+        # NinjaScript files have no .csproj -- autobuild does a best-effort
+        # compile so CodeQL can still perform its full static analysis pass.
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
