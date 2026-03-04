@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// V12.Phase8 [F-01/F-02]: Staging struct for target orders ??" committed to tracking dicts only after Submit succeeds.
+        /// V12.Phase8 [F-01/F-02]: Staging struct for target orders -- committed to tracking dicts only after Submit succeeds.
         /// </summary>
         private struct StagedTarget
         {
@@ -71,7 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// [STRESS_TEST Phase 9.0] When true, OnAccountExecutionUpdate injects duplicate execution events
         /// into _accountExecutionQueue to validate the EntryFilled dedup guard under high-message density.
-        /// Default: false ??" must be manually enabled for stress testing only. Never enable in production.
+        /// Default: false -- must be manually enabled for stress testing only. Never enable in production.
         /// </summary>
         private bool isStressTestEnabled = false;
 

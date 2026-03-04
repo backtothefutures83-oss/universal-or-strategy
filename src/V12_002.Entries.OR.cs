@@ -156,7 +156,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
-                Print(string.Format("POSITION SIZE: {0} contracts \u2192 T1:{1} T2:{2} T3:{3} T4:{4} T5:{5}",
+                Print(string.Format("POSITION SIZE: {0} contracts -> T1:{1} T2:{2} T3:{3} T4:{4} T5:{5}",
                     contracts, t1Qty, t2Qty, t3Qty, t4Qty, t5Qty));
 
                 string signalName = direction == MarketPosition.Long ? "ORLong" : "ORShort";

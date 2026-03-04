@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     
                     // Only print every 10th sample to avoid flooding, but audit all
                     if (i % 10 == 0)
-                        Print(string.Format("  Sample {0}: ATR {1:F2} \u2192 RoundUp: {2:F0}pt", i, testAtr, ceilingDistance));
+                        Print(string.Format("  Sample {0}: ATR {1:F2} -> RoundUp: {2:F0}pt", i, testAtr, ceilingDistance));
                 }
 
                 Print("");
@@ -61,7 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                     if (i % 10 == 0)
-                        Print(string.Format("  Sample {0}: Stop {1:F1}pt \u2192 Qty: {2} (Cost: ${3:F0})", i, stopPoints, finalQty, finalQty * stopDollars));
+                        Print(string.Format("  Sample {0}: Stop {1:F1}pt -> Qty: {2} (Cost: ${3:F0})", i, stopPoints, finalQty, finalQty * stopDollars));
                 }
 
                 Print("");
@@ -80,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         int t1, t2, t3, t4, t5;
                         GetTargetDistribution(qty, out t1, out t2, out t3, out t4, out t5, count);
-                        Print(string.Format("    {0} contr \u2192 T1:{1} T2:{2} T3:{3} T4:{4} T5:{5}",
+                        Print(string.Format("    {0} contr -> T1:{1} T2:{2} T3:{3} T4:{4} T5:{5}",
                             qty, t1, t2, t3, t4, t5));
                     }
                 }
@@ -101,7 +101,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         double mag = GetConfiguredTargetMagnitude(tn);
                         double tPrice = CalculateTargetPrice(MarketPosition.Long, auditEntry, tn);
-                        Print(string.Format("  T{0}: mode={1} value={2:F4} ATR={3:F4} \u2192 price={4:F4}",
+                        Print(string.Format("  T{0}: mode={1} value={2:F4} ATR={3:F4} -> price={4:F4}",
                             tn, tnMode, mag, currentATR, tPrice));
                     }
                 }

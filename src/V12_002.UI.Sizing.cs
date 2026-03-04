@@ -84,6 +84,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private int CalculatePositionSize(double stopDistanceRaw)
         {
+            if (double.IsNaN(stopDistanceRaw) || double.IsInfinity(stopDistanceRaw) || pointValue <= 0)
+            {
+                Print("[SIZING] (!) Invalid sizing inputs -- returning min contracts");
+                return Math.Max(1, minContracts);
+            }
             if (stopDistanceRaw <= 0) return Math.Max(1, minContracts);
 
             // STEP 1: CEILING to whole POINT (e.g. 2.3 -> 3.0, 4.0 -> 4.0)

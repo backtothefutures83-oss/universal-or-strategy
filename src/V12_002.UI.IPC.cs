@@ -39,8 +39,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private const int IpcMaxCommandLength = 512;
         private const int IpcMaxQueueDepth = 2000;
         private const int IpcMaxCommandsPerDrain = 500;
-        private int ipcQueuedCommandCount = 0;
-        private int _ipcClientIdSeed = 0;
+        private int ipcQueuedCommandCount    = 0;
+        private int _ipcClientIdSeed          = 0;
+        private int _ipcInvalidUtf8Count      = 0;
+        private int _ipcAllowlistRejectCount   = 0;
+        private int _ipcQueueDepthPeak         = 0;
 
         private static readonly HashSet<string> AllowedIpcActions =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -51,7 +54,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "SET_SIMA","DIAG_FLEET","SET_RMA_MODE","SYNC_MODE","SET_TARGETS",
                 "MKT_SYNC","SYNC_ALL","SET_MODE","SET_LEADER_ACCOUNT","REQUEST_FLEET_STATE",
                 "SET_MANUAL_PRICE","TREND_MANUAL_LIMIT","RETEST_MANUAL_LIMIT",
-                "FFMA_MANUAL_LIMIT","FFMA_MANUAL_MARKET","FFMA_DISARM","GET_LAYOUT"
+                "FFMA_MANUAL_LIMIT","FFMA_MANUAL_MARKET","FFMA_DISARM","GET_LAYOUT",
+                "DIAG_IPC"
             };
 
         private void StartIpcServer()
@@ -184,6 +188,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (DecoderFallbackException)
                 {
+                    Interlocked.Increment(ref _ipcInvalidUtf8Count);
                     Print($"V12 IPC: Invalid UTF-8 payload from client {clientId}; disconnecting.");
                     break;
                 }
@@ -381,6 +386,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
+            // Build 941 [FIX-4]: Track peak queue depth for DIAG_IPC telemetry.
+            int peak = _ipcQueueDepthPeak;
+            while (queueDepth > peak &&
+                   Interlocked.CompareExchange(ref _ipcQueueDepthPeak, queueDepth, peak) != peak)
+                peak = _ipcQueueDepthPeak;
+
             ipcCommandQueue.Enqueue(message);
             return true;
         }
@@ -504,6 +515,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string action = parts[0].Trim().ToUpperInvariant();
                     if (!IsAllowedIpcAction(action))
                     {
+                        Interlocked.Increment(ref _ipcAllowlistRejectCount);
                         Print($"V12 IPC REJECT: action '{action}' is not allowed");
                         continue;
                     }
@@ -517,6 +529,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                            action == "GET_FLEET" || action == "DIAG_FLEET" || action == "CANCEL_ALL" ||
                                            action == "FLATTEN" || action == "SYNC_ALL" || action == "MKT_SYNC" ||
                                            action == "REQUEST_FLEET_STATE" || action == "RESET_MEMORY" ||
+                                           action == "DIAG_IPC" ||
                                            action.StartsWith("MOVE_TARGET") || action == "LOCK_50"; // [1102Z-F]
 
                     // V10.3: Robust Symbol Matching (Matches MGC to GC/MGC, MES to ES/MES, etc.)
@@ -991,6 +1004,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.2: Diagnostic command to check fleet state
                     else if (action == "DIAG_FLEET")
                         HandleFleetCommand(action, parts);
+                    // Build 941 [FIX-4]: IPC telemetry counters -- reports ops monitoring stats
+                    else if (action == "DIAG_IPC")
+                    {
+                        Print("[DIAG_IPC] Invalid UTF-8 count   : " + _ipcInvalidUtf8Count);
+                        Print("[DIAG_IPC] Allowlist reject count: " + _ipcAllowlistRejectCount);
+                        Print("[DIAG_IPC] Queue depth peak      : " + _ipcQueueDepthPeak);
+                    }
                     else if (action.StartsWith("SET_ANCHOR"))
                     {
                         // V11: SET_ANCHOR|EMA30|Global

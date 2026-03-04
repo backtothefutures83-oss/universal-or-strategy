@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "940";  // V12.940: OCO stable hash + REAPER lock finally + ASCII gate recurse
+        public const string BUILD_TAG = "941";  // V12.941: NaN sizing guard, IPC telemetry counters, ASCII cleanup
 
         #region Variables
 
