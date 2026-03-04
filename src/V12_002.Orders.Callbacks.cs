@@ -558,7 +558,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         TriggerCustomEvent(o =>
                         {
-                            SubmitFollowerReplacement(sigName, acctNameCapture, price, qty, fsmCapture);
+                            // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
+                            // ATR tick absorption may have updated PendingPrice/PendingQty after the
+                            // lambda was scheduled -- using stale captures would submit wrong values.
+                            SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
                             _followerReplaceSpecs.TryRemove(sigName, out _);
                         }, null);
                     }

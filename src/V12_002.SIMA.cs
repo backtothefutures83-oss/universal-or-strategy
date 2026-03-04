@@ -935,7 +935,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     foreach (Order ord in acct.Orders.ToArray())
                     {
                         if (ord.Instrument?.FullName != Instrument?.FullName) continue;
-                        if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                        // [Codex P2] Include all live in-flight states -- Submitted/ChangePending/ChangeSubmitted
+                        // can be active during an in-flight FSM replace at reconnect time.
+                        // Setting _orderAdoptionComplete=true while these are skipped leaves REAPER
+                        // auditing against incomplete order tracking and can fire false repair cycles.
+                        if (ord.OrderState != OrderState.Working    &&
+                            ord.OrderState != OrderState.Accepted   &&
+                            ord.OrderState != OrderState.Submitted  &&
+                            ord.OrderState != OrderState.ChangePending &&
+                            ord.OrderState != OrderState.ChangeSubmitted) continue;
 
                         string name = ord.Name ?? string.Empty;
                         ConcurrentDictionary<string, Order> targetDict = null;
@@ -956,6 +964,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         { targetDict = target4Orders; key = name.Substring(3); dictName = "target4Orders"; }
                         else if (name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
                         { targetDict = target5Orders; key = name.Substring(3); dictName = "target5Orders"; }
+                        // [Codex P1] Adopt Fleet_ prefixed follower entry orders into entryOrders.
+                        // Without this, broker-resident follower entries are invisible after reconnect.
+                        // ProcessQueuedExecution finds them by object ref in entryOrders, so a missed
+                        // adoption means SymmetryGuardOnFollowerFill is bypassed and the new filled
+                        // position launches without its protective bracket orders.
+                        else if (name.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = entryOrders; key = name; dictName = "entryOrders"; }
 
                         if (targetDict == null || key == null) continue;
 

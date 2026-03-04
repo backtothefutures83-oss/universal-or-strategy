@@ -876,7 +876,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // [BUILD 948] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
                 // Must run while dicts are still populated and accounts still subscribed.
-                CancelAllV12GtcOrders();
+                // force=true: hard terminate, cancel regardless of open positions.
+                CancelAllV12GtcOrders(true);
 
                 // Stop IPC Server
                 StopIpcServer();
