@@ -814,6 +814,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
+                    CancelAllV12GtcOrders(); // [BUILD 948] GTC sweep before teardown
                     StopReaperAudit();
                     UnsubscribeFromFleetAccounts();
                     Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
@@ -870,6 +871,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // V12.Phase6 [HYDRATE]: Seed expectedPositions from live broker state
             HydrateExpectedPositionsFromBroker();
+
+            // [BUILD 948] Adopt any working broker orders into tracking dicts; sets _orderAdoptionComplete = true
+            HydrateWorkingOrdersFromBroker();
         }
 
         /// <summary>
@@ -910,6 +914,137 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (hydratedCount > 0)
                 Print($"[SIMA HYDRATE] Hydrated {hydratedCount} account(s) with live broker positions");
+        }
+
+        /// <summary>
+        /// Build 948 [FIX-B]: Re-adopt working broker orders into tracking dicts after restart or reconnect.
+        /// Derives the original entry key by stripping the well-known order-name prefix (e.g. "Stop_" -> stopOrders).
+        /// Sets _orderAdoptionComplete = true when done so REAPER can resume auditing.
+        /// MUST be called on the strategy thread (via TriggerCustomEvent when initiated from a callback).
+        /// All dict writes are guarded by stateLock per the StateLock Rule.
+        /// </summary>
+        private void HydrateWorkingOrdersFromBroker()
+        {
+            int adoptedCount = 0;
+
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                try
+                {
+                    foreach (Order ord in acct.Orders.ToArray())
+                    {
+                        if (ord.Instrument?.FullName != Instrument?.FullName) continue;
+                        if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+
+                        string name = ord.Name ?? string.Empty;
+                        ConcurrentDictionary<string, Order> targetDict = null;
+                        string key     = null;
+                        string dictName = null;
+
+                        if (name.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = stopOrders;   key = name.Substring(5); dictName = "stopOrders"; }
+                        else if (name.StartsWith("S_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = stopOrders;   key = name.Substring(2); dictName = "stopOrders"; }
+                        else if (name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target1Orders; key = name.Substring(3); dictName = "target1Orders"; }
+                        else if (name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target2Orders; key = name.Substring(3); dictName = "target2Orders"; }
+                        else if (name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target3Orders; key = name.Substring(3); dictName = "target3Orders"; }
+                        else if (name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target4Orders; key = name.Substring(3); dictName = "target4Orders"; }
+                        else if (name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target5Orders; key = name.Substring(3); dictName = "target5Orders"; }
+
+                        if (targetDict == null || key == null) continue;
+
+                        lock (stateLock) { targetDict[key] = ord; }
+                        Print(string.Format("[SIMA HYDRATE] Adopted working order {0} into {1}", name, dictName));
+                        adoptedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print(string.Format("[SIMA HYDRATE] WARNING: Could not read orders for {0}: {1}", acct.Name, ex.Message));
+                }
+            }
+
+            _orderAdoptionComplete = true;
+            if (adoptedCount > 0)
+                Print(string.Format("[SIMA HYDRATE] Adopted {0} working order(s) from broker -- adoption complete.", adoptedCount));
+            else
+                Print("[SIMA HYDRATE] No working orders to adopt -- adoption complete.");
+        }
+
+        /// <summary>
+        /// Build 948 [FIX-A]: Sweep and cancel all V12-managed GTC orders before SIMA disable or strategy terminate.
+        /// Phase 1 scans tracked order dicts; Phase 2 scans broker order lists for any V12-prefixed orders.
+        /// </summary>
+        private void CancelAllV12GtcOrders()
+        {
+            int trackedCancels = 0;
+            int brokerCancels  = 0;
+
+            // Phase 1: Cancel orders tracked in strategy dicts
+            var trackedDicts = new ConcurrentDictionary<string, Order>[]
+            {
+                entryOrders, stopOrders,
+                target1Orders, target2Orders, target3Orders, target4Orders, target5Orders
+            };
+            foreach (var dict in trackedDicts)
+            {
+                if (dict == null) continue;
+                foreach (var kvp in dict.ToArray())
+                {
+                    Order ord = kvp.Value;
+                    if (ord == null) continue;
+                    if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                    try
+                    {
+                        bool isFleet = ord.Account != null &&
+                            ord.Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                            !string.Equals(ord.Account.Name, Account.Name, StringComparison.OrdinalIgnoreCase);
+                        if (isFleet)
+                            ord.Account.Cancel(new[] { ord });
+                        else
+                            CancelOrder(ord);
+                        trackedCancels++;
+                    }
+                    catch { }
+                }
+            }
+
+            // Phase 2: Broker scan -- catch any V12 orders not held in tracking dicts
+            var v12Prefixes = new[] { "Stop_", "S_", "T1_", "T2_", "T3_", "T4_", "T5_", "Fleet_" };
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                try
+                {
+                    foreach (Order ord in acct.Orders.ToArray())
+                    {
+                        if (ord.Instrument?.FullName != Instrument?.FullName) continue;
+                        if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                        string ordName = ord.Name ?? string.Empty;
+                        bool isV12 = false;
+                        for (int pi = 0; pi < v12Prefixes.Length; pi++)
+                        {
+                            if (ordName.StartsWith(v12Prefixes[pi], StringComparison.OrdinalIgnoreCase))
+                            {
+                                isV12 = true;
+                                break;
+                            }
+                        }
+                        if (!isV12) continue;
+                        try { acct.Cancel(new[] { ord }); brokerCancels++; } catch { }
+                    }
+                }
+                catch { }
+            }
+
+            Print(string.Format("[BUILD 948] GTC sweep: cancelled {0} tracked + {1} broker-scanned orders",
+                trackedCancels, brokerCancels));
         }
 
         /// <summary>

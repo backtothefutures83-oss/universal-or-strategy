@@ -1130,7 +1130,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (order != null && order.Instrument.FullName == Instrument.FullName &&
                             (order.OrderState == OrderState.Working ||
                              order.OrderState == OrderState.Accepted ||
-                             order.OrderState == OrderState.Submitted))
+                             order.OrderState == OrderState.Submitted ||
+                             order.OrderState == OrderState.ChangePending ||
+                             order.OrderState == OrderState.ChangeSubmitted))
                         {
                             // V12.13c: Skip stops and targets on active positions -- only cancel pending entries
                             string oName = order.Name;
@@ -1155,7 +1157,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 if (order != null && order.Instrument.FullName == Instrument.FullName &&
                                     (order.OrderState == OrderState.Working ||
                                      order.OrderState == OrderState.Accepted ||
-                                     order.OrderState == OrderState.Submitted))
+                                     order.OrderState == OrderState.Submitted ||
+                                     order.OrderState == OrderState.ChangePending ||
+                                     order.OrderState == OrderState.ChangeSubmitted))
                                 {
                                     // V12.13c: Skip stops and targets -- only cancel pending entries
                                     string oName = order.Name;
@@ -1180,7 +1184,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (order != null && order.Instrument.FullName == Instrument.FullName &&
                             (order.OrderState == OrderState.Working ||
                              order.OrderState == OrderState.Accepted ||
-                             order.OrderState == OrderState.Submitted))
+                             order.OrderState == OrderState.Submitted ||
+                             order.OrderState == OrderState.ChangePending ||
+                             order.OrderState == OrderState.ChangeSubmitted))
                         {
                             // V12.13c: Skip stops and targets -- only cancel pending entries
                             string oName = order.Name;
