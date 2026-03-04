@@ -814,7 +814,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    CancelAllV12GtcOrders(); // [BUILD 948] GTC sweep before teardown
+                    CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
                     StopReaperAudit();
                     UnsubscribeFromFleetAccounts();
                     Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
@@ -980,13 +980,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// Build 948 [FIX-A]: Sweep and cancel all V12-managed GTC orders before SIMA disable or strategy terminate.
         /// Phase 1 scans tracked order dicts; Phase 2 scans broker order lists for any V12-prefixed orders.
+        /// force=true: cancel regardless of open positions (strategy terminate).
+        /// force=false: skip accounts that have an open position for this instrument (SIMA disable -- prevent naked accounts).
         /// </summary>
-        private void CancelAllV12GtcOrders()
+        private void CancelAllV12GtcOrders(bool force)
+        {
+            int trackedCancels = SweepTrackedOrders(force);
+            int brokerCancels  = SweepBrokerOrders(force);
+            Print(string.Format("[BUILD 948] GTC sweep: cancelled {0} tracked + {1} broker-scanned orders",
+                trackedCancels, brokerCancels));
+        }
+
+        /// <summary>Phase 1: cancel orders held in strategy tracking dictionaries.</summary>
+        private int SweepTrackedOrders(bool force)
         {
             int trackedCancels = 0;
-            int brokerCancels  = 0;
-
-            // Phase 1: Cancel orders tracked in strategy dicts
             var trackedDicts = new ConcurrentDictionary<string, Order>[]
             {
                 entryOrders, stopOrders,
@@ -1014,12 +1022,41 @@ namespace NinjaTrader.NinjaScript.Strategies
                     catch { }
                 }
             }
+            return trackedCancels;
+        }
 
-            // Phase 2: Broker scan -- catch any V12 orders not held in tracking dicts
+        /// <summary>
+        /// Phase 2: broker-level scan to catch V12 orders not held in tracking dicts.
+        /// [P1 LIFECYCLE SAFETY]: skips accounts with open positions when force=false
+        /// to avoid leaving them naked after entry-order cancellation.
+        /// </summary>
+        private int SweepBrokerOrders(bool force)
+        {
+            int brokerCancels = 0;
             var v12Prefixes = new[] { "Stop_", "S_", "T1_", "T2_", "T3_", "T4_", "T5_", "Fleet_" };
             foreach (Account acct in Account.All)
             {
                 if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                // [P1 LIFECYCLE SAFETY]: If not a forced teardown, skip accounts with open positions
+                // to avoid leaving them naked (no bracket/stop) after their entry orders are cancelled.
+                if (!force)
+                {
+                    bool hasPosition = false;
+                    try
+                    {
+                        foreach (Position pos in acct.Positions)
+                        {
+                            if (pos.Instrument?.FullName == Instrument?.FullName && pos.Quantity != 0)
+                            { hasPosition = true; break; }
+                        }
+                    }
+                    catch { }
+                    if (hasPosition)
+                    {
+                        Print(string.Format("[BUILD 948] GTC sweep: SKIPPING {0} -- open position detected (force=false)", acct.Name));
+                        continue;
+                    }
+                }
                 try
                 {
                     foreach (Order ord in acct.Orders.ToArray())
@@ -1031,10 +1068,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         for (int pi = 0; pi < v12Prefixes.Length; pi++)
                         {
                             if (ordName.StartsWith(v12Prefixes[pi], StringComparison.OrdinalIgnoreCase))
-                            {
-                                isV12 = true;
-                                break;
-                            }
+                            { isV12 = true; break; }
                         }
                         if (!isV12) continue;
                         try { acct.Cancel(new[] { ord }); brokerCancels++; } catch { }
@@ -1042,9 +1076,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch { }
             }
-
-            Print(string.Format("[BUILD 948] GTC sweep: cancelled {0} tracked + {1} broker-scanned orders",
-                trackedCancels, brokerCancels));
+            return brokerCancels;
         }
 
         /// <summary>
