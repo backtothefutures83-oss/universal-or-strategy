@@ -440,9 +440,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        // [BUILD 948] Cap per-invocation drain to prevent strategy-thread starvation during broker replay bursts.
+        private const int MaxAccountExecutionsPerDrain = 16;
+
         /// <summary>
         /// V12.Phase6 [CONCURRENCY-01]: Processes queued account execution events on the STRATEGY THREAD.
-        /// Drains the entire queue each invocation to prevent starvation under heavy fill bursts.
+        /// [BUILD 948] Drain is capped at MaxAccountExecutionsPerDrain per invocation; remaining items
+        /// are rescheduled via TriggerCustomEvent to yield the strategy thread between bursts.
         /// </summary>
         private void ProcessAccountExecutionQueue()
         {
@@ -454,9 +458,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            int drained = 0;
             QueuedAccountExecution item;
-            while (_accountExecutionQueue.TryDequeue(out item))
+            while (drained < MaxAccountExecutionsPerDrain && _accountExecutionQueue.TryDequeue(out item))
             {
+                drained++;
                 if (isFlattenRunning)
                 {
                     _accountExecutionQueue.Enqueue(item);
@@ -536,6 +542,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch { }
             }
+
+            // [BUILD 948] Reschedule if items remain after hitting the drain cap
+            if (!_accountExecutionQueue.IsEmpty)
+                try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
 
             // Update the compliance log once after draining all queued events
             if (EnableComplianceHub && !isFlattenRunning)

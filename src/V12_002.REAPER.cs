@@ -147,6 +147,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.8: Pause auditing while a flatten is actively running to prevent race conditions
                     if (isFlattenRunning) continue;
 
+                    // [BUILD 948] Skip audit until working orders have been re-adopted after restart/reconnect.
+                    // Prevents false CRITICAL DESYNC or naked-position alerts during the adoption window.
+                    if (!_orderAdoptionComplete) continue;
+
                     // V12.Hardening: Only audit in live/realtime -- skip historical replay
                     if (State != State.Realtime) continue;
 
