@@ -672,9 +672,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// V12 SIMA: Chase If Touch - iterates the unified entryOrders dictionary which contains
-        /// BOTH local and fleet follower limit orders. When price touches a working limit,
-        /// the order is converted to market so it fills immediately.
-        /// Local orders: ChangeOrder(). Follower orders: cancel + resubmit via ExecutingAccount.
+        /// BOTH local and fleet follower limit orders. When price touches a working limit entry
+        /// that was not filled, the limit is nudged N ticks toward market (citOffset * TickSize)
+        /// exactly once per order lifetime. Local orders: ChangeOrder() to new limit price.
+        /// Follower orders: cancel + resubmit as OrderType.Limit at new price via ExecutingAccount.
+        /// Re-nudging is prevented by _citNudgedKeys one-shot guard, cleared on fill or cancel.
         /// </summary>
         private void ManageCIT()
         {
@@ -739,6 +741,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         Order nudgedOrder = followerAcct.CreateOrder(Instrument, order.OrderAction, OrderType.Limit,
                             TimeInForce.Gtc, order.Quantity, newLimitPrice, 0, "", "CIT_" + key, null);
+                        if (nudgedOrder == null)
+                        {
+                            Print($"[CIT] ERROR: CreateOrder returned null for {key} on {followerAcct.Name} -- nudge aborted");
+                            continue;
+                        }
                         followerAcct.Submit(new[] { nudgedOrder });
 
                         entryOrders[key] = nudgedOrder;
