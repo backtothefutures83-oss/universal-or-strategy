@@ -47,7 +47,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             = new ConcurrentDictionary<string, long>();
 
         /// <summary>Build 946: Track consecutive failed repair attempts per account where PositionInfo is missing.</summary>
-        private ConcurrentDictionary<string, int> _reaperOrphanRepairCount = new ConcurrentDictionary<string, int>();
+        private readonly ConcurrentDictionary<string, int> _reaperOrphanRepairCount = new ConcurrentDictionary<string, int>();
 
         // Stamps per-account fill grace. Call from SetExpectedPositionLocked when applying a non-zero delta.
         private void StampAccountFillGrace(string expKey)
@@ -551,8 +551,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         Print(string.Format("[REAPER] SELF-HEAL: {0} has no PositionInfo after 3 attempts. Force-zeroing expectedPositions to unblock repair loop.",
                             accountName));
+                        // SetExpectedPositionLocked(..., 0) already removes from _dispatchSyncPendingExpKeys internally.
                         SetExpectedPositionLocked(ExpKey(accountName), 0);
-                        ClearDispatchSyncPending(ExpKey(accountName));
                         _reaperOrphanRepairCount.TryRemove(accountName, out _);
                     }
                     return;
