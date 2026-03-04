@@ -562,6 +562,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     Print(string.Format("{0:HH:mm:ss} | IPC Executing {1} for {2}", DateTime.UtcNow, action, Instrument.MasterInstrument.Name));
 
+                    // Build 942 [FIX-2]: Diag commands handled here; removes 2 branches from chain below (CS-R1140)
+                    if (TryHandleDiagCommand(action, parts)) return;
+
                     if (action == "TRIM_25" || action == "TRIM_50")
                         HandleTrimCommand(action, parts);
                     else if (action == "CONFIG")
@@ -1001,16 +1004,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.Phase6 [LIFECYCLE]: Uses centralized ApplySimaState for full lifecycle management
                     else if (action == "SET_SIMA")
                         HandleFleetCommand(action, parts);
-                    // V12.2: Diagnostic command to check fleet state
-                    else if (action == "DIAG_FLEET")
-                        HandleFleetCommand(action, parts);
-                    // Build 941 [FIX-4]: IPC telemetry counters -- reports ops monitoring stats
-                    else if (action == "DIAG_IPC")
-                    {
-                        Print("[DIAG_IPC] Invalid UTF-8 count   : " + _ipcInvalidUtf8Count);
-                        Print("[DIAG_IPC] Allowlist reject count: " + _ipcAllowlistRejectCount);
-                        Print("[DIAG_IPC] Queue depth peak      : " + _ipcQueueDepthPeak);
-                    }
                     else if (action.StartsWith("SET_ANCHOR"))
                     {
                         // V11: SET_ANCHOR|EMA30|Global
@@ -1415,6 +1408,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 activeFleetAccounts[resolvedName] = active;
             }
             Print($"[V12.2] TOGGLE_ACCOUNT: {resolvedName} (resolved from '{parts[1]}') | Active={active}");
+        }
+
+        /// <summary>
+        /// Build 942 [FIX-2]: Handles DIAG_FLEET and DIAG_IPC commands.
+        /// Extracted from ProcessIpcCommands to reduce cyclomatic complexity (DeepSource CS-R1140).
+        /// </summary>
+        private bool TryHandleDiagCommand(string action, string[] parts)
+        {
+            if (action == "DIAG_FLEET")
+            {
+                HandleFleetCommand(action, parts);
+                return true;
+            }
+            if (action == "DIAG_IPC")
+            {
+                Print("[DIAG_IPC] Invalid UTF-8 count   : " + _ipcInvalidUtf8Count);
+                Print("[DIAG_IPC] Allowlist reject count: " + _ipcAllowlistRejectCount);
+                Print("[DIAG_IPC] Queue depth peak      : " + _ipcQueueDepthPeak);
+                return true;
+            }
+            return false;
         }
 
         /// <summary>

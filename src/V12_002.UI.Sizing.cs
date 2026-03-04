@@ -84,7 +84,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private int CalculatePositionSize(double stopDistanceRaw)
         {
-            if (double.IsNaN(stopDistanceRaw) || double.IsInfinity(stopDistanceRaw) || pointValue <= 0)
+            if (double.IsNaN(stopDistanceRaw)      || double.IsInfinity(stopDistanceRaw)      ||
+                double.IsNaN(MaxRiskAmount)         || double.IsInfinity(MaxRiskAmount)         ||
+                double.IsNaN(SlippageCushionPoints) || double.IsInfinity(SlippageCushionPoints) ||
+                pointValue <= 0)
             {
                 Print("[SIZING] (!) Invalid sizing inputs -- returning min contracts");
                 return Math.Max(1, minContracts);
