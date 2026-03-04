@@ -46,6 +46,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentDictionary<string, long> _accountFillGraceTicks
             = new ConcurrentDictionary<string, long>();
 
+        /// <summary>Build 946: Track consecutive failed repair attempts per account where PositionInfo is missing.</summary>
+        private ConcurrentDictionary<string, int> _reaperOrphanRepairCount = new ConcurrentDictionary<string, int>();
+
         // Stamps per-account fill grace. Call from SetExpectedPositionLocked when applying a non-zero delta.
         private void StampAccountFillGrace(string expKey)
         {
@@ -540,9 +543,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (repairPos == null)
                 {
-                    Print($"[REAPER REPAIR] \u2717 No PositionInfo found for {accountName} -- cannot repair.");
+                    int orphanCount = _reaperOrphanRepairCount.AddOrUpdate(accountName, 1, (k, v) => v + 1);
+                    Print(string.Format("[REAPER REPAIR] x No PositionInfo found for {0} -- cannot repair. (orphan attempt {1}/3)",
+                        accountName, orphanCount));
+
+                    if (orphanCount >= 3)
+                    {
+                        Print(string.Format("[REAPER] SELF-HEAL: {0} has no PositionInfo after 3 attempts. Force-zeroing expectedPositions to unblock repair loop.",
+                            accountName));
+                        SetExpectedPositionLocked(ExpKey(accountName), 0);
+                        ClearDispatchSyncPending(ExpKey(accountName));
+                        _reaperOrphanRepairCount.TryRemove(accountName, out _);
+                    }
                     return;
                 }
+
+                // Clear orphan counter on successful PositionInfo resolution
+                _reaperOrphanRepairCount.TryRemove(accountName, out _);
 
                 OrderType repairOrderType = repairPos.EntryOrderType;
                 double repairEntryPrice = Instrument.MasterInstrument.RoundToTickSize(repairPos.EntryPrice);

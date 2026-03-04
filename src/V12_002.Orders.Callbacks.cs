@@ -554,7 +554,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (cascadePos.ExecutingAccount != null)
                             {
                                 int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
-                                DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
+                                int currentExp = 0;
+                                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(cascadeAcctName), out currentExp); }
+                                if (currentExp == 0)
+                                {
+                                    Print(string.Format("[GHOST_FIX] SKIP cascade delta for {0}: expectedPositions already 0 (purge-race guard). Delta suppressed.",
+                                        cascadeAcctName));
+                                }
+                                else
+                                {
+                                    DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
+                                }
                                 ClearDispatchSyncPending(ExpKey(cascadeAcctName));
                                 try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
                             }
