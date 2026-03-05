@@ -370,7 +370,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (kvp.Value.OldOrder == order && activePositions.TryGetValue(kvp.Key, out var pos))
                     {
                         if (pos.RemainingContracts > 0)
+                        {
                             CreateNewStopOrder(kvp.Key, pos.RemainingContracts, kvp.Value.StopPrice, kvp.Value.Direction);
+                            // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
+                            if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
+                            {
+                                TargetSnapshot[] _mSnap = kvp.Value.CapturedTargets;
+                                string _mKey = kvp.Key;
+                                TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
+                            }
+                        }
                         if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
                         handled = true;
                         break;
@@ -578,6 +587,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
+                // Build 950: Follower stop replacement -- mirrors HandleOrderCancelled master path.
+                // Follower stop cancels arrive via OnAccountOrderUpdate (not OnOrderUpdate), so
+                // HandleOrderCancelled never fires for them. Match pendingStopReplacements here.
+                // This block is in the else branch because stop orders are not in entryOrders.
+                if (order.Name.StartsWith("Stop_") || order.Name.StartsWith("S_"))
+                {
+                    foreach (var _psr in pendingStopReplacements.ToArray())
+                    {
+                        if (_psr.Value.OldOrder == order)
+                        {
+                            PositionInfo _rPos;
+                            if (activePositions.TryGetValue(_psr.Key, out _rPos) && _rPos.RemainingContracts > 0)
+                            {
+                                int _rQty;
+                                lock (stateLock) { _rQty = _rPos.RemainingContracts; }
+                                CreateNewStopOrder(_psr.Key, _rQty, _psr.Value.StopPrice, _psr.Value.Direction);
+                                if (_psr.Value.BracketRestorationNeeded && _psr.Value.CapturedTargets != null)
+                                {
+                                    TargetSnapshot[] _snap = _psr.Value.CapturedTargets;
+                                    string _rKey = _psr.Key;
+                                    TriggerCustomEvent(o => RestoreCascadedTargets(_rKey, _snap), null);
+                                }
+                            }
+                            if (pendingStopReplacements.TryRemove(_psr.Key, out _))
+                                Interlocked.Decrement(ref pendingReplacementCount);
+                            return;
+                        }
+                    }
+                }
                 Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
                 RemoveGhostOrderRef(order, reason);
             }

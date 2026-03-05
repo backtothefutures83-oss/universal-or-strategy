@@ -45,3 +45,46 @@ The 1,806-line `Entries.cs` has been surgically partitioned into 6 mode-specific
 1. **Compile**: Press F5 in NinjaTrader to verify Phase 7 partial class structure compiles.
 2. **Live Deployment**: Deploy to a single PA account for "Live Smoke Test."
 3. **Performance Audit**: Begin tracking P/L symmetry across the 20-account fleet.
+
+## Build 950: OCO Cascade Fix -- Resilient Bracket Replacement FSM
+
+### Problem
+When UpdateStopOrder cancelled a follower stop for BE/trail replacement, broker-native OCO
+(OcoGroupId shared across stop + all targets) auto-cancelled T1/T2/T3. Simultaneously,
+follower stop-cancel events arrive via OnAccountOrderUpdate -- which only checked
+_followerReplaceSpecs (entry FSM), NOT pendingStopReplacements. Result: no new stop for
+followers, no targets either. V8.30 5-second timeout eventually fired an emergency stop but
+with no OCO group and no targets -- naked bracket.
+
+### Fix: Two-Part Resilient Bracket Replacement FSM
+
+**Part 1 -- Follower stop black hole (HandleMatchedFollowerOrder):**
+Added pendingStopReplacements lookup in HandleMatchedFollowerOrder (Orders.Callbacks.cs).
+When a follower stop cancel matches OldOrder, CreateNewStopOrder is called immediately --
+same logic as HandleOrderCancelled does for master accounts.
+
+**Part 2 -- OCO cascade target restoration (RestoreCascadedTargets):**
+Extended PendingStopReplacement with CapturedTargets[] (TargetSnapshot array: TargetNum,
+Price, Qty, Order ref). Populated in UpdateStopOrder before cancel is issued.
+After new stop is created (on any path: normal callback, follower callback, V8.30 timeout),
+RestoreCascadedTargets() is scheduled via TriggerCustomEvent. It checks each captured
+Order.OrderState -- if Cancelled, the target was OCO-cascade-killed and is re-submitted
+with the same OcoGroupId and same price/qty.
+
+**Part 3 -- CreateNewStopOrder OcoGroupId fix:**
+New stop now includes pos.OcoGroupId so it re-enters the broker OCO bracket. Restored
+targets also use OcoGroupId -- full bracket linkage is restored.
+
+### Files Changed
+- src/V12_002.cs -- TargetSnapshot class, PendingStopReplacement extended, BUILD_TAG = "950"
+- src/V12_002.Trailing.cs -- target snapshot in UpdateStopOrder, restore in V8.30 timeout
+- src/V12_002.Orders.Callbacks.cs -- follower stop handler + master bracket restore
+- src/V12_002.Orders.Management.cs -- RestoreCascadedTargets(), CreateNewStopOrder OcoId fix
+
+### Verification
+1. Sim session: Enter 4-contract position, verify bracket (Stop + T1/T2/T3) all Working
+2. Send BE_CUSTOM via IPC -- confirm logs show "[B950] Target T1 restored", "[B950] Target T2 restored"
+3. Confirm new stop in stopOrders[entryName], new targets in target1Orders/target2Orders
+4. REAPER must NOT fire emergency stop (no naked position)
+5. Let T1 fill -- confirm stop reduces to 3 contracts, T2/T3 still Working
+6. Let stop fill -- confirm remaining targets cancelled by existing manual OCO loop
