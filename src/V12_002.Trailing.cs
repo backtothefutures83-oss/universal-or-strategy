@@ -514,14 +514,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (currentStop != null && (currentStop.OrderState == OrderState.CancelPending || currentStop.OrderState == OrderState.Submitted))
                 {
                     // Order is already being cancelled or submitted - queue the new stop price
+                    // Build 955: Snapshot targets BEFORE TryAdd so any callback sees a fully-initialized record.
+                    var _b955TargetsA = new System.Collections.Generic.List<TargetSnapshot>();
+                    for (int _tA = 1; _tA <= 5; _tA++)
+                    {
+                        var _tDA = GetTargetOrdersDictionary(_tA);
+                        Order _tOA;
+                        if (_tDA != null && _tDA.TryGetValue(entryName, out _tOA) && _tOA != null
+                            && (_tOA.OrderState == OrderState.Working || _tOA.OrderState == OrderState.Accepted))
+                            _b955TargetsA.Add(new TargetSnapshot { TargetNum = _tA, Price = _tOA.LimitPrice, Qty = _tOA.Quantity, CapturedOrder = _tOA });
+                    }
                     var newPending = new PendingStopReplacement
                     {
-                        EntryName = entryName,
-                        Quantity = pos.RemainingContracts,
-                        StopPrice = validatedStopPrice,
-                        Direction = pos.Direction,
-                        OldOrder = currentStop,
-                        CreatedTime = DateTime.Now  // V8.30: Timeout support
+                        EntryName                 = entryName,
+                        Quantity                  = pos.RemainingContracts,
+                        StopPrice                 = validatedStopPrice,
+                        Direction                 = pos.Direction,
+                        OldOrder                  = currentStop,
+                        CreatedTime               = DateTime.Now,  // V8.30: Timeout support
+                        CapturedTargets           = _b955TargetsA.Count > 0 ? _b955TargetsA.ToArray() : null,
+                        BracketRestorationNeeded  = _b955TargetsA.Count > 0
                     };
 
                     // V8.30: Thread-safe add or update
@@ -558,21 +570,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
 
-                    // Build 950: Snapshot Working/Accepted targets before cancel for OCO cascade restoration.
-                    {
-                        var _b950Targets = new System.Collections.Generic.List<TargetSnapshot>();
-                        for (int _t = 1; _t <= 5; _t++)
-                        {
-                            var _tD = GetTargetOrdersDictionary(_t);
-                            Order _tO;
-                            if (_tD != null && _tD.TryGetValue(entryName, out _tO) && _tO != null
-                                && (_tO.OrderState == OrderState.Working || _tO.OrderState == OrderState.Accepted))
-                                _b950Targets.Add(new TargetSnapshot { TargetNum = _t, Price = _tO.LimitPrice, Qty = _tO.Quantity, CapturedOrder = _tO });
-                        }
-                        newPending.CapturedTargets = _b950Targets.Count > 0 ? _b950Targets.ToArray() : null;
-                        newPending.BracketRestorationNeeded = _b950Targets.Count > 0;
-                    }
-
                     pos.CurrentStopPrice = validatedStopPrice;
                     pos.CurrentTrailLevel = newTrailLevel;
                     Print(string.Format("V8.12: Stop update queued for {0} (current state: {1})", entryName, currentStop.OrderState));
@@ -581,14 +578,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (currentStop != null && (currentStop.OrderState == OrderState.Working || currentStop.OrderState == OrderState.Accepted))
                 {
+                    // Build 955: Snapshot targets BEFORE TryAdd so any callback sees a fully-initialized record.
+                    var _b955TargetsB = new System.Collections.Generic.List<TargetSnapshot>();
+                    for (int _tB = 1; _tB <= 5; _tB++)
+                    {
+                        var _tDB = GetTargetOrdersDictionary(_tB);
+                        Order _tOB;
+                        if (_tDB != null && _tDB.TryGetValue(entryName, out _tOB) && _tOB != null
+                            && (_tOB.OrderState == OrderState.Working || _tOB.OrderState == OrderState.Accepted))
+                            _b955TargetsB.Add(new TargetSnapshot { TargetNum = _tB, Price = _tOB.LimitPrice, Qty = _tOB.Quantity, CapturedOrder = _tOB });
+                    }
                     var newPending = new PendingStopReplacement
                     {
-                        EntryName = entryName,
-                        Quantity = pos.RemainingContracts,
-                        StopPrice = validatedStopPrice,
-                        Direction = pos.Direction,
-                        OldOrder = currentStop,
-                        CreatedTime = DateTime.Now  // V8.30: Timeout support
+                        EntryName                 = entryName,
+                        Quantity                  = pos.RemainingContracts,
+                        StopPrice                 = validatedStopPrice,
+                        Direction                 = pos.Direction,
+                        OldOrder                  = currentStop,
+                        CreatedTime               = DateTime.Now,  // V8.30: Timeout support
+                        CapturedTargets           = _b955TargetsB.Count > 0 ? _b955TargetsB.ToArray() : null,
+                        BracketRestorationNeeded  = _b955TargetsB.Count > 0
                     };
 
                     // V8.30: Thread-safe add
@@ -601,21 +610,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                             circuitBreakerActivatedTime = DateTime.Now;
                             Print(string.Format("V8.30: CIRCUIT BREAKER ACTIVATED - {0} pending replacements", currentCount));
                         }
-                    }
-
-                    // Build 950: Snapshot Working/Accepted targets before cancel for OCO cascade restoration.
-                    {
-                        var _b950Targets = new System.Collections.Generic.List<TargetSnapshot>();
-                        for (int _t = 1; _t <= 5; _t++)
-                        {
-                            var _tD = GetTargetOrdersDictionary(_t);
-                            Order _tO;
-                            if (_tD != null && _tD.TryGetValue(entryName, out _tO) && _tO != null
-                                && (_tO.OrderState == OrderState.Working || _tO.OrderState == OrderState.Accepted))
-                                _b950Targets.Add(new TargetSnapshot { TargetNum = _t, Price = _tO.LimitPrice, Qty = _tO.Quantity, CapturedOrder = _tO });
-                        }
-                        newPending.CapturedTargets = _b950Targets.Count > 0 ? _b950Targets.ToArray() : null;
-                        newPending.BracketRestorationNeeded = _b950Targets.Count > 0;
                     }
 
                     if (pos.ExecutingAccount != null)

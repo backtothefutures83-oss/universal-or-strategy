@@ -2998,70 +2998,8 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void ConnectToStrategy()
         {
-            // [Build 954]: IPC deprecated -- strategy no longer hosts IPC server (Phase 6 pruning).
-            // Panel operates in standalone UI mode. All SendCommand calls are safely no-oped via tcpStream null guard.
-            return;
-            try
-            {
-                lock (tcpLock)
-                {
-                    if (isConnected) return;
-
-                    tcpClient = new TcpClient();
-                    tcpClient.Connect("127.0.0.1", IpcPort);
-                    tcpStream = tcpClient.GetStream();
-                    isConnected = true;
-                    // [Build 934]: Reset retry counters on successful connect
-                    _ipcRetryCount    = 0;
-                    _lastRetryLogTime = DateTime.MinValue;
-
-                    Print($"V12 Panel: Strategy connected on port {IpcPort} ?");
-
-                    if (ChartControl != null)
-                    {
-                        ChartControl.Dispatcher.BeginInvoke(new Action(() =>
-                        {
-                            if (hubStatusLed != null)
-                            {
-                                hubStatusLed.Background = GreenFg;
-                                hubStatusLed.ToolTip = "IPC Connected";
-                            }
-                        }));
-                    }
-
-                    receiveThread = new Thread(ReceiveLoop) { IsBackground = true, Name = "V12_Std_Receive" };
-                    receiveThread.Start();
-
-                    SendCommand("GET_LAYOUT");
-                }
-            }
-            catch (Exception)
-            {
-                isConnected = false;
-                _ipcRetryCount++;
-
-                // [Build 934]: Log only on first failure and then at most once per 60 seconds
-                if (_ipcRetryCount == 1 || (DateTime.Now - _lastRetryLogTime).TotalSeconds >= 60)
-                {
-                    Print($"V12 Panel: Strategy offline -- retrying in background (attempt #{_ipcRetryCount})");
-                    _lastRetryLogTime = DateTime.Now;
-                }
-
-                if (ChartControl != null)
-                {
-                    ChartControl.Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        if (hubStatusLed != null)
-                        {
-                            hubStatusLed.Background = TextMuted;
-                            hubStatusLed.ToolTip = "Waiting for Strategy (retrying...)";
-                        }
-                    }));
-                }
-
-                // [Build 933]: Start retry loop on initial failure (market closed / Strategy not yet live).
-                ScheduleReconnect();
-            }
+            // [Build 954]: IPC deprecated. Strategy no longer hosts IPC server (Phase 6 pruning).
+            // [Build 955]: Dead code removed. SendCommand() is safely no-oped via tcpStream null guard.
         }
 
         private void DisconnectFromStrategy()

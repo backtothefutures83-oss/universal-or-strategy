@@ -369,9 +369,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (kvp.Value.OldOrder == order && activePositions.TryGetValue(kvp.Key, out var pos))
                     {
-                        if (pos.RemainingContracts > 0)
+                        // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
+                        int _stopQty;
+                        lock (stateLock) { _stopQty = pos.RemainingContracts; }
+                        if (_stopQty > 0)
                         {
-                            CreateNewStopOrder(kvp.Key, pos.RemainingContracts, kvp.Value.StopPrice, kvp.Value.Direction);
+                            CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
                             // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
                             if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
                             {
@@ -598,18 +601,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (_psr.Value.OldOrder == order)
                         {
                             PositionInfo _rPos;
-                            if (activePositions.TryGetValue(_psr.Key, out _rPos) && _rPos.RemainingContracts > 0)
+                            // Build 955: Move guard inside lock -- check and use same atomic snapshot.
+                            if (activePositions.TryGetValue(_psr.Key, out _rPos))
                             {
                                 int _rQty;
                                 lock (stateLock) { _rQty = _rPos.RemainingContracts; }
-                                CreateNewStopOrder(_psr.Key, _rQty, _psr.Value.StopPrice, _psr.Value.Direction);
-                                if (_psr.Value.BracketRestorationNeeded && _psr.Value.CapturedTargets != null)
+                                if (_rQty > 0)
                                 {
-                                    TargetSnapshot[] _snap = _psr.Value.CapturedTargets;
-                                    string _rKey = _psr.Key;
-                                    TriggerCustomEvent(o => RestoreCascadedTargets(_rKey, _snap), null);
-                                }
-                            }
+                                    CreateNewStopOrder(_psr.Key, _rQty, _psr.Value.StopPrice, _psr.Value.Direction);
+                                    if (_psr.Value.BracketRestorationNeeded && _psr.Value.CapturedTargets != null)
+                                    {
+                                        TargetSnapshot[] _snap = _psr.Value.CapturedTargets;
+                                        string _rKey = _psr.Key;
+                                        TriggerCustomEvent(o => RestoreCascadedTargets(_rKey, _snap), null);
+                                    }
+                                } // if (_rQty > 0)
+                            } // if (activePositions.TryGetValue)
                             if (pendingStopReplacements.TryRemove(_psr.Key, out _))
                                 Interlocked.Decrement(ref pendingReplacementCount);
                             return;

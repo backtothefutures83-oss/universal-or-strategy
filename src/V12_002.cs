@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "954";  // V12.954: Bot Audit Fixes (IPC ghost conn, RETEST null state, deprecated mode fallback)
+        public const string BUILD_TAG = "955";  // V12.955: Race condition fix -- snapshot-before-TryAdd; TOCTOU lock-guard on RemainingContracts; IPC dead code pruned
 
         #region Variables
 
