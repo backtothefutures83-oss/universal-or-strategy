@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "950";  // V12.950: OCO Cascade Fix (bracket restore on V8.30 timeout path)
+        public const string BUILD_TAG = "954";  // V12.954: Bot Audit Fixes (IPC ghost conn, RETEST null state, deprecated mode fallback)
 
         #region Variables
 
