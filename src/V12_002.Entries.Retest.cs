@@ -186,6 +186,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetest);
                     Print("[ERROR][1102Y-V3] RETEST SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
+                    return; // [Build 954]: Do not latch session or dispatch SIMA for a failed order.
                 }
 
                 entryOrders[entryName] = entryOrder;

@@ -785,7 +785,19 @@ namespace NinjaTrader.NinjaScript.Indicators
                 selectedTargetCount = activeCount;
 
                 Button modeBtn = GetModeButton(activeMode);
-                if (modeBtn != null) HighlightModeButton(modeBtn);
+                if (modeBtn != null)
+                {
+                    HighlightModeButton(modeBtn);
+                }
+                else
+                {
+                    // [Build 954]: Saved mode is deprecated/unrecognized -- normalize both vars to RMA baseline.
+                    Print("[WARN][954] Unrecognized saved mode '" + activeMode + "' -- falling back to RMA.");
+                    activeMode = "RMA";
+                    selectedConfigMode = "RMA";
+                    modeBtn = GetModeButton("RMA");
+                    if (modeBtn != null) HighlightModeButton(modeBtn);
+                }
 
                 // Apply active mode+count settings to UI
                 ApplySettings(fullConfig.GetSettings(activeMode, activeCount));
@@ -2986,6 +2998,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void ConnectToStrategy()
         {
+            // [Build 954]: IPC deprecated -- strategy no longer hosts IPC server (Phase 6 pruning).
+            // Panel operates in standalone UI mode. All SendCommand calls are safely no-oped via tcpStream null guard.
+            return;
             try
             {
                 lock (tcpLock)
