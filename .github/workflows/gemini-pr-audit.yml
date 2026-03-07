@@ -23,22 +23,29 @@ jobs:
         run: |
           git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
 
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install Google Generative AI SDK
-        run: npm install @google/generative-ai
+      - name: Install Vertex AI SDK
+        run: npm install @google-cloud/vertexai
 
-      - name: Run Gemini Audit and Post Comment
+      - name: Run Vertex AI Audit and Post Comment
         uses: actions/github-script@v7
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: us-central1
         with:
           script: |
             const fs = require('fs');
-            const { GoogleGenerativeAI } = require('@google/generative-ai');
+            const { VertexAI } = require('@google-cloud/vertexai');
 
             const diffContent = fs.readFileSync('pr.diff', 'utf8');
             let geminiMdContent = '';
@@ -64,23 +71,26 @@ jobs:
 
             Be thorough, precise, and uncompromising on the rules.`;
 
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            // Targeted model as requested: Gemini 3.1 Pro (High) 
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+            const vertex_ai = new VertexAI({project: process.env.GCP_PROJECT_ID, location: process.env.GCP_REGION});
+            // Gemini 3.1 Pro Preview via Vertex AI
+            const generativeModel = vertex_ai.preview.getGenerativeModel({
+              model: 'gemini-3.1-pro-preview-customtools',
+            });
 
             let reviewText = '';
             try {
-              const result = await model.generateContent(prompt);
-              const response = await result.response;
-              reviewText = response.text();
+              const resp = await generativeModel.generateContent({
+                contents: [{role: 'user', parts: [{text: prompt}]}],
+              });
+              reviewText = resp.response.candidates[0].content.parts[0].text;
             } catch (error) {
-              console.error("Error calling Gemini API:", error);
-              reviewText = "⚠️ **Gemini Audit Failed to Execute**: " + error.message;
+              console.error("Error calling Vertex AI API:", error);
+              reviewText = "⚠️ **Vertex AI Audit Failed to Execute**: " + error.message;
             }
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "### 🤖 Antigravity Auto-Auditor (Gemini 3.1 Pro)\n\n" + reviewText
+              body: "### 🤖 Antigravity Auto-Auditor (Gemini 3.1 Pro via Vertex AI)\n\n" + reviewText
             });
