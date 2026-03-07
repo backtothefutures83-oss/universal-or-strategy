@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "948";  // V12.948: Freeze Prevention (GTC Sweep + Order Adoption + Burst Cap)
+        public const string BUILD_TAG = "950";  // V12.950: OCO Cascade Fix (bracket restore on V8.30 timeout path)
 
         #region Variables
 
@@ -278,6 +278,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Prevents re-nudging on subsequent bars after the first limit move.
         private readonly ConcurrentDictionary<string, bool> _citNudgedKeys
             = new ConcurrentDictionary<string, bool>();
+
+        // Build 950: Target snapshot for OCO cascade detection during stop replacement.
+        private class TargetSnapshot
+        {
+            public int    TargetNum;     // 1-5
+            public double Price;         // LimitPrice at snapshot time
+            public int    Qty;           // Quantity at snapshot time
+            public Order  CapturedOrder; // Order ref -- check .OrderState for cascade detection
+        }
 
         #endregion
 
@@ -560,6 +569,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             public MarketPosition Direction;
             public Order OldOrder;  // Track the old order being cancelled
             public DateTime CreatedTime;  // V8.30: Timeout support - clean up stale replacements
+            // Build 950: Bracket restoration -- populated before stop cancel is sent.
+            public TargetSnapshot[] CapturedTargets;      // null if no Working targets at cancel time
+            public bool             BracketRestorationNeeded; // true when CapturedTargets is non-null
         }
 
         // V8.22: Thread-Safe UI Snapshot Struct

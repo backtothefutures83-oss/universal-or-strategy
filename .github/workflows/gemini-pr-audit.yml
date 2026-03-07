@@ -1,0 +1,86 @@
+name: Gemini PR Auditor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  gemini-audit:
+    name: Gemini 3.1 Pro (High) Auto-Auditor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract PR diff
+        id: diff
+        run: |
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Google Generative AI SDK
+        run: npm install @google/generative-ai
+
+      - name: Run Gemini Audit and Post Comment
+        uses: actions/github-script@v7
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+            const diffContent = fs.readFileSync('pr.diff', 'utf8');
+            let geminiMdContent = '';
+            try {
+              geminiMdContent = fs.readFileSync('GEMINI.md', 'utf8');
+            } catch (e) {
+              console.log('GEMINI.md not found in the root directory, proceeding without it.');
+            }
+
+            const prompt = `You are the Gemini CLI (Antigravity Auto-Auditor) acting as a PR reviewer.
+            Your task is to analyze the following PR diff strictly against our project's GEMINI.md standards (Zero-Trust IPC, FSM mutations, etc.).
+
+            Here are the GEMINI.md standards:
+            ${geminiMdContent}
+
+            Here is the pull request diff:
+            ${diffContent}
+
+            Provide a systematic review of the changes:
+            1. Evaluate strict adherence to the standards (e.g., FSM replace pattern vs cancel+submit, lock guards, headless UI rules).
+            2. Point out any violations of the standard with specific file and line context.
+            3. If the code is perfectly aligned, state that it passes the Zero-Regression Bot Audit.
+
+            Be thorough, precise, and uncompromising on the rules.`;
+
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            // Targeted model as requested: Gemini 3.1 Pro (High) 
+            const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro" });
+
+            let reviewText = '';
+            try {
+              const result = await model.generateContent(prompt);
+              const response = await result.response;
+              reviewText = response.text();
+            } catch (error) {
+              console.error("Error calling Gemini API:", error);
+              reviewText = "⚠️ **Gemini Audit Failed to Execute**: " + error.message;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: "### 🤖 Antigravity Auto-Auditor (Gemini 3.1 Pro)\n\n" + reviewText
+            });

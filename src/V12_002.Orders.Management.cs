@@ -519,20 +519,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.3: Route to correct account (fleet follower vs local)
                 if (activePositions.TryGetValue(entryName, out var pos) && pos.IsFollower && pos.ExecutingAccount != null)
                 {
+                    // Build 950: Re-link replacement stop to broker OCO bracket.
+                    string _b950OcoId;
+                    lock (stateLock) { _b950OcoId = pos.OcoGroupId ?? string.Empty; }
                     // Fleet follower: use Account API
                     string sigName = "S_" + entryName;
                     if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
                     newStop = pos.ExecutingAccount.CreateOrder(Instrument, exitAction,
-                        OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, sigName, sigName, null);
+                        OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, _b950OcoId, sigName, null);
                     pos.ExecutingAccount.Submit(new[] { newStop });
                 }
                 else
                 {
+                    // Build 950: Re-link replacement stop to broker OCO bracket.
+                    string _b950OcoId;
+                    lock (stateLock) { _b950OcoId = pos != null ? (pos.OcoGroupId ?? string.Empty) : string.Empty; }
                     // Local: use SubmitOrderUnmanaged with truncated signal name
                     string suffix = (DateTime.Now.Ticks % 100000000).ToString();
                     string sigName = "S_" + entryName + "_" + suffix;
                     if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
-                    newStop = SubmitOrderUnmanaged(0, exitAction, OrderType.StopMarket, quantity, 0, stopPrice, "", sigName);
+                    newStop = SubmitOrderUnmanaged(0, exitAction, OrderType.StopMarket, quantity, 0, stopPrice, _b950OcoId, sigName);
                 }
 
                 if (newStop == null)
@@ -565,6 +571,92 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception ex)
             {
                 Print(string.Format("?? ?? ERROR CreateNewStopOrder for {0}: {1}", entryName, ex.Message));
+            }
+        }
+
+        // Build 950: Re-submit profit targets that were OCO-cascade-cancelled during stop replacement.
+        // Runs on strategy thread via TriggerCustomEvent. Checks Order.OrderState directly on the
+        // captured Order object -- avoids dict-timing races with RemoveGhostOrderRef.
+        private void RestoreCascadedTargets(string entryName, TargetSnapshot[] capturedTargets)
+        {
+            if (capturedTargets == null || capturedTargets.Length == 0) return;
+
+            PositionInfo pos;
+            if (!activePositions.TryGetValue(entryName, out pos)) return;
+
+            bool entryFilled;
+            int remainingContracts;
+            MarketPosition direction;
+            bool isFollower;
+            Account executingAccount;
+            string ocoGroupId;
+
+            lock (stateLock)
+            {
+                entryFilled        = pos.EntryFilled;
+                remainingContracts = pos.RemainingContracts;
+                direction          = pos.Direction;
+                isFollower         = pos.IsFollower;
+                executingAccount   = pos.ExecutingAccount;
+                ocoGroupId         = pos.OcoGroupId;
+            }
+
+            if (!entryFilled || remainingContracts <= 0) return;
+
+            OrderAction exitAction = direction == MarketPosition.Long
+                ? OrderAction.Sell : OrderAction.BuyToCover;
+            string bracketOcoId = ocoGroupId ?? string.Empty;
+
+            foreach (TargetSnapshot snap in capturedTargets)
+            {
+                if (snap == null || snap.CapturedOrder == null) continue;
+
+                // Only restore targets the broker OCO cascade-cancelled.
+                // Filled targets have OrderState.Filled -- skip them.
+                if (snap.CapturedOrder.OrderState != OrderState.Cancelled
+                    && snap.CapturedOrder.OrderState != OrderState.Rejected)
+                    continue;
+
+                double restoredPrice = Instrument.MasterInstrument.RoundToTickSize(snap.Price);
+                Order newTarget = null;
+
+                if (isFollower && executingAccount != null)
+                {
+                    string tSig = SymmetryTrim("T" + snap.TargetNum + "_" + entryName, 40);
+                    Order tOrd = executingAccount.CreateOrder(
+                        Instrument, exitAction, OrderType.Limit, TimeInForce.Gtc,
+                        snap.Qty, restoredPrice, 0, bracketOcoId, tSig, null);
+                    if (tOrd != null)
+                    {
+                        executingAccount.Submit(new[] { tOrd });
+                        newTarget = tOrd;
+                    }
+                }
+                else
+                {
+                    string tSig = "T" + snap.TargetNum + "_" + entryName;
+                    newTarget = direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Limit,
+                            snap.Qty, restoredPrice, 0, bracketOcoId, tSig)
+                        : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Limit,
+                            snap.Qty, restoredPrice, 0, bracketOcoId, tSig);
+                }
+
+                var tDict = GetTargetOrdersDictionary(snap.TargetNum);
+                if (tDict != null)
+                {
+                    if (newTarget != null)
+                    {
+                        tDict[entryName] = newTarget;
+                        Print(string.Format("[B950] Target T{0} restored for {1} @ {2:F2} qty={3}",
+                            snap.TargetNum, entryName, restoredPrice, snap.Qty));
+                    }
+                    else
+                    {
+                        Print(string.Format("[B950] WARN: Target T{0} restore NULL for {1}",
+                            snap.TargetNum, entryName));
+                    }
+                }
             }
         }
 
