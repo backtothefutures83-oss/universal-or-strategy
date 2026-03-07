@@ -66,7 +66,7 @@ jobs:
 
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             // Targeted model as requested: Gemini 3.1 Pro (High) 
-            const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
             let reviewText = '';
             try {
