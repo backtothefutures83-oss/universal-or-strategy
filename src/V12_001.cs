@@ -366,7 +366,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             else if (State == State.Realtime)
             {
                 activeSymbol = Instrument.MasterInstrument.Name;
-                if (AutoConnect) Task.Run(() => ConnectToStrategy());
+                // [Build 956]: IPC deprecated -- ConnectToStrategy() removed. AutoConnect is a no-op.
             }
             else if (State == State.Terminated)
             {
@@ -2996,12 +2996,6 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         #region IPC Communication
 
-        private void ConnectToStrategy()
-        {
-            // [Build 954]: IPC deprecated. Strategy no longer hosts IPC server (Phase 6 pruning).
-            // [Build 955]: Dead code removed. SendCommand() is safely no-oped via tcpStream null guard.
-        }
-
         private void DisconnectFromStrategy()
         {
             isShuttingDown = true;
@@ -3022,8 +3016,6 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 try
                 {
-                    if (!isConnected) ConnectToStrategy();
-
                     lock (tcpLock)
                     {
                         if (tcpStream != null && tcpStream.CanWrite)
@@ -3047,123 +3039,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             });
         }
 
-        private void ReceiveLoop()
-        {
-            StringBuilder buffer = new StringBuilder();
-            byte[] readBuffer = new byte[4096];
-
-            try
-            {
-                while (isConnected)
-                {
-                    try
-                    {
-                        if (tcpStream == null || !tcpStream.CanRead) break;
-
-                        int bytesRead = tcpStream.Read(readBuffer, 0, readBuffer.Length);
-                        if (bytesRead == 0)
-                        {
-                            Print("V12.14: ReceiveLoop - server closed connection (0 bytes)");
-                            break;
-                        }
-
-                        buffer.Append(Encoding.UTF8.GetString(readBuffer, 0, bytesRead));
-
-                        string data = buffer.ToString();
-                        int newlineIdx;
-                        while ((newlineIdx = data.IndexOf('\n')) >= 0)
-                        {
-                            string message = data.Substring(0, newlineIdx).Trim();
-                            data = data.Substring(newlineIdx + 1);
-
-                            if (!string.IsNullOrEmpty(message))
-                                responseQueue.Enqueue(message);
-                        }
-                        buffer.Clear();
-                        buffer.Append(data);
-                    }
-                    catch (Exception ex)
-                    {
-                        Print($"V12.14: ReceiveLoop exception - {ex.Message}");
-                        break;
-                    }
-                }
-            }
-            finally
-            {
-                // V12.14: Cleanup - mark disconnected and schedule reconnect
-                Print("V12.14: ReceiveLoop exited - marking disconnected");
-                lock (tcpLock)
-                {
-                    isConnected = false;
-                    try { tcpStream?.Close(); } catch { }
-                    try { tcpClient?.Close(); } catch { }
-                    tcpStream = null;
-                    tcpClient = null;
-                }
-
-                if (ChartControl != null)
-                {
-                    ChartControl.Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        if (hubStatusLed != null)
-                        {
-                            hubStatusLed.Background = TextMuted;
-                            hubStatusLed.ToolTip = "IPC Disconnected";
-                        }
-                    }));
-                }
-
-                ScheduleReconnect();
-            }
-        }
-
-        // V12.14: Auto-reconnect after unexpected disconnect
-        // V12.1101E [B-8]: Refactored to non-recursive -- reuses a single timer object via .Change()
-        // instead of Dispose + new Timer on each failure. Prevents timer object accumulation and
-        // eliminates recursive call stack growth under sustained disconnection.
-        private readonly object _reconnectLock = new object();
-
-        private void ScheduleReconnect()
-        {
-            if (isShuttingDown || isConnected) return;
-
-            lock (_reconnectLock)
-            {
-                if (reconnectTimer != null)
-                {
-                    // Reset the existing timer to fire again in 3 s -- no new allocation needed
-                    reconnectTimer.Change(3000, Timeout.Infinite);
-                    return;
-                }
-
-                // First time: create the timer once; subsequent reconnect calls reuse it via .Change()
-                reconnectTimer = new System.Threading.Timer(_ =>
-                {
-                    if (isShuttingDown || isConnected) return;
-
-                    // [Build 934]: Removed per-attempt "Auto-reconnect attempting..." print -- now throttled in ConnectToStrategy() catch block
-                    try
-                    {
-                        ConnectToStrategy();
-                        if (isConnected)
-                        {
-                            Print("V12 Panel: Strategy came online -- connected ?");
-                            lock (_reconnectLock) { reconnectTimer = null; }
-                        }
-                        else
-                        {
-                            ScheduleReconnect();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // [Build 934]: Logging is throttled inside ConnectToStrategy() catch -- no extra print here
-                        ScheduleReconnect();
-                    }
-                }, null, 3000, Timeout.Infinite);
-            }
-        }
+        // [Build 956]: ReceiveLoop() and ScheduleReconnect() removed -- IPC deprecated (Phase 6 pruning).
 
         private void ProcessStrategyResponse(string response)
         {

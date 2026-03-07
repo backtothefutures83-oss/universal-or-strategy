@@ -185,6 +185,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetest);
+                    activePositions.TryRemove(entryName, out _); // [Build 956]: Clean pre-registered state on null submit.
                     Print("[ERROR][1102Y-V3] RETEST SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
                     return; // [Build 954]: Do not latch session or dispatch SIMA for a failed order.
                 }
@@ -326,7 +327,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetestMnl);
+                    activePositions.TryRemove(entryName, out _); // [Build 956]: Clean pre-registered state on null submit.
                     Print("[ERROR][1102Y-V3] RETEST_MANUAL SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
+                    return; // [Build 956]: Do not assign null entryOrder or dispatch SIMA for a failed order.
                 }
                 entryOrders[entryName] = entryOrder;
 

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "955";  // V12.955: Race condition fix -- snapshot-before-TryAdd; TOCTOU lock-guard on RemainingContracts; IPC dead code pruned
+        public const string BUILD_TAG = "956";  // V12.956: DeepSource remediation -- RETEST_MANUAL null cleanup + IPC dead code removal (ReceiveLoop/ScheduleReconnect)
 
         #region Variables
 
