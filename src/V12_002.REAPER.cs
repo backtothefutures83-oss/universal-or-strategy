@@ -285,6 +285,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (!hasWorkingEntry)
                         {
                             if (shouldLog) Print($"[REAPER] * REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
+                            // A3-2: Mark in-flight BEFORE TriggerCustomEvent to block double-enqueue in next audit cycle (Build 960 audit fix)
+                            lock (stateLock) { _repairInFlight.Add(repairKey); }
                             _reaperRepairQueue.Enqueue(acct.Name);
                             try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); } catch { }
                         }
@@ -527,6 +529,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Threading: runs on strategy thread (via TriggerCustomEvent). All stateLock usages unchanged.
         private void ExecuteReaperRepair(string accountName)
         {
+            // A3-2: Abort immediately if a flatten is in progress (Build 960 audit fix)
+            if (isFlattenRunning)
+            {
+                Print("[REAPER REPAIR] Aborted -- flatten in progress.");
+                return;
+            }
+
             string repairKey = accountName + "_" + Instrument.FullName;
             try
             {
@@ -632,9 +641,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // 4. Mark in-flight to prevent double-repair
-                lock (stateLock) { _repairInFlight.Add(repairKey); }
-
+                // 4. In-flight was already set on the background thread before TriggerCustomEvent (A3-2)
                 try  // Build 940 [FIX-2]: Inner try/finally guarantees _repairInFlight cleanup on all exit paths.
                 {
                 // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern

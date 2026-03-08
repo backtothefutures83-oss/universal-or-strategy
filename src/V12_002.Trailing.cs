@@ -659,9 +659,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pos.EntryPrice));
                     Print(string.Format("(!) Attempted stop price: {0:F2} | Current price: {1:F2}", validatedStopPrice, Close[0]));
 
+                    // A3-3: Circuit breaker -- cap consecutive flatten attempts to 3 (Build 960 audit fix)
+                    PositionInfo cbPos;
+                    if (activePositions.TryGetValue(entryName, out cbPos) && cbPos != null)
+                    {
+                        cbPos.FlattenAttemptCount++;
+                        if (cbPos.FlattenAttemptCount > 3)
+                        {
+                            Print(string.Format("[CIRCUIT BREAKER] Emergency flatten halted after 3 consecutive failures for {0}. Manual intervention required.", entryName));
+                            return;
+                        }
+                    }
                     Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
                     FlattenPositionByName(entryName);
                     return;
+                }
+
+                // A3-3: Reset circuit breaker counter on successful stop submission
+                {
+                    PositionInfo cbReset;
+                    if (activePositions.TryGetValue(entryName, out cbReset) && cbReset != null)
+                        cbReset.FlattenAttemptCount = 0;
                 }
 
                 // A1-1: stopOrders final write inside stateLock (Build 960 audit fix)
@@ -678,15 +696,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("(!) ERROR UpdateStopOrder for {0}: {1}", entryName, ex.Message));
                 Print(string.Format("(!) POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
                 
-                // Attempt emergency flatten
-                try
+                // A3-3: Circuit breaker -- cap consecutive flatten attempts to 3 (Build 960 audit fix)
+                PositionInfo exCbPos;
+                bool flattenBlocked = false;
+                if (activePositions.TryGetValue(entryName, out exCbPos) && exCbPos != null)
                 {
-                    Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
-                    FlattenPositionByName(entryName);
+                    exCbPos.FlattenAttemptCount++;
+                    if (exCbPos.FlattenAttemptCount > 3)
+                    {
+                        Print(string.Format("[CIRCUIT BREAKER] Emergency flatten halted after 3 consecutive failures for {0}. Manual intervention required.", entryName));
+                        flattenBlocked = true;
+                    }
                 }
-                catch (Exception flattenEx)
+                if (!flattenBlocked)
                 {
-                    Print(string.Format("(!)(!) EMERGENCY FLATTEN FAILED: {0}", flattenEx.Message));
+                    try
+                    {
+                        Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
+                        FlattenPositionByName(entryName);
+                    }
+                    catch (Exception flattenEx)
+                    {
+                        Print(string.Format("(!)(!) EMERGENCY FLATTEN FAILED: {0}", flattenEx.Message));
+                    }
                 }
             }
         }

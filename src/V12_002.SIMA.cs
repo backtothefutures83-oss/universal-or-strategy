@@ -637,6 +637,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void PumpFleetDispatch()
         {
+            // A3-1: Abort and drain queue if SIMA is disabled or flatten is running (Build 960 audit fix)
+            if (isFlattenRunning || !EnableSIMA)
+            {
+                FleetDispatchRequest stale;
+                while (_pendingFleetDispatches.TryDequeue(out stale)) { }
+                Print("[PUMP] Abort: SIMA inactive or flatten running. Queue drained.");
+                return;
+            }
+
             if (!_pendingFleetDispatches.TryDequeue(out var req))
                 return;
 
@@ -817,6 +826,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
                     StopReaperAudit();
                     UnsubscribeFromFleetAccounts();
+                    // A3-1: Drain ghost dispatch queue on SIMA disable (Build 960 audit fix)
+                    {
+                        FleetDispatchRequest ignored;
+                        while (_pendingFleetDispatches.TryDequeue(out ignored)) { }
+                        Print("[SIMA] Dispatch queue cleared on shutdown.");
+                    }
                     Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
                 }
                 EnableSIMA = enabled;
