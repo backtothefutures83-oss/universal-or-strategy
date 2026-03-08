@@ -6,7 +6,7 @@ on:
 
 jobs:
   gemini-audit:
-    name: Gemini 3.1 Pro (High) Auto-Auditor
+    name: Gemini 1.5 Pro (High) Auto-Auditor
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -72,9 +72,9 @@ jobs:
             Be thorough, precise, and uncompromising on the rules.`;
 
             const vertex_ai = new VertexAI({project: process.env.GCP_PROJECT_ID, location: process.env.GCP_REGION});
-            // Gemini 3.1 Pro Preview via Vertex AI
+            // Gemini 1.5 Pro via Vertex AI
             const generativeModel = vertex_ai.preview.getGenerativeModel({
-              model: 'gemini-3.1-pro-preview-customtools',
+              model: 'gemini-1.5-pro',
             });
 
             let reviewText = '';
@@ -92,5 +92,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "### 🤖 Antigravity Auto-Auditor (Gemini 3.1 Pro via Vertex AI)\n\n" + reviewText
+              body: "### 🤖 Antigravity Auto-Auditor (Gemini 1.5 Pro via Vertex AI)\n\n" + reviewText
             });
