@@ -694,12 +694,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pos.ExecutingAccount.Cancel(new[] { order });
                     else
                         CancelOrder(order);
-
-                    // Build 930.1 P1: Direction-aware delta rollback.
-                    // expectedPositions is signed (Long=+, Short=-). Cancelling a Short must add back.
-                    string acctKey = pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : Account.Name;
-                    int delta = (pos.Direction == MarketPosition.Long) ? -pos.TotalContracts : pos.TotalContracts;
-                    DeltaExpectedPositionLocked(ExpKey(acctKey), delta);
+                    // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
+                    // to prevent REAPER desync if the follower was microseconds from filling (Build 960 audit fix).
                 }
             }
         }

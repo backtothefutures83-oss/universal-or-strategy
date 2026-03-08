@@ -358,6 +358,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Broker (Rithmic/Apex/Tradovate) uses this to cancel remaining orders when one fills,
             // protecting the position natively even during NT8 restarts.
             public string OcoGroupId;
+
+            // Build 960 [A2-2]: Deferred metadata purge -- set true when stop cancel is requested on
+            // final-target/trim close. Actual activePositions.TryRemove deferred to OnAccountOrderUpdate
+            // or HandleOrderCancelled when broker confirms stop terminal state.
+            public bool PendingCleanup;
+
+            // Build 960 [A3-3]: Circuit breaker counter for emergency flatten attempts from null stop submit.
+            // Incremented each call to FlattenPositionByName triggered by null stop. Halts after 3 failures.
+            public int FlattenAttemptCount;
         }
 
         private TargetMode GetTargetMode(int targetNumber)

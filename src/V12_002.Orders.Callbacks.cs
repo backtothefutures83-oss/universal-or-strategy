@@ -388,6 +388,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                         break;
                     }
                 }
+
+                // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
+                // If no pendingStopReplacement matched, check if this stop cancel completes a
+                // final-target/trim close where activePositions was intentionally kept alive.
+                if (!handled)
+                {
+                    foreach (var kvp in stopOrders.ToArray())
+                    {
+                        if (kvp.Value == order)
+                        {
+                            PositionInfo cleanupPos;
+                            if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
+                                && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
+                            {
+                                lock (stateLock) { activePositions.TryRemove(kvp.Key, out _); }
+                                SymmetryGuardForgetEntry(kvp.Key);
+                                Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
+                            }
+                            break;
+                        }
+                    }
+                }
             }
 
             if (!handled && entryOrders.Values.Contains(order))
@@ -596,6 +618,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return; // FSM-controlled cancel -- not a real desync
                 }
 
+                // A2-3: Direction-aware delta rollback on CONFIRMED cancel -- deferred from SymmetryGuardCascadeFollowerCleanup
+                // to prevent REAPER desync on microsecond fill race (Build 960 audit fix).
+                PositionInfo cancelledFollowerPos;
+                if (activePositions.TryGetValue(matchedEntry, out cancelledFollowerPos) && cancelledFollowerPos != null)
+                {
+                    string cancelAcctKey = cancelledFollowerPos.ExecutingAccount != null
+                        ? cancelledFollowerPos.ExecutingAccount.Name : Account.Name;
+                    int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
+                        ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
+                    DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+                }
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
             }
@@ -634,6 +667,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                 }
+                // A2-2: Deferred PendingCleanup purge -- follower stop terminal (Build 960 audit fix).
+                if (order.Name.StartsWith("Stop_") || order.Name.StartsWith("S_"))
+                {
+                    foreach (var _sc in stopOrders.ToArray())
+                    {
+                        if (_sc.Value == order)
+                        {
+                            PositionInfo _scPos;
+                            if (activePositions.TryGetValue(_sc.Key, out _scPos) && _scPos != null
+                                && _scPos.PendingCleanup && _scPos.RemainingContracts <= 0)
+                            {
+                                lock (stateLock) { activePositions.TryRemove(_sc.Key, out _); }
+                                SymmetryGuardForgetEntry(_sc.Key);
+                                Print("[A2-2] Deferred PendingCleanup purge (follower stop terminal): " + _sc.Key);
+                            }
+                            break;
+                        }
+                    }
+                }
+
                 Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
                 RemoveGhostOrderRef(order, reason);
             }
@@ -1028,9 +1081,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         else
                         {
                             // Position fully closed, cancel stop
+                            // A2-2: Defer activePositions.TryRemove to broker-confirmed stop terminal state (Build 960)
                             RequestStopCancelLifecycleSafe(entryName);
-                            activePositions.TryRemove(entryName, out _);
-                            SymmetryGuardForgetEntry(entryName);
+                            PositionInfo closedPos;
+                            if (activePositions.TryGetValue(entryName, out closedPos) && closedPos != null)
+                                closedPos.PendingCleanup = true;
+                            else
+                                SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
 
                         // V12.1101E [F-07]: Clear target ref only after broker confirms Filled.
@@ -1078,6 +1135,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             // Position fully closed by trim, cancel stop
                             Print(string.Format("TRIM FLATTEN: Position {0} fully closed. Cancelling stop.", entryName));
+                            // A2-2: Defer activePositions.TryRemove to broker-confirmed stop terminal state (Build 960)
                             RequestStopCancelLifecycleSafe(entryName);
 
                             // Also clean up any pending replacements
@@ -1086,8 +1144,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Interlocked.Decrement(ref pendingReplacementCount);
                             }
 
-                            activePositions.TryRemove(entryName, out _);
-                            SymmetryGuardForgetEntry(entryName);
+                            PositionInfo trimPos;
+                            if (activePositions.TryGetValue(entryName, out trimPos) && trimPos != null)
+                                trimPos.PendingCleanup = true;
+                            else
+                                SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
                     }
                 }
