@@ -405,6 +405,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
+                int contracts = CalculatePositionSize(stopDistance);
                 // contracts extracted directly from passed in parameter
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
