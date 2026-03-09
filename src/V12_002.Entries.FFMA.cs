@@ -61,7 +61,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("FFMA SHORT TRIGGERED: RSI={0:F1} > {1} | Distance={2:F2}pts > {3}pts | RED candle",
                         rsiValue, FFMARSIOverbought, distanceFromEMA, FFMAEMADistance));
-                    ExecuteFFMAEntry(MarketPosition.Short);
+                    double stopPrice = High[0];
+                    double stopDistance = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                    if (stopDistance < tickSize * 2) stopDistance = tickSize * 2;
+                    int contracts = CalculatePositionSize(stopDistance);
+                    ExecuteFFMAEntry(MarketPosition.Short, contracts);
                     return;
                 }
 
@@ -70,7 +74,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("FFMA LONG TRIGGERED: RSI={0:F1} < {1} | Distance={2:F2}pts (below by {3}pts) | GREEN candle",
                         rsiValue, FFMARSIOversold, distanceFromEMA, FFMAEMADistance));
-                    ExecuteFFMAEntry(MarketPosition.Long);
+                    double stopPrice = Low[0];
+                    double stopDistance = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                    if (stopDistance < tickSize * 2) stopDistance = tickSize * 2;
+                    int contracts = CalculatePositionSize(stopDistance);
+                    ExecuteFFMAEntry(MarketPosition.Long, contracts);
                     return;
                 }
             }
@@ -84,7 +92,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V8.7: Execute FFMA market order with entry candle high/low as stop
         /// Uses same target system as RMA (T1-T5)
         /// </summary>
-        private void ExecuteFFMAEntry(MarketPosition direction)
+        private void ExecuteFFMAEntry(MarketPosition direction, int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
             if (!IsOrderAllowed()) return;
@@ -127,7 +135,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
                 // Calculate position size based on ATR stop
-                int contracts = CalculatePositionSize(stopDistance);
+                            // contracts input passed directly by UI/IPC (No-Blink compliance)
 
                 // 5-target distribution
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
@@ -167,21 +175,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                     IsRMATrade = false,
                     IsFFMATrade = true,
                     // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
-                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
+                    OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
-                activePositions[entryName] = pos;
-
-                // V12.13-D: Notify connected panel clients of position entry
-                string syncMsg = string.Format("POSITION_ENTERED|FFMA|{0}", contracts);
-                SendResponseToRemote(syncMsg);
-
-
                 // Submit MARKET order (immediate execution)
                 Order entryOrder = direction == MarketPosition.Long
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Market, contracts, 0, 0, "", entryName);
 
-                entryOrders[entryName] = entryOrder;
+                // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
+                if (entryOrder == null)
+                {
+                    Print("[ENTRY_ABORT] FFMA SubmitOrderUnmanaged returned null for " + entryName + ". Rolling back.");
+                    return;
+                }
+                lock (stateLock)
+                {
+                    activePositions[entryName] = pos;
+                    entryOrders[entryName] = entryOrder;
+                }
+                // B957: Notify panel only after confirmed submit (not before). Prevents premature IPC notification.
+                string syncMsg = string.Format("POSITION_ENTERED|FFMA|{0}", contracts);
+                SendResponseToRemote(syncMsg);
 
                 Print(string.Format("FFMA MARKET ORDER: {0} {1}@MARKET | Stop: {2:F2} (candle {3})",
                     signalName, contracts, stopPrice, direction == MarketPosition.Long ? "low" : "high"));
@@ -219,7 +233,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.27: FFMA manual entry using Limit Order at user-specified price.
         /// Uses ATR-based stop (same as standard FFMA but with Limit instead of Market).
         /// </summary>
-        private void ExecuteFFMALimitEntry(double manualPrice, MarketPosition direction)
+        private void ExecuteFFMALimitEntry(double manualPrice, MarketPosition direction, int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
             if (!IsOrderAllowed()) return;
@@ -265,7 +279,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                int contracts = CalculatePositionSize(stopDistance);
+                            // contracts input passed directly by UI/IPC (No-Blink compliance)
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
@@ -302,15 +316,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     IsRMATrade = false,
                     IsFFMATrade = true,
                     // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
-                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
+                    OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
-                activePositions[entryName] = pos;
-
                 // V12.27: Submit LIMIT order (not Market like standard FFMA)
                 Order entryOrder = direction == MarketPosition.Long
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, contracts, entryPrice, 0, "", entryName)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, contracts, entryPrice, 0, "", entryName);
-                entryOrders[entryName] = entryOrder;
+
+                // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
+                if (entryOrder == null)
+                {
+                    Print("[ENTRY_ABORT] FFMA_LIMIT SubmitOrderUnmanaged returned null for " + entryName + ". Rolling back.");
+                    return;
+                }
+                lock (stateLock)
+                {
+                    activePositions[entryName] = pos;
+                    entryOrders[entryName] = entryOrder;
+                }
 
                 Print(string.Format("V12.27 FFMA_LIMIT: {0} {1}@{2:F2} LIMIT | Stop: {3:F2} | ATR-based",
                     direction, contracts, entryPrice, stopPrice));
@@ -334,7 +357,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.27: FFMA Manual Market entry -- instant market order, direction toward 9 EMA.
         /// Stop at entry candle high/low (same as Auto FFMA).
         /// </summary>
-        private void ExecuteFFMAManualMarketEntry()
+        private void ExecuteFFMAManualMarketEntry(int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
             if (!IsOrderAllowed()) return;
@@ -404,7 +427,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                int contracts = CalculatePositionSize(stopDistance);
+                            // contracts input passed directly by UI/IPC (No-Blink compliance)
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
@@ -441,15 +464,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     IsRMATrade = false,
                     IsFFMATrade = true,
                     // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
-                    OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
+                    OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
-                activePositions[entryName] = pos;
-
                 // Submit MARKET order (immediate execution)
                 Order entryOrder = direction == MarketPosition.Long
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Market, contracts, 0, 0, "", entryName);
-                entryOrders[entryName] = entryOrder;
+
+                // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
+                if (entryOrder == null)
+                {
+                    Print("[ENTRY_ABORT] FFMA_MANUAL_MARKET SubmitOrderUnmanaged returned null for " + entryName + ". Rolling back.");
+                    return;
+                }
+                lock (stateLock)
+                {
+                    activePositions[entryName] = pos;
+                    entryOrders[entryName] = entryOrder;
+                }
 
                 Print(string.Format("V12.27 FFMA_MANUAL_MARKET: {0} {1}@MARKET | Stop: {2:F2} (candle {3}) | Toward EMA9={4:F2}",
                     direction, contracts, stopPrice, direction == MarketPosition.Long ? "low" : "high", ema9Value));

@@ -1,0 +1,27 @@
+name: StyleCop Enforcement Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  lint:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore Linting.csproj
+
+      - name: Run StyleCop Analysis
+        # Treat warnings as errors to enforce strict pass/fail status on PRs
+        # -clp:ErrorsOnly minimizes output noise to just surface the errors
+        run: dotnet build Linting.csproj -warnaserror -clp:ErrorsOnly

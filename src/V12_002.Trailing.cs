@@ -631,10 +631,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // No existing stop or not in a cancellable state - create directly
                 if (pos.ExecutingAccount != null)
                 {
-                    newStop = pos.ExecutingAccount.CreateOrder(Instrument, pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover, 
+                    newStop = pos.ExecutingAccount.CreateOrder(Instrument, pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover,
                         OrderType.StopMarket, TimeInForce.Gtc, pos.RemainingContracts, 0, validatedStopPrice, "Stop_" + entryName, "Stop_" + entryName, null);
                     pos.ExecutingAccount.Submit(new[] { newStop });
-                    stopOrders[entryName] = newStop;
+                    // A1-1: stopOrders mutation inside stateLock (Build 960 audit fix)
+                    lock (stateLock) { stopOrders[entryName] = newStop; }
                 }
                 else
                 {
@@ -645,7 +646,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     OrderAction stopExitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
                     newStop = SubmitOrderUnmanaged(0, stopExitAction, OrderType.StopMarket, pos.RemainingContracts, 0, validatedStopPrice, "", stopSigName);
 
-                    if (newStop != null) stopOrders[entryName] = newStop;
+                    // A1-1: stopOrders mutation inside stateLock (Build 960 audit fix)
+                    if (newStop != null) lock (stateLock) { stopOrders[entryName] = newStop; }
                 }
 
                 if (newStop == null)
@@ -657,12 +659,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pos.EntryPrice));
                     Print(string.Format("(!) Attempted stop price: {0:F2} | Current price: {1:F2}", validatedStopPrice, Close[0]));
 
+                    // A3-3: Circuit breaker -- cap consecutive flatten attempts to 3 (Build 960 audit fix)
+                    // B957/A: FlattenAttemptCount is a shared PositionInfo field -- guard all R-M-W under stateLock.
+                    PositionInfo cbPos;
+                    bool circuitOpen = false;
+                    if (activePositions.TryGetValue(entryName, out cbPos) && cbPos != null)
+                    {
+                        lock (stateLock)
+                        {
+                            cbPos.FlattenAttemptCount++;
+                            if (cbPos.FlattenAttemptCount > 3) circuitOpen = true;
+                        }
+                        if (circuitOpen)
+                        {
+                            Print(string.Format("[CIRCUIT BREAKER] Emergency flatten halted after 3 consecutive failures for {0}. Manual intervention required.", entryName));
+                            return;
+                        }
+                    }
                     Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
                     FlattenPositionByName(entryName);
                     return;
                 }
 
-                stopOrders[entryName] = newStop;
+                // A3-3: Reset circuit breaker counter on successful stop submission
+                {
+                    PositionInfo cbReset;
+                    if (activePositions.TryGetValue(entryName, out cbReset) && cbReset != null)
+                        lock (stateLock) { cbReset.FlattenAttemptCount = 0; } // B957/A: stateLock guards PositionInfo field writes
+                }
+
+                // B957: Removed redundant stopOrders write -- already set at CreateOrder/SubmitOrderUnmanaged path above.
                 pos.CurrentStopPrice = validatedStopPrice;
                 pos.CurrentTrailLevel = newTrailLevel;
 
@@ -675,15 +701,31 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("(!) ERROR UpdateStopOrder for {0}: {1}", entryName, ex.Message));
                 Print(string.Format("(!) POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
                 
-                // Attempt emergency flatten
-                try
+                // A3-3: Circuit breaker -- cap consecutive flatten attempts to 3 (Build 960 audit fix)
+                // B957/A: FlattenAttemptCount R-M-W guarded under stateLock.
+                PositionInfo exCbPos;
+                bool flattenBlocked = false;
+                if (activePositions.TryGetValue(entryName, out exCbPos) && exCbPos != null)
                 {
-                    Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
-                    FlattenPositionByName(entryName);
+                    lock (stateLock)
+                    {
+                        exCbPos.FlattenAttemptCount++;
+                        if (exCbPos.FlattenAttemptCount > 3) flattenBlocked = true;
+                    }
+                    if (flattenBlocked)
+                        Print(string.Format("[CIRCUIT BREAKER] Emergency flatten halted after 3 consecutive failures for {0}. Manual intervention required.", entryName));
                 }
-                catch (Exception flattenEx)
+                if (!flattenBlocked)
                 {
-                    Print(string.Format("(!)(!) EMERGENCY FLATTEN FAILED: {0}", flattenEx.Message));
+                    try
+                    {
+                        Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
+                        FlattenPositionByName(entryName);
+                    }
+                    catch (Exception flattenEx)
+                    {
+                        Print(string.Format("(!)(!) EMERGENCY FLATTEN FAILED: {0}", flattenEx.Message));
+                    }
                 }
             }
         }
@@ -975,23 +1017,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (pos.IsFollower && pos.ExecutingAccount != null)
                     {
-                        // [1102Z-F]: Fleet follower path -- cancel old limit, resubmit at new price
-                        pos.ExecutingAccount.Cancel(new[] { targetOrder });
-
+                        // B957/C1: Two-phase FSM for follower target replacement (banned Cancel+Submit replaced).
+                        // Record spec in _followerTargetReplaceSpecs, cancel only -- submission deferred to
+                        // broker cancel confirmation in OnAccountOrderUpdate / SubmitFollowerTargetReplacement().
                         OrderAction exitAct = pos.Direction == MarketPosition.Long
                             ? OrderAction.Sell : OrderAction.BuyToCover;
-                        Order newFollowerOrder = pos.ExecutingAccount.CreateOrder(
-                            Instrument, exitAct, OrderType.Limit, TimeInForce.Gtc,
-                            targetOrder.Quantity, newTargetPrice, 0, "", targetOrderName, null);
-                        pos.ExecutingAccount.Submit(new[] { newFollowerOrder });
-
-                        // Update dictionary reference so the strategy tracks the new order
-                        var tDictF = GetTargetOrdersDictionary(targetNum);
-                        if (tDictF != null) tDictF[entryName] = newFollowerOrder;
-
+                        var tSpec = new FollowerTargetReplaceSpec
+                        {
+                            EntryName      = entryName,
+                            TargetNum      = targetNum,
+                            NewTargetPrice = newTargetPrice,
+                            Quantity       = targetOrder.Quantity,
+                            ExitAction     = exitAct,
+                            TargetAccount  = pos.ExecutingAccount,
+                            CancellingOrderId = targetOrder.OrderId
+                        };
+                        lock (stateLock) { _followerTargetReplaceSpecs[targetOrderName] = tSpec; }
+                        // A1-2: Stamp REAPER grace window before cancel to suppress false desync during replace gap.
+                        StampReaperMoveGrace();
+                        pos.ExecutingAccount.Cancel(new[] { targetOrder });
                         movedCount++;
                         double profitFromEntryF = Math.Abs(newTargetPrice - entryPrice);
-                        Print($"[SIMA] MoveSpecificTarget T{targetNum}: Follower {entryName} on {pos.ExecutingAccount.Name} -> {newTargetPrice:F2} (+{profitFromEntryF:F2})");
+                        Print($"[SIMA] MoveSpecificTarget T{targetNum}: Follower {entryName} on {pos.ExecutingAccount.Name} -> FSM PendingCancel -> {newTargetPrice:F2} (+{profitFromEntryF:F2})");
                     }
                     else
                     {

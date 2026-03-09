@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "956";  // V12.956: DeepSource remediation -- RETEST_MANUAL null cleanup + IPC dead code removal (ReceiveLoop/ScheduleReconnect)
+        public const string BUILD_TAG = "960";  // V12.960: Resolve PR #32 audit findings -- ghost-state teardown fixes, locked cleanup symmetry, protocol alignment
 
         #region Variables
 
@@ -274,6 +274,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentDictionary<string, FollowerReplaceSpec>
             _followerReplaceSpecs = new ConcurrentDictionary<string, FollowerReplaceSpec>();
 
+        // B957/C1: Two-phase FSM for follower TARGET order replacement (same pattern as entry replace FSM).
+        // Replaces the banned Cancel+Submit anti-pattern in MoveSpecificTarget follower path.
+        private class FollowerTargetReplaceSpec
+        {
+            public string      EntryName;
+            public int         TargetNum;
+            public double      NewTargetPrice;
+            public int         Quantity;
+            public OrderAction ExitAction;
+            public Account     TargetAccount;
+            public string      CancellingOrderId; // matched by order ID in OnAccountOrderUpdate
+        }
+        private readonly ConcurrentDictionary<string, FollowerTargetReplaceSpec>
+            _followerTargetReplaceSpecs = new ConcurrentDictionary<string, FollowerTargetReplaceSpec>();
+
         // [BUILD 949] CIT one-shot guard: tracks keys that have already been nudged.
         // Prevents re-nudging on subsequent bars after the first limit move.
         private readonly ConcurrentDictionary<string, bool> _citNudgedKeys
@@ -358,6 +373,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Broker (Rithmic/Apex/Tradovate) uses this to cancel remaining orders when one fills,
             // protecting the position natively even during NT8 restarts.
             public string OcoGroupId;
+
+            // Build 960 [A2-2]: Deferred metadata purge -- set true when stop cancel is requested on
+            // final-target/trim close. Actual activePositions.TryRemove deferred to OnAccountOrderUpdate
+            // or HandleOrderCancelled when broker confirms stop terminal state.
+            public bool PendingCleanup;
+
+            // Build 960 [A3-3]: Circuit breaker counter for emergency flatten attempts from null stop submit.
+            // Incremented each call to FlattenPositionByName triggered by null stop. Halts after 3 failures.
+            public int FlattenAttemptCount;
         }
 
         private TargetMode GetTargetMode(int targetNumber)
@@ -1349,6 +1373,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (o.Tag == tag) return o;
             }
             return null;
+        }
+
+        // Build 940 [FIX-1]: Stable OCO hash -- FNV-1a non-crypto hash, consistent across NT8 restarts and platforms.
+        // Used for OCO Group IDs to satisfy SonarCloud security hotspots while maintaining stability.
+        private string GetStableHash(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return "00000000";
+            uint hash = 2166136261;
+            foreach (char c in input)
+            {
+                hash = (hash ^ c) * 16777619;
+            }
+            return hash.ToString("X8").ToUpperInvariant();
         }
 
         #endregion

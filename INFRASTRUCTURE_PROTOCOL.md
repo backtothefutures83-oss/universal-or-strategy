@@ -1,52 +1,68 @@
 # BMad Hardened Infrastructure Protocol
 
-**Purpose:** To eliminate the "Old Code" failure mode by ensuring a single, verifiable source of truth between the development environment and NinjaTrader 8.
+**Purpose:** Eliminate the "Old Code" failure mode by enforcing a single, verifiable source of truth between the repo and NinjaTrader 8.
 
 ---
 
-## 🛡️ 1. The "One Source of Truth" (HardLink)
-All strategy files in the NinjaTrader directory MUST be **HardLinks** to the files in `C:\WSGTA\universal-or-strategy\src`.
-*   **Verification Command (Run by AI at start of session):**
-    `fsutil hardlink list "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\UniversalORStrategyV12_002_Dev.cs"`
-*   **Success Criteria:** The command MUST return both the NinjaTrader path and the `C:\WSGTA` path. If it only returns one path, the link is broken.
+## 1. One Source of Truth (HardLink)
 
-## 🛠️ 2. Deployment Protocol
-If the link is broken or files need refreshing, run the deployment script:
-*   **Script:** `C:\WSGTA\universal-or-strategy\deploy-sync.ps1`
-*   **Policy:** Never manually copy/paste code into the NinjaTrader editor. Always edit in the Repo and let the HardLink propagate.
+All strategy files in the NinjaTrader directory MUST be hardlinks to files in `C:\WSGTA\universal-or-strategy\src`.
 
-## 🏷️ 3. Version Traceability (Build Tags)
-Every forensic or architectural change MUST be accompanied by an increment to the `BUILD_TAG` in `UniversalORStrategyV12_002_Dev.cs`.
-*   **Current Build:** `930`
-*   **Audit Step:** On strategy start, verify the NinjaTrader Output window shows:
-    `🛡 BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE | Build: 930`
+- **Verification Command (run at session start):**
+  `fsutil hardlink list "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\V12_002.cs"`
+- **Success Criteria:** The command must return both the NinjaTrader path and the matching `C:\WSGTA\universal-or-strategy\src\V12_002.cs` path. If it returns only one path, the hardlink is broken.
 
-## 🔎 4. Zero-Trust Policy
+## 2. Deployment Protocol
+
+If a hardlink is broken or files need refreshing, run the deployment script:
+
+- **Script:** `C:\WSGTA\universal-or-strategy\deploy-sync.ps1`
+- **Policy:** Never manually copy and paste code into the NinjaTrader editor. Always edit in the repo and let the hardlink propagate.
+
+## 3. Version Traceability (Build Tags)
+
+Every forensic or architectural change must increment `BUILD_TAG` in `src\V12_002.cs`.
+
+- **Current Build:** `960`
+- **Audit Step:** On strategy start, verify the NinjaTrader Output window includes both:
+  `[OK] BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE`
+  `Build: 960`
+
+## 4. Zero-Trust Policy
+
 Never assume the code on GitHub is the code running in NinjaTrader.
-1.  **Always** verify the local Build Tag.
-2.  **Always** verify HardLinks using `fsutil` at the start of every session.
-3.  **Mandatory Script:** Use `deploy-sync.ps1` to restore or establish links. Manual copy-pasting is a violation of the Security Shield.
 
-## 🛠️ 5. Live Repair Protocol (Emergency)
+1. Always verify the local build tag.
+2. Always verify hardlinks using `fsutil` at the start of every session.
+3. Always use `deploy-sync.ps1` to restore or establish links. Manual copy-pasting is a protocol violation.
+
+## 5. Live Repair Protocol
+
 If a bug is detected during active trading:
-1.  **Repair Location:** Edit files ONLY in `C:\WSGTA\universal-or-strategy\src`.
-2.  **Build Increment:** Immediately increment the `BUILD_TAG` (e.g., `923B` -> `923C`).
-3.  **Propagation:** Save the file; the HardLink will update NinjaTrader's file instantly.
-4.  **User Action:** Instruct the user: "HardLink updated. Please press F5 in NinjaTrader to compile."
-5.  **Audit:** Verify the NinjaTrader Output window shows the NEW Build Tag.
-6.  **Commit:** Commit the repair to the current branch immediately, but **Hold Merge** until the session reset.
 
-## 🏁 6. Git & Pull Request Workflow
-To maintain code integrity, all changes must be committed to a branch and merged via Pull Request using the GitHub CLI (`gh`).
-1.  **Branching:** Always work on a descriptive feature branch (e.g., `audit/full-codebase-review`).
-2.  **Commit Policy:** Every commit must reference the `BUILD_TAG`.
-3.  **PR Action:** When a build is verified, the AI must automatically prepare the PR:
-    *   `git push origin [branch-name]`
-    *   `gh pr create --title "Build [BUILD_TAG]: [Brief Description]" --body "Forensic Audit & Repairs for Build [BUILD_TAG]."`
-4.  **Merge Rule:** Do not merge into `main` during live trading. Merges should happen after the market close/reset.
+1. Edit files only in `C:\WSGTA\universal-or-strategy\src`.
+2. Immediately increment the `BUILD_TAG` (for example, `959` -> `960`).
+3. Save the file so the hardlink updates the NinjaTrader file instantly.
+4. Instruct the user: "HardLink updated. Please press F5 in NinjaTrader to compile."
+5. Verify the NinjaTrader Output window shows the new build tag.
+6. Commit the repair to the current branch immediately, but hold merge until the session reset.
 
-## 🏁 7. Handoff Requirements
+## 6. Git and Pull Request Workflow
+
+To maintain code integrity, all changes must be committed to a branch and merged via pull request using the GitHub CLI.
+
+1. Always work on a descriptive feature branch.
+2. Every commit must reference the `BUILD_TAG`.
+3. When a build is verified, the AI must prepare the PR:
+   `git push origin [branch-name]`
+   `gh pr create --title "Build [BUILD_TAG]: [Brief Description]" --body "Forensic Audit & Repairs for Build [BUILD_TAG]."`
+4. Do not merge into `main` during live trading. Merge after the market close or reset.
+5. AI-led persistence is mandatory: the AI agent is authorized and required to `git push` all verified repairs before closing a session.
+
+## 7. Handoff Requirements
+
 When closing a coding session, the AI must confirm:
-1.  **Sync Status:** "All files HardLinked and verified via fsutil."
-2.  **Build Tag:** "Current code signature is [BUILD_TAG]."
-3.  **Compile Status:** "User advised to press F5 in NinjaTrader."
+
+1. "All files hardlinked and verified via fsutil."
+2. "Current code signature is [BUILD_TAG]."
+3. "User advised to press F5 in NinjaTrader."

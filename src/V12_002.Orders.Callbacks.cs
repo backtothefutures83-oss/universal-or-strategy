@@ -125,7 +125,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (stopOrder.OrderState == OrderState.Cancelled || stopOrder.OrderState == OrderState.Filled ||
                 stopOrder.OrderState == OrderState.Rejected || stopOrder.OrderState == OrderState.Unknown)
             {
-                stopOrders.TryRemove(entryName, out _);
+                lock (stateLock) { stopOrders.TryRemove(entryName, out _); }
             }
         }
 
@@ -136,7 +136,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in dict.ToArray())
             {
                 if (kvp.Value == order)
-                    return dict.TryRemove(kvp.Key, out _);
+                {
+                    lock (stateLock) { dict.TryRemove(kvp.Key, out _); }
+                    return true;
+                }
             }
             return false;
         }
@@ -206,9 +209,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrders.TryGetValue(kvp.Key, out var entryOrder) && entryOrder == order && !kvp.Value.EntryFilled)
                 {
                     PositionInfo pos = kvp.Value;
-                    pos.EntryFilled = true;
-                    pos.InitialTargetCount = activeTargetCount;
-
                     if (!pos.IsFollower)
                     {
                         int masterFillQty = filled > 0 ? filled : quantity;
@@ -217,26 +217,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (averageFillPrice <= 0)
                     {
+                        lock (stateLock) { pos.EntryFilled = true; pos.InitialTargetCount = activeTargetCount; }
                         Print(string.Format("[PRICE_GUARD] CRITICAL: averageFillPrice=0 for {0}. Keeping intended price {1:F2}. NOT re-anchoring.", kvp.Key, pos.EntryPrice));
                         SubmitBracketOrders(kvp.Key, pos);
                         return true;
                     }
 
-                    pos.EntryPrice = averageFillPrice;
-                    pos.ExtremePriceSinceEntry = averageFillPrice;
-
-                    // Recalculate targets and stop
-                    double stopDistance = pos.IsRMATrade ? currentATR * RMAStopATRMultiplier : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
-                    pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
-                    pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
-                    pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
-                    pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
-                    pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
+                    lock (stateLock)
+                    {
+                        pos.EntryFilled = true;
+                        pos.InitialTargetCount = activeTargetCount;
+                        pos.EntryPrice = averageFillPrice;
+                        pos.ExtremePriceSinceEntry = averageFillPrice;
+                        // Recalculate targets and stop
+                        double stopDistance = pos.IsRMATrade ? currentATR * RMAStopATRMultiplier : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
+                        pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
+                        pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
+                        pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
+                        pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
+                        pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
+                        stopDistance = Math.Min(stopDistance, 12.0);
+                        pos.InitialStopPrice = pos.Direction == MarketPosition.Long ? averageFillPrice - stopDistance : averageFillPrice + stopDistance;
+                        pos.CurrentStopPrice = pos.InitialStopPrice;
+                    }
                     ApplyTargetLadderGuard(pos);
-
-                    stopDistance = Math.Min(stopDistance, 12.0);
-                    pos.InitialStopPrice = pos.Direction == MarketPosition.Long ? averageFillPrice - stopDistance : averageFillPrice + stopDistance;
-                    pos.CurrentStopPrice = pos.InitialStopPrice;
 
                     Print(string.Format("{0} ENTRY FILLED: {1} {2} @ {3:F2}", pos.IsRMATrade ? "RMA" : "OR", pos.Direction, pos.TotalContracts, averageFillPrice));
                     SubmitBracketOrders(kvp.Key, pos);
@@ -293,7 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            if (orderName.StartsWith("T1_") || orderName.StartsWith("T2_") || orderName.StartsWith("T3_") || orderName.StartsWith("T4_") || orderName.StartsWith("T5_"))
+            if (orderName.StartsWith("T1_") || orderName.StartsWith("T2_") || orderName.StartsWith("T3_") || orderName.StartsWith("T4_") || orderName.StartsWith("T5_") || orderName.StartsWith("Runner_"))
             {
                 RemoveTargetReferenceOnTerminalFill(order);
                 return true;
@@ -324,7 +328,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
                         Print(string.Format("?? ?? CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
-                        stopOrders.TryRemove(kvp.Key, out _);
+                        lock (stateLock) { stopOrders.TryRemove(kvp.Key, out _); }
                         CreateNewStopOrder(kvp.Key, kvp.Value.RemainingContracts, kvp.Value.CurrentStopPrice, kvp.Value.Direction);
                         return true;
                     }
@@ -383,9 +387,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
                             }
                         }
-                        if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                        lock (stateLock)
+                        {
+                            if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                        }
                         handled = true;
                         break;
+                    }
+                }
+
+                // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
+                // If no pendingStopReplacement matched, check if this stop cancel completes a
+                // final-target/trim close where activePositions was intentionally kept alive.
+                if (!handled)
+                {
+                    foreach (var kvp in stopOrders.ToArray())
+                    {
+                        if (kvp.Value == order)
+                        {
+                            PositionInfo cleanupPos;
+                            if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
+                                && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
+                            {
+                                lock (stateLock)
+                                {
+                                    stopOrders.TryRemove(kvp.Key, out _);
+                                    activePositions.TryRemove(kvp.Key, out _);
+                                }
+                                SymmetryGuardForgetEntry(kvp.Key);
+                                Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
+                            }
+                            break;
+                        }
                     }
                 }
             }
@@ -422,11 +455,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             kvp.Value.EntryPrice = newPrice;
                             Print(string.Format("V12: Entry order MOVED: {0} to {1:F2}", kvp.Key, newPrice));
                         }
-                        if (quantity > 0 && quantity != kvp.Value.TotalContracts)
+                        int _totalContracts;
+                        lock (stateLock) { _totalContracts = kvp.Value.TotalContracts; }
+                        if (quantity > 0 && quantity != _totalContracts)
                         {
                             // [937-FIX] Sync expectedPositions with broker-confirmed qty.
                             // Without this, RollbackExpectedPosition uses stale TotalContracts -> desync.
-                            int qtyDiff = quantity - kvp.Value.TotalContracts;
+                            int qtyDiff = quantity - _totalContracts;
                             string fixAcct = (kvp.Value.IsFollower && kvp.Value.ExecutingAccount != null)
                                 ? kvp.Value.ExecutingAccount.Name : Account.Name;
                             int expDelta = (kvp.Value.Direction == MarketPosition.Long) ? qtyDiff : -qtyDiff;
@@ -526,13 +561,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
                 !matchedPos.EntryFilled)
             {
-                entryOrders.TryRemove(matchedEntry, out _);
+                lock (stateLock) { entryOrders.TryRemove(matchedEntry, out _); }
                 int gfExp = 0;
                 lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
                 if (gfExp == 0)
                 {
                     // Build 947: clean up any in-flight FSM spec to avoid orphaned state
-                    _followerReplaceSpecs.TryRemove(matchedEntry, out _);
+                    lock (stateLock) { _followerReplaceSpecs.TryRemove(matchedEntry, out _); }
                     return;
                 }
 
@@ -554,17 +589,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         Print("[FSM] Master filled during cancel wait -- routing "
                             + fsm.SignalName + " to repair instead of replace.");
-                        _followerReplaceSpecs.TryRemove(fsm.SignalName, out _);
+                        lock (stateLock) { _followerReplaceSpecs.TryRemove(fsm.SignalName, out _); }
                         return;
                     }
 
-                    // Snapshot latest spec values, transition to Submitting, schedule on strategy thread
-                    int    qty      = fsm.PendingQty;
-                    double price    = fsm.PendingPrice;
-                    string acctNameCapture = fsm.AccountName;
-                    string sigName  = fsm.SignalName;
-                    FollowerReplaceSpec fsmCapture = fsm;
-                    fsm.State = FollowerReplaceState.Submitting;
+                    // A1-3: Snapshot qty/price and transition state atomically under stateLock to close TOCTOU window.
+                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside lock(stateLock)
+                    // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
+                    // the snapshot and state transition can observe torn state. (Build 960 audit fix)
+                    int    qty;
+                    double price;
+                    string acctNameCapture;
+                    string sigName;
+                    FollowerReplaceSpec fsmCapture;
+                    lock (stateLock)
+                    {
+                        qty             = fsm.PendingQty;
+                        price           = fsm.PendingPrice;
+                        acctNameCapture = fsm.AccountName;
+                        sigName         = fsm.SignalName;
+                        fsmCapture      = fsm;
+                        fsm.State       = FollowerReplaceState.Submitting;
+                    }
 
                     try
                     {
@@ -574,17 +620,63 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // ATR tick absorption may have updated PendingPrice/PendingQty after the
                             // lambda was scheduled -- using stale captures would submit wrong values.
                             SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
-                            _followerReplaceSpecs.TryRemove(sigName, out _);
+                            lock (stateLock) { _followerReplaceSpecs.TryRemove(sigName, out _); }
                         }, null);
                     }
                     catch (Exception ex)
                     {
                         Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
-                        _followerReplaceSpecs.TryRemove(sigName, out _);
+                        lock (stateLock) { _followerReplaceSpecs.TryRemove(sigName, out _); }
                     }
                     return; // FSM-controlled cancel -- not a real desync
                 }
 
+                // B957/C1: Check for follower TARGET replace FSM spec before doing delta rollback.
+                // If this cancel was part of a two-phase target replacement, submit the new order
+                // and return -- no delta rollback needed (position remains open, just target moved).
+                {
+                    FollowerTargetReplaceSpec tSpec = null;
+                    string tFsmMatchKey = null;
+                    foreach (var tKvp in _followerTargetReplaceSpecs.ToArray())
+                    {
+                        if (tKvp.Value.CancellingOrderId == order.OrderId)
+                        {
+                            tSpec = tKvp.Value;
+                            tFsmMatchKey = tKvp.Key;
+                            break;
+                        }
+                    }
+                    if (tSpec != null && tFsmMatchKey != null)
+                    {
+                        lock (stateLock) { _followerTargetReplaceSpecs.TryRemove(tFsmMatchKey, out _); }
+                        FollowerTargetReplaceSpec captured = tSpec;
+                        string capturedKey = tFsmMatchKey;
+                        try
+                        {
+                            TriggerCustomEvent(o => SubmitFollowerTargetReplacement(capturedKey, captured), null);
+                        }
+                        catch (Exception tFsmEx)
+                        {
+                            Print("[FSM_TGT] TriggerCustomEvent failed for " + capturedKey + ": " + tFsmEx.Message);
+                        }
+                        return; // FSM-controlled target cancel -- skip delta rollback, not a real desync
+                    }
+                }
+
+                // A2-3: Direction-aware delta rollback on CONFIRMED cancel -- deferred from SymmetryGuardCascadeFollowerCleanup
+                // to prevent REAPER desync on microsecond fill race (Build 960 audit fix).
+                PositionInfo cancelledFollowerPos;
+                if (activePositions.TryGetValue(matchedEntry, out cancelledFollowerPos) && cancelledFollowerPos != null)
+                {
+                    string cancelAcctKey = cancelledFollowerPos.ExecutingAccount != null
+                        ? cancelledFollowerPos.ExecutingAccount.Name : Account.Name;
+                    int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
+                        ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
+                    DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+                    // B957/D2: Release the SIMA dispatch-sync barrier for this account. Without this, the barrier
+                    // remains permanently blocked after a follower cancel, starving future dispatches.
+                    lock (stateLock) { _dispatchSyncPendingExpKeys.Remove(cancelAcctKey); }
+                }
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
             }
@@ -617,12 +709,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     }
                                 } // if (_rQty > 0)
                             } // if (activePositions.TryGetValue)
-                            if (pendingStopReplacements.TryRemove(_psr.Key, out _))
-                                Interlocked.Decrement(ref pendingReplacementCount);
+                            lock (stateLock)
+                            {
+                                if (pendingStopReplacements.TryRemove(_psr.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                            }
                             return;
                         }
                     }
                 }
+                // A2-2: Deferred PendingCleanup purge -- follower stop terminal (Build 960 audit fix).
+                if (order.Name.StartsWith("Stop_") || order.Name.StartsWith("S_"))
+                {
+                    foreach (var _sc in stopOrders.ToArray())
+                    {
+                        if (_sc.Value == order)
+                        {
+                            PositionInfo _scPos;
+                            if (activePositions.TryGetValue(_sc.Key, out _scPos) && _scPos != null
+                                && _scPos.PendingCleanup && _scPos.RemainingContracts <= 0)
+                            {
+                                lock (stateLock)
+                                {
+                                    stopOrders.TryRemove(_sc.Key, out _);
+                                    activePositions.TryRemove(_sc.Key, out _);
+                                }
+                                SymmetryGuardForgetEntry(_sc.Key);
+                                Print("[A2-2] Deferred PendingCleanup purge (follower stop terminal): " + _sc.Key);
+                            }
+                            break;
+                        }
+                    }
+                }
+
                 Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
                 RemoveGhostOrderRef(order, reason);
             }
@@ -881,7 +999,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // V12.1101E [F-08]: Fallback dedup key when executionId is missing: (Order, FilledQuantity).
                     // Uses runtime order object identity + cumulative filled quantity.
-                    int dedupOrderIdentity = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(execution.Order);
+                    string uniqueOrderId = !string.IsNullOrEmpty(execution.Order.OrderId) ? execution.Order.OrderId : execution.Order.Name;
+                    string dedupOrderIdentity = GetStableHash(uniqueOrderId);
                     int dedupFilledQuantity = execution.Order.Filled > 0 ? execution.Order.Filled : Math.Max(0, quantity);
                     string fallbackKey = string.Format("{0}|{1}", dedupOrderIdentity, dedupFilledQuantity);
 
@@ -957,21 +1076,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("OCO: Cancelled {0} target orders for {1}", cancelledTargets, entryName));
                         }
 
-                        // Remove stop order reference
-                        stopOrders.TryRemove(entryName, out _);
-
-                        // Clean up pending replacements if any
-                        if (pendingStopReplacements.TryRemove(entryName, out _))
+                        // B957/D1: Only remove stopOrders and pendingStopReplacements when position is fully closed.
+                        // Do NOT remove on partial fills -- the stop may still be tracking residual contracts.
+                        lock (stateLock)
                         {
-                            Interlocked.Decrement(ref pendingReplacementCount);
+                            if (remainingAfterStop <= 0)
+                            {
+                                stopOrders.TryRemove(entryName, out _);
+                                if (pendingStopReplacements.TryRemove(entryName, out _))
+                                    Interlocked.Decrement(ref pendingReplacementCount);
+                                activePositions.TryRemove(entryName, out _);
+                                entryOrders.TryRemove(entryName, out _);
+                            }
                         }
-
-                        // If position is fully closed, remove from activePositions
                         if (remainingAfterStop <= 0)
                         {
-                            activePositions.TryRemove(entryName, out _);
                             SymmetryGuardForgetEntry(entryName);
-                            entryOrders.TryRemove(entryName, out _);
                             Print(string.Format("Position {0} fully closed by stop.", entryName));
                         }
                     }
@@ -1002,7 +1122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (terminalFill)
                             {
                                 var tDict = GetTargetOrdersDictionary(targetNum);
-                                if (tDict != null) tDict.TryRemove(entryName, out _);
+                                if (tDict != null) lock (stateLock) { tDict.TryRemove(entryName, out _); }
                             }
                             return;
                         }
@@ -1017,16 +1137,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         else
                         {
                             // Position fully closed, cancel stop
+                            // A2-2: Defer activePositions.TryRemove to broker-confirmed stop terminal state (Build 960)
                             RequestStopCancelLifecycleSafe(entryName);
-                            activePositions.TryRemove(entryName, out _);
-                            SymmetryGuardForgetEntry(entryName);
+                            PositionInfo closedPos;
+                            if (activePositions.TryGetValue(entryName, out closedPos) && closedPos != null)
+                                lock (stateLock) { closedPos.PendingCleanup = true; } // B957/A: stateLock guards PositionInfo field writes
+                            else
+                                SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
 
                         // V12.1101E [F-07]: Clear target ref only after broker confirms Filled.
                         if (terminalFill)
                         {
                             var tDict = GetTargetOrdersDictionary(targetNum);
-                            if (tDict != null) tDict.TryRemove(entryName, out _);
+                            if (tDict != null) lock (stateLock) { tDict.TryRemove(entryName, out _); }
                         }
                     }
                 }
@@ -1067,6 +1191,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             // Position fully closed by trim, cancel stop
                             Print(string.Format("TRIM FLATTEN: Position {0} fully closed. Cancelling stop.", entryName));
+                            // A2-2: Defer activePositions.TryRemove to broker-confirmed stop terminal state (Build 960)
                             RequestStopCancelLifecycleSafe(entryName);
 
                             // Also clean up any pending replacements
@@ -1075,8 +1200,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Interlocked.Decrement(ref pendingReplacementCount);
                             }
 
-                            activePositions.TryRemove(entryName, out _);
-                            SymmetryGuardForgetEntry(entryName);
+                            PositionInfo trimPos;
+                            if (activePositions.TryGetValue(entryName, out trimPos) && trimPos != null)
+                                lock (stateLock) { trimPos.PendingCleanup = true; } // B957/A: stateLock guards PositionInfo field writes
+                            else
+                                SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
                     }
                 }
@@ -1539,6 +1667,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             Print("[FSM] Replacement submitted: " + fleetSignalName
                 + " @ " + price + " x" + qty);
+        }
+
+        // B957/C1: SubmitFollowerTargetReplacement -- called on strategy thread via TriggerCustomEvent
+        // after broker confirms the PendingCancel of a follower target order (two-phase FSM for targets).
+        private void SubmitFollowerTargetReplacement(string tFsmKey, FollowerTargetReplaceSpec spec)
+        {
+            var tDict = GetTargetOrdersDictionary(spec.TargetNum);
+            Order newTargetOrder = null;
+            try
+            {
+                newTargetOrder = spec.TargetAccount.CreateOrder(
+                    Instrument, spec.ExitAction, OrderType.Limit, TimeInForce.Gtc,
+                    spec.Quantity, spec.NewTargetPrice, 0, "",
+                    "T" + spec.TargetNum + "_" + spec.EntryName, null);
+            }
+            catch (Exception createEx)
+            {
+                Print("[FSM_TGT] CreateOrder threw for " + tFsmKey + ": " + createEx.Message);
+                return;
+            }
+            if (newTargetOrder == null)
+            {
+                Print("[FSM_TGT] CreateOrder returned null for " + tFsmKey + " -- position may be unprotected.");
+                return;
+            }
+            try { spec.TargetAccount.Submit(new[] { newTargetOrder }); }
+            catch (Exception submitEx)
+            {
+                Print("[FSM_TGT] Submit threw for " + tFsmKey + ": " + submitEx.Message);
+                return;
+            }
+            if (tDict != null) lock (stateLock) { tDict[spec.EntryName] = newTargetOrder; }
+            Print("[FSM_TGT] Target replacement submitted: T" + spec.TargetNum + " for " + spec.EntryName + " -> " + spec.NewTargetPrice);
         }
 
         #endregion

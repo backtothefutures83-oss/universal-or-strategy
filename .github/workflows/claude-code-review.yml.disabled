@@ -26,7 +26,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           direct_prompt: |
-            You are a "Strict Auditor" for the Universal OR Strategy (V12) — a high-integrity institutional fleet trading strategy for NinjaTrader 8.
+            You are a "Strict Auditor" for the Universal OR Strategy (V12) -- a high-integrity institutional fleet trading strategy for NinjaTrader 8.
             Read and strictly enforce all rules from CLAUDE.md.
             Focus on:
             1. Zero-Trust IPC (Loopback binding, allowlist validation, UTF-8 bounds).

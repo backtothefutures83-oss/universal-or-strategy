@@ -552,6 +552,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 oldTarget.OrderState == OrderState.Submitted ||
                 oldTarget.OrderState == OrderState.ChangePending)
             {
+                // A1-2: Stamp REAPER grace window before cancel to suppress false desync during replace gap (Build 960 audit fix)
+                StampReaperMoveGrace();
                 pos.ExecutingAccount.Cancel(new[] { oldTarget });
             }
 
@@ -574,7 +576,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 null);
 
             pos.ExecutingAccount.Submit(new[] { replacement });
-            dict[fleetEntryName] = replacement;
+            lock (stateLock) { dict[fleetEntryName] = replacement; }
         }
 
         private void SymmetryGuardSkipFollower(
@@ -589,9 +591,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "[SYMMETRY_GUARD] SKIP | {0} | {1} | FleetFill={2:F2} | Slip={3:F1} ticks (${4:F2}/ct)",
                 fleetEntryName, reason, fleetFillPrice, slippageTicks, slippageUsdPerContract));
 
-            pos.EntryFilled = true;
+            // A1-1: pos.EntryFilled must be inside stateLock to prevent torn read by REAPER (Build 960 audit fix)
             lock (stateLock)
             {
+                pos.EntryFilled = true;
                 if (pos.RemainingContracts <= 0)
                     pos.RemainingContracts = Math.Max(1, pos.TotalContracts);
             }
@@ -691,12 +694,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pos.ExecutingAccount.Cancel(new[] { order });
                     else
                         CancelOrder(order);
-
-                    // Build 930.1 P1: Direction-aware delta rollback.
-                    // expectedPositions is signed (Long=+, Short=-). Cancelling a Short must add back.
-                    string acctKey = pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : Account.Name;
-                    int delta = (pos.Direction == MarketPosition.Long) ? -pos.TotalContracts : pos.TotalContracts;
-                    DeltaExpectedPositionLocked(ExpKey(acctKey), delta);
+                    // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
+                    // to prevent REAPER desync if the follower was microseconds from filling (Build 960 audit fix).
                 }
             }
         }

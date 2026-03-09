@@ -96,7 +96,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (isTrendRmaMode)
             {
                 Print(string.Format("V12.20: TREND Multiplier -> Mode=RMA (9/15 Split) ATR={0:F2}", currentATR));
-                ExecuteTrendSplitEntry();
+                ExecuteTrendSplitEntry(contracts);
                 return;
             }
 
@@ -204,18 +204,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     entry1Qty, true, trendGroupId, isTrendRmaMode);
                 // Build 1102Y-V3 [LG-01]: Enforce staircase rule on E1.
                 ApplyTargetLadderGuard(pos1);
-                activePositions[entry1Name] = pos1;
 
                 // Create position info for Entry 2
                 PositionInfo pos2 = CreateTRENDPosition(entry2Name, direction, entry2Price, stop2Price,
                     entry2Qty, false, trendGroupId, isTrendRmaMode);
                 // Build 1102Y-V3 [LG-01]: Enforce staircase rule on E2.
                 ApplyTargetLadderGuard(pos2);
-                activePositions[entry2Name] = pos2;
-
-                // Link the entries together
-                linkedTRENDEntries[entry1Name] = entry2Name;
-                linkedTRENDEntries[entry2Name] = entry1Name;
 
                 // Build 1102Y-V3 [MS-04a]: Register Master expected for E1 BEFORE submit.
                 int masterDeltaE1 = (direction == MarketPosition.Long) ? entry1Qty : -entry1Qty;
@@ -226,12 +220,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, entry1Qty, entry1Price, 0, "", entry1Name)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, entry1Qty, entry1Price, 0, "", entry1Name);
 
+                // A1-1/A2-1: Null-abort rollback + stateLock wrap for E1 (Build 960 audit fix)
                 if (entryOrder1 == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaE1);
-                    Print("[ERROR][1102Y-V3] TREND E1 SubmitOrderUnmanaged NULL for " + entry1Name + " -- rolled back.");
+                    Print("[ENTRY_ABORT] TREND E1 SubmitOrderUnmanaged NULL for " + entry1Name + " -- rolled back.");
+                    return;
                 }
-                entryOrders[entry1Name] = entryOrder1;
+                lock (stateLock) { activePositions[entry1Name] = pos1; entryOrders[entry1Name] = entryOrder1; }
+
+                // Only link the two legs after E1 is confirmed to have a live order handle.
+                linkedTRENDEntries[entry1Name] = entry2Name;
+                linkedTRENDEntries[entry2Name] = entry1Name;
 
                 // Build 1102Y-V3 [MS-04b]: Register Master expected for E2 BEFORE submit.
                 int masterDeltaE2 = (direction == MarketPosition.Long) ? entry2Qty : -entry2Qty;
@@ -242,12 +242,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, entry2Qty, entry2Price, 0, "", entry2Name)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, entry2Qty, entry2Price, 0, "", entry2Name);
 
+                // A1-1/A2-1: Null-abort rollback + stateLock wrap for E2 (Build 960 audit fix)
                 if (entryOrder2 == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaE2);
-                    Print("[ERROR][1102Y-V3] TREND E2 SubmitOrderUnmanaged NULL for " + entry2Name + " -- rolled back.");
+                    // Remove partnership references; HandleOrderCancelled will teardown E1 state naturally.
+                    string removedPartner;
+                    linkedTRENDEntries.TryRemove(entry1Name, out removedPartner);
+                    linkedTRENDEntries.TryRemove(entry2Name, out removedPartner);
+                    if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState)) CancelOrder(entryOrder1);
+                    Print("[ENTRY_ABORT] TREND E2 NULL -- E1 cancel issued for " + entry1Name + "; teardown deferred to cancel callback.");
+                    return;
                 }
-                entryOrders[entry2Name] = entryOrder2;
+                lock (stateLock) { activePositions[entry2Name] = pos2; entryOrders[entry2Name] = entryOrder2; }
 
                 Print(string.Format("TREND ORDERS PLACED: {0} Total={1} contracts",
                     direction == MarketPosition.Long ? "LONG" : "SHORT", totalContracts));
@@ -330,7 +337,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsTRENDEntry2 = !isEntry1,
                 LinkedTRENDGroup = groupId,
                 // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
-                OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
+                OcoGroupId = "V12_" + GetStableHash(entryName)
             };
             return tPos;
         }
@@ -397,7 +404,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Build 1102Y-V3 [LG-01]: Enforce staircase rule.
                 ApplyTargetLadderGuard(pos);
-                activePositions[entryName] = pos;
 
                 // Build 1102Y-V3 [MS-05]: Register Master expected BEFORE submit.
                 int masterDeltaTMNL = (direction == MarketPosition.Long) ? contracts : -contracts;
@@ -408,12 +414,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, contracts, entryPrice, 0, "", entryName)
                     : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, contracts, entryPrice, 0, "", entryName);
 
+                // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
                 if (entryOrder == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaTMNL);
-                    Print("[ERROR][1102Y-V3] TRENDManual SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
+                    Print("[ENTRY_ABORT] TRENDManual SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
+                    return;
                 }
-                entryOrders[entryName] = entryOrder;
+                lock (stateLock)
+                {
+                    activePositions[entryName] = pos;
+                    entryOrders[entryName] = entryOrder;
+                }
 
                 Print(string.Format("V12.27 TREND_MANUAL: {0} {1}@{2:F2} LIMIT | Stop: {3:F2} | 100% Risk",
                     direction, contracts, entryPrice, stopPrice));

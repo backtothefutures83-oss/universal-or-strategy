@@ -1431,7 +1431,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
                         Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                        ExecuteFFMALimitEntry(price, mp);
+                        double ffmaStopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+                        if (ffmaStopDist <= 0) ffmaStopDist = MinimumStop;
+                        int contracts = CalculatePositionSize(ffmaStopDist);
+                        ExecuteFFMALimitEntry(price, mp, contracts);
                     }
                     else
                     {
@@ -1444,7 +1447,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 // V12.27: M.FFMA button -- instant market, direction toward 9 EMA
                 Print("V12.27 IPC: FFMA_MANUAL_MARKET -- auto-direction toward EMA9");
-                ExecuteFFMAManualMarketEntry();
+                double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                double ema9Value = ema9[0];
+                MarketPosition direction = currentPrice < ema9Value ? MarketPosition.Long : MarketPosition.Short;
+                double stopPrice = direction == MarketPosition.Long ? Low[0] : High[0];
+                double ffmaStopDist = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                if (ffmaStopDist < tickSize * 2) ffmaStopDist = tickSize * 2;
+                int contracts = CalculatePositionSize(ffmaStopDist);
+                ExecuteFFMAManualMarketEntry(contracts);
                 return true;
             }
             // V10.3: Target-Specific Close Commands
@@ -1835,7 +1845,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                  double ema9Value = _ema9Val;
                  MarketPosition direction = currentPrice > ema9Value ? MarketPosition.Short : MarketPosition.Long;
                  Print(string.Format("V12.24: MODE_M firing -- Price={0:F2} vs EMA9={1:F2} -> {2}", currentPrice, ema9Value, direction));
-                 ExecuteFFMAEntry(direction);
+                 double stopPrice = direction == MarketPosition.Long ? Low[0] : High[0];
+                 double ffmaStopDist = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                 if (ffmaStopDist < tickSize * 2) ffmaStopDist = tickSize * 2;
+                 int ffmaContracts = CalculatePositionSize(ffmaStopDist);
+                 ExecuteFFMAEntry(direction, ffmaContracts);
              }
 
              Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4} FFMA={5}",

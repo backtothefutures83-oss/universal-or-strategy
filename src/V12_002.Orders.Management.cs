@@ -100,7 +100,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     FlattenPositionByName(entryName);
                     return;
                 }
-                stopOrders[entryName] = stopOrder;
+                // A1-1: stopOrders mutation inside stateLock (Build 960 audit fix)
+                lock (stateLock) { stopOrders[entryName] = stopOrder; }
 
                 int nonRunnerLimitQty = 0;
                 int runnerQty = 0;
@@ -300,8 +301,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             try
                             {
                                 CancelOrder(existingOrder);
-                                targetDict.TryRemove(entryName, out _);
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancelled -> now Runner", targetNum, entryName));
+                                // B957: Do NOT TryRemove from targetDict here -- CancelOrder is async.
+                                // The broker-confirmed terminal callback will perform the removal under stateLock
+                                // once confirmed, preventing premature cleanup before the cancel is acknowledged.
+                                Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancel requested -> now Runner (awaiting broker confirm)", targetNum, entryName));
                                 refreshed++;
                             }
                             catch (Exception ex)
@@ -527,7 +530,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
                     newStop = pos.ExecutingAccount.CreateOrder(Instrument, exitAction,
                         OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, _b950OcoId, sigName, null);
-                    pos.ExecutingAccount.Submit(new[] { newStop });
+                    // B957: Guard against null CreateOrder and Submit throws to prevent unprotected position.
+                    if (newStop == null)
+                    {
+                        Print(string.Format("[STOP_GUARD] CreateOrder returned null for follower {0}. Flattening.", entryName));
+                        FlattenPositionByName(entryName);
+                        return;
+                    }
+                    try { pos.ExecutingAccount.Submit(new[] { newStop }); }
+                    catch (Exception submitEx)
+                    {
+                        Print(string.Format("[STOP_GUARD] Submit threw for follower {0}: {1}. Flattening.", entryName, submitEx.Message));
+                        FlattenPositionByName(entryName);
+                        return;
+                    }
                 }
                 else
                 {
@@ -553,7 +569,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                stopOrders[entryName] = newStop;
+                // A1-1: stopOrders mutation inside stateLock (Build 960 audit fix)
+                lock (stateLock) { stopOrders[entryName] = newStop; }
 
                 // [LATENCY_AUDIT] Measure OCO turnaround: CreatedTime was stamped in UpdateStopQuantity() when
                 // the target fill triggered the pending stop replacement. The delta = Target Fill -> Stop Cancel
@@ -1077,9 +1094,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // V8.31: Clear pending replacements
-                if (pendingStopReplacements.TryRemove(entryName, out _))
+                lock (stateLock)
                 {
-                    Interlocked.Decrement(ref pendingReplacementCount);
+                    if (pendingStopReplacements.TryRemove(entryName, out _)) Interlocked.Decrement(ref pendingReplacementCount);
                 }
 
                 int flattenQty = pos.RemainingContracts;
@@ -1177,7 +1194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (stopOrder != null)
                 {
                     if (IsOrderTerminal(stopOrder.OrderState))
-                        stopOrders.TryRemove(entryName, out _);
+                        lock (stateLock) { stopOrders.TryRemove(entryName, out _); }
                     else
                     {
                         if (isFollowerForCleanup)
@@ -1188,7 +1205,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
                 else
-                    stopOrders.TryRemove(entryName, out _);
+                    lock (stateLock) { stopOrders.TryRemove(entryName, out _); }
             }
 
             // T1-T5: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
@@ -1202,7 +1219,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (tOrder != null)
                     {
                         if (IsOrderTerminal(tOrder.OrderState))
-                            tDict.TryRemove(entryName, out _);
+                            lock (stateLock) { tDict.TryRemove(entryName, out _); }
                         else
                         {
                             if (isFollowerForCleanup)
@@ -1214,7 +1231,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else
                     {
-                        tDict.TryRemove(entryName, out _);
+                        lock (stateLock) { tDict.TryRemove(entryName, out _); }
                     }
                 }
             }
@@ -1226,8 +1243,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (IsOrderTerminal(eOrder.OrderState))
                     {
-                        entryOrders.TryRemove(entryName, out _);
-                        _citNudgedKeys.TryRemove(entryName, out _);
+                        lock (stateLock)
+                        {
+                            entryOrders.TryRemove(entryName, out _);
+                            _citNudgedKeys.TryRemove(entryName, out _);
+                        }
                     }
                     else
                     {
@@ -1240,13 +1260,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    entryOrders.TryRemove(entryName, out _);
-                    _citNudgedKeys.TryRemove(entryName, out _);
+                    lock (stateLock)
+                    {
+                        entryOrders.TryRemove(entryName, out _);
+                        _citNudgedKeys.TryRemove(entryName, out _);
+                    }
                 }
             }
 
-            if (pendingStopReplacements.TryRemove(entryName, out _))
-                Interlocked.Decrement(ref pendingReplacementCount);
+            lock (stateLock)
+            {
+                if (pendingStopReplacements.TryRemove(entryName, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+            }
 
             if (cancelledStops > 0 || cancelledTargets > 0 || cancelledEntries > 0)
                 Print(string.Format("CLEANUP SUMMARY for {0}: Stops={1} Targets={2} Entries={3}",
@@ -1282,8 +1307,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.Phase8.2 [META-GUARD]: Skip purge if Reaper Repair Hook is active (followerExpected != 0).
             if (followerExpected == 0 && !HasActiveOrPendingOrderForEntry(entryName))
             {
-                if (activePositions.TryRemove(entryName, out _))
-                    SymmetryGuardForgetEntry(entryName);
+                bool removed;
+                lock (stateLock) { removed = activePositions.TryRemove(entryName, out _); }
+                if (removed) SymmetryGuardForgetEntry(entryName);
             }
 
             // [FIX-ZP-02]: Secondary safety net for SIMA followers -- force purge if broker confirms flat.
@@ -1298,7 +1324,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     .FirstOrDefault(p => p.Instrument == Instrument);
                 if (brokerPos != null && brokerPos.MarketPosition == MarketPosition.Flat)
                 {
-                    if (activePositions.TryRemove(entryName, out _))
+                    bool removedFZP;
+                    lock (stateLock) { removedFZP = activePositions.TryRemove(entryName, out _); }
+                    if (removedFZP)
                     {
                         SymmetryGuardForgetEntry(entryName);
                         Print(string.Format("[FIXED_G] Purging {0} - confirmed flat by broker.", entryName));
@@ -1337,7 +1365,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (kvp.Value == order ||
                         (kvp.Value != null && order != null && kvp.Value.OrderId == order.OrderId))
                     {
-                        if (dict.TryRemove(kvp.Key, out _))
+                        bool ghostRemoved;
+                        lock (stateLock) { ghostRemoved = dict.TryRemove(kvp.Key, out _); }
+                        if (ghostRemoved)
                         {
                             string matchType = (kvp.Value == order) ? "REF" : "ORDERID";
                             Print(string.Format("[GHOST_FIX] Order {0}_{1} terminated ({2}). Nullifying reference. (match={3}, OrderId={4})",
@@ -1396,7 +1426,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
 
-                    if (activePositions.TryRemove(removedKey, out _))
+                    bool zombieRemoved;
+                    lock (stateLock) { zombieRemoved = activePositions.TryRemove(removedKey, out _); }
+                    if (zombieRemoved)
                     {
                         SymmetryGuardForgetEntry(removedKey);
                         Print(string.Format("[ZOMBIE_PURGE] {0}: all order refs terminal. Purging activePositions.", removedKey));
@@ -1542,7 +1574,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         if (isTerminal || notInBroker)
                         {
-                            if (dict.TryRemove(kvp.Key, out _))
+                            bool reverseRemoved;
+                            lock (stateLock) { reverseRemoved = dict.TryRemove(kvp.Key, out _); }
+                            if (reverseRemoved)
                             {
                                 string state = trackedOrder.OrderState.ToString();
                                 Print(string.Format("[GHOST_FIX] REVERSE AUDIT: {0} ghost for {1} purged (State={2}, InBroker={3}, OrderId={4})",
