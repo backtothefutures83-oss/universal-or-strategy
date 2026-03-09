@@ -125,7 +125,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (stopOrder.OrderState == OrderState.Cancelled || stopOrder.OrderState == OrderState.Filled ||
                 stopOrder.OrderState == OrderState.Rejected || stopOrder.OrderState == OrderState.Unknown)
             {
-                stopOrders.TryRemove(entryName, out _);
+                lock (stateLock) { stopOrders.TryRemove(entryName, out _); }
             }
         }
 
@@ -136,7 +136,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in dict.ToArray())
             {
                 if (kvp.Value == order)
-                    return dict.TryRemove(kvp.Key, out _);
+                {
+                    lock (stateLock) { dict.TryRemove(kvp.Key, out _); }
+                    return true;
+                }
             }
             return false;
         }
@@ -206,9 +209,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrders.TryGetValue(kvp.Key, out var entryOrder) && entryOrder == order && !kvp.Value.EntryFilled)
                 {
                     PositionInfo pos = kvp.Value;
-                    pos.EntryFilled = true;
-                    pos.InitialTargetCount = activeTargetCount;
-
                     if (!pos.IsFollower)
                     {
                         int masterFillQty = filled > 0 ? filled : quantity;
@@ -217,26 +217,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (averageFillPrice <= 0)
                     {
+                        lock (stateLock) { pos.EntryFilled = true; pos.InitialTargetCount = activeTargetCount; }
                         Print(string.Format("[PRICE_GUARD] CRITICAL: averageFillPrice=0 for {0}. Keeping intended price {1:F2}. NOT re-anchoring.", kvp.Key, pos.EntryPrice));
                         SubmitBracketOrders(kvp.Key, pos);
                         return true;
                     }
 
-                    pos.EntryPrice = averageFillPrice;
-                    pos.ExtremePriceSinceEntry = averageFillPrice;
-
-                    // Recalculate targets and stop
-                    double stopDistance = pos.IsRMATrade ? currentATR * RMAStopATRMultiplier : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
-                    pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
-                    pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
-                    pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
-                    pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
-                    pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
+                    lock (stateLock)
+                    {
+                        pos.EntryFilled = true;
+                        pos.InitialTargetCount = activeTargetCount;
+                        pos.EntryPrice = averageFillPrice;
+                        pos.ExtremePriceSinceEntry = averageFillPrice;
+                        // Recalculate targets and stop
+                        double stopDistance = pos.IsRMATrade ? currentATR * RMAStopATRMultiplier : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
+                        pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
+                        pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
+                        pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
+                        pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
+                        pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
+                        stopDistance = Math.Min(stopDistance, 12.0);
+                        pos.InitialStopPrice = pos.Direction == MarketPosition.Long ? averageFillPrice - stopDistance : averageFillPrice + stopDistance;
+                        pos.CurrentStopPrice = pos.InitialStopPrice;
+                    }
                     ApplyTargetLadderGuard(pos);
-
-                    stopDistance = Math.Min(stopDistance, 12.0);
-                    pos.InitialStopPrice = pos.Direction == MarketPosition.Long ? averageFillPrice - stopDistance : averageFillPrice + stopDistance;
-                    pos.CurrentStopPrice = pos.InitialStopPrice;
 
                     Print(string.Format("{0} ENTRY FILLED: {1} {2} @ {3:F2}", pos.IsRMATrade ? "RMA" : "OR", pos.Direction, pos.TotalContracts, averageFillPrice));
                     SubmitBracketOrders(kvp.Key, pos);
@@ -324,7 +328,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
                         Print(string.Format("?? ?? CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
-                        stopOrders.TryRemove(kvp.Key, out _);
+                        lock (stateLock) { stopOrders.TryRemove(kvp.Key, out _); }
                         CreateNewStopOrder(kvp.Key, kvp.Value.RemainingContracts, kvp.Value.CurrentStopPrice, kvp.Value.Direction);
                         return true;
                     }
@@ -383,7 +387,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
                             }
                         }
-                        if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                        lock (stateLock)
+                        {
+                            if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                        }
                         handled = true;
                         break;
                     }
@@ -444,11 +451,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             kvp.Value.EntryPrice = newPrice;
                             Print(string.Format("V12: Entry order MOVED: {0} to {1:F2}", kvp.Key, newPrice));
                         }
-                        if (quantity > 0 && quantity != kvp.Value.TotalContracts)
+                        int _totalContracts;
+                        lock (stateLock) { _totalContracts = kvp.Value.TotalContracts; }
+                        if (quantity > 0 && quantity != _totalContracts)
                         {
                             // [937-FIX] Sync expectedPositions with broker-confirmed qty.
                             // Without this, RollbackExpectedPosition uses stale TotalContracts -> desync.
-                            int qtyDiff = quantity - kvp.Value.TotalContracts;
+                            int qtyDiff = quantity - _totalContracts;
                             string fixAcct = (kvp.Value.IsFollower && kvp.Value.ExecutingAccount != null)
                                 ? kvp.Value.ExecutingAccount.Name : Account.Name;
                             int expDelta = (kvp.Value.Direction == MarketPosition.Long) ? qtyDiff : -qtyDiff;
@@ -548,13 +557,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
                 !matchedPos.EntryFilled)
             {
-                entryOrders.TryRemove(matchedEntry, out _);
+                lock (stateLock) { entryOrders.TryRemove(matchedEntry, out _); }
                 int gfExp = 0;
                 lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
                 if (gfExp == 0)
                 {
                     // Build 947: clean up any in-flight FSM spec to avoid orphaned state
-                    _followerReplaceSpecs.TryRemove(matchedEntry, out _);
+                    lock (stateLock) { _followerReplaceSpecs.TryRemove(matchedEntry, out _); }
                     return;
                 }
 
@@ -576,7 +585,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         Print("[FSM] Master filled during cancel wait -- routing "
                             + fsm.SignalName + " to repair instead of replace.");
-                        _followerReplaceSpecs.TryRemove(fsm.SignalName, out _);
+                        lock (stateLock) { _followerReplaceSpecs.TryRemove(fsm.SignalName, out _); }
                         return;
                     }
 
@@ -607,13 +616,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // ATR tick absorption may have updated PendingPrice/PendingQty after the
                             // lambda was scheduled -- using stale captures would submit wrong values.
                             SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
-                            _followerReplaceSpecs.TryRemove(sigName, out _);
+                            lock (stateLock) { _followerReplaceSpecs.TryRemove(sigName, out _); }
                         }, null);
                     }
                     catch (Exception ex)
                     {
                         Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
-                        _followerReplaceSpecs.TryRemove(sigName, out _);
+                        lock (stateLock) { _followerReplaceSpecs.TryRemove(sigName, out _); }
                     }
                     return; // FSM-controlled cancel -- not a real desync
                 }
@@ -661,8 +670,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     }
                                 } // if (_rQty > 0)
                             } // if (activePositions.TryGetValue)
-                            if (pendingStopReplacements.TryRemove(_psr.Key, out _))
-                                Interlocked.Decrement(ref pendingReplacementCount);
+                            lock (stateLock)
+                            {
+                                if (pendingStopReplacements.TryRemove(_psr.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                            }
                             return;
                         }
                     }
@@ -1021,21 +1032,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("OCO: Cancelled {0} target orders for {1}", cancelledTargets, entryName));
                         }
 
-                        // Remove stop order reference
-                        stopOrders.TryRemove(entryName, out _);
-
-                        // Clean up pending replacements if any
-                        if (pendingStopReplacements.TryRemove(entryName, out _))
+                        // Remove stop order reference (under stateLock to prevent TOCTOU ghost state)
+                        lock (stateLock)
                         {
-                            Interlocked.Decrement(ref pendingReplacementCount);
+                            stopOrders.TryRemove(entryName, out _);
+                            if (pendingStopReplacements.TryRemove(entryName, out _))
+                                Interlocked.Decrement(ref pendingReplacementCount);
+                            if (remainingAfterStop <= 0)
+                            {
+                                activePositions.TryRemove(entryName, out _);
+                                entryOrders.TryRemove(entryName, out _);
+                            }
                         }
-
-                        // If position is fully closed, remove from activePositions
                         if (remainingAfterStop <= 0)
                         {
-                            activePositions.TryRemove(entryName, out _);
                             SymmetryGuardForgetEntry(entryName);
-                            entryOrders.TryRemove(entryName, out _);
                             Print(string.Format("Position {0} fully closed by stop.", entryName));
                         }
                     }
@@ -1066,7 +1077,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (terminalFill)
                             {
                                 var tDict = GetTargetOrdersDictionary(targetNum);
-                                if (tDict != null) tDict.TryRemove(entryName, out _);
+                                if (tDict != null) lock (stateLock) { tDict.TryRemove(entryName, out _); }
                             }
                             return;
                         }
@@ -1094,7 +1105,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (terminalFill)
                         {
                             var tDict = GetTargetOrdersDictionary(targetNum);
-                            if (tDict != null) tDict.TryRemove(entryName, out _);
+                            if (tDict != null) lock (stateLock) { tDict.TryRemove(entryName, out _); }
                         }
                     }
                 }

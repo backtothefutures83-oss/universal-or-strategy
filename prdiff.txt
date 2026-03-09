@@ -1,0 +1,678 @@
+﻿diff --git a/.agent/standards_manifesto.md b/.agent/standards_manifesto.md
+index 4fa90c5..ca0266d 100644
+--- a/.agent/standards_manifesto.md
++++ b/.agent/standards_manifesto.md
+@@ -44,6 +44,11 @@ This document provides the immutable technical standards for all AI agents (Anth
+ ## 6. Clean-Slate Repo Hygiene (The "Hygiene Rule")
+ 
+ - **Zero-Delta Mandate**: Every new Mission (initialized via `$MISSION`) MUST start with a 0-delta `main` branch. If "Big Numbers" (large uncommitted/unmerged diffs > 100 lines) exist, the agent MUST recommend a cleanup/merge before starting new work.
++- **Autonomous Pull Request Handover (The Fresh PR Rule)**: When submitting code for bot audit or human review, agents MUST NEVER push to an existing open Pull Request (e.g., updating a dirty branch). Instead, agents MUST:
++  1. Checkout a completely new semantic branch (e.g., `build/955-audit-remediation`).
++  2. Push the new branch and open a BRAND NEW Pull Request targeting `main`.
++  3. Close any superseded or legacy PRs via the GitHub CLI, explicitly leaving a comment referencing the new clean PR.
++     _Why? Incrementally updating existing PRs can cause automated audit bots (Codex, Greptile, DeepSource) to miss context. A fresh PR triggers a 100% clean, full-file audit sweep._
+ - **Atomic Missions**: Every bug fix or feature MUST be its own branch and MUST be merged into `main` immediately upon verification (e.g. F5 compile in NT8). No "stacking" unrelated fixes in long-lived branches.
+ - **Binary & Log Purge**: Never commit `.exe`, `.log`, `.bak`, or legacy backup folders to source control. They should be stashed, deleted, or added to `.gitignore`.
+ - **Dashboard Cleanup**: Before ending a session, the agent MUST ensure all work is either Committed or the user has been guided to Merge. The goal is a +0/-0 dashboard between missions.
+@@ -156,6 +161,15 @@ OnLineInfo ... status=open <- live untracked GTC order at broker
+ 
+ **Full discovery steps:** See `.agent/workflows/live-bug-triage.md` Section 0.
+ 
++## 12. Claude Agent Operation Protocol (Usage Insights)
++
++**Based on historical friction data, all agents MUST adhere to these execution constraints:**
++
++- **The "Do Not Interrupt" Protocol:** Agents operating in standard execution mode should complete their logical batches and commit _autonomously_. Do not pause mid-task to ask for user check-ins unless explicitly blocked by a missing file or a hard compilation failure.
++- **.NET 4.8 Hardening Hook:** Target framework is .NET 4.8. Do NOT use C# features unavailable in .NET 4.8 (e.g., range operators `[..]`, `Index`/`Range` types, default interface implementations). Always use `CultureInfo.InvariantCulture` for numeric parsing. This must be checked before every commit.
++- **The "Missing Brief" Failsafe:** Before any phase starts, the Agent MUST verify that the referenced `implementation_plan.md` or `$MISSION` artifact exists on disk. If it does not, the Agent MUST halt and ask the user for the brief, rather than attempting to guess or reverse-engineer the plan via codebase searches.
++- **Autonomy Rule (Default to Action):** Agents are empowered and EXPECTED to execute the full end-to-end lifecycle of a task autonomously. This includes branch creation, surgical implementation, local verification (compile/ASCII), git committing, pushing, and opening/updating PRs. Do not wait for manual approval to move from "Code Change" to "Git Push" if local verification (`deploy-sync.ps1`) passes.
++
+ ---
+ 
+ > [!NOTE]
+diff --git a/.github/workflows/codex-audit.yml b/.github/workflows/codex-audit.yml
+new file mode 100644
+index 0000000..9f7e605
+--- /dev/null
++++ b/.github/workflows/codex-audit.yml
+@@ -0,0 +1,47 @@
++name: Codex Pre-Triage PR Audit
++
++on:
++  pull_request:
++    types: [opened, synchronize, reopened]
++    branches: [main, master]
++
++permissions:
++  pull-requests: write
++  contents: read
++
++jobs:
++  codex-audit:
++    runs-on: ubuntu-latest
++
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
++
++      - name: Setup Python
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++
++      - name: Install Aider (OpenAI CLI)
++        run: pip install aider-chat
++
++      - name: Run Codex Audit via OpenAI
++        env:
++          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
++        run: |
++          # Use Aider in headless mode to execute the audit using GPT-4o
++          aider --model gpt-4o --no-auto-commits --yes-always --message "Execute audit mission: .agent/brain/codex_pr25_audit.md. Read the workflows and write the final P1/P2/P3 severity report safely to audit_output.md without modifying any source files." > audit_output.md
++
++      - name: Post Audit Results to PR
++        env:
++          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++        run: |
++          if [ -f audit_output.md ]; then
++            gh pr comment ${{ github.event.pull_request.number }} --body-file audit_output.md
++          else
++            echo "Audit output file not found."
++            # Fallback if Aider stdout'd it instead
++            gh pr comment ${{ github.event.pull_request.number }} --body "The OpenAI audit finished, but the markdown file was not saved correctly. Please check action logs."
++          fi
+diff --git a/.github/workflows/gemini-pr-audit.yml b/.github/workflows/gemini-pr-audit.yml
+new file mode 100644
+index 0000000..d486b3d
+--- /dev/null
++++ b/.github/workflows/gemini-pr-audit.yml
+@@ -0,0 +1,96 @@
++name: Gemini PR Auditor
++
++on:
++  pull_request:
++    types: [opened, synchronize, reopened]
++
++jobs:
++  gemini-audit:
++    name: Gemini 2.5 Pro (High) Auto-Auditor
++    runs-on: ubuntu-latest
++    permissions:
++      contents: read
++      pull-requests: write
++
++    steps:
++      - name: Checkout Code
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
++
++      - name: Extract PR diff
++        id: diff
++        run: |
++          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
++
++      - name: Authenticate to Google Cloud
++        id: auth
++        uses: google-github-actions/auth@v2
++        with:
++          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
++
++      - name: Setup Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: "20"
++
++      - name: Install Vertex AI SDK
++        run: npm install @google-cloud/vertexai
++
++      - name: Run Vertex AI Audit and Post Comment
++        uses: actions/github-script@v7
++        env:
++          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
++          GCP_REGION: us-central1
++        with:
++          script: |
++            const fs = require('fs');
++            const { VertexAI } = require('@google-cloud/vertexai');
++
++            const diffContent = fs.readFileSync('pr.diff', 'utf8');
++            let geminiMdContent = '';
++            try {
++              geminiMdContent = fs.readFileSync('GEMINI.md', 'utf8');
++            } catch (e) {
++              console.log('GEMINI.md not found in the root directory, proceeding without it.');
++            }
++
++            const prompt = `You are the Gemini CLI (Antigravity Auto-Auditor) acting as a PR reviewer.
++            Your task is to analyze the following PR diff strictly against our project's GEMINI.md standards (Zero-Trust IPC, FSM mutations, etc.).
++
++            Here are the GEMINI.md standards:
++            ${geminiMdContent}
++
++            Here is the pull request diff:
++            ${diffContent}
++
++            Provide a systematic review of the changes:
++            1. Evaluate strict adherence to the standards (e.g., FSM replace pattern vs cancel+submit, lock guards, headless UI rules).
++            2. Point out any violations of the standard with specific file and line context.
++            3. If the code is perfectly aligned, state that it passes the Zero-Regression Bot Audit.
++
++            Be thorough, precise, and uncompromising on the rules.`;
++
++            const vertex_ai = new VertexAI({project: process.env.GCP_PROJECT_ID, location: process.env.GCP_REGION});
++            // Gemini 2.5 Pro via Vertex AI
++            const generativeModel = vertex_ai.preview.getGenerativeModel({
++              model: 'gemini-2.5-pro',
++            });
++
++            let reviewText = '';
++            try {
++              const resp = await generativeModel.generateContent({
++                contents: [{role: 'user', parts: [{text: prompt}]}],
++              });
++              reviewText = resp.response.candidates[0].content.parts[0].text;
++            } catch (error) {
++              console.error("Error calling Vertex AI API:", error);
++              reviewText = "ÔÜá´©Å **Vertex AI Audit Failed to Execute**: " + error.message;
++            }
++
++            await github.rest.issues.createComment({
++              owner: context.repo.owner,
++              repo: context.repo.repo,
++              issue_number: context.issue.number,
++              body: "### ­ƒñû Antigravity Auto-Auditor (Gemini 2.5 Pro via Vertex AI)\n\n" + reviewText
++            });
+diff --git a/src/V12_001.cs b/src/V12_001.cs
+index 3fb0924..ec2e192 100644
+--- a/src/V12_001.cs
++++ b/src/V12_001.cs
+@@ -164,8 +164,6 @@ public void SetSettings(string mode, int count, V12ModeSettings settings)
+         private NetworkStream tcpStream;
+         private readonly object tcpLock = new object();
+         private Thread receiveThread;
+-        private volatile bool isConnected = false;
+-        private volatile bool isShuttingDown = false;
+         private System.Threading.Timer reconnectTimer;
+         private ConcurrentQueue<string> responseQueue = new ConcurrentQueue<string>();
+         // [Build 934]: Throttle IPC retry log spam -- print on 1st failure then once per 60 s
+@@ -366,7 +364,7 @@ protected override void OnStateChange()
+             else if (State == State.Realtime)
+             {
+                 activeSymbol = Instrument.MasterInstrument.Name;
+-                if (AutoConnect) Task.Run(() => ConnectToStrategy());
++                // [Build 956]: IPC deprecated -- ConnectToStrategy() removed. AutoConnect is a no-op.
+             }
+             else if (State == State.Terminated)
+             {
+@@ -785,7 +783,19 @@ private void LoadConfig()
+                 selectedTargetCount = activeCount;
+ 
+                 Button modeBtn = GetModeButton(activeMode);
+-                if (modeBtn != null) HighlightModeButton(modeBtn);
++                if (modeBtn != null)
++                {
++                    HighlightModeButton(modeBtn);
++                }
++                else
++                {
++                    // [Build 954]: Saved mode is deprecated/unrecognized -- normalize both vars to RMA baseline.
++                    Print("[WARN][954] Unrecognized saved mode '" + activeMode + "' -- falling back to RMA.");
++                    activeMode = "RMA";
++                    selectedConfigMode = "RMA";
++                    modeBtn = GetModeButton("RMA");
++                    if (modeBtn != null) HighlightModeButton(modeBtn);
++                }
+ 
+                 // Apply active mode+count settings to UI
+                 ApplySettings(fullConfig.GetSettings(activeMode, activeCount));
+@@ -2984,80 +2994,13 @@ private void SyncAll_Click(object sender, RoutedEventArgs e)
+ 
+         #region IPC Communication
+ 
+-        private void ConnectToStrategy()
+-        {
+-            try
+-            {
+-                lock (tcpLock)
+-                {
+-                    if (isConnected) return;
+-
+-                    tcpClient = new TcpClient();
+-                    tcpClient.Connect("127.0.0.1", IpcPort);
+-                    tcpStream = tcpClient.GetStream();
+-                    isConnected = true;
+-                    // [Build 934]: Reset retry counters on successful connect
+-                    _ipcRetryCount    = 0;
+-                    _lastRetryLogTime = DateTime.MinValue;
+-
+-                    Print($"V12 Panel: Strategy connected on port {IpcPort} ?");
+-
+-                    if (ChartControl != null)
+-                    {
+-                        ChartControl.Dispatcher.BeginInvoke(new Action(() =>
+-                        {
+-                            if (hubStatusLed != null)
+-                            {
+-                                hubStatusLed.Background = GreenFg;
+-                                hubStatusLed.ToolTip = "IPC Connected";
+-                            }
+-                        }));
+-                    }
+-
+-                    receiveThread = new Thread(ReceiveLoop) { IsBackground = true, Name = "V12_Std_Receive" };
+-                    receiveThread.Start();
+-
+-                    SendCommand("GET_LAYOUT");
+-                }
+-            }
+-            catch (Exception)
+-            {
+-                isConnected = false;
+-                _ipcRetryCount++;
+-
+-                // [Build 934]: Log only on first failure and then at most once per 60 seconds
+-                if (_ipcRetryCount == 1 || (DateTime.Now - _lastRetryLogTime).TotalSeconds >= 60)
+-                {
+-                    Print($"V12 Panel: Strategy offline -- retrying in background (attempt #{_ipcRetryCount})");
+-                    _lastRetryLogTime = DateTime.Now;
+-                }
+-
+-                if (ChartControl != null)
+-                {
+-                    ChartControl.Dispatcher.BeginInvoke(new Action(() =>
+-                    {
+-                        if (hubStatusLed != null)
+-                        {
+-                            hubStatusLed.Background = TextMuted;
+-                            hubStatusLed.ToolTip = "Waiting for Strategy (retrying...)";
+-                        }
+-                    }));
+-                }
+-
+-                // [Build 933]: Start retry loop on initial failure (market closed / Strategy not yet live).
+-                ScheduleReconnect();
+-            }
+-        }
+-
+         private void DisconnectFromStrategy()
+         {
+-            isShuttingDown = true;
+             reconnectTimer?.Dispose();
+             lock (tcpLock)
+             {
+-                isConnected = false;
+-                try { tcpStream?.Close(); } catch { }
+-                try { tcpClient?.Close(); } catch { }
++                tcpStream?.Close();
++                tcpClient?.Close();
+                 tcpStream = null;
+                 tcpClient = null;
+             }
+@@ -3069,8 +3012,6 @@ private void SendCommand(string command)
+             {
+                 try
+                 {
+-                    if (!isConnected) ConnectToStrategy();
+-
+                     lock (tcpLock)
+                     {
+                         if (tcpStream != null && tcpStream.CanWrite)
+@@ -3089,128 +3030,11 @@ private void SendCommand(string command)
+                 catch (Exception ex)
+                 {
+                     Print($"V12 STD: Send error - {ex.Message}");
+-                    isConnected = false;
+                 }
+             });
+         }
+ 
+-        private void ReceiveLoop()
+-        {
+-            StringBuilder buffer = new StringBuilder();
+-            byte[] readBuffer = new byte[4096];
+-
+-            try
+-            {
+-                while (isConnected)
+-                {
+-                    try
+-                    {
+-                        if (tcpStream == null || !tcpStream.CanRead) break;
+-
+-                        int bytesRead = tcpStream.Read(readBuffer, 0, readBuffer.Length);
+-                        if (bytesRead == 0)
+-                        {
+-                            Print("V12.14: ReceiveLoop - server closed connection (0 bytes)");
+-                            break;
+-                        }
+-
+-                        buffer.Append(Encoding.UTF8.GetString(readBuffer, 0, bytesRead));
+-
+-                        string data = buffer.ToString();
+-                        int newlineIdx;
+-                        while ((newlineIdx = data.IndexOf('\n')) >= 0)
+-                        {
+-                            string message = data.Substring(0, newlineIdx).Trim();
+-                            data = data.Substring(newlineIdx + 1);
+-
+-                            if (!string.IsNullOrEmpty(message))
+-                                responseQueue.Enqueue(message);
+-                        }
+-                        buffer.Clear();
+-                        buffer.Append(data);
+-                    }
+-                    catch (Exception ex)
+-                    {
+-                        Print($"V12.14: ReceiveLoop exception - {ex.Message}");
+-                        break;
+-                    }
+-                }
+-            }
+-            finally
+-            {
+-                // V12.14: Cleanup - mark disconnected and schedule reconnect
+-                Print("V12.14: ReceiveLoop exited - marking disconnected");
+-                lock (tcpLock)
+-                {
+-                    isConnected = false;
+-                    try { tcpStream?.Close(); } catch { }
+-                    try { tcpClient?.Close(); } catch { }
+-                    tcpStream = null;
+-                    tcpClient = null;
+-                }
+-
+-                if (ChartControl != null)
+-                {
+-                    ChartControl.Dispatcher.BeginInvoke(new Action(() =>
+-                    {
+-                        if (hubStatusLed != null)
+-                        {
+-                            hubStatusLed.Background = TextMuted;
+-                            hubStatusLed.ToolTip = "IPC Disconnected";
+-                        }
+-                    }));
+-                }
+-
+-                ScheduleReconnect();
+-            }
+-        }
+-
+-        // V12.14: Auto-reconnect after unexpected disconnect
+-        // V12.1101E [B-8]: Refactored to non-recursive -- reuses a single timer object via .Change()
+-        // instead of Dispose + new Timer on each failure. Prevents timer object accumulation and
+-        // eliminates recursive call stack growth under sustained disconnection.
+-        private readonly object _reconnectLock = new object();
+-
+-        private void ScheduleReconnect()
+-        {
+-            if (isShuttingDown || isConnected) return;
+-
+-            lock (_reconnectLock)
+-            {
+-                if (reconnectTimer != null)
+-                {
+-                    // Reset the existing timer to fire again in 3 s -- no new allocation needed
+-                    reconnectTimer.Change(3000, Timeout.Infinite);
+-                    return;
+-                }
+-
+-                // First time: create the timer once; subsequent reconnect calls reuse it via .Change()
+-                reconnectTimer = new System.Threading.Timer(_ =>
+-                {
+-                    if (isShuttingDown || isConnected) return;
+-
+-                    // [Build 934]: Removed per-attempt "Auto-reconnect attempting..." print -- now throttled in ConnectToStrategy() catch block
+-                    try
+-                    {
+-                        ConnectToStrategy();
+-                        if (isConnected)
+-                        {
+-                            Print("V12 Panel: Strategy came online -- connected ?");
+-                            lock (_reconnectLock) { reconnectTimer = null; }
+-                        }
+-                        else
+-                        {
+-                            ScheduleReconnect();
+-                        }
+-                    }
+-                    catch (Exception ex)
+-                    {
+-                        // [Build 934]: Logging is throttled inside ConnectToStrategy() catch -- no extra print here
+-                        ScheduleReconnect();
+-                    }
+-                }, null, 3000, Timeout.Infinite);
+-            }
+-        }
++        // [Build 956]: ReceiveLoop() and ScheduleReconnect() removed -- IPC deprecated (Phase 6 pruning).
+ 
+         private void ProcessStrategyResponse(string response)
+         {
+diff --git a/src/V12_002.Entries.Retest.cs b/src/V12_002.Entries.Retest.cs
+index e14f9d3..3cc741b 100644
+--- a/src/V12_002.Entries.Retest.cs
++++ b/src/V12_002.Entries.Retest.cs
+@@ -171,7 +171,7 @@ private void ExecuteRetestEntry(int contracts)
+                 };
+                 ApplyTargetLadderGuard(pos);
+ 
+-                activePositions[entryName] = pos;
++                lock (stateLock) { activePositions[entryName] = pos; }
+ 
+                 // Build 1102Y-V3 [MS-07]: Register Master expected BEFORE Limit entry.
+                 int masterDeltaRetest = (direction == MarketPosition.Long) ? contracts : -contracts;
+@@ -185,10 +185,12 @@ private void ExecuteRetestEntry(int contracts)
+                 if (entryOrder == null)
+                 {
+                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetest);
++                    lock (stateLock) { activePositions.TryRemove(entryName, out _); } // [Build 956]: Clean pre-registered state on null submit.
+                     Print("[ERROR][1102Y-V3] RETEST SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
++                    return; // [Build 954]: Do not latch session or dispatch SIMA for a failed order.
+                 }
+ 
+-                entryOrders[entryName] = entryOrder;
++                lock (stateLock) { entryOrders[entryName] = entryOrder; }
+                 retestFiredThisSession = true;  // V12.1101E [B-2]: Arm latch -- no further RETEST entries this session
+ 
+                 Print(string.Format("RETEST ENTRY ORDER: {0} {1}@{2:F2} | ATR: {3:F2}", signalName, contracts, entryPrice, currentATR));
+@@ -311,7 +313,7 @@ private void ExecuteRetestManualEntry(double manualPrice, MarketPosition directi
+                 };
+                 ApplyTargetLadderGuard(pos);
+ 
+-                activePositions[entryName] = pos;
++                lock (stateLock) { activePositions[entryName] = pos; }
+ 
+                 // Build 1102Y-V3 [MS-08]: Register Master expected BEFORE Limit entry.
+                 int masterDeltaRetestMnl = (direction == MarketPosition.Long) ? contracts : -contracts;
+@@ -325,9 +327,11 @@ private void ExecuteRetestManualEntry(double manualPrice, MarketPosition directi
+                 if (entryOrder == null)
+                 {
+                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRetestMnl);
++                    lock (stateLock) { activePositions.TryRemove(entryName, out _); } // [Build 956]: Clean pre-registered state on null submit.
+                     Print("[ERROR][1102Y-V3] RETEST_MANUAL SubmitOrderUnmanaged NULL for " + entryName + " -- rolled back.");
++                    return; // [Build 956]: Do not assign null entryOrder or dispatch SIMA for a failed order.
+                 }
+-                entryOrders[entryName] = entryOrder;
++                lock (stateLock) { entryOrders[entryName] = entryOrder; }
+ 
+                 Print(string.Format("V12.27 RETEST_MANUAL: {0} {1}@{2:F2} LIMIT | Stop: {3:F2} | RMA Targets",
+                     direction, contracts, entryPrice, stopPrice));
+diff --git a/src/V12_002.Orders.Callbacks.cs b/src/V12_002.Orders.Callbacks.cs
+index d76699f..f540055 100644
+--- a/src/V12_002.Orders.Callbacks.cs
++++ b/src/V12_002.Orders.Callbacks.cs
+@@ -369,9 +369,12 @@ private bool HandleOrderCancelled(Order order)
+                 {
+                     if (kvp.Value.OldOrder == order && activePositions.TryGetValue(kvp.Key, out var pos))
+                     {
+-                        if (pos.RemainingContracts > 0)
++                        // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
++                        int _stopQty;
++                        lock (stateLock) { _stopQty = pos.RemainingContracts; }
++                        if (_stopQty > 0)
+                         {
+-                            CreateNewStopOrder(kvp.Key, pos.RemainingContracts, kvp.Value.StopPrice, kvp.Value.Direction);
++                            CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
+                             // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
+                             if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
+                             {
+@@ -598,18 +601,22 @@ private void HandleMatchedFollowerOrder(string matchedEntry, PositionInfo matche
+                         if (_psr.Value.OldOrder == order)
+                         {
+                             PositionInfo _rPos;
+-                            if (activePositions.TryGetValue(_psr.Key, out _rPos) && _rPos.RemainingContracts > 0)
++                            // Build 955: Move guard inside lock -- check and use same atomic snapshot.
++                            if (activePositions.TryGetValue(_psr.Key, out _rPos))
+                             {
+                                 int _rQty;
+                                 lock (stateLock) { _rQty = _rPos.RemainingContracts; }
+-                                CreateNewStopOrder(_psr.Key, _rQty, _psr.Value.StopPrice, _psr.Value.Direction);
+-                                if (_psr.Value.BracketRestorationNeeded && _psr.Value.CapturedTargets != null)
++                                if (_rQty > 0)
+                                 {
+-                                    TargetSnapshot[] _snap = _psr.Value.CapturedTargets;
+-                                    string _rKey = _psr.Key;
+-                                    TriggerCustomEvent(o => RestoreCascadedTargets(_rKey, _snap), null);
+-                                }
+-                            }
++                                    CreateNewStopOrder(_psr.Key, _rQty, _psr.Value.StopPrice, _psr.Value.Direction);
++                                    if (_psr.Value.BracketRestorationNeeded && _psr.Value.CapturedTargets != null)
++                                    {
++                                        TargetSnapshot[] _snap = _psr.Value.CapturedTargets;
++                                        string _rKey = _psr.Key;
++                                        TriggerCustomEvent(o => RestoreCascadedTargets(_rKey, _snap), null);
++                                    }
++                                } // if (_rQty > 0)
++                            } // if (activePositions.TryGetValue)
+                             if (pendingStopReplacements.TryRemove(_psr.Key, out _))
+                                 Interlocked.Decrement(ref pendingReplacementCount);
+                             return;
+diff --git a/src/V12_002.Trailing.cs b/src/V12_002.Trailing.cs
+index c539b69..80da1f4 100644
+--- a/src/V12_002.Trailing.cs
++++ b/src/V12_002.Trailing.cs
+@@ -514,14 +514,26 @@ private void UpdateStopOrder(string entryName, PositionInfo pos, double newStopP
+                 if (currentStop != null && (currentStop.OrderState == OrderState.CancelPending || currentStop.OrderState == OrderState.Submitted))
+                 {
+                     // Order is already being cancelled or submitted - queue the new stop price
++                    // Build 955: Snapshot targets BEFORE TryAdd so any callback sees a fully-initialized record.
++                    var _b955TargetsA = new System.Collections.Generic.List<TargetSnapshot>();
++                    for (int _tA = 1; _tA <= 5; _tA++)
++                    {
++                        var _tDA = GetTargetOrdersDictionary(_tA);
++                        Order _tOA;
++                        if (_tDA != null && _tDA.TryGetValue(entryName, out _tOA) && _tOA != null
++                            && (_tOA.OrderState == OrderState.Working || _tOA.OrderState == OrderState.Accepted))
++                            _b955TargetsA.Add(new TargetSnapshot { TargetNum = _tA, Price = _tOA.LimitPrice, Qty = _tOA.Quantity, CapturedOrder = _tOA });
++                    }
+                     var newPending = new PendingStopReplacement
+                     {
+-                        EntryName = entryName,
+-                        Quantity = pos.RemainingContracts,
+-                        StopPrice = validatedStopPrice,
+-                        Direction = pos.Direction,
+-                        OldOrder = currentStop,
+-                        CreatedTime = DateTime.Now  // V8.30: Timeout support
++                        EntryName                 = entryName,
++                        Quantity                  = pos.RemainingContracts,
++                        StopPrice                 = validatedStopPrice,
++                        Direction                 = pos.Direction,
++                        OldOrder                  = currentStop,
++                        CreatedTime               = DateTime.Now,  // V8.30: Timeout support
++                        CapturedTargets           = _b955TargetsA.Count > 0 ? _b955TargetsA.ToArray() : null,
++                        BracketRestorationNeeded  = _b955TargetsA.Count > 0
+                     };
+ 
+                     // V8.30: Thread-safe add or update
+@@ -558,21 +570,6 @@ private void UpdateStopOrder(string entryName, PositionInfo pos, double newStopP
+                         }
+                     }
+ 
+-                    // Build 950: Snapshot Working/Accepted targets before cancel for OCO cascade restoration.
+-                    {
+-                        var _b950Targets = new System.Collections.Generic.List<TargetSnapshot>();
+-                        for (int _t = 1; _t <= 5; _t++)
+-                        {
+-                            var _tD = GetTargetOrdersDictionary(_t);
+-                            Order _tO;
+-                            if (_tD != null && _tD.TryGetValue(entryName, out _tO) && _tO != null
+-                                && (_tO.OrderState == OrderState.Working || _tO.OrderState == OrderState.Accepted))
+-                                _b950Targets.Add(new TargetSnapshot { TargetNum = _t, Price = _tO.LimitPrice, Qty = _tO.Quantity, CapturedOrder = _tO });
+-                        }
+-                        newPending.CapturedTargets = _b950Targets.Count > 0 ? _b950Targets.ToArray() : null;
+-                        newPending.BracketRestorationNeeded = _b950Targets.Count > 0;
+-                    }
+-
+                     pos.CurrentStopPrice = validatedStopPrice;
+                     pos.CurrentTrailLevel = newTrailLevel;
+                     Print(string.Format("V8.12: Stop update queued for {0} (current state: {1})", entryName, currentStop.OrderState));
+@@ -581,14 +578,26 @@ private void UpdateStopOrder(string entryName, PositionInfo pos, double newStopP
+ 
+                 if (currentStop != null && (currentStop.OrderState == OrderState.Working || currentStop.OrderState == OrderState.Accepted))
+                 {
++                    // Build 955: Snapshot targets BEFORE TryAdd so any callback sees a fully-initialized record.
++                    var _b955TargetsB = new System.Collections.Generic.List<TargetSnapshot>();
++                    for (int _tB = 1; _tB <= 5; _tB++)
++                    {
++                        var _tDB = GetTargetOrdersDictionary(_tB);
++                        Order _tOB;
++                        if (_tDB != null && _tDB.TryGetValue(entryName, out _tOB) && _tOB != null
++                            && (_tOB.OrderState == OrderState.Working || _tOB.OrderState == OrderState.Accepted))
++                            _b955TargetsB.Add(new TargetSnapshot { TargetNum = _tB, Price = _tOB.LimitPrice, Qty = _tOB.Quantity, CapturedOrder = _tOB });
++                    }
+                     var newPending = new PendingStopReplacement
+                     {
+-                        EntryName = entryName,
+-                        Quantity = pos.RemainingContracts,
+-                        StopPrice = validatedStopPrice,
+-                        Direction = pos.Direction,
+-                        OldOrder = currentStop,
+-                        CreatedTime = DateTime.Now  // V8.30: Timeout support
++                        EntryName                 = entryName,
++                        Quantity                  = pos.RemainingContracts,
++                        StopPrice                 = validatedStopPrice,
++                        Direction                 = pos.Direction,
++                        OldOrder                  = currentStop,
++                        CreatedTime               = DateTime.Now,  // V8.30: Timeout support
++                        CapturedTargets           = _b955TargetsB.Count > 0 ? _b955TargetsB.ToArray() : null,
++                        BracketRestorationNeeded  = _b955TargetsB.Count > 0
+                     };
+ 
+                     // V8.30: Thread-safe add
+@@ -603,21 +612,6 @@ private void UpdateStopOrder(string entryName, PositionInfo pos, double newStopP
+                         }
+                     }
+ 
+-                    // Build 950: Snapshot Working/Accepted targets before cancel for OCO cascade restoration.
+-                    {
+-                        var _b950Targets = new System.Collections.Generic.List<TargetSnapshot>();
+-                        for (int _t = 1; _t <= 5; _t++)
+-                        {
+-                            var _tD = GetTargetOrdersDictionary(_t);
+-                            Order _tO;
+-                            if (_tD != null && _tD.TryGetValue(entryName, out _tO) && _tO != null
+-                                && (_tO.OrderState == OrderState.Working || _tO.OrderState == OrderState.Accepted))
+-                                _b950Targets.Add(new TargetSnapshot { TargetNum = _t, Price = _tO.LimitPrice, Qty = _tO.Quantity, CapturedOrder = _tO });
+-                        }
+-                        newPending.CapturedTargets = _b950Targets.Count > 0 ? _b950Targets.ToArray() : null;
+-                        newPending.BracketRestorationNeeded = _b950Targets.Count > 0;
+-                    }
+-
+                     if (pos.ExecutingAccount != null)
+                     {
+                         pos.ExecutingAccount.Cancel(new[] { currentStop });
+diff --git a/src/V12_002.cs b/src/V12_002.cs
+index f78fdc7..cd1a420 100644
+--- a/src/V12_002.cs
++++ b/src/V12_002.cs
+@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
+ {
+     public partial class V12_002 : Strategy
+     {
+-        public const string BUILD_TAG = "950";  // V12.950: OCO Cascade Fix (bracket restore on V8.30 timeout path)
++        public const string BUILD_TAG = "956";  // V12.956: DeepSource remediation -- RETEST_MANUAL null cleanup + IPC dead code removal (ReceiveLoop/ScheduleReconnect)
+ 
+         #region Variables
+ 

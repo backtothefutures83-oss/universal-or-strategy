@@ -1,39 +1,6 @@
-# Cursor Rules: Universal OR Strategy V12 (Full Mirror)
+# Cursor Rules: Universal OR Strategy V12
 
-Follow these rules for ALL code modifications. Reference **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** for permanent safety standards.
+**CRITICAL INSTRUCTION FOR CURSOR AI:**
+You must read, ingest, and strictly adhere to the permanent project standards defined in the `c:\WSGTA\universal-or-strategy\.agent\standards_manifesto.md` file before making any code suggestions or architectural decisions.
 
-- **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
-- **Concurrency**: All state mutations (activePositions, expectedPositions) MUST be guarded by lock(stateLock).
-- **Lifecycle**: Semaphores (_simaToggleSem) MUST be released in finally blocks.
-- **Refactoring**: Prefer explicit FirstOrDefault logic for instrument lookups (Reaper parity).
-- **Style**: Use PascalCase for methods, camelCase for local variables. Avoid dense one-liners; prioritize "Metabolic Elegance."
-
-## 🛡️ Protocol Hardening (V12.Phase7)
-
-### 1. Scope Control
-- **Surgical Edits**: AI agents MUST restrict code modifications to the specific files requested in the Mission Brief. NEVER refactor unrelated files without explicit Director authorization.
-- **Zero-Trust Planning**: Always generate an `implementation_plan.md` before applying code changes to local files.
-
-### 2. WPF/UI Guardrails
-- **Escalation**: If a UI layout or positioning task enters a loop (more than 2 failed attempts), the agent MUST halt and escalate to the Director for manual layout review.
-- **Headless Mode**: Prefer headless execution for batch logic updates; do not attempt complex UI re-styling without a visual brief.
-
-### 3. Path & Deployment Management
-- **Source Truth**: All primary NinjaScript logic resides in `src/`.
-- **Deployment**: Local builds MUST be synced to `C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\` using the `/deploy` skill.
-
-## 🕹️ Director Commands ($)
-
-- **$PLAN_AUDIT**: Use `read_terminal` on the active Claude/Antigravity PID to ingest Sonnet's implementation plan. Perform a forensic logic audit before recommending approval to the Director.
-- **$MISSION**: Initialize a new project phase via a Mission Brief artifact.
-- **$AUDIT**: Trigger the `/audit` skill to scan the `src/` directory.
-
-## Agent Synchronization
-AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini) MUST follow the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** as the primary source of truth for architectural standards and safety protocols.
-
-
-## CRITICAL: ASCII-Only in All C# String Literals
-- NEVER use emoji, curly quotes, em-dashes, Unicode arrows, or box-drawing in Print() or any string literal.
-- Non-ASCII inside C# strings breaks the NinjaTrader compiler with 300+ cascading errors (Build 936 incident).
-- Allowed substitutions: (!) not emoji, -- not em-dash, -> not arrow, straight " not curly " "
-- See .agent/standards_manifesto.md Section 7 for the full rule table and emergency fix sequence.
+Do not deviate from those rules. The manifesto is the absolute absolute single source of truth for architecture, locking, repo hygiene, and multi-agent parity.

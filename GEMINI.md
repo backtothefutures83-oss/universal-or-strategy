@@ -29,6 +29,7 @@
 - **Atomic Merging**: Merge and delete feature branches immediately after successful F5 compilation and initial testing.
 - **Binary Guard**: DO NOT commit `.exe`, `.log`, or `.bak` files. Use stashing or `.gitignore`.
 - **Clean Dashboard**: All agents (Claude, Gemini, Antigravity, Rovo Dev) MUST ensure the repo is clean before starting new missions.
+- **Autonomous Repair Loop**: Every fix mission should checkout a fresh branch, implement, and open a PR to trigger the **Phase 3 Omni-Audit Matrix** (Opus, Sonnet, Gemini 2.5).
 
 ### 5. MOVE-SYNC / Follower Order Replace Pattern (Build 947+)
 

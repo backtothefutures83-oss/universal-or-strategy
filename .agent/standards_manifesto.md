@@ -24,12 +24,9 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 - **Advisor (Antigravity):** The **"General Manager."** Handles high-level brainstorming, diagnosing market issues, and engineering the core "Mission Prompt."
 - **Desk Supervisor & Lab (Gemini CLI):** The **"Quant & Compliance."** Uses **Conductor/ODIN** to turn Antigravity prompts into rigid technical plans. Uses the **Sandbox** to test math/logic in Python before implementation. Runs local security/lint audits.
-- **Lead Engineer (Claude/Sonnet):** The **"Execution Specialist."** Use **Sonnet** (latest) for all implementation. Sonnet is faster and optimized for code generation. Reserve Opus for architectural deep-dives only (complex broker-native design, multi-phase FSM design).
-- **Forensic Auditor (Codex):** The **"Deep Logic Inspector."** Performs a 360-degree forensic scan for logic traps/leaks. Code trace only — never ask Codex for patches.
-- **Secondary Auditor (Cursor AI):** The **"Peer Reviewer."** Performed by the Cursor agent to provide a cross-verification audit from a different model perspective.
-- **Maintenance Inspector (Human):** The **"Final Sign-off."** Used by the Fund Manager in Cursor to perform visual review and manual polish.
-- **Context Layer (OneContext):** The **"Order Book."** Maintains a shared trajectory of all agent thoughts and actions.
-- **The Bridge:** Handoffs are managed via `implementation_plan.md`, `session_handoff.md`, and **OneContext snapshots**.
+- **Lead Engineer (Claude/Sonnet):** The **"Execution Specialist."** Use **Sonnet** (latest) for all implementation. Sonnet is functionally autonomous: it creates its own branches, executes repairs, and **calls for automated audits** by opening PRs.
+- **The Loop:** Repair Mission -> Sonnet Handoff -> Branch/Code/Push -> PR Re-Audit Matrix (Opus/Gemini) -> Merge.
+- **The Bridge:** Handoffs are managed via `implementation_plan.md`, `session_handoff.md`, and **Mission Brief** artifacts.
 
 ## 5. Multi-Agent Parity & Sync Protocol
 
@@ -168,7 +165,12 @@ OnLineInfo ... status=open <- live untracked GTC order at broker
 - **The "Do Not Interrupt" Protocol:** Agents operating in standard execution mode should complete their logical batches and commit _autonomously_. Do not pause mid-task to ask for user check-ins unless explicitly blocked by a missing file or a hard compilation failure.
 - **.NET 4.8 Hardening Hook:** Target framework is .NET 4.8. Do NOT use C# features unavailable in .NET 4.8 (e.g., range operators `[..]`, `Index`/`Range` types, default interface implementations). Always use `CultureInfo.InvariantCulture` for numeric parsing. This must be checked before every commit.
 - **The "Missing Brief" Failsafe:** Before any phase starts, the Agent MUST verify that the referenced `implementation_plan.md` or `$MISSION` artifact exists on disk. If it does not, the Agent MUST halt and ask the user for the brief, rather than attempting to guess or reverse-engineer the plan via codebase searches.
-- **Autonomy Rule (Default to Action):** Agents are empowered and EXPECTED to execute the full end-to-end lifecycle of a task autonomously. This includes branch creation, surgical implementation, local verification (compile/ASCII), git committing, pushing, and opening/updating PRs. Do not wait for manual approval to move from "Code Change" to "Git Push" if local verification (`deploy-sync.ps1`) passes.
+- **Autonomy Rule (Default to Action):** Agents are empowered and EXPECTED to execute the full end-to-end lifecycle of a task autonomously. This includes:
+  1. **Branch Creation**: Create a semantic branch (e.g., `fix/sima-dispatch-gate`).
+  2. **Surgical Implementation**: Apply changes per the Mission Brief.
+  3. **Verification**: Run local tests/ASCII checks (`deploy-sync.ps1`).
+  4. **PR Trigger**: Push and open a PR to trigger the **3-Agent Multi-Model Audit (Opus, Sonnet, Gemini)**.
+  5. **Merge**: Merge once bot-approvals and human sign-off are received.
 
 ---
 

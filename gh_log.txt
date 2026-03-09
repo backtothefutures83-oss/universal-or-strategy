@@ -1,0 +1,21 @@
+﻿codex-audit	Post Audit Results to PR	´╗┐2026-03-07T00:40:24.0405745Z ##[group]Run if [ -f audit_output.md ]; then
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0406101Z [36;1mif [ -f audit_output.md ]; then[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0406414Z [36;1m  gh pr comment 26 --body-file audit_output.md[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0406709Z [36;1melse[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0406912Z [36;1m  echo "Audit output file not found."[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0407214Z [36;1m  # Fallback if Aider stdout'd it instead[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0407783Z [36;1m  gh pr comment 26 --body "The OpenAI audit finished, but the markdown file was not saved correctly. Please check action logs."[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0408303Z [36;1mfi[0m
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0458098Z shell: /usr/bin/bash -e {0}
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0458350Z env:
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0458608Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.14/x64
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0459055Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib/pkgconfig
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0459704Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0460135Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0460547Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.14/x64
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0460931Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.14/x64/lib
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0461503Z   GH_TOKEN: ***
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0461692Z ##[endgroup]
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:24.0533500Z Audit output file not found.
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:26.1321535Z GraphQL: Resource not accessible by integration (addComment)
+codex-audit	Post Audit Results to PR	2026-03-07T00:40:26.1357370Z ##[error]Process completed with exit code 1.
