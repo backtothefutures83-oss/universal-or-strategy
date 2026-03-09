@@ -238,20 +238,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double snapT1, snapT2, snapT3, snapT4, snapT5;
                 TargetMode snapT1Type, snapT2Type, snapT3Type, snapT4Type, snapT5Type;
                 string snapCit; bool snapTrma, snapRrma;
-                lock (stateLock)
-                {
-                    snapMode   = isRMAModeActive ? "RMA" : "OR";
-                    snapStop   = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
-                    snapCount  = activeTargetCount;
-                    snapT1     = Target1Value; snapT1Type = T1Type;
-                    snapT2     = Target2Value; snapT2Type = T2Type;
-                    snapT3     = Target3Value; snapT3Type = T3Type;
-                    snapT4     = Target4Value; snapT4Type = T4Type;
-                    snapT5     = Target5Value; snapT5Type = T5Type;
-                    snapCit    = ChaseIfTouchPoints ?? "0";
-                    snapTrma   = isTrendRmaMode;
-                    snapRrma   = isRetestRmaMode;
-                }
+                snapMode   = isRMAModeActive ? "RMA" : "OR";
+                snapStop   = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
+                snapCount  = activeTargetCount;
+                snapT1     = Target1Value; snapT1Type = T1Type;
+                snapT2     = Target2Value; snapT2Type = T2Type;
+                snapT3     = Target3Value; snapT3Type = T3Type;
+                snapT4     = Target4Value; snapT4Type = T4Type;
+                snapT5     = Target5Value; snapT5Type = T5Type;
+                snapCit    = ChaseIfTouchPoints ?? "0";
+                snapTrma   = isTrendRmaMode;
+                snapRrma   = isRetestRmaMode;
                 string configResponse = string.Format(
                     "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
                     snapMode, snapCount, snapT1, ToIpcTargetMode(snapT1Type),
@@ -728,7 +725,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (int.TryParse(val, out int v)) {
                     // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
                     int clamped = Math.Max(1, Math.Min(5, v));
-                    lock (stateLock) { activeTargetCount = clamped; }
+                    activeTargetCount = clamped;
                 }
                 return true;
             }
@@ -791,10 +788,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool active = parts[2] == "1";
             // V12.1101E [A-2]: Lock IPC writes to activeFleetAccounts -- this dict is also
             // read by the strategy thread (ExecuteMultiAccountMarket) without a lock.
-            lock (stateLock)
-            {
-                activeFleetAccounts[resolvedName] = active;
-            }
+            activeFleetAccounts[resolvedName] = active;
             Print($"[V12.2] TOGGLE_ACCOUNT: {resolvedName} (resolved from '{parts[1]}') | Active={active}");
         }
 
@@ -872,38 +866,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string newMode = parts[1].Trim().ToUpperInvariant();
 
                     // V12.20: Atomic mode transition -- prevents partial state reads during switch
-                    lock (stateLock)
-                    {
-                        isRMAModeActive = false;
-                        isRMAButtonClicked = false;
-                        isRetestModeActive = false;
-                        isTRENDModeActive = false;
-                        isMOMOModeActive = false;
-                        isFFMAModeArmed = false;
+                    isRMAModeActive = false;
+                    isRMAButtonClicked = false;
+                    isRetestModeActive = false;
+                    isTRENDModeActive = false;
+                    isMOMOModeActive = false;
+                    isFFMAModeArmed = false;
 
-                        if (newMode == "RMA")
-                        {
-                            isRMAModeActive = true;
-                            isRMAButtonClicked = true;
-                        }
-                        else if (newMode == "RETEST")
-                        {
-                            isRetestModeActive = true;
-                        }
-                        else if (newMode == "TREND")
-                        {
-                            isTRENDModeActive = true;
-                        }
-                        else if (newMode == "MOMO")
-                        {
-                            isMOMOModeActive = true;
-                        }
-                        else if (newMode == "FFMA")
-                        {
-                            isFFMAModeArmed = true;
-                        }
-                        // ORB/OR = all modes off (already deactivated above)
+                    if (newMode == "RMA")
+                    {
+                        isRMAModeActive = true;
+                        isRMAButtonClicked = true;
                     }
+                    else if (newMode == "RETEST")
+                    {
+                        isRetestModeActive = true;
+                    }
+                    else if (newMode == "TREND")
+                    {
+                        isTRENDModeActive = true;
+                    }
+                    else if (newMode == "MOMO")
+                    {
+                        isMOMOModeActive = true;
+                    }
+                    else if (newMode == "FFMA")
+                    {
+                        isFFMAModeArmed = true;
+                    }
+                    // ORB/OR = all modes off (already deactivated above)
 
                     Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
                         newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
@@ -1026,7 +1017,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
                     int clamped = Math.Max(1, Math.Min(5, targetCount));
-                    lock (stateLock) { activeTargetCount = clamped; }
+                    activeTargetCount = clamped;
                     Print(string.Format("V12.Phase8.3: SET_TARGETS = {0} targets (clamped from {1}; minContracts preserved at {2})", clamped, targetCount, minContracts));
                     // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
                     // Sending CONFIG back here caused the Ping-Pong overwrite bug.
@@ -1319,7 +1310,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
                     int contracts    = CalculatePositionSize(stopDist);
-                    ExecuteRMAEntryV2(currentPrice, direction, contracts);
+                    Enqueue(ctx => ctx.ExecuteRMAEntryV2(currentPrice, direction, contracts));
                 }
                 return true;
             }
@@ -1334,7 +1325,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("[SYNC] ToS Handshake Received -> Executing OR_LONG");
                         double orStopDist = CalculateORStopDistance();
                         int orContracts   = CalculatePositionSize(orStopDist);
-                        ExecuteLong(orContracts);
+                        Enqueue(ctx => ctx.ExecuteLong(orContracts));
                         isLongArmed = false;
                     }
                     else
@@ -1346,7 +1337,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     double orStopDist = CalculateORStopDistance();
                     int orContracts   = CalculatePositionSize(orStopDist);
-                    ExecuteLong(orContracts);
+                    Enqueue(ctx => ctx.ExecuteLong(orContracts));
                     Print("V10.3: OR_LONG executed via IPC");
                 }
                 return true;
@@ -1361,7 +1352,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("[SYNC] ToS Handshake Received -> Executing OR_SHORT");
                         double orStopDist = CalculateORStopDistance();
                         int orContracts   = CalculatePositionSize(orStopDist);
-                        ExecuteShort(orContracts);
+                        Enqueue(ctx => ctx.ExecuteShort(orContracts));
                         isShortArmed = false;
                     }
                     else
@@ -1373,7 +1364,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     double orStopDist = CalculateORStopDistance();
                     int orContracts   = CalculatePositionSize(orStopDist);
-                    ExecuteShort(orContracts);
+                    Enqueue(ctx => ctx.ExecuteShort(orContracts));
                     Print("V10.3: OR_SHORT executed via IPC");
                 }
                 return true;
@@ -1391,7 +1382,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double trendDist   = CalculateTRENDStopDistance();
                         int trendContracts = CalculatePositionSize(trendDist);
-                        ExecuteTRENDManualEntry(price, mp, trendContracts);
+                        Enqueue(ctx => ctx.ExecuteTRENDManualEntry(price, mp, trendContracts));
                     }
                     else
                     {
@@ -1412,7 +1403,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double retestDist   = CalculateRetestStopDistance();
                         int retestContracts = CalculatePositionSize(retestDist);
-                        ExecuteRetestManualEntry(price, mp, retestContracts);
+                        Enqueue(ctx => ctx.ExecuteRetestManualEntry(price, mp, retestContracts));
                     }
                     else
                     {
@@ -1434,7 +1425,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         double ffmaStopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
                         if (ffmaStopDist <= 0) ffmaStopDist = MinimumStop;
                         int contracts = CalculatePositionSize(ffmaStopDist);
-                        ExecuteFFMALimitEntry(price, mp, contracts);
+                        Enqueue(ctx => ctx.ExecuteFFMALimitEntry(price, mp, contracts));
                     }
                     else
                     {
@@ -1454,7 +1445,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double ffmaStopDist = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
                 if (ffmaStopDist < tickSize * 2) ffmaStopDist = tickSize * 2;
                 int contracts = CalculatePositionSize(ffmaStopDist);
-                ExecuteFFMAManualMarketEntry(contracts);
+                Enqueue(ctx => ctx.ExecuteFFMAManualMarketEntry(contracts));
                 return true;
             }
             // V10.3: Target-Specific Close Commands
@@ -1779,44 +1770,41 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ToggleStrategyMode(string action)
         {
              // V12.20: Atomic flag mutations
-             lock (stateLock)
+             if (action == "MODE_RMA") isRMAModeActive = !isRMAModeActive;
+             else if (action == "MODE_MOMO") isMOMOModeActive = !isMOMOModeActive;
+             else if (action == "MODE_FFMA")
              {
-                 if (action == "MODE_RMA") isRMAModeActive = !isRMAModeActive;
-                 else if (action == "MODE_MOMO") isMOMOModeActive = !isMOMOModeActive;
-                 else if (action == "MODE_FFMA")
-                 {
-                     isFFMAModeArmed = true;
-                     Print("V12.24: FFMA AUTO armed -- reversal scanner active");
-                 }
-                 else if (action == "MODE_M")
-                 {
-                     Print("V12.24: MODE_M received -- immediate FFMA entry pending");
-                 }
-                 else if (action == "FFMA_DISARM")
-                 {
-                     isFFMAModeArmed = false;
-                     Print("V12.24: FFMA disarmed via panel ResetExecutionMode");
-                 }
-                 else if (action == "MODE_TREND_RMA")
-                 {
-                     isTrendRmaMode = true;
-                     Print("IPC: TREND RMA Mode Enabled");
-                 }
-                 else if (action == "MODE_TREND_STD")
-                 {
-                     isTrendRmaMode = false;
-                     Print("IPC: TREND Standard Mode Enabled");
-                 }
-                 else if (action == "MODE_RETEST_RMA")
-                 {
-                     isRetestRmaMode = true;
-                     Print("IPC: RETEST RMA Mode Enabled");
-                 }
-                 else if (action == "MODE_RETEST_STD")
-                 {
-                     isRetestRmaMode = false;
-                     Print("IPC: RETEST Standard Mode Enabled");
-                 }
+                 isFFMAModeArmed = true;
+                 Print("V12.24: FFMA AUTO armed -- reversal scanner active");
+             }
+             else if (action == "MODE_M")
+             {
+                 Print("V12.24: MODE_M received -- immediate FFMA entry pending");
+             }
+             else if (action == "FFMA_DISARM")
+             {
+                 isFFMAModeArmed = false;
+                 Print("V12.24: FFMA disarmed via panel ResetExecutionMode");
+             }
+             else if (action == "MODE_TREND_RMA")
+             {
+                 isTrendRmaMode = true;
+                 Print("IPC: TREND RMA Mode Enabled");
+             }
+             else if (action == "MODE_TREND_STD")
+             {
+                 isTrendRmaMode = false;
+                 Print("IPC: TREND Standard Mode Enabled");
+             }
+             else if (action == "MODE_RETEST_RMA")
+             {
+                 isRetestRmaMode = true;
+                 Print("IPC: RETEST RMA Mode Enabled");
+             }
+             else if (action == "MODE_RETEST_STD")
+             {
+                 isRetestRmaMode = false;
+                 Print("IPC: RETEST Standard Mode Enabled");
              }
 
              // Execution calls stay outside lock (they do their own order management)
@@ -1824,19 +1812,20 @@ namespace NinjaTrader.NinjaScript.Strategies
              {
                  double trendDist   = CalculateTRENDStopDistance();
                  int trendContracts = CalculatePositionSize(trendDist);
-                 ExecuteTRENDEntry(trendContracts);
+                 Enqueue(ctx => ctx.ExecuteTRENDEntry(trendContracts));
              }
              else if (action == "EXEC_RETEST" || action == "EXEC_RETEST_PLUS" || action == "EXEC_RETEST_MINUS")
              {
                  double retestDist   = CalculateRetestStopDistance();
                  int retestContracts = CalculatePositionSize(retestDist);
-                 ExecuteRetestEntry(retestContracts);
+                 Enqueue(ctx => ctx.ExecuteRetestEntry(retestContracts));
              }
              else if (action == "EXEC_MOMO")
             {
                 double momoStopDist = Math.Min(MOMOStopPoints, MaximumStop);
                 int momoContracts   = CalculatePositionSize(momoStopDist);
-                ExecuteMOMOEntry(lastKnownPrice, momoContracts);
+                double capturedMomoPrice = lastKnownPrice;
+                Enqueue(ctx => ctx.ExecuteMOMOEntry(capturedMomoPrice, momoContracts));
             }
              else if (action == "MODE_M")
              {
@@ -1849,7 +1838,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                  double ffmaStopDist = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
                  if (ffmaStopDist < tickSize * 2) ffmaStopDist = tickSize * 2;
                  int ffmaContracts = CalculatePositionSize(ffmaStopDist);
-                 ExecuteFFMAEntry(direction, ffmaContracts);
+                 Enqueue(ctx => ctx.ExecuteFFMAEntry(direction, ffmaContracts));
              }
 
              Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4} FFMA={5}",

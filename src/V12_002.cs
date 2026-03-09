@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "963";  // V12.963: Build 963 Remediation -- full Enqueue coverage, ghost-state immunity
+        public const string BUILD_TAG = "964";  // V12.964: Build 964 Patch -- full IPC entry Enqueue coverage
 
         #region Variables
 
