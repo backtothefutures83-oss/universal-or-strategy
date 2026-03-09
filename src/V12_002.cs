@@ -1375,6 +1375,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             return null;
         }
 
+        // Build 940 [FIX-1]: Stable OCO hash -- FNV-1a non-crypto hash, consistent across NT8 restarts and platforms.
+        // Used for OCO Group IDs to satisfy SonarCloud security hotspots while maintaining stability.
+        private string GetStableHash(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return "00000000";
+            uint hash = 2166136261;
+            foreach (char c in input)
+            {
+                hash = (hash ^ c) * 16777619;
+            }
+            return hash.ToString("X8").ToUpperInvariant();
+        }
+
         #endregion
 
         // V12.16: OR, RMA, MOMO, TREND, RETEST entry logic moved to Entries.cs

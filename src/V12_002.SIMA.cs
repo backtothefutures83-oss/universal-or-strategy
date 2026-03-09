@@ -415,7 +415,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ExtremePriceSinceEntry = entryPrice,
                             CurrentTrailLevel = 0,
                             // Build 936 [FIX-2]: Deterministic bracket OCO group ID for broker-native stop+target linking.
-                            OcoGroupId = "V12_" + fleetEntryName.GetHashCode().ToString("X8"),
+                            OcoGroupId = "V12_" + GetStableHash(fleetEntryName),
                         };
 
                         // V12.7: Submit only entry for Limit; market entries include stop + non-runner targets.
@@ -1474,7 +1474,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ExtremePriceSinceEntry = price,
                             CurrentTrailLevel = 0,
                             // Build 936 [FIX-2]: Deterministic bracket OCO group ID for broker-native stop+target linking.
-                            OcoGroupId = "V12_" + fleetKey.GetHashCode().ToString("X8"),
+                            OcoGroupId = "V12_" + GetStableHash(fleetKey),
                         };
                         lock (stateLock)
                         {
