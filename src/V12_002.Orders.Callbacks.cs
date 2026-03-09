@@ -999,7 +999,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // V12.1101E [F-08]: Fallback dedup key when executionId is missing: (Order, FilledQuantity).
                     // Uses runtime order object identity + cumulative filled quantity.
-                    int dedupOrderIdentity = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(execution.Order);
+                    string uniqueOrderId = !string.IsNullOrEmpty(execution.Order.OrderId) ? execution.Order.OrderId : execution.Order.Name;
+                    string dedupOrderIdentity = GetStableHash(uniqueOrderId);
                     int dedupFilledQuantity = execution.Order.Filled > 0 ? execution.Order.Filled : Math.Max(0, quantity);
                     string fallbackKey = string.Format("{0}|{1}", dedupOrderIdentity, dedupFilledQuantity);
 
