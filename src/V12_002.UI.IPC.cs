@@ -1064,7 +1064,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // [1102Z-F]: IPC LOCK_50 -- Lock 50% of unrealized profit on all active positions.
                 // Delegates to ExecuteRunnerAction which already handles all account routing.
                 Print("[IPC LOCK_50] Received -- routing to ExecuteRunnerAction(lock50)");
-                ExecuteRunnerAction("lock50");
+                Enqueue(ctx => ctx.ExecuteRunnerAction("lock50"));
                 return true;
             }
             if (action == "FLATTEN_ONLY")

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "964";  // V12.964: Build 964 Patch -- full IPC entry Enqueue coverage
+        public const string BUILD_TAG = "965";  // V12.965: Build 965 Close-Out -- ExecuteRunnerAction Enqueue coverage
 
         #region Variables
 

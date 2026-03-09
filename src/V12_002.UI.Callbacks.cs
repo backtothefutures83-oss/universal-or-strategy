@@ -202,12 +202,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             // v5.12: Runner Actions (3 + letter)
             else if (Keyboard.IsKeyDown(Key.D3) || Keyboard.IsKeyDown(Key.NumPad3))
             {
-                if (e.Key == Key.M) { ExecuteRunnerAction("market"); e.Handled = true; }
-                else if (e.Key == Key.O) { ExecuteRunnerAction("stop1pt"); e.Handled = true; }
-                else if (e.Key == Key.W) { ExecuteRunnerAction("stop2pt"); e.Handled = true; }
-                else if (e.Key == Key.B) { ExecuteRunnerAction("stopbe"); e.Handled = true; }
-                else if (e.Key == Key.P) { ExecuteRunnerAction("lock50"); e.Handled = true; }  // P for Profit
-                else if (e.Key == Key.D) { ExecuteRunnerAction("disabletrail"); e.Handled = true; }
+                if (e.Key == Key.M) { Enqueue(ctx => ctx.ExecuteRunnerAction("market")); e.Handled = true; }
+                else if (e.Key == Key.O) { Enqueue(ctx => ctx.ExecuteRunnerAction("stop1pt")); e.Handled = true; }
+                else if (e.Key == Key.W) { Enqueue(ctx => ctx.ExecuteRunnerAction("stop2pt")); e.Handled = true; }
+                else if (e.Key == Key.B) { Enqueue(ctx => ctx.ExecuteRunnerAction("stopbe")); e.Handled = true; }
+                else if (e.Key == Key.P) { Enqueue(ctx => ctx.ExecuteRunnerAction("lock50")); e.Handled = true; }  // P for Profit
+                else if (e.Key == Key.D) { Enqueue(ctx => ctx.ExecuteRunnerAction("disabletrail")); e.Handled = true; }
             }
 
             // RMA uses Shift+Click (R conflicts with NT search, Ctrl conflicts with chart drag)
