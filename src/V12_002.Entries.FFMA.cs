@@ -61,6 +61,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("FFMA SHORT TRIGGERED: RSI={0:F1} > {1} | Distance={2:F2}pts > {3}pts | RED candle",
                         rsiValue, FFMARSIOverbought, distanceFromEMA, FFMAEMADistance));
+                    double stopPrice = High[0];
+                    double stopDistance = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                    if (stopDistance < tickSize * 2) stopDistance = tickSize * 2;
                     int contracts = CalculatePositionSize(stopDistance);
                     ExecuteFFMAEntry(MarketPosition.Short, contracts);
                     return;
@@ -71,6 +74,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("FFMA LONG TRIGGERED: RSI={0:F1} < {1} | Distance={2:F2}pts (below by {3}pts) | GREEN candle",
                         rsiValue, FFMARSIOversold, distanceFromEMA, FFMAEMADistance));
+                    double stopPrice = Low[0];
+                    double stopDistance = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                    if (stopDistance < tickSize * 2) stopDistance = tickSize * 2;
                     int contracts = CalculatePositionSize(stopDistance);
                     ExecuteFFMAEntry(MarketPosition.Long, contracts);
                     return;
