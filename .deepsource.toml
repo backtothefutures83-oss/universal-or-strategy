@@ -2,6 +2,5 @@
 name = "csharp"
 enabled = true
 
-  [analyzers.meta]
-  # Suppress file-scoped namespace rule (CS-R1062) because project uses C# 8.0
-  skip_rules = ["CS-R1062"]
+[analyzers.meta]
+lang_version = "8.0"
