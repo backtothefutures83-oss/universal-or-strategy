@@ -1431,7 +1431,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
                         Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
-                        ExecuteFFMALimitEntry(price, mp);
+                        int contracts = CalculatePositionSize(ffmaStopDist);
+                        ExecuteFFMALimitEntry(price, mp, contracts);
                     }
                     else
                     {
@@ -1444,7 +1445,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 // V12.27: M.FFMA button -- instant market, direction toward 9 EMA
                 Print("V12.27 IPC: FFMA_MANUAL_MARKET -- auto-direction toward EMA9");
-                ExecuteFFMAManualMarketEntry();
+                int contracts = CalculatePositionSize(ffmaStopDist);
+                ExecuteFFMAManualMarketEntry(contracts);
                 return true;
             }
             // V10.3: Target-Specific Close Commands
@@ -1835,7 +1837,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                  double ema9Value = _ema9Val;
                  MarketPosition direction = currentPrice > ema9Value ? MarketPosition.Short : MarketPosition.Long;
                  Print(string.Format("V12.24: MODE_M firing -- Price={0:F2} vs EMA9={1:F2} -> {2}", currentPrice, ema9Value, direction));
-                 ExecuteFFMAEntry(direction);
+                 int ffmaContracts = CalculatePositionSize(ffmaStopDist);
+                 ExecuteFFMAEntry(direction, ffmaContracts);
              }
 
              Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4} FFMA={5}",

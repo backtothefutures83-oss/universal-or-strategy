@@ -38,7 +38,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
 
         // V11: Trend RMA (9/15 Split) Logic
-        private void ExecuteTrendSplitEntry()
+        private void ExecuteTrendSplitEntry(int contracts)
         {
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
             if (isFlattenRunning) return;
@@ -74,7 +74,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double stop15Dist = CalculateATRStopDistance(e2Mult);  // EMA15 leg stop distance
                 double weightedStopDist = (stop9Dist * (1.0 / 3.0)) + (stop15Dist * (2.0 / 3.0));
 
-                int totalQty = CalculatePositionSize(weightedStopDist);
+                // totalQty extracted directly from passed in parameter (contracts) rather than dynamic calculation
+                int totalQty = contracts;
                 // TREND-SPLIT-FIX: Strict floor -- EMA9 gets ?Total/3?, EMA15 gets remainder.
                 // Matches the (1/3, 2/3) weights in weightedStopDist; prevents risk budget overrun.
                 int qty9  = Math.Max(1, totalQty / 3);
@@ -192,7 +193,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return ema65[0]; // Default
         }
 
-        private void ExecuteRMAEntry(double clickPrice, MarketPosition? forcedDirection = null)
+        private void ExecuteRMAEntry(double clickPrice, int contracts, MarketPosition? forcedDirection = null)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
             if (!IsOrderAllowed()) return;
@@ -265,7 +266,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                int contracts = CalculatePositionSize(stopDistance);
+                // contracts extracted directly from passed in parameter
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
@@ -404,7 +405,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                int contracts = CalculatePositionSize(stopDistance);
+                // contracts extracted directly from passed in parameter
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 

@@ -61,7 +61,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("FFMA SHORT TRIGGERED: RSI={0:F1} > {1} | Distance={2:F2}pts > {3}pts | RED candle",
                         rsiValue, FFMARSIOverbought, distanceFromEMA, FFMAEMADistance));
-                    ExecuteFFMAEntry(MarketPosition.Short);
+                    int contracts = CalculatePositionSize(stopDistance);
+                    ExecuteFFMAEntry(MarketPosition.Short, contracts);
                     return;
                 }
 
@@ -70,7 +71,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("FFMA LONG TRIGGERED: RSI={0:F1} < {1} | Distance={2:F2}pts (below by {3}pts) | GREEN candle",
                         rsiValue, FFMARSIOversold, distanceFromEMA, FFMAEMADistance));
-                    ExecuteFFMAEntry(MarketPosition.Long);
+                    int contracts = CalculatePositionSize(stopDistance);
+                    ExecuteFFMAEntry(MarketPosition.Long, contracts);
                     return;
                 }
             }
@@ -84,7 +86,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V8.7: Execute FFMA market order with entry candle high/low as stop
         /// Uses same target system as RMA (T1-T5)
         /// </summary>
-        private void ExecuteFFMAEntry(MarketPosition direction)
+        private void ExecuteFFMAEntry(MarketPosition direction, int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
             if (!IsOrderAllowed()) return;
@@ -127,7 +129,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
                 // Calculate position size based on ATR stop
-                int contracts = CalculatePositionSize(stopDistance);
+                            // contracts input passed directly by UI/IPC (No-Blink compliance)
 
                 // 5-target distribution
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
@@ -225,7 +227,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.27: FFMA manual entry using Limit Order at user-specified price.
         /// Uses ATR-based stop (same as standard FFMA but with Limit instead of Market).
         /// </summary>
-        private void ExecuteFFMALimitEntry(double manualPrice, MarketPosition direction)
+        private void ExecuteFFMALimitEntry(double manualPrice, MarketPosition direction, int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
             if (!IsOrderAllowed()) return;
@@ -271,7 +273,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                int contracts = CalculatePositionSize(stopDistance);
+                            // contracts input passed directly by UI/IPC (No-Blink compliance)
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
@@ -349,7 +351,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.27: FFMA Manual Market entry -- instant market order, direction toward 9 EMA.
         /// Stop at entry candle high/low (same as Auto FFMA).
         /// </summary>
-        private void ExecuteFFMAManualMarketEntry()
+        private void ExecuteFFMAManualMarketEntry(int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
             if (!IsOrderAllowed()) return;
@@ -419,7 +421,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                int contracts = CalculatePositionSize(stopDistance);
+                            // contracts input passed directly by UI/IPC (No-Blink compliance)
                 int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 

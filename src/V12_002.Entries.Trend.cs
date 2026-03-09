@@ -96,7 +96,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (isTrendRmaMode)
             {
                 Print(string.Format("V12.20: TREND Multiplier -> Mode=RMA (9/15 Split) ATR={0:F2}", currentATR));
-                ExecuteTrendSplitEntry();
+                ExecuteTrendSplitEntry(contracts);
                 return;
             }
 

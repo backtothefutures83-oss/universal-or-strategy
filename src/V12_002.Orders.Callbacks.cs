@@ -297,7 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            if (orderName.StartsWith("T1_") || orderName.StartsWith("T2_") || orderName.StartsWith("T3_") || orderName.StartsWith("T4_") || orderName.StartsWith("T5_"))
+            if (orderName.StartsWith("T1_") || orderName.StartsWith("T2_") || orderName.StartsWith("T3_") || orderName.StartsWith("T4_") || orderName.StartsWith("T5_") || orderName.StartsWith("Runner_"))
             {
                 RemoveTargetReferenceOnTerminalFill(order);
                 return true;
