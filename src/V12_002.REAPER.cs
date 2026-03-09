@@ -288,7 +288,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // A3-2: Mark in-flight BEFORE TriggerCustomEvent to block double-enqueue in next audit cycle (Build 960 audit fix)
                             lock (stateLock) { _repairInFlight.Add(repairKey); }
                             _reaperRepairQueue.Enqueue(acct.Name);
-                            try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); } catch { }
+                            // B957/E1: Clear in-flight guard if TriggerCustomEvent fails, preventing permanent lockout.
+                            try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); }
+                            catch (Exception repairTriggerEx)
+                            {
+                                lock (stateLock) { _repairInFlight.Remove(repairKey); }
+                                Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
+                            }
                         }
                         else
                         {

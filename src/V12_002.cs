@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "956";  // V12.956: DeepSource remediation -- RETEST_MANUAL null cleanup + IPC dead code removal (ReceiveLoop/ScheduleReconnect)
+        public const string BUILD_TAG = "957";  // V12.957: Audit remediation loop 1 -- Groups A-H: stateLock guards, FSM target replace, null-submit rollbacks, REAPER/SIMA drain fixes
 
         #region Variables
 
@@ -273,6 +273,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private readonly ConcurrentDictionary<string, FollowerReplaceSpec>
             _followerReplaceSpecs = new ConcurrentDictionary<string, FollowerReplaceSpec>();
+
+        // B957/C1: Two-phase FSM for follower TARGET order replacement (same pattern as entry replace FSM).
+        // Replaces the banned Cancel+Submit anti-pattern in MoveSpecificTarget follower path.
+        private class FollowerTargetReplaceSpec
+        {
+            public string      EntryName;
+            public int         TargetNum;
+            public double      NewTargetPrice;
+            public int         Quantity;
+            public OrderAction ExitAction;
+            public Account     TargetAccount;
+            public string      CancellingOrderId; // matched by order ID in OnAccountOrderUpdate
+        }
+        private readonly ConcurrentDictionary<string, FollowerTargetReplaceSpec>
+            _followerTargetReplaceSpecs = new ConcurrentDictionary<string, FollowerTargetReplaceSpec>();
 
         // [BUILD 949] CIT one-shot guard: tracks keys that have already been nudged.
         // Prevents re-nudging on subsequent bars after the first limit move.

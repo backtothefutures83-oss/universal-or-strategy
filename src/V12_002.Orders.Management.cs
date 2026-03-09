@@ -301,8 +301,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             try
                             {
                                 CancelOrder(existingOrder);
-                                lock (stateLock) { targetDict.TryRemove(entryName, out _); }
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancelled -> now Runner", targetNum, entryName));
+                                // B957: Do NOT TryRemove from targetDict here -- CancelOrder is async.
+                                // The broker-confirmed terminal callback will perform the removal under stateLock
+                                // once confirmed, preventing premature cleanup before the cancel is acknowledged.
+                                Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancel requested -> now Runner (awaiting broker confirm)", targetNum, entryName));
                                 refreshed++;
                             }
                             catch (Exception ex)
@@ -528,7 +530,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
                     newStop = pos.ExecutingAccount.CreateOrder(Instrument, exitAction,
                         OrderType.StopMarket, TimeInForce.Gtc, quantity, 0, stopPrice, _b950OcoId, sigName, null);
-                    pos.ExecutingAccount.Submit(new[] { newStop });
+                    // B957: Guard against null CreateOrder and Submit throws to prevent unprotected position.
+                    if (newStop == null)
+                    {
+                        Print(string.Format("[STOP_GUARD] CreateOrder returned null for follower {0}. Flattening.", entryName));
+                        FlattenPositionByName(entryName);
+                        return;
+                    }
+                    try { pos.ExecutingAccount.Submit(new[] { newStop }); }
+                    catch (Exception submitEx)
+                    {
+                        Print(string.Format("[STOP_GUARD] Submit threw for follower {0}: {1}. Flattening.", entryName, submitEx.Message));
+                        FlattenPositionByName(entryName);
+                        return;
+                    }
                 }
                 else
                 {

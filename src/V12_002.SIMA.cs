@@ -640,9 +640,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             // A3-1: Abort and drain queue if SIMA is disabled or flatten is running (Build 960 audit fix)
             if (isFlattenRunning || !EnableSIMA)
             {
+                // B957/F1: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
                 FleetDispatchRequest stale;
-                while (_pendingFleetDispatches.TryDequeue(out stale)) { }
-                Print("[PUMP] Abort: SIMA inactive or flatten running. Queue drained.");
+                while (_pendingFleetDispatches.TryDequeue(out stale))
+                {
+                    if (stale.ReservedDelta != 0)
+                        AddExpectedPositionDeltaLocked(stale.ExpectedKey, -stale.ReservedDelta);
+                    ClearDispatchSyncPending(stale.ExpectedKey);
+                }
+                Print("[PUMP] Abort: SIMA inactive or flatten running. Queue drained with delta rollback.");
                 return;
             }
 
@@ -827,10 +833,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     StopReaperAudit();
                     UnsubscribeFromFleetAccounts();
                     // A3-1: Drain ghost dispatch queue on SIMA disable (Build 960 audit fix)
+                    // B957/F2: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
                     {
                         FleetDispatchRequest ignored;
-                        while (_pendingFleetDispatches.TryDequeue(out ignored)) { }
-                        Print("[SIMA] Dispatch queue cleared on shutdown.");
+                        while (_pendingFleetDispatches.TryDequeue(out ignored))
+                        {
+                            if (ignored.ReservedDelta != 0)
+                                AddExpectedPositionDeltaLocked(ignored.ExpectedKey, -ignored.ReservedDelta);
+                            ClearDispatchSyncPending(ignored.ExpectedKey);
+                        }
+                        Print("[SIMA] Dispatch queue cleared on shutdown with delta rollback.");
                     }
                     Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
                 }

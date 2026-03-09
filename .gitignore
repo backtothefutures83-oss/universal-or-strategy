@@ -26,3 +26,16 @@ testsprite_tests/
 .env
 auth.json
 *.key
+
+# Audit & PR artifacts (never commit these)
+audit_report.md
+codex_audit.md
+*_audit*.md
+*_audit*.json
+pr*.diff
+pr*.txt
+prdiff*.txt
+diff.txt
+gh_log.txt
+help.txt
+test-vertex.js

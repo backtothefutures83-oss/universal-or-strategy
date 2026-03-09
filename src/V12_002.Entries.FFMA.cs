@@ -169,10 +169,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + entryName.GetHashCode().ToString("X8")
                 };
-                // V12.13-D: Notify connected panel clients of position entry
-                string syncMsg = string.Format("POSITION_ENTERED|FFMA|{0}", contracts);
-                SendResponseToRemote(syncMsg);
-
                 // Submit MARKET order (immediate execution)
                 Order entryOrder = direction == MarketPosition.Long
                     ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
@@ -189,6 +185,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     activePositions[entryName] = pos;
                     entryOrders[entryName] = entryOrder;
                 }
+                // B957: Notify panel only after confirmed submit (not before). Prevents premature IPC notification.
+                string syncMsg = string.Format("POSITION_ENTERED|FFMA|{0}", contracts);
+                SendResponseToRemote(syncMsg);
 
                 Print(string.Format("FFMA MARKET ORDER: {0} {1}@MARKET | Stop: {2:F2} (candle {3})",
                     signalName, contracts, stopPrice, direction == MarketPosition.Long ? "low" : "high"));

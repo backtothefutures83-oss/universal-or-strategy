@@ -121,8 +121,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // A1-1/A2-1: Null-abort + stateLock wrap for E2 (Build 960 audit fix)
                     if (entryOrder2 == null)
                     {
-                        Print("[ENTRY_ABORT] TrendSplit E2 SubmitOrderUnmanaged returned null for " + entry2Name + ". Rolling back.");
-                        // E1 already submitted -- log but continue without E2 tracking
+                        Print("[ENTRY_ABORT] TrendSplit E2 SubmitOrderUnmanaged returned null for " + entry2Name + ". Removing linked-pair references so E1 functions standalone.");
+                        // B957: Remove linkedTRENDEntries cross-references so E1 teardown doesn't look for a missing E2 partner.
+                        string removedPartner;
+                        linkedTRENDEntries.TryRemove(entry1Name, out removedPartner);
+                        linkedTRENDEntries.TryRemove(entry2Name, out removedPartner);
                     }
                     else
                     {
@@ -300,9 +303,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddExpectedPositionDeltaLocked(ExpKey(Account.Name), masterDeltaRMA);
 
                 // Submit LIMIT order at clicked price (RMA uses limit entries)
-                Order entryOrder = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, contracts, entryPrice, 0, "", entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, contracts, entryPrice, 0, "", entryName);
+                // B957: Wrap in try/catch so a thrown exception also triggers delta rollback (not just null return).
+                Order entryOrder = null;
+                try
+                {
+                    entryOrder = direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, contracts, entryPrice, 0, "", entryName)
+                        : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, contracts, entryPrice, 0, "", entryName);
+                }
+                catch (Exception submitEx)
+                {
+                    AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRMA);
+                    Print("[ENTRY_ABORT] RMA SubmitOrderUnmanaged THREW for " + entryName + " -- " + submitEx.Message + " -- expected rolled back.");
+                    Draw.Text(this, "Debug_Fail_" + entryName, "ORDER FAILED", 0, entryPrice, Brushes.Red);
+                    return;
+                }
 
                 // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
                 if (entryOrder == null)
@@ -418,9 +433,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddExpectedPositionDeltaLocked(ExpKey(Account.Name), masterDeltaRMACustom);
 
                 // Execute as MARKET order for IPC commands to ensure immediate fill (V9 style)
-                Order entryOrderCustom = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Market, contracts, 0, 0, "", entryName);
+                // B957: Wrap in try/catch so a thrown exception also triggers delta rollback (not just null return).
+                Order entryOrderCustom = null;
+                try
+                {
+                    entryOrderCustom = direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
+                        : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Market, contracts, 0, 0, "", entryName);
+                }
+                catch (Exception submitEx)
+                {
+                    AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaRMACustom);
+                    Print("[ENTRY_ABORT] RMACustom SubmitOrderUnmanaged THREW for " + entryName + " -- " + submitEx.Message + " -- expected rolled back.");
+                    return;
+                }
 
                 // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
                 if (entryOrderCustom == null)

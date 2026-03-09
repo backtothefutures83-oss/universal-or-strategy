@@ -246,7 +246,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (entryOrder2 == null)
                 {
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaE2);
-                    Print("[ENTRY_ABORT] TREND E2 SubmitOrderUnmanaged NULL for " + entry2Name + " -- rolled back.");
+                    // B957: E2 failed -- atomically abort E1 to prevent orphan state (unpartnered live order).
+                    AddExpectedPositionDeltaLocked(ExpKey(Account.Name), -masterDeltaE1);
+                    lock (stateLock)
+                    {
+                        activePositions.TryRemove(entry1Name, out _);
+                        entryOrders.TryRemove(entry1Name, out _);
+                    }
+                    string removedPartner;
+                    linkedTRENDEntries.TryRemove(entry1Name, out removedPartner);
+                    linkedTRENDEntries.TryRemove(entry2Name, out removedPartner);
+                    // Cancel live E1 order if still working (may already be filled; swallow gracefully).
+                    try { if (entryOrder1 != null && !entryOrder1.IsTerminal) CancelOrder(entryOrder1); } catch { }
+                    Print("[ENTRY_ABORT] TREND E2 NULL -- E1 aborted for " + entry1Name + " to prevent orphan state.");
                     return;
                 }
                 lock (stateLock) { activePositions[entry2Name] = pos2; entryOrders[entry2Name] = entryOrder2; }

@@ -24,8 +24,8 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 - **Advisor (Antigravity):** The **"General Manager."** Handles high-level brainstorming, diagnosing market issues, and engineering the core "Mission Prompt."
 - **Desk Supervisor & Lab (Gemini CLI):** The **"Quant & Compliance."** Uses **Conductor/ODIN** to turn Antigravity prompts into rigid technical plans. Uses the **Sandbox** to test math/logic in Python before implementation. Runs local security/lint audits.
-- **Lead Engineer (Claude/Sonnet):** The **"Execution Specialist."** Use **Sonnet** (latest) for all implementation. Sonnet is functionally autonomous: it creates its own branches, executes repairs, and **calls for automated audits** by opening PRs.
-- **The Loop:** Repair Mission -> Sonnet Handoff -> Branch/Code/Push -> PR Re-Audit Matrix (Opus/Gemini) -> Merge.
+- **Lead Engineer (Claude/Sonnet):** The **"Execution Specialist."** Use **Sonnet** (latest) for all implementation. Sonnet is functionally autonomous: it creates its own branches, executes repairs, and **calls for automated audits** by opening PRs. **MANDATORY AUDIT GATE:** Sonnet MUST paste its `implementation_plan.md` to Antigravity for audit and receive explicit Director approval before creating any branch or PR. No branch creation without sign-off.
+- **The Loop:** Repair Mission -> Sonnet Handoff -> **Plan to Antigravity for Audit** -> Director Approval -> Branch/Code/Push -> PR Re-Audit Matrix (Opus/Gemini) -> Merge.
 - **The Bridge:** Handoffs are managed via `implementation_plan.md`, `session_handoff.md`, and **Mission Brief** artifacts.
 
 ## 5. Multi-Agent Parity & Sync Protocol

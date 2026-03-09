@@ -627,6 +627,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return; // FSM-controlled cancel -- not a real desync
                 }
 
+                // B957/C1: Check for follower TARGET replace FSM spec before doing delta rollback.
+                // If this cancel was part of a two-phase target replacement, submit the new order
+                // and return -- no delta rollback needed (position remains open, just target moved).
+                {
+                    FollowerTargetReplaceSpec tSpec = null;
+                    string tFsmMatchKey = null;
+                    foreach (var tKvp in _followerTargetReplaceSpecs.ToArray())
+                    {
+                        if (tKvp.Value.CancellingOrderId == order.OrderId)
+                        {
+                            tSpec = tKvp.Value;
+                            tFsmMatchKey = tKvp.Key;
+                            break;
+                        }
+                    }
+                    if (tSpec != null && tFsmMatchKey != null)
+                    {
+                        lock (stateLock) { _followerTargetReplaceSpecs.TryRemove(tFsmMatchKey, out _); }
+                        FollowerTargetReplaceSpec captured = tSpec;
+                        string capturedKey = tFsmMatchKey;
+                        try
+                        {
+                            TriggerCustomEvent(o => SubmitFollowerTargetReplacement(capturedKey, captured), null);
+                        }
+                        catch (Exception tFsmEx)
+                        {
+                            Print("[FSM_TGT] TriggerCustomEvent failed for " + capturedKey + ": " + tFsmEx.Message);
+                        }
+                        return; // FSM-controlled target cancel -- skip delta rollback, not a real desync
+                    }
+                }
+
                 // A2-3: Direction-aware delta rollback on CONFIRMED cancel -- deferred from SymmetryGuardCascadeFollowerCleanup
                 // to prevent REAPER desync on microsecond fill race (Build 960 audit fix).
                 PositionInfo cancelledFollowerPos;
@@ -637,6 +669,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
                         ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
                     DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+                    // B957/D2: Release the SIMA dispatch-sync barrier for this account. Without this, the barrier
+                    // remains permanently blocked after a follower cancel, starving future dispatches.
+                    byte removedSyncKey;
+                    _dispatchSyncPendingExpKeys.TryRemove(cancelAcctKey, out removedSyncKey);
                 }
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
@@ -1032,14 +1068,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("OCO: Cancelled {0} target orders for {1}", cancelledTargets, entryName));
                         }
 
-                        // Remove stop order reference (under stateLock to prevent TOCTOU ghost state)
+                        // B957/D1: Only remove stopOrders and pendingStopReplacements when position is fully closed.
+                        // Do NOT remove on partial fills -- the stop may still be tracking residual contracts.
                         lock (stateLock)
                         {
-                            stopOrders.TryRemove(entryName, out _);
-                            if (pendingStopReplacements.TryRemove(entryName, out _))
-                                Interlocked.Decrement(ref pendingReplacementCount);
                             if (remainingAfterStop <= 0)
                             {
+                                stopOrders.TryRemove(entryName, out _);
+                                if (pendingStopReplacements.TryRemove(entryName, out _))
+                                    Interlocked.Decrement(ref pendingReplacementCount);
                                 activePositions.TryRemove(entryName, out _);
                                 entryOrders.TryRemove(entryName, out _);
                             }
@@ -1096,7 +1133,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             RequestStopCancelLifecycleSafe(entryName);
                             PositionInfo closedPos;
                             if (activePositions.TryGetValue(entryName, out closedPos) && closedPos != null)
-                                closedPos.PendingCleanup = true;
+                                lock (stateLock) { closedPos.PendingCleanup = true; } // B957/A: stateLock guards PositionInfo field writes
                             else
                                 SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
@@ -1157,7 +1194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                             PositionInfo trimPos;
                             if (activePositions.TryGetValue(entryName, out trimPos) && trimPos != null)
-                                trimPos.PendingCleanup = true;
+                                lock (stateLock) { trimPos.PendingCleanup = true; } // B957/A: stateLock guards PositionInfo field writes
                             else
                                 SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
@@ -1622,6 +1659,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             Print("[FSM] Replacement submitted: " + fleetSignalName
                 + " @ " + price + " x" + qty);
+        }
+
+        // B957/C1: SubmitFollowerTargetReplacement -- called on strategy thread via TriggerCustomEvent
+        // after broker confirms the PendingCancel of a follower target order (two-phase FSM for targets).
+        private void SubmitFollowerTargetReplacement(string tFsmKey, FollowerTargetReplaceSpec spec)
+        {
+            var tDict = GetTargetOrdersDictionary(spec.TargetNum);
+            Order newTargetOrder = null;
+            try
+            {
+                newTargetOrder = spec.TargetAccount.CreateOrder(
+                    Instrument, spec.ExitAction, OrderType.Limit, TimeInForce.Gtc,
+                    spec.Quantity, spec.NewTargetPrice, 0, "",
+                    "T" + spec.TargetNum + "_" + spec.EntryName, null);
+            }
+            catch (Exception createEx)
+            {
+                Print("[FSM_TGT] CreateOrder threw for " + tFsmKey + ": " + createEx.Message);
+                return;
+            }
+            if (newTargetOrder == null)
+            {
+                Print("[FSM_TGT] CreateOrder returned null for " + tFsmKey + " -- position may be unprotected.");
+                return;
+            }
+            try { spec.TargetAccount.Submit(new[] { newTargetOrder }); }
+            catch (Exception submitEx)
+            {
+                Print("[FSM_TGT] Submit threw for " + tFsmKey + ": " + submitEx.Message);
+                return;
+            }
+            if (tDict != null) lock (stateLock) { tDict[spec.EntryName] = newTargetOrder; }
+            Print("[FSM_TGT] Target replacement submitted: T" + spec.TargetNum + " for " + spec.EntryName + " -> " + spec.NewTargetPrice);
         }
 
         #endregion
