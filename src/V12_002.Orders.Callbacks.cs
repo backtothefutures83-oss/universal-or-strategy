@@ -52,38 +52,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             appliedQty = 0;
             remainingContractsAfter = 0;
 
-            lock (stateLock)
+            alreadyProcessed = IsTargetFilled(pos, targetNumber);
+            if (alreadyProcessed)
             {
-                alreadyProcessed = IsTargetFilled(pos, targetNumber);
-                if (alreadyProcessed)
-                {
-                    remainingContractsAfter = pos.RemainingContracts;
-                    return;
-                }
-
-                int targetContracts = Math.Max(0, GetTargetContracts(pos, targetNumber));
-                int filledQty = Math.Max(0, GetTargetFilledQuantity(pos, targetNumber));
-                int remainingTargetQty = Math.Max(0, targetContracts - filledQty);
-
-                int requestedFillQty = Math.Max(0, fillQty);
-                appliedQty = Math.Min(requestedFillQty, remainingTargetQty);
-
-                if (appliedQty > 0)
-                {
-                    filledQty += appliedQty;
-                    SetTargetFilledQuantity(pos, targetNumber, filledQty);
-                    pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - appliedQty);
-                }
-
-                bool isComplete = forceComplete || filledQty >= targetContracts;
-                if (isComplete)
-                {
-                    SetTargetFilledQuantity(pos, targetNumber, Math.Max(filledQty, targetContracts));
-                    MarkTargetFilled(pos, targetNumber);
-                }
-
                 remainingContractsAfter = pos.RemainingContracts;
+                return;
             }
+
+            int targetContracts = Math.Max(0, GetTargetContracts(pos, targetNumber));
+            int filledQty = Math.Max(0, GetTargetFilledQuantity(pos, targetNumber));
+            int remainingTargetQty = Math.Max(0, targetContracts - filledQty);
+
+            int requestedFillQty = Math.Max(0, fillQty);
+            appliedQty = Math.Min(requestedFillQty, remainingTargetQty);
+
+            if (appliedQty > 0)
+            {
+                filledQty += appliedQty;
+                SetTargetFilledQuantity(pos, targetNumber, filledQty);
+                pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - appliedQty);
+            }
+
+            bool isComplete = forceComplete || filledQty >= targetContracts;
+            if (isComplete)
+            {
+                SetTargetFilledQuantity(pos, targetNumber, Math.Max(filledQty, targetContracts));
+                MarkTargetFilled(pos, targetNumber);
+            }
+
+            remainingContractsAfter = pos.RemainingContracts;
         }
 
         // V12.1101E [F-07]: Request stop cancellation without dropping dictionary state early.
@@ -125,7 +122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (stopOrder.OrderState == OrderState.Cancelled || stopOrder.OrderState == OrderState.Filled ||
                 stopOrder.OrderState == OrderState.Rejected || stopOrder.OrderState == OrderState.Unknown)
             {
-                lock (stateLock) { stopOrders.TryRemove(entryName, out _); }
+                stopOrders.TryRemove(entryName, out _);
             }
         }
 
@@ -137,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (kvp.Value == order)
                 {
-                    lock (stateLock) { dict.TryRemove(kvp.Key, out _); }
+                    dict.TryRemove(kvp.Key, out _);
                     return true;
                 }
             }
@@ -155,9 +152,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             TryRemoveTargetReferenceByOrder(target5Orders, order);
         }
 
+        // V12.962 INLINE ACTOR: Thin-shell entry point. Captures order-object reference and all
+        // primitive args before Enqueue. ProcessOnOrderUpdate runs lock-free inside the drain.
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice,
             int quantity, int filled, double averageFillPrice, OrderState orderState,
             DateTime time, ErrorCode error, string nativeError)
+        {
+            // Order reference is stable (NT8 managed object); capture primitives to avoid
+            // any potential race between callback return and drain execution.
+            Order      _o  = order;
+            double     _lp = limitPrice;
+            double     _sp = stopPrice;
+            int        _q  = quantity;
+            int        _f  = filled;
+            double     _af = averageFillPrice;
+            OrderState _os = orderState;
+            DateTime   _t  = time;
+            string     _ne = nativeError ?? string.Empty;
+            Enqueue(ctx => ctx.ProcessOnOrderUpdate(_o, _lp, _sp, _q, _f, _af, _os, _t, _ne));
+        }
+
+        private void ProcessOnOrderUpdate(Order order, double limitPrice, double stopPrice,
+            int quantity, int filled, double averageFillPrice, OrderState orderState,
+            DateTime time, string nativeError)
         {
             try
             {
@@ -217,29 +234,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (averageFillPrice <= 0)
                     {
-                        lock (stateLock) { pos.EntryFilled = true; pos.InitialTargetCount = activeTargetCount; }
+                        pos.EntryFilled = true; pos.InitialTargetCount = activeTargetCount;
                         Print(string.Format("[PRICE_GUARD] CRITICAL: averageFillPrice=0 for {0}. Keeping intended price {1:F2}. NOT re-anchoring.", kvp.Key, pos.EntryPrice));
                         SubmitBracketOrders(kvp.Key, pos);
                         return true;
                     }
 
-                    lock (stateLock)
-                    {
-                        pos.EntryFilled = true;
-                        pos.InitialTargetCount = activeTargetCount;
-                        pos.EntryPrice = averageFillPrice;
-                        pos.ExtremePriceSinceEntry = averageFillPrice;
-                        // Recalculate targets and stop
-                        double stopDistance = pos.IsRMATrade ? currentATR * RMAStopATRMultiplier : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
-                        pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
-                        pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
-                        pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
-                        pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
-                        pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
-                        stopDistance = Math.Min(stopDistance, 12.0);
-                        pos.InitialStopPrice = pos.Direction == MarketPosition.Long ? averageFillPrice - stopDistance : averageFillPrice + stopDistance;
-                        pos.CurrentStopPrice = pos.InitialStopPrice;
-                    }
+                    pos.EntryFilled = true;
+                    pos.InitialTargetCount = activeTargetCount;
+                    pos.EntryPrice = averageFillPrice;
+                    pos.ExtremePriceSinceEntry = averageFillPrice;
+                    // Recalculate targets and stop
+                    double stopDistance = pos.IsRMATrade ? currentATR * RMAStopATRMultiplier : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
+                    pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
+                    pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
+                    pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
+                    pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
+                    pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
+                    stopDistance = Math.Min(stopDistance, 12.0);
+                    pos.InitialStopPrice = pos.Direction == MarketPosition.Long ? averageFillPrice - stopDistance : averageFillPrice + stopDistance;
+                    pos.CurrentStopPrice = pos.InitialStopPrice;
                     ApplyTargetLadderGuard(pos);
 
                     Print(string.Format("{0} ENTRY FILLED: {1} {2} @ {3:F2}", pos.IsRMATrade ? "RMA" : "OR", pos.Direction, pos.TotalContracts, averageFillPrice));
@@ -328,7 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
                         Print(string.Format("?? ?? CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
-                        lock (stateLock) { stopOrders.TryRemove(kvp.Key, out _); }
+                        stopOrders.TryRemove(kvp.Key, out _);
                         CreateNewStopOrder(kvp.Key, kvp.Value.RemainingContracts, kvp.Value.CurrentStopPrice, kvp.Value.Direction);
                         return true;
                     }
@@ -375,7 +389,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
                         int _stopQty;
-                        lock (stateLock) { _stopQty = pos.RemainingContracts; }
+                        _stopQty = pos.RemainingContracts;
                         if (_stopQty > 0)
                         {
                             CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
@@ -387,10 +401,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
                             }
                         }
-                        lock (stateLock)
-                        {
-                            if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
-                        }
+                        if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
                         handled = true;
                         break;
                     }
@@ -409,11 +420,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
                                 && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
                             {
-                                lock (stateLock)
-                                {
-                                    stopOrders.TryRemove(kvp.Key, out _);
-                                    activePositions.TryRemove(kvp.Key, out _);
-                                }
+                                stopOrders.TryRemove(kvp.Key, out _);
+                                activePositions.TryRemove(kvp.Key, out _);
                                 SymmetryGuardForgetEntry(kvp.Key);
                                 Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
                             }
@@ -456,7 +464,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("V12: Entry order MOVED: {0} to {1:F2}", kvp.Key, newPrice));
                         }
                         int _totalContracts;
-                        lock (stateLock) { _totalContracts = kvp.Value.TotalContracts; }
+                        _totalContracts = kvp.Value.TotalContracts;
                         if (quantity > 0 && quantity != _totalContracts)
                         {
                             // [937-FIX] Sync expectedPositions with broker-confirmed qty.
@@ -467,12 +475,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             int expDelta = (kvp.Value.Direction == MarketPosition.Long) ? qtyDiff : -qtyDiff;
                             DeltaExpectedPositionLocked(ExpKey(fixAcct), expDelta);
                             Print(string.Format("[937-FIX] expectedPositions adjusted on qty change: {0} delta={1}", fixAcct, expDelta));
-                            lock (stateLock)
-                            {
-                                kvp.Value.TotalContracts = quantity;
-                                kvp.Value.RemainingContracts = quantity;
-                                GetTargetDistribution(quantity, out kvp.Value.T1Contracts, out kvp.Value.T2Contracts, out kvp.Value.T3Contracts, out kvp.Value.T4Contracts, out kvp.Value.T5Contracts);
-                            }
+                            kvp.Value.TotalContracts = quantity;
+                            kvp.Value.RemainingContracts = quantity;
+                            GetTargetDistribution(quantity, out kvp.Value.T1Contracts, out kvp.Value.T2Contracts, out kvp.Value.T3Contracts, out kvp.Value.T4Contracts, out kvp.Value.T5Contracts);
                         }
                         return true;
                     }
@@ -561,13 +566,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 (entryOrder == order || (entryOrder != null && entryOrder.OrderId == order.OrderId)) &&
                 !matchedPos.EntryFilled)
             {
-                lock (stateLock) { entryOrders.TryRemove(matchedEntry, out _); }
+                entryOrders.TryRemove(matchedEntry, out _);
                 int gfExp = 0;
-                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(acctName), out gfExp); }
+                expectedPositions.TryGetValue(ExpKey(acctName), out gfExp);
                 if (gfExp == 0)
                 {
                     // Build 947: clean up any in-flight FSM spec to avoid orphaned state
-                    lock (stateLock) { _followerReplaceSpecs.TryRemove(matchedEntry, out _); }
+                    _followerReplaceSpecs.TryRemove(matchedEntry, out _);
                     return;
                 }
 
@@ -589,47 +594,44 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         Print("[FSM] Master filled during cancel wait -- routing "
                             + fsm.SignalName + " to repair instead of replace.");
-                        lock (stateLock) { _followerReplaceSpecs.TryRemove(fsm.SignalName, out _); }
+                        _followerReplaceSpecs.TryRemove(fsm.SignalName, out _);
                         return;
                     }
 
                     // A1-3: Snapshot qty/price and transition state atomically under stateLock to close TOCTOU window.
-                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside lock(stateLock)
-                    // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
-                    // the snapshot and state transition can observe torn state. (Build 960 audit fix)
-                    int    qty;
-                    double price;
-                    string acctNameCapture;
-                    string sigName;
-                    FollowerReplaceSpec fsmCapture;
-                    lock (stateLock)
-                    {
-                        qty             = fsm.PendingQty;
-                        price           = fsm.PendingPrice;
-                        acctNameCapture = fsm.AccountName;
-                        sigName         = fsm.SignalName;
-                        fsmCapture      = fsm;
-                        fsm.State       = FollowerReplaceState.Submitting;
-                    }
+                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside
+                // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
+                // the snapshot and state transition can observe torn state. (Build 960 audit fix)
+                int    qty;
+                double price;
+                string acctNameCapture;
+                string sigName;
+                FollowerReplaceSpec fsmCapture;
+                // V12.962 ACTOR: Direct field reads -- lock-free, serialized by _drainToken
+                qty             = fsm.PendingQty;
+                price           = fsm.PendingPrice;
+                acctNameCapture = fsm.AccountName;
+                sigName         = fsm.SignalName;
+                fsmCapture      = fsm;
+                fsm.State       = FollowerReplaceState.Submitting;
 
-                    try
+                try
+                {
+                    TriggerCustomEvent(o =>
                     {
-                        TriggerCustomEvent(o =>
-                        {
-                            // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
-                            // ATR tick absorption may have updated PendingPrice/PendingQty after the
-                            // lambda was scheduled -- using stale captures would submit wrong values.
-                            SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
-                            lock (stateLock) { _followerReplaceSpecs.TryRemove(sigName, out _); }
-                        }, null);
-                    }
-                    catch (Exception ex)
-                    {
-                        Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
-                        lock (stateLock) { _followerReplaceSpecs.TryRemove(sigName, out _); }
-                    }
-                    return; // FSM-controlled cancel -- not a real desync
+                        // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
+                        // ATR tick absorption may have updated PendingPrice/PendingQty after the
+                        // lambda was scheduled -- using stale captures would submit wrong values.
+                        SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
+                        _followerReplaceSpecs.TryRemove(sigName, out _);
+                    }, null);
                 }
+                catch (Exception ex)
+                {
+                    Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
+                    _followerReplaceSpecs.TryRemove(sigName, out _);
+                }
+                } // END of PendingCancel block
 
                 // B957/C1: Check for follower TARGET replace FSM spec before doing delta rollback.
                 // If this cancel was part of a two-phase target replacement, submit the new order
@@ -648,7 +650,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     if (tSpec != null && tFsmMatchKey != null)
                     {
-                        lock (stateLock) { _followerTargetReplaceSpecs.TryRemove(tFsmMatchKey, out _); }
+                        _followerTargetReplaceSpecs.TryRemove(tFsmMatchKey, out _);
                         FollowerTargetReplaceSpec captured = tSpec;
                         string capturedKey = tFsmMatchKey;
                         try
@@ -675,7 +677,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
                     // B957/D2: Release the SIMA dispatch-sync barrier for this account. Without this, the barrier
                     // remains permanently blocked after a follower cancel, starving future dispatches.
-                    lock (stateLock) { _dispatchSyncPendingExpKeys.Remove(cancelAcctKey); }
+                    _dispatchSyncPendingExpKeys.Remove(cancelAcctKey);
                 }
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
@@ -697,7 +699,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (activePositions.TryGetValue(_psr.Key, out _rPos))
                             {
                                 int _rQty;
-                                lock (stateLock) { _rQty = _rPos.RemainingContracts; }
+                                _rQty = _rPos.RemainingContracts;
                                 if (_rQty > 0)
                                 {
                                     CreateNewStopOrder(_psr.Key, _rQty, _psr.Value.StopPrice, _psr.Value.Direction);
@@ -709,10 +711,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     }
                                 } // if (_rQty > 0)
                             } // if (activePositions.TryGetValue)
-                            lock (stateLock)
-                            {
-                                if (pendingStopReplacements.TryRemove(_psr.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
-                            }
+                            if (pendingStopReplacements.TryRemove(_psr.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
                             return;
                         }
                     }
@@ -728,11 +727,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (activePositions.TryGetValue(_sc.Key, out _scPos) && _scPos != null
                                 && _scPos.PendingCleanup && _scPos.RemainingContracts <= 0)
                             {
-                                lock (stateLock)
-                                {
-                                    stopOrders.TryRemove(_sc.Key, out _);
-                                    activePositions.TryRemove(_sc.Key, out _);
-                                }
+                                stopOrders.TryRemove(_sc.Key, out _);
+                                activePositions.TryRemove(_sc.Key, out _);
                                 SymmetryGuardForgetEntry(_sc.Key);
                                 Print("[A2-2] Deferred PendingCleanup purge (follower stop terminal): " + _sc.Key);
                             }
@@ -772,7 +768,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             {
                                 int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
                                 int currentExp = 0;
-                                lock (stateLock) { expectedPositions.TryGetValue(ExpKey(cascadeAcctName), out currentExp); }
+                                expectedPositions.TryGetValue(ExpKey(cascadeAcctName), out currentExp);
                                 if (currentExp == 0)
                                 {
                                     Print(string.Format("[GHOST_FIX] SKIP cascade delta for {0}: expectedPositions already 0 (purge-race guard). Delta suppressed.",
@@ -838,17 +834,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
-            try
-            {
-                if (marketPosition == MarketPosition.Flat)
-                    HandleFlatPositionUpdate(position);
-
-                BroadcastSyncTargetState();
-            }
-            catch (Exception ex)
-            {
-                Print("ERROR OnPositionUpdate: " + ex.Message);
-            }
+            Enqueue(ctx => {
+                try
+                {
+                    if (marketPosition == MarketPosition.Flat)
+                        ctx.HandleFlatPositionUpdate(position);
+                    ctx.BroadcastSyncTargetState();
+                }
+                catch (Exception ex) { ctx.Print("ERROR OnPositionUpdate: " + ex.Message); }
+            });
         }
 
         // Build 935 [CB-B935-001]: Flat-position cleanup extracted from OnPositionUpdate.
@@ -968,32 +962,45 @@ namespace NinjaTrader.NinjaScript.Strategies
             SendResponseToRemote($"SYNC_TARGET_STATE|{syncCount}");
         }
 
+        // V12.962 INLINE ACTOR: Thin-shell for OnExecutionUpdate.
+        // Captures Execution fields before Enqueue; ProcessOnExecutionUpdate runs lock-free inside the drain.
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        {
+            if (execution == null || execution.Order == null) return;
+            // Capture all values from Execution -- NT8 may recycle the object after callback returns
+            string     _on  = execution.Order.Name ?? string.Empty;
+            string     _eid = executionId ?? string.Empty;
+            string     _oid = execution.Order.OrderId ?? string.Empty;
+            int        _of  = execution.Order.Filled;
+            OrderState _ost = execution.Order.OrderState;
+            double     _pr  = price;
+            int        _qty = quantity;
+            Execution  _ex  = execution; // Reference kept -- stable for compliance TrackTradeEntry path
+            Enqueue(ctx => ctx.ProcessOnExecutionUpdate(_on, _eid, _oid, _of, _ost, _pr, _qty, _ex));
+        }
+
+        private void ProcessOnExecutionUpdate(
+            string orderName, string executionId, string orderId,
+            int orderFilled, OrderState orderState,
+            double price, int quantity, Execution execution)
         {
             try
             {
-                if (execution == null || execution.Order == null) return;
-
-                string orderName = execution.Order.Name;
                 if (string.IsNullOrEmpty(orderName)) return;
 
-                // V12.Phase7 [C-01]: Dedup guard -- prevent double-decrement if OnOrderUpdate + OnExecutionUpdate both fire for same fill.
-                // CRITICAL FIX: Use stateLock (same lock as ApplyTargetFill/OnOrderUpdate) to ensure mutual exclusion.
-                // Previously used separate executionDeduplicateLock which allowed both threads to proceed concurrently.
+                // V12.962 INLINE ACTOR: Dedup guard -- lock-free, serial execution guaranteed by _drainToken.
+                // V12.Phase7 [C-01]: Prevent double-decrement if OnOrderUpdate + OnExecutionUpdate both fire.
                 if (!string.IsNullOrEmpty(executionId))
                 {
-                    lock (stateLock)
+                    if (!processedExecutionIds.Add(executionId))
                     {
-                        if (!processedExecutionIds.Add(executionId))
-                        {
-                            Print(string.Format("[DEDUP] Skipping duplicate execution {0} for {1}", executionId, orderName));
-                            return;
-                        }
-                        // Bounded pruning: keep at most MaxProcessedExecutionIds entries
-                        processedExecutionIdQueue.Enqueue(executionId);
-                        while (processedExecutionIdQueue.Count > MaxProcessedExecutionIds)
-                            processedExecutionIds.Remove(processedExecutionIdQueue.Dequeue());
+                        Print(string.Format("[DEDUP] Skipping duplicate execution {0} for {1}", executionId, orderName));
+                        return;
                     }
+                    // Bounded pruning: keep at most MaxProcessedExecutionIds entries
+                    processedExecutionIdQueue.Enqueue(executionId);
+                    while (processedExecutionIdQueue.Count > MaxProcessedExecutionIds)
+                        processedExecutionIds.Remove(processedExecutionIdQueue.Dequeue());
                 }
                 else
                 {
@@ -1004,17 +1011,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     int dedupFilledQuantity = execution.Order.Filled > 0 ? execution.Order.Filled : Math.Max(0, quantity);
                     string fallbackKey = string.Format("{0}|{1}", dedupOrderIdentity, dedupFilledQuantity);
 
-                    lock (stateLock)
+                    if (!processedExecutionFallbackKeys.Add(fallbackKey))
                     {
-                        if (!processedExecutionFallbackKeys.Add(fallbackKey))
-                        {
-                            Print(string.Format("[DEDUP] Skipping duplicate fallback execution {0} for {1}", fallbackKey, orderName));
-                            return;
-                        }
-                        processedExecutionFallbackQueue.Enqueue(fallbackKey);
-                        while (processedExecutionFallbackQueue.Count > MaxProcessedExecutionIds)
-                            processedExecutionFallbackKeys.Remove(processedExecutionFallbackQueue.Dequeue());
+                        Print(string.Format("[DEDUP] Skipping duplicate fallback execution {0} for {1}", fallbackKey, orderName));
+                        return;
                     }
+                    processedExecutionFallbackQueue.Enqueue(fallbackKey);
+                    while (processedExecutionFallbackQueue.Count > MaxProcessedExecutionIds)
+                        processedExecutionFallbackKeys.Remove(processedExecutionFallbackQueue.Dequeue());
                 }
 
                 // V12.12: Compliance tracking for single-account mode
@@ -1047,11 +1051,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (!string.IsNullOrEmpty(entryName) && activePositions.TryGetValue(entryName, out PositionInfo pos))
                     {
                         int remainingAfterStop;
-                        lock (stateLock)
-                        {
-                            pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - Math.Max(0, quantity));
-                            remainingAfterStop = pos.RemainingContracts;
-                        }
+                        pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - Math.Max(0, quantity));
+                        remainingAfterStop = pos.RemainingContracts;
 
                         Print(string.Format("STOP FILLED: {0} @ {1:F2}. Cancelling targets.", quantity, price));
 
@@ -1078,16 +1079,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         // B957/D1: Only remove stopOrders and pendingStopReplacements when position is fully closed.
                         // Do NOT remove on partial fills -- the stop may still be tracking residual contracts.
-                        lock (stateLock)
+                        if (remainingAfterStop <= 0)
                         {
-                            if (remainingAfterStop <= 0)
-                            {
-                                stopOrders.TryRemove(entryName, out _);
-                                if (pendingStopReplacements.TryRemove(entryName, out _))
-                                    Interlocked.Decrement(ref pendingReplacementCount);
-                                activePositions.TryRemove(entryName, out _);
-                                entryOrders.TryRemove(entryName, out _);
-                            }
+                            stopOrders.TryRemove(entryName, out _);
+                            if (pendingStopReplacements.TryRemove(entryName, out _))
+                                Interlocked.Decrement(ref pendingReplacementCount);
+                            activePositions.TryRemove(entryName, out _);
+                            entryOrders.TryRemove(entryName, out _);
                         }
                         if (remainingAfterStop <= 0)
                         {
@@ -1122,7 +1120,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (terminalFill)
                             {
                                 var tDict = GetTargetOrdersDictionary(targetNum);
-                                if (tDict != null) lock (stateLock) { tDict.TryRemove(entryName, out _); }
+                                if (tDict != null) tDict.TryRemove(entryName, out _);
                             }
                             return;
                         }
@@ -1141,7 +1139,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             RequestStopCancelLifecycleSafe(entryName);
                             PositionInfo closedPos;
                             if (activePositions.TryGetValue(entryName, out closedPos) && closedPos != null)
-                                lock (stateLock) { closedPos.PendingCleanup = true; } // B957/A: stateLock guards PositionInfo field writes
+                                closedPos.PendingCleanup = true; // B957/A: stateLock guards PositionInfo field writes
                             else
                                 SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
@@ -1150,7 +1148,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (terminalFill)
                         {
                             var tDict = GetTargetOrdersDictionary(targetNum);
-                            if (tDict != null) lock (stateLock) { tDict.TryRemove(entryName, out _); }
+                            if (tDict != null) tDict.TryRemove(entryName, out _);
                         }
                     }
                 }
@@ -1170,12 +1168,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         int previousQty;
                         int remainingAfterTrim;
-                        lock (stateLock)
-                        {
-                            previousQty = pos.RemainingContracts;
-                            pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - Math.Max(0, quantity));
-                            remainingAfterTrim = pos.RemainingContracts;
-                        }
+                        previousQty = pos.RemainingContracts;
+                        pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - Math.Max(0, quantity));
+                        remainingAfterTrim = pos.RemainingContracts;
 
                         Print(string.Format("TRIM EXECUTION: {0} contracts closed for {1}. Position: {2} ??' {3}",
                             quantity, entryName, previousQty, remainingAfterTrim));
@@ -1202,7 +1197,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                             PositionInfo trimPos;
                             if (activePositions.TryGetValue(entryName, out trimPos) && trimPos != null)
-                                lock (stateLock) { trimPos.PendingCleanup = true; } // B957/A: stateLock guards PositionInfo field writes
+                                trimPos.PendingCleanup = true; // B957/A: stateLock guards PositionInfo field writes
                             else
                                 SymmetryGuardForgetEntry(entryName); // already gone -- clean up now
                         }
@@ -1570,40 +1565,37 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             Order currentEntry = null;
 
-            lock (stateLock)
+            FollowerReplaceSpec existing;
+            if (_followerReplaceSpecs.TryGetValue(fleetEntryName, out existing))
             {
-                FollowerReplaceSpec existing;
-                if (_followerReplaceSpecs.TryGetValue(fleetEntryName, out existing))
-                {
-                    // Already in PendingCancel or Submitting -- absorb ATR tick into latest spec.
-                    existing.PendingQty   = newQty;
-                    existing.PendingPrice = newPrice;
-                    Print("[FSM] Replace spec updated (in-flight): "
-                        + fleetEntryName + " qty=" + newQty + " price=" + newPrice);
-                    return;
-                }
-
-                if (!entryOrders.TryGetValue(fleetEntryName, out currentEntry) || currentEntry == null)
-                {
-                    Print("[FSM] SKIP replace: no tracked entry for " + fleetEntryName);
-                    return;
-                }
-
-                var spec = new FollowerReplaceSpec
-                {
-                    State             = FollowerReplaceState.PendingCancel,
-                    CancellingOrderId = currentEntry.OrderId,
-                    PendingQty        = newQty,
-                    PendingPrice      = newPrice,
-                    AccountName       = accountName,
-                    SignalName        = fleetEntryName,
-                    MasterSignalName  = masterSignalName,
-                    EntryAction       = entryAction,
-                    EntryOrderType    = entryOrderType,
-                    IsStopType        = isStopType
-                };
-                _followerReplaceSpecs[fleetEntryName] = spec;
+                // Already in PendingCancel or Submitting -- absorb ATR tick into latest spec.
+                existing.PendingQty   = newQty;
+                existing.PendingPrice = newPrice;
+                Print("[FSM] Replace spec updated (in-flight): "
+                    + fleetEntryName + " qty=" + newQty + " price=" + newPrice);
+                return;
             }
+
+            if (!entryOrders.TryGetValue(fleetEntryName, out currentEntry) || currentEntry == null)
+            {
+                Print("[FSM] SKIP replace: no tracked entry for " + fleetEntryName);
+                return;
+            }
+
+            var spec = new FollowerReplaceSpec
+            {
+                State             = FollowerReplaceState.PendingCancel,
+                CancellingOrderId = currentEntry.OrderId,
+                PendingQty        = newQty,
+                PendingPrice      = newPrice,
+                AccountName       = accountName,
+                SignalName        = fleetEntryName,
+                MasterSignalName  = masterSignalName,
+                EntryAction       = entryAction,
+                EntryOrderType    = entryOrderType,
+                IsStopType        = isStopType
+            };
+            _followerReplaceSpecs[fleetEntryName] = spec;
 
             // Cancel outside lock -- currentEntry captured inside lock above
             try
@@ -1645,24 +1637,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fleetSignalName, null);
             acct.Submit(new[] { newEntry });
 
-            lock (stateLock)
-            {
-                entryOrders[fleetSignalName] = newEntry;
+            entryOrders[fleetSignalName] = newEntry;
 
-                // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
-                PositionInfo pos;
-                if (activePositions.TryGetValue(fleetSignalName, out pos) && pos != null)
-                {
-                    pos.TotalContracts     = qty;
-                    pos.RemainingContracts = qty;
-                    int ft1, ft2, ft3, ft4, ft5;
-                    GetTargetDistribution(qty, out ft1, out ft2, out ft3, out ft4, out ft5);
-                    pos.T1Contracts = ft1;
-                    pos.T2Contracts = ft2;
-                    pos.T3Contracts = ft3;
-                    pos.T4Contracts = ft4;
-                    pos.T5Contracts = ft5;
-                }
+            // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
+            PositionInfo pos;
+            if (activePositions.TryGetValue(fleetSignalName, out pos) && pos != null)
+            {
+                pos.TotalContracts     = qty;
+                pos.RemainingContracts = qty;
+                int ft1, ft2, ft3, ft4, ft5;
+                GetTargetDistribution(qty, out ft1, out ft2, out ft3, out ft4, out ft5);
+                pos.T1Contracts = ft1;
+                pos.T2Contracts = ft2;
+                pos.T3Contracts = ft3;
+                pos.T4Contracts = ft4;
+                pos.T5Contracts = ft5;
             }
 
             Print("[FSM] Replacement submitted: " + fleetSignalName
@@ -1698,7 +1687,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("[FSM_TGT] Submit threw for " + tFsmKey + ": " + submitEx.Message);
                 return;
             }
-            if (tDict != null) lock (stateLock) { tDict[spec.EntryName] = newTargetOrder; }
+            if (tDict != null) tDict[spec.EntryName] = newTargetOrder;
             Print("[FSM_TGT] Target replacement submitted: T" + spec.TargetNum + " for " + spec.EntryName + " -> " + spec.NewTargetPrice);
         }
 

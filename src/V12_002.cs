@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "961";  // V12.961: Transition to Inline Actor (Serializing Executor) architecture
+        public const string BUILD_TAG = "963";  // V12.963: Build 963 Remediation -- full Enqueue coverage, ghost-state immunity
 
         #region Variables
 
@@ -192,8 +192,44 @@ namespace NinjaTrader.NinjaScript.Strategies
         private TcpListener ipcListener;
         private Thread ipcThread;
         private volatile bool isIpcRunning;
-        private readonly object ipcLock = new object();
-        private readonly object stateLock = new object();  // V12.20: Atomic mode transitions
+
+        // V12.962 INLINE ACTOR (Serializing Executor) -- replaces stateLock
+        // All state mutations run inside Enqueue closures; _drainToken ensures serial execution.
+        // Zero locks: no monitor is ever held across a broker call (CancelOrder/SubmitOrder).
+        private abstract class StrategyCommand { public abstract void Execute(V12_002 ctx); }
+        private sealed class DelegateCommand : StrategyCommand {
+            private readonly Action<V12_002> _action;
+            public DelegateCommand(Action<V12_002> action) => _action = action;
+            public override void Execute(V12_002 ctx) => _action?.Invoke(ctx);
+        }
+        private readonly ConcurrentQueue<StrategyCommand> _cmdQueue = new ConcurrentQueue<StrategyCommand>();
+        private volatile int _drainToken = 0;
+        protected void Enqueue(Action<V12_002> action) {
+            if (action == null) return;
+            _cmdQueue.Enqueue(new DelegateCommand(action));
+            TryDrain();
+        }
+        private void TryDrain() {
+            if (Interlocked.CompareExchange(ref _drainToken, 1, 0) != 0) return;
+            DrainActor();
+        }
+        // V12.963: Non-recursive drain -- prevents stack growth from immediate broker callbacks
+        // (SubmitOrder/CancelOrder can re-trigger OnExecutionUpdate -> Enqueue -> TryDrain on same stack).
+        // Instead of recursing, schedule a new drain cycle via TriggerCustomEvent.
+        private void DrainActor() {
+            try {
+                StrategyCommand cmd;
+                while (_cmdQueue.TryDequeue(out cmd)) {
+                    try { cmd.Execute(this); }
+                    catch (Exception ex) { Print("[V12_INLINE_ACTOR] " + ex); }
+                }
+            }
+            finally {
+                Interlocked.Exchange(ref _drainToken, 0);
+                if (!_cmdQueue.IsEmpty)
+                    TriggerCustomEvent(o => { if (Interlocked.CompareExchange(ref _drainToken, 1, 0) == 0) DrainActor(); }, null);
+            }
+        }
         private ConcurrentQueue<string> ipcCommandQueue;
         // V12.2: Multi-Client Support
         private ConcurrentDictionary<int, TcpClient> connectedClients;

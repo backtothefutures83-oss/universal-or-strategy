@@ -139,14 +139,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // MOMO uses a fixed-points stop: Math.Min(MOMOStopPoints, MaximumStop)
                     double momoStopDist = Math.Min(MOMOStopPoints, MaximumStop);
                     int momoContracts   = CalculatePositionSize(momoStopDist);
-                    ExecuteMOMOEntry(clickPrice, momoContracts);
+                    double capturedMomoPrice = clickPrice; int capturedMomoContracts = momoContracts;
+                    Enqueue(ctx => ctx.ExecuteMOMOEntry(capturedMomoPrice, capturedMomoContracts));
                 }
                 else
                 {
                     MarketPosition direction = (clickPrice > currentPrice) ? MarketPosition.Short : MarketPosition.Long;
                     double rmaStopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
                     int rmaContracts   = CalculatePositionSize(rmaStopDist);
-                    ExecuteRMAEntryV2(clickPrice, direction, rmaContracts);
+                    double capturedRmaPrice = clickPrice; MarketPosition capturedDir = direction; int capturedRmaContracts = rmaContracts;
+                    Enqueue(ctx => ctx.ExecuteRMAEntryV2(capturedRmaPrice, capturedDir, capturedRmaContracts));
 
                     if (isRMAButtonClicked)
                     {
@@ -170,8 +172,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             // Basic hotkeys
-            if (e.Key == Key.L) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); ExecuteLong(orContracts); e.Handled = true; }
-            else if (e.Key == Key.S) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); ExecuteShort(orContracts); e.Handled = true; }
+            if (e.Key == Key.L) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); Enqueue(ctx => ctx.ExecuteLong(orContracts)); e.Handled = true; }
+            else if (e.Key == Key.S) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); Enqueue(ctx => ctx.ExecuteShort(orContracts)); e.Handled = true; }
             // V12.1101E [PH5-COLLIDE-01]: Panic hotkey routes through lifecycle-safe flatten pipeline.
             else if (e.Key == Key.F) { FlattenAll(); e.Handled = true; }
 

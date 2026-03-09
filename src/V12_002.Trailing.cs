@@ -466,10 +466,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("V8.30: Creating EMERGENCY replacement stop for {0}", kvp.Key));
                             // V12.1101E [F-02]: Use live RemainingContracts under stateLock instead of stale pending.Quantity
                             int replacementQty;
-                            lock (stateLock)
-                            {
-                                replacementQty = pos.RemainingContracts;
-                            }
+                            replacementQty = pos.RemainingContracts;
                             CreateNewStopOrder(kvp.Key, replacementQty, pending.StopPrice, pending.Direction);
                             // Build 950: Also restore bracket targets after V8.30 emergency stop.
                             if (pending.BracketRestorationNeeded && pending.CapturedTargets != null)
@@ -635,7 +632,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         OrderType.StopMarket, TimeInForce.Gtc, pos.RemainingContracts, 0, validatedStopPrice, "Stop_" + entryName, "Stop_" + entryName, null);
                     pos.ExecutingAccount.Submit(new[] { newStop });
                     // A1-1: stopOrders mutation inside stateLock (Build 960 audit fix)
-                    lock (stateLock) { stopOrders[entryName] = newStop; }
+                    stopOrders[entryName] = newStop;
                 }
                 else
                 {
@@ -647,7 +644,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     newStop = SubmitOrderUnmanaged(0, stopExitAction, OrderType.StopMarket, pos.RemainingContracts, 0, validatedStopPrice, "", stopSigName);
 
                     // A1-1: stopOrders mutation inside stateLock (Build 960 audit fix)
-                    if (newStop != null) lock (stateLock) { stopOrders[entryName] = newStop; }
+                    if (newStop != null) stopOrders[entryName] = newStop;
                 }
 
                 if (newStop == null)
@@ -665,11 +662,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bool circuitOpen = false;
                     if (activePositions.TryGetValue(entryName, out cbPos) && cbPos != null)
                     {
-                        lock (stateLock)
-                        {
-                            cbPos.FlattenAttemptCount++;
-                            if (cbPos.FlattenAttemptCount > 3) circuitOpen = true;
-                        }
+                        cbPos.FlattenAttemptCount++;
+                        if (cbPos.FlattenAttemptCount > 3) circuitOpen = true;
                         if (circuitOpen)
                         {
                             Print(string.Format("[CIRCUIT BREAKER] Emergency flatten halted after 3 consecutive failures for {0}. Manual intervention required.", entryName));
@@ -685,7 +679,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     PositionInfo cbReset;
                     if (activePositions.TryGetValue(entryName, out cbReset) && cbReset != null)
-                        lock (stateLock) { cbReset.FlattenAttemptCount = 0; } // B957/A: stateLock guards PositionInfo field writes
+                        cbReset.FlattenAttemptCount = 0; // B957/A: stateLock guards PositionInfo field writes
                 }
 
                 // B957: Removed redundant stopOrders write -- already set at CreateOrder/SubmitOrderUnmanaged path above.
@@ -707,11 +701,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool flattenBlocked = false;
                 if (activePositions.TryGetValue(entryName, out exCbPos) && exCbPos != null)
                 {
-                    lock (stateLock)
-                    {
-                        exCbPos.FlattenAttemptCount++;
-                        if (exCbPos.FlattenAttemptCount > 3) flattenBlocked = true;
-                    }
+                    exCbPos.FlattenAttemptCount++;
+                    if (exCbPos.FlattenAttemptCount > 3) flattenBlocked = true;
                     if (flattenBlocked)
                         Print(string.Format("[CIRCUIT BREAKER] Emergency flatten halted after 3 consecutive failures for {0}. Manual intervention required.", entryName));
                 }
@@ -800,26 +791,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // Toggle: if armed, disarm; if disarmed, arm
+                // V12.963: Mutations to PositionInfo fields must run inside Enqueue (actor thread).
                 foreach (var kvp in posSnapshot)
                 {
-                    if (!activePositions.ContainsKey(kvp.Key)) continue;
-                    PositionInfo pos = kvp.Value;
-                    if (pos.EntryFilled && !pos.ManualBreakevenTriggered)
-                    {
-                        if (anyArmed)
+                    var capturedKey = kvp.Key;
+                    var capturedAnyArmed = anyArmed;
+                    Enqueue(ctx => {
+                        if (!ctx.activePositions.ContainsKey(capturedKey)) return;
+                        PositionInfo pos = ctx.activePositions[capturedKey];
+                        if (pos.EntryFilled && !pos.ManualBreakevenTriggered)
                         {
-                            // Disarm
-                            pos.ManualBreakevenArmed = false;
-                            Print(string.Format("BREAKEVEN DISARMED: {0}", kvp.Key));
+                            pos.ManualBreakevenArmed = !capturedAnyArmed;
+                            if (capturedAnyArmed)
+                                ctx.Print(string.Format("BREAKEVEN DISARMED: {0}", capturedKey));
+                            else
+                                ctx.Print(string.Format("BREAKEVEN ARMED: {0} - Will trigger at Entry + {1} tick(s)",
+                                    capturedKey, ctx.BreakEvenOffsetTicks));
                         }
-                        else
-                        {
-                            // Arm
-                            pos.ManualBreakevenArmed = true;
-                            Print(string.Format("BREAKEVEN ARMED: {0} - Will trigger at Entry + {1} tick(s)",
-                                kvp.Key, BreakEvenOffsetTicks));
-                        }
-                    }
+                    });
                 }
             }
             catch (Exception ex)
@@ -1032,7 +1021,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             TargetAccount  = pos.ExecutingAccount,
                             CancellingOrderId = targetOrder.OrderId
                         };
-                        lock (stateLock) { _followerTargetReplaceSpecs[targetOrderName] = tSpec; }
+                        _followerTargetReplaceSpecs[targetOrderName] = tSpec;
                         // A1-2: Stamp REAPER grace window before cancel to suppress false desync during replace gap.
                         StampReaperMoveGrace();
                         pos.ExecutingAccount.Cancel(new[] { targetOrder });

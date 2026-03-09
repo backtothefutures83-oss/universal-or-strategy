@@ -287,14 +287,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         int realQty = kvp.Value;
                         int driftedQty = realQty + 1;
 
-                        // Introduce artificial drift under stateLock (mirrors real desync scenario)
-                        lock (stateLock) { expectedPositions[acctName] = driftedQty; }
-                        Print(string.Format("  [DESYNC]  Account {0}: expectedPositions drifted {1} -> {2}", acctName, realQty, driftedQty));
-
-                        // Restore immediately -- this is a read-only probe, not a live corruption test
-                        lock (stateLock) { expectedPositions[acctName] = realQty; }
-                        Print(string.Format("  [RESTORE] Account {0}: expectedPositions restored to {1}", acctName, realQty));
-                        Print(string.Format("  [VERIFY]  Reaper heartbeat = {0}ms -- any unrestored drift would be detected on next AuditApexPositions() cycle.", ReaperIntervalMs));
+                        // V12.963: Wrap expectedPositions writes in Enqueue for actor-thread compliance.
+                        // This is a test probe (drift + immediate restore); all mutations must be serialized.
+                        Enqueue(ctx => {
+                            ctx.expectedPositions[acctName] = driftedQty;
+                            ctx.Print(string.Format("  [DESYNC]  Account {0}: expectedPositions drifted {1} -> {2}", acctName, realQty, driftedQty));
+                            // Restore immediately -- this is a read-only probe, not a live corruption test
+                            ctx.expectedPositions[acctName] = realQty;
+                            ctx.Print(string.Format("  [RESTORE] Account {0}: expectedPositions restored to {1}", acctName, realQty));
+                            ctx.Print(string.Format("  [VERIFY]  Reaper heartbeat = {0}ms -- any unrestored drift would be detected on next AuditApexPositions() cycle.", ctx.ReaperIntervalMs));
+                        });
                         driftCount++;
                     }
                     Print(string.Format("  CASE 9 RESULT: {0} account(s) drift-probed and restored. Reaper window = {1}ms.",
