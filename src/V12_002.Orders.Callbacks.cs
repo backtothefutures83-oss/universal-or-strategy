@@ -486,5 +486,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return false;
         }
 
+    #endregion
+
     }
 }
