@@ -279,18 +279,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             _accountExecutionQueue.Enqueue(new QueuedAccountExecution { Account = execAccount, EventArgs = e });
             try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
 
-            // [STRESS_TEST Phase 9.0] Fleet Density Burst: when isStressTestEnabled, inject 2 duplicate events
-            // to simulate a high-message-density burst. Validates that the EntryFilled guard in
-            // ProcessAccountExecutionQueue blocks redundant bracket submissions under heavy fire.
-            if (isStressTestEnabled)
-            {
-                var burstItem = new QueuedAccountExecution { Account = execAccount, EventArgs = e };
-                _accountExecutionQueue.Enqueue(burstItem);
-                _accountExecutionQueue.Enqueue(burstItem);
-                Print(string.Format("[STRESS_BURST] Injected 2 duplicate execution signals for account {0}",
-                    execAccount?.Name ?? "unknown"));
-                try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
-            }
         }
 
         // [BUILD 948] Cap per-invocation drain to prevent strategy-thread starvation during broker replay bursts.
@@ -365,11 +353,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                             {
                                 double fleetFillPrice = item.EventArgs.Execution != null ? item.EventArgs.Execution.Price : 0;
                                 SymmetryGuardOnFollowerFill(fleetKey, pos, fleetFillPrice);
-                            }
-                            else if (isStressTestEnabled && activePositions.TryGetValue(fleetKey, out var dupPos) && dupPos.IsFollower && dupPos.EntryFilled)
-                            {
-                                // [STRESS_BURST] Dedup guard caught a duplicate burst signal -- bracket already submitted.
-                                Print(string.Format("[STRESS_BURST] DedupGuard HIT: {0} already EntryFilled -- duplicate bracket blocked.", fleetKey));
                             }
                             break;
                         }
