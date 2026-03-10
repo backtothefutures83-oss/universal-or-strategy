@@ -1,6 +1,6 @@
 // V12.Phase7 MODULAR: RMA Entry Node (Split from Entries.cs -- Phase 7 Partition)
-// Contains: ExecuteTrendSplitEntry, GetRmaAnchorPrice, ExecuteRMAEntry,
-//           ExecuteRMAEntryCustom, ActivateRMAMode, DeactivateRMAMode
+// Contains: ExecuteTrendSplitEntry, ExecuteRMAEntry,
+//           ExecuteRMAEntryCustom, DeactivateRMAMode
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -181,22 +181,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region RMA Entry Logic
 
-        // V11: Helper to get price of currently selected RMA Anchor
-        private double GetRmaAnchorPrice()
-        {
-            switch (currentRmaAnchor)
-            {
-                case RmaAnchorType.Ema30: return ema30[0];
-                case RmaAnchorType.Ema65: return ema65[0];
-                case RmaAnchorType.Ema200: return ema200[0];
-                case RmaAnchorType.OrHigh: return sessionHigh;
-                case RmaAnchorType.OrLow: return sessionLow;
-                case RmaAnchorType.Manual:
-                    // Use thread-safe cache
-                    return cachedMnlPrice;
-            }
-            return ema65[0]; // Default
-        }
 
         private void ExecuteRMAEntry(double clickPrice, int contracts, MarketPosition? forcedDirection = null)
         {
@@ -483,10 +467,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void ActivateRMAMode()
-        {
-            isRMAModeActive = true;
-        }
 
         private void DeactivateRMAMode()
         {

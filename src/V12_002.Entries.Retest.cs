@@ -1,5 +1,5 @@
 // V12.Phase7 MODULAR: RETEST Entry Node (Split from Entries.cs -- Phase 7 Partition)
-// Contains: ExecuteRetestEntry, ActivateRetestMode, DeactivateRetestMode, ExecuteRetestManualEntry
+// Contains: ExecuteRetestEntry, DeactivateRetestMode, ExecuteRetestManualEntry
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -220,10 +220,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void ActivateRetestMode()
-        {
-            isRetestModeActive = true;
-        }
 
         private void DeactivateRetestMode()
         {

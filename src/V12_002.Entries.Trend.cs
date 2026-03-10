@@ -1,5 +1,5 @@
 // V12.Phase7 MODULAR: TREND Entry Node (Split from Entries.cs -- Phase 7 Partition)
-// Contains: ExecuteTRENDEntry, CreateTRENDPosition, ActivateTRENDMode,
+// Contains: ExecuteTRENDEntry, CreateTRENDPosition,
 //           DeactivateTRENDMode, ExecuteTRENDManualEntry
 using System;
 using System.Collections.Generic;
@@ -343,10 +343,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             return tPos;
         }
 
-        private void ActivateTRENDMode()
-        {
-            isTRENDModeActive = true;
-        }
 
         private void DeactivateTRENDMode()
         {
