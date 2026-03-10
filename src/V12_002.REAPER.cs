@@ -21,13 +21,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.Phase8.2: Queue for repair requests marshaled from background thread -> strategy thread
         private ConcurrentQueue<string> _reaperRepairQueue = new ConcurrentQueue<string>();
         // V12.Phase8.2: Prevents double-repair for the same account while an order is in-flight
-        private readonly HashSet<string> _repairInFlight = new HashSet<string>();
+        private readonly ConcurrentDictionary<string, byte> _repairInFlight = new ConcurrentDictionary<string, byte>(); // [Build 968]
 
         // Build 1102R: Queue for naked-position emergency stop requests (background -> strategy thread)
         private ConcurrentQueue<(string AccountName, MarketPosition Direction, int Qty)> _reaperNakedStopQueue
             = new ConcurrentQueue<(string, MarketPosition, int)>();
         // Build 1102R: Prevents duplicate emergency stops while broker confirmation is pending (mirrors _repairInFlight)
-        private readonly HashSet<string> _reaperNakedStopInFlight = new HashSet<string>();
+        private readonly ConcurrentDictionary<string, byte> _reaperNakedStopInFlight = new ConcurrentDictionary<string, byte>(); // [Build 968]
 
         // GHOST-FIX-2 [Build 922Z]: Tracks when an account first appeared as "naked" (position with no working stop).
         // REAPER only fires emergency stop after NakedPositionGraceSec have elapsed, preventing race-condition
@@ -218,7 +218,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int expectedQty = 0;
             bool syncPending = false;
             expectedPositions.TryGetValue(expectedKey, out expectedQty);
-            syncPending = _dispatchSyncPendingExpKeys.Contains(expectedKey);
+            syncPending = _dispatchSyncPendingExpKeys.ContainsKey(expectedKey); // [B967-FIX-02]
             // Build 935 [REAPER-B935-002]: Per-account grace prevents Account A fill blocking Account B repair.
             bool inFillGrace = IsReaperFillGraceActive(expectedKey);
 
@@ -249,7 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     string repairKey = acct.Name + "_" + Instrument.FullName;
                     bool alreadyInFlight;
-                    alreadyInFlight = _repairInFlight.Contains(repairKey);
+                    alreadyInFlight = _repairInFlight.ContainsKey(repairKey); // [Build 968]
 
                     if (!alreadyInFlight)
                     {
@@ -283,13 +283,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             if (shouldLog) Print($"[REAPER] * REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
                             // A3-2: Mark in-flight BEFORE TriggerCustomEvent to block double-enqueue in next audit cycle (Build 960 audit fix)
-                            _repairInFlight.Add(repairKey);
+                            _repairInFlight.TryAdd(repairKey, 0); // [Build 968]
                             _reaperRepairQueue.Enqueue(acct.Name);
                             // B957/E1: Clear in-flight guard if TriggerCustomEvent fails, preventing permanent lockout.
                             try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); }
                             catch (Exception repairTriggerEx)
                             {
-                                _repairInFlight.Remove(repairKey);
+                                _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
                                 Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
                             }
                         }
@@ -351,10 +351,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
                     {
                         bool alreadyNakedInFlight;
-                        alreadyNakedInFlight = _reaperNakedStopInFlight.Contains(acct.Name);
+                        alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(ExpKey(acct.Name)); // [Build 968]
                         if (!alreadyNakedInFlight)
                         {
-                            _reaperNakedStopInFlight.Add(acct.Name);
+                            _reaperNakedStopInFlight.TryAdd(ExpKey(acct.Name), 0); // [Build 968]
                             Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
                                 acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
                             _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
@@ -704,7 +704,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 finally
                 {
                     // 7. Clear in-flight flag -- guaranteed on all exit paths (return, throw, or normal).
-                    _repairInFlight.Remove(repairKey);
+                    _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
                 }
             }
             catch (Exception ex)
@@ -764,7 +764,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     acct.Submit(new[] { emergencyStop });
 
                     // BUG-M2: Clear in-flight guard after successful submission
-                    _reaperNakedStopInFlight.Remove(item.AccountName);
+                    _reaperNakedStopInFlight.TryRemove(ExpKey(item.AccountName), out _); // [Build 968]
                     Print(string.Format(
                         "[REAPER][EMERGENCY_STOP] Submitted StopMarket for {0}: {1} {2}ct @ {3:F2} (Dist={4:F2})",
                         item.AccountName, closeAction, item.Qty, stopPrice, emergencyStopDist));
@@ -772,7 +772,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 catch (Exception ex)
                 {
                     // BUG-M2: Clear in-flight guard on failure so next cycle can retry
-                    _reaperNakedStopInFlight.Remove(item.AccountName);
+                    _reaperNakedStopInFlight.TryRemove(ExpKey(item.AccountName), out _); // [Build 968]
                     Print(string.Format("[REAPER][EMERGENCY_STOP_FAIL] {0}: {1}", item.AccountName, ex.Message));
                 }
             }
