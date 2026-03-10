@@ -1,0 +1,367 @@
+// Build 971: SIMA Lifecycle -- ApplySimaState, EnumerateApexAccounts, Hydrate*, CancelAll*, Sweep*
+// V12 SIMA Module (Extracted)
+using System;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Globalization;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
+using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.Strategies;
+using System.Net;
+using System.Net.Sockets;
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+    public partial class V12_002 : Strategy
+    {
+        #region V12 SIMA Lifecycle
+
+        /// <summary>
+        /// V12.Phase6 [LIFECYCLE]: Centralized SIMA state transition. Handles full lifecycle:
+        /// enable ??' enumerate accounts + subscribe handlers + hydrate positions + start Reaper
+        /// disable ??' stop Reaper + unsubscribe handlers + clear fleet state
+        /// Replaces raw EnableSIMA flag toggles to prevent handler leaks and Reaper state mismatches.
+        /// </summary>
+        private void ApplySimaState(bool enabled)
+        {
+            // V12.Audit [H-10]: If a previous toggle timed out, attempt retry now.
+            // We re-enter with the same `enabled` argument that was pending.
+            // If the semaphore is still held this call will time out again, setting the flag once more.
+            if (_simaTogglePending)
+                Print("[SIMA LIFECYCLE] Retrying previously timed-out toggle (pending retry flag was set).");
+
+            // V12.Phase7 [H-10]: Serialize enable/disable transitions to prevent race between
+            // concurrent IPC commands and UI toggles leaving SIMA in a partially initialized state.
+            if (!_simaToggleSem.Wait(500))
+            {
+                // V12.Audit [H-10]: Record that this toggle did not complete so the next caller can retry.
+                _simaTogglePending = true;
+                Print("[SIMA_WARN] ApplySimaState timed out waiting for semaphore -- toggle pending, retry.");
+                return;
+            }
+            try
+            {
+                if (enabled)
+                {
+                    EnumerateApexAccounts(); // Unsubs first (idempotent), then re-subscribes + hydrates
+                    if (ReaperAuditEnabled)
+                        StartReaperAudit();
+                    Print("[SIMA LIFECYCLE] SIMA ENABLED -- fleet enumerated, Reaper started");
+                }
+                else
+                {
+                    CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
+                    StopReaperAudit();
+                    UnsubscribeFromFleetAccounts();
+                    // A3-1: Drain ghost dispatch queue on SIMA disable (Build 960 audit fix)
+                    // B957/F2: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
+                    {
+                        FleetDispatchRequest ignored;
+                        while (_pendingFleetDispatches.TryDequeue(out ignored))
+                        {
+                            if (ignored.ReservedDelta != 0)
+                                AddExpectedPositionDeltaLocked(ignored.ExpectedKey, -ignored.ReservedDelta);
+                            ClearDispatchSyncPending(ignored.ExpectedKey);
+                        }
+                        Print("[SIMA] Dispatch queue cleared on shutdown with delta rollback.");
+                    }
+                    Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
+                }
+                EnableSIMA = enabled;
+                // V12.Audit [H-10]: Toggle completed successfully ??" clear any pending-retry flag.
+                _simaTogglePending = false;
+            }
+            finally
+            {
+                _simaToggleSem.Release();
+            }
+        }
+
+        private void EnumerateApexAccounts()
+        {
+            UnsubscribeFromFleetAccounts(); // V12.1101E [A-4]: Always unsub first ??" idempotent guard against handler accumulation
+            simaAccountCount = 0;
+            Print("[SIMA] ===================================================");
+            Print("[SIMA] V12.12 - Fleet Symmetry & Safety Hardening Initializing");
+            Print($"[SIMA] Account Prefix Filter: \"{AccountPrefix}\"");
+            Print("[SIMA] ---------------------------------------------------");
+
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    simaAccountCount++;
+                    { var _acct966init = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966init, 0)); } // Initialize expected position as flat
+                    accountDailyProfit[acct.Name] = 0; // Initialize daily profit
+                    EnsureAccountComplianceTracking(acct.Name, GetComplianceNow());
+                    activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE ??" wait for Fleet Manager / IPC to enable
+
+                    // V12.7: Always subscribe to execution updates for fleet bracket management
+                    // (Also used by ComplianceHub for P/L tracking)
+                    acct.ExecutionUpdate += OnAccountExecutionUpdate;
+                    acct.OrderUpdate += OnAccountOrderUpdate;
+                    _subscribedAccountNames.Add(acct.Name); // V12.Phase6 [UNSUB-TRACK]: Track for deterministic unsubscribe
+                    if (EnableComplianceHub)
+                    {
+                        Print($"[SIMA] [OK] {acct.Name} | COMPLIANCE MONITORING ACTIVE");
+                    }
+                    else
+                    {
+                        Print($"[SIMA] #{simaAccountCount}: {acct.Name} | Connected: {acct.Connection?.Status == ConnectionStatus.Connected} | Fleet: INACTIVE (awaiting IPC enable)");
+                    }
+                }
+            }
+
+            Print("[SIMA] ---------------------------------------------------");
+            Print($"[SIMA] TOTAL ACCOUNTS DETECTED: {simaAccountCount} | ALL INACTIVE by default");
+            Print("[SIMA] FLEET INACTIVE - MANUAL ENABLE REQUIRED"); // V12.Phase10 [DEFAULT-FIX]
+            Print("[SIMA] ===================================================");
+
+            // V12.Phase6 [HYDRATE]: Seed expectedPositions from live broker state
+            HydrateExpectedPositionsFromBroker();
+
+            // [BUILD 948] Adopt any working broker orders into tracking dicts; sets _orderAdoptionComplete = true
+            HydrateWorkingOrdersFromBroker();
+        }
+
+        /// <summary>
+        /// V12.Phase6 [HYDRATE]: Reads actual broker positions for each fleet account and seeds
+        /// expectedPositions accordingly. Prevents false Reaper CRITICAL DESYNC alerts when the
+        /// strategy restarts while accounts hold open positions.
+        /// </summary>
+        private void HydrateExpectedPositionsFromBroker()
+        {
+            int hydratedCount = 0;
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                try
+                {
+                    // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
+                    foreach (Position pos in acct.Positions.ToArray())
+                    {
+                        if (pos != null && pos.Instrument != null
+                            && pos.Instrument.FullName == Instrument.FullName
+                            && pos.MarketPosition != MarketPosition.Flat)
+                        {
+                            int qty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
+                            // V12.Phase7 [M-10]: Use AddOrUpdate instead of direct assignment to prevent
+                            // overwriting if called multiple times or during concurrent access.
+                            AddOrUpdateExpectedPositionLocked(ExpKey(acct.Name), qty, v => qty);
+                            Print($"[SIMA HYDRATE] {acct.Name}: Seeded expected={qty} from broker ({pos.MarketPosition} {pos.Quantity})");
+                            hydratedCount++;
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print($"[SIMA HYDRATE] WARNING: Could not read positions for {acct.Name}: {ex.Message}");
+                }
+            }
+            if (hydratedCount > 0)
+                Print($"[SIMA HYDRATE] Hydrated {hydratedCount} account(s) with live broker positions");
+        }
+
+        /// <summary>
+        /// Build 948 [FIX-B]: Re-adopt working broker orders into tracking dicts after restart or reconnect.
+        /// Derives the original entry key by stripping the well-known order-name prefix (e.g. "Stop_" -> stopOrders).
+        /// Sets _orderAdoptionComplete = true when done so REAPER can resume auditing.
+        /// MUST be called on the strategy thread (via TriggerCustomEvent when initiated from a callback).
+        /// All dict writes are guarded by stateLock per the StateLock Rule.
+        /// </summary>
+        private void HydrateWorkingOrdersFromBroker()
+        {
+            int adoptedCount = 0;
+
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                try
+                {
+                    foreach (Order ord in acct.Orders.ToArray())
+                    {
+                        if (ord.Instrument?.FullName != Instrument?.FullName) continue;
+                        // [Codex P2] Include all live in-flight states -- Submitted/ChangePending/ChangeSubmitted
+                        // can be active during an in-flight FSM replace at reconnect time.
+                        // Setting _orderAdoptionComplete=true while these are skipped leaves REAPER
+                        // auditing against incomplete order tracking and can fire false repair cycles.
+                        if (ord.OrderState != OrderState.Working    &&
+                            ord.OrderState != OrderState.Accepted   &&
+                            ord.OrderState != OrderState.Submitted  &&
+                            ord.OrderState != OrderState.ChangePending &&
+                            ord.OrderState != OrderState.ChangeSubmitted) continue;
+
+                        string name = ord.Name ?? string.Empty;
+                        ConcurrentDictionary<string, Order> targetDict = null;
+                        string key     = null;
+                        string dictName = null;
+
+                        if (name.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = stopOrders;   key = name.Substring(5); dictName = "stopOrders"; }
+                        else if (name.StartsWith("S_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = stopOrders;   key = name.Substring(2); dictName = "stopOrders"; }
+                        else if (name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target1Orders; key = name.Substring(3); dictName = "target1Orders"; }
+                        else if (name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target2Orders; key = name.Substring(3); dictName = "target2Orders"; }
+                        else if (name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target3Orders; key = name.Substring(3); dictName = "target3Orders"; }
+                        else if (name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target4Orders; key = name.Substring(3); dictName = "target4Orders"; }
+                        else if (name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = target5Orders; key = name.Substring(3); dictName = "target5Orders"; }
+                        // [Codex P1] Adopt Fleet_ prefixed follower entry orders into entryOrders.
+                        // Without this, broker-resident follower entries are invisible after reconnect.
+                        // ProcessQueuedExecution finds them by object ref in entryOrders, so a missed
+                        // adoption means SymmetryGuardOnFollowerFill is bypassed and the new filled
+                        // position launches without its protective bracket orders.
+                        else if (name.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase))
+                        { targetDict = entryOrders; key = name; dictName = "entryOrders"; }
+
+                        if (targetDict == null || key == null) continue;
+
+                        targetDict[key] = ord;
+                        Print(string.Format("[SIMA HYDRATE] Adopted working order {0} into {1}", name, dictName));
+                        adoptedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print(string.Format("[SIMA HYDRATE] WARNING: Could not read orders for {0}: {1}", acct.Name, ex.Message));
+                }
+            }
+
+            _orderAdoptionComplete = true;
+            if (adoptedCount > 0)
+                Print(string.Format("[SIMA HYDRATE] Adopted {0} working order(s) from broker -- adoption complete.", adoptedCount));
+            else
+                Print("[SIMA HYDRATE] No working orders to adopt -- adoption complete.");
+        }
+
+        /// <summary>
+        /// Build 948 [FIX-A]: Sweep and cancel all V12-managed GTC orders before SIMA disable or strategy terminate.
+        /// Phase 1 scans tracked order dicts; Phase 2 scans broker order lists for any V12-prefixed orders.
+        /// force=true: cancel regardless of open positions (strategy terminate).
+        /// force=false: skip accounts that have an open position for this instrument (SIMA disable -- prevent naked accounts).
+        /// </summary>
+        private void CancelAllV12GtcOrders(bool force)
+        {
+            int trackedCancels = SweepTrackedOrders(force);
+            int brokerCancels  = SweepBrokerOrders(force);
+            Print(string.Format("[BUILD 948] GTC sweep: cancelled {0} tracked + {1} broker-scanned orders",
+                trackedCancels, brokerCancels));
+        }
+
+        /// <summary>Phase 1: cancel orders held in strategy tracking dictionaries.</summary>
+        private int SweepTrackedOrders(bool force)
+        {
+            int trackedCancels = 0;
+            var trackedDicts = new ConcurrentDictionary<string, Order>[]
+            {
+                entryOrders, stopOrders,
+                target1Orders, target2Orders, target3Orders, target4Orders, target5Orders
+            };
+            foreach (var dict in trackedDicts)
+            {
+                if (dict == null) continue;
+                foreach (var kvp in dict.ToArray())
+                {
+                    Order ord = kvp.Value;
+                    if (ord == null) continue;
+                    if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                    try
+                    {
+                        bool isFleet = ord.Account != null &&
+                            ord.Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                            !string.Equals(ord.Account.Name, Account.Name, StringComparison.OrdinalIgnoreCase);
+                        if (isFleet)
+                            ord.Account.Cancel(new[] { ord });
+                        else
+                            CancelOrder(ord);
+                        trackedCancels++;
+                    }
+                    catch { }
+                }
+            }
+            return trackedCancels;
+        }
+
+        /// <summary>
+        /// Phase 2: broker-level scan to catch V12 orders not held in tracking dicts.
+        /// [P1 LIFECYCLE SAFETY]: skips accounts with open positions when force=false
+        /// to avoid leaving them naked after entry-order cancellation.
+        /// </summary>
+        private int SweepBrokerOrders(bool force)
+        {
+            int brokerCancels = 0;
+            var v12Prefixes = new[] { "Stop_", "S_", "T1_", "T2_", "T3_", "T4_", "T5_", "Fleet_" };
+            foreach (Account acct in Account.All)
+            {
+                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                // [P1 LIFECYCLE SAFETY]: If not a forced teardown, skip accounts with open positions
+                // to avoid leaving them naked (no bracket/stop) after their entry orders are cancelled.
+                if (!force)
+                {
+                    bool hasPosition = false;
+                    try
+                    {
+                        foreach (Position pos in acct.Positions)
+                        {
+                            if (pos.Instrument?.FullName == Instrument?.FullName && pos.Quantity != 0)
+                            { hasPosition = true; break; }
+                        }
+                    }
+                    catch { }
+                    if (hasPosition)
+                    {
+                        Print(string.Format("[BUILD 948] GTC sweep: SKIPPING {0} -- open position detected (force=false)", acct.Name));
+                        continue;
+                    }
+                }
+                try
+                {
+                    foreach (Order ord in acct.Orders.ToArray())
+                    {
+                        if (ord.Instrument?.FullName != Instrument?.FullName) continue;
+                        if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                        string ordName = ord.Name ?? string.Empty;
+                        bool isV12 = false;
+                        for (int pi = 0; pi < v12Prefixes.Length; pi++)
+                        {
+                            if (ordName.StartsWith(v12Prefixes[pi], StringComparison.OrdinalIgnoreCase))
+                            { isV12 = true; break; }
+                        }
+                        if (!isV12) continue;
+                        try { acct.Cancel(new[] { ord }); brokerCancels++; } catch { }
+                    }
+                }
+                catch { }
+            }
+            return brokerCancels;
+        }
+
+
+        #endregion
+    }
+}
