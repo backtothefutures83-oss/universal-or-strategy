@@ -379,29 +379,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Enable RMA Intelligence", GroupName = "14. RMA Intelligence", Order = 1)]
         public bool RmaIntelligenceEnabled { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "Exhaustion ATR Mult", GroupName = "14. RMA Intelligence", Order = 2)]
-        public double RmaExhaustionAtrMultiplier { get; set; }
+
+
 
         [NinjaScriptProperty]
-        [Display(Name = "Stretched Candle Mult", GroupName = "14. RMA Intelligence", Order = 3)]
-        public double RmaStretchedCandleMultiplier { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Fresh Candle ATR Buffer", GroupName = "14. RMA Intelligence", Order = 4)]
-        public double RmaFreshCandleBufferAtr { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Proximity Ticks", GroupName = "14. RMA Intelligence", Order = 5)]
+        [Display(Name = "Proximity Ticks", GroupName = "14. RMA Intelligence", Order = 2)]
         public int RmaProximityTicks { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Cancellation Ticks", GroupName = "14. RMA Intelligence", Order = 6)]
+        [Display(Name = "Cancellation Ticks", GroupName = "14. RMA Intelligence", Order = 3)]
         public int RmaCancellationTicks { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "Use MTF Confluence", GroupName = "14. RMA Intelligence", Order = 7)]
-        public bool RmaUseMtfConfluence { get; set; }
 
         #endregion
     }

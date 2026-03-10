@@ -149,12 +149,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TrailingDrawdownLimit = 2500; // Common Apex 50K trailing DD
                 // RMA Intelligence defaults (Phase 9.2)
                 RmaIntelligenceEnabled = false; // Default to isolated/OFF
-                RmaExhaustionAtrMultiplier = 2.0;
-                RmaStretchedCandleMultiplier = 1.0;
-                RmaFreshCandleBufferAtr = 1.0;
                 RmaProximityTicks = 2;
                 RmaCancellationTicks = 4;
-                RmaUseMtfConfluence = true;
             }
             else if (State == State.Configure)
             {
