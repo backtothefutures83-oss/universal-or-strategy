@@ -1,4 +1,4 @@
-// Build 971: Trailing.Breakeven -- OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget + Stop Management Helpers
+// Build 971: Trailing.Breakeven -- MoveStopsToBreakevenWithOffset, MoveSpecificTarget + Stop Management Helpers
 // V12 Trailing Module (Extracted)
 using System;
 using System.Collections.Generic;
@@ -32,73 +32,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        private void OnBreakevenButtonClick()
-        {
-            try
-            {
-                if (activePositions.Count == 0)
-                {
-                    Print("BREAKEVEN: No active positions");
-                    return;
-                }
-
-                // V8.30: Thread-safe snapshot iteration for UI button handler
-                var posSnapshot = activePositions.ToArray();
-
-                // Check if any positions are already triggered (can't toggle after trigger)
-                bool anyTriggered = false;
-                foreach (var kvp in posSnapshot)
-                {
-                    if (kvp.Value.ManualBreakevenTriggered)
-                    {
-                        anyTriggered = true;
-                        break;
-                    }
-                }
-
-                if (anyTriggered)
-                {
-                    Print("BREAKEVEN: Already triggered - cannot toggle");
-                    return;
-                }
-
-                // Check current state - if any armed, disarm all; if none armed, arm all
-                bool anyArmed = false;
-                foreach (var kvp in posSnapshot)
-                {
-                    if (kvp.Value.ManualBreakevenArmed)
-                    {
-                        anyArmed = true;
-                        break;
-                    }
-                }
-
-                // Toggle: if armed, disarm; if disarmed, arm
-                // V12.963: Mutations to PositionInfo fields must run inside Enqueue (actor thread).
-                foreach (var kvp in posSnapshot)
-                {
-                    var capturedKey = kvp.Key;
-                    var capturedAnyArmed = anyArmed;
-                    Enqueue(ctx => {
-                        if (!ctx.activePositions.ContainsKey(capturedKey)) return;
-                        PositionInfo pos = ctx.activePositions[capturedKey];
-                        if (pos.EntryFilled && !pos.ManualBreakevenTriggered)
-                        {
-                            pos.ManualBreakevenArmed = !capturedAnyArmed;
-                            if (capturedAnyArmed)
-                                ctx.Print(string.Format("BREAKEVEN DISARMED: {0}", capturedKey));
-                            else
-                                ctx.Print(string.Format("BREAKEVEN ARMED: {0} - Will trigger at Entry + {1} tick(s)",
-                                    capturedKey, ctx.BreakEvenOffsetTicks));
-                        }
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                Print("ERROR OnBreakevenButtonClick: " + ex.Message);
-            }
-        }
 
 
         #region Stop Management Helpers (V11)

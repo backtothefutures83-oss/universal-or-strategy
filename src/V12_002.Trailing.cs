@@ -1,6 +1,6 @@
 // V12.46 MODULAR: Trailing Stop Module (Extracted from Orders.cs)
 // Contains: ManageTrailingStops, CleanupStalePendingReplacements, UpdateStopOrder,
-//           CalculateStopForLevel, OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget
+//           CalculateStopForLevel, MoveStopsToBreakevenWithOffset, MoveSpecificTarget
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
