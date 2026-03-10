@@ -359,7 +359,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
                             _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
                             try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
-                            catch (Exception tcEx) { Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed: {0}", tcEx.Message)); }
+                            catch (Exception tcEx)
+                            {
+                                _reaperNakedStopInFlight.TryRemove(ExpKey(acct.Name), out _); // [Build 969]
+                                Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
+                            }
                         }
                     }
                 }
@@ -640,7 +644,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Account targetAcct = repairPos.ExecutingAccount;
                 if (targetAcct == null)
                 {
-                    Print($"[REAPER REPAIR] \u2717 ExecutingAccount is null for {accountName}");
+                    Print($"[REAPER REPAIR] [FAIL] ExecutingAccount is null for {accountName}"); // [Build 969]
                     return;
                 }
 
@@ -667,7 +671,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (repairEntry == null)
                 {
-                    Print($"[REAPER REPAIR] \u2717 CreateOrder returned null for {accountName}");
+                    Print($"[REAPER REPAIR] [FAIL] CreateOrder returned null for {accountName}"); // [Build 969]
                     return;
                 }
 
@@ -688,7 +692,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 targetAcct.Submit(new[] { repairEntry });
 
-                Print($"[REAPER REPAIR] \u2713 Repair order submitted for {accountName} under key={repairEntryName}: " +
+                Print($"[REAPER REPAIR] [OK] Repair order submitted for {accountName} under key={repairEntryName}: " + // [Build 969]
                       $"{action} {quantity} {repairOrderType} " +
                       $"{(repairOrderType == OrderType.Market ? "@ Market" : "@ " + repairEntryPrice.ToString("F2"))} " +
                       $"(original entry={repairEntryPrice:F2})");
@@ -709,7 +713,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print($"[REAPER REPAIR] \u2717 FAILED for {accountName}: {ex.Message}");
+                Print($"[REAPER REPAIR] [FAIL] FAILED for {accountName}: {ex.Message}"); // [Build 969]
             }
         }
 
