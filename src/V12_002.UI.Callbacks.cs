@@ -216,6 +216,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region Target & Runner Actions
+
+        #region Primary Actions
+
         // v5.12: Execute target actions (T1..T5)
         private void ExecuteTargetAction(string targetType, string action)
         {
@@ -541,6 +544,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("ERROR ExecuteRunnerAction ({0}): {1}", action, ex.Message));
             }
         }
+        #endregion
+
         #endregion
     }
 }

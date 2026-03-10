@@ -34,6 +34,8 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region Apex Compliance Hub Logic (V12.1)
 
+        #region Compliance Tracking
+
         private DateTime GetComplianceNow()
         {
             return ConvertToSelectedTimeZone(DateTime.Now);
@@ -106,6 +108,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return days.Count;
             return 0;
         }
+
+        #endregion
+
+        #region CSV Reporting
 
         private void EnsureDailySummaryCsv()
         {
@@ -207,6 +213,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return accounts;
         }
+
+        #endregion
+
+        #region Snapshot & Enforcement
 
         private ComplianceSnapshot BuildComplianceSnapshot()
         {
@@ -417,6 +427,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// to the strategy thread via TriggerCustomEvent to avoid cross-thread mutation of
         /// strategy state (entryOrders, activePositions, compliance counters).
         /// </summary>
+        #endregion
+
+        #region Execution Callbacks
+
         private void OnAccountExecutionUpdate(object sender, ExecutionEventArgs e)
         {
             if (e == null) return;
@@ -565,6 +579,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// Writes current account health to a JSON file for the WPF Remote App to read
         /// </summary>
+        #endregion
+
+        #region Performance Logging
+
         private void LogApexPerformance()
         {
             if (!EnableComplianceHub || string.IsNullOrEmpty(complianceLogPath)) return;
@@ -642,6 +660,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("[COMPLIANCE] ERROR writing log: " + ex.Message);
             }
         }
+
+        #endregion
 
         #endregion
     }

@@ -37,6 +37,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Trade copying is replaced by direct Account.All iteration in ExecuteSmartDispatchEntry.
         // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
 
+        #region Trend Split Entry
+
         // V11: Trend RMA (9/15 Split) Logic
         private void ExecuteTrendSplitEntry(int contracts)
         {
@@ -174,6 +176,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("ERROR ExecuteTrendSplitEntry: " + ex.Message);
             }
         }
+
+        #endregion
 
         #region RMA Entry Logic
 
