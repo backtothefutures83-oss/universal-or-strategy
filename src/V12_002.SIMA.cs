@@ -68,12 +68,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             public int ReservedDelta;
         }
 
-        /// <summary>
-        /// [STRESS_TEST Phase 9.0] When true, OnAccountExecutionUpdate injects duplicate execution events
-        /// into _accountExecutionQueue to validate the EntryFilled dedup guard under high-message density.
-        /// Default: false -- must be manually enabled for stress testing only. Never enable in production.
-        /// </summary>
-        private bool isStressTestEnabled = false;
 
         // V12.1101E [F-06]: Serialize expectedPositions mutations so Reaper never observes partial state.
         private void AddExpectedPositionDeltaLocked(string accountName, int delta)
