@@ -17,6 +17,10 @@ $Mappings = @(
     
     # Strategy (Modularized V12_002 Series)
     @{ src = "V12_002.cs"; dst = Join-Path $NtStrategyDir "V12_002.cs" },
+    @{ src = "V12_002.PositionInfo.cs"; dst = Join-Path $NtStrategyDir "V12_002.PositionInfo.cs" },
+    @{ src = "V12_002.Lifecycle.cs"; dst = Join-Path $NtStrategyDir "V12_002.Lifecycle.cs" },
+    @{ src = "V12_002.BarUpdate.cs"; dst = Join-Path $NtStrategyDir "V12_002.BarUpdate.cs" },
+    @{ src = "V12_002.DrawingHelpers.cs"; dst = Join-Path $NtStrategyDir "V12_002.DrawingHelpers.cs" },
     @{ src = "V12_002.Entries.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.cs" },
     @{ src = "V12_002.Entries.FFMA.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.FFMA.cs" },
     @{ src = "V12_002.Entries.OR.cs"; dst = Join-Path $NtStrategyDir "V12_002.Entries.OR.cs" },
