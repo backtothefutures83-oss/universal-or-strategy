@@ -536,16 +536,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Threading: runs on strategy thread (via TriggerCustomEvent). All stateLock usages unchanged.
         private void ExecuteReaperRepair(string accountName)
         {
-            // A3-2: Abort immediately if a flatten is in progress (Build 960 audit fix)
-            if (isFlattenRunning)
-            {
-                Print("[REAPER REPAIR] Aborted -- flatten in progress.");
-                return;
-            }
-
             string repairKey = accountName + "_" + Instrument.FullName;
             try
             {
+                // A3-2: Abort immediately if a flatten is in progress (Build 960 audit fix)
+                if (isFlattenRunning)
+                {
+                    Print("[REAPER REPAIR] Aborted -- flatten in progress.");
+                    return;
+                }
+
                 // 1. Find the stored PositionInfo for this account in activePositions
                 PositionInfo repairPos = null;
                 string repairEntryName = null;
@@ -649,8 +649,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // 4. In-flight was already set on the background thread before TriggerCustomEvent (A3-2)
-                try  // Build 940 [FIX-2]: Inner try/finally guarantees _repairInFlight cleanup on all exit paths.
-                {
                 // 5. Re-issue entry order using the SIMA acct.CreateOrder + acct.Submit pattern
                 OrderAction action = repairPos.Direction == MarketPosition.Long
                     ? OrderAction.Buy : OrderAction.SellShort;
@@ -704,16 +702,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RemoveDrawObject(desyncTag);
                 }
                 catch { }
-                }
-                finally
-                {
-                    // 7. Clear in-flight flag -- guaranteed on all exit paths (return, throw, or normal).
-                    _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
-                }
             }
             catch (Exception ex)
             {
                 Print($"[REAPER REPAIR] [FAIL] FAILED for {accountName}: {ex.Message}"); // [Build 969]
+            }
+            finally
+            {
+                // [Build 969.3] - Top-level finally guarantees _repairInFlight cleanup on ALL exit paths.
+                _repairInFlight.TryRemove(repairKey, out _);
             }
         }
 
@@ -732,6 +729,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (acct == null)
                     {
                         Print(string.Format("[REAPER][NAKED_STOP] Account {0} not found -- skipping.", item.AccountName));
+                        _reaperNakedStopInFlight.TryRemove(ExpKey(item.AccountName), out _); // [Build 969.3]
                         continue;
                     }
 
@@ -768,7 +766,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     acct.Submit(new[] { emergencyStop });
 
                     // BUG-M2: Clear in-flight guard after successful submission
-                    _reaperNakedStopInFlight.TryRemove(ExpKey(item.AccountName), out _); // [Build 968]
+                    _reaperNakedStopInFlight.TryRemove(ExpKey(item.AccountName), out _); // [Build 969.3] - Clears guard for immediate retry if broker update latches
                     Print(string.Format(
                         "[REAPER][EMERGENCY_STOP] Submitted StopMarket for {0}: {1} {2}ct @ {3:F2} (Dist={4:F2})",
                         item.AccountName, closeAction, item.Qty, stopPrice, emergencyStopDist));
