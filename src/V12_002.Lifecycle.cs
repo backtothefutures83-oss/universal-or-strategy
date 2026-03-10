@@ -329,8 +329,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // to handle cases where flag was toggled OFF mid-session while handlers were still subscribed.
                 UnsubscribeFromFleetAccounts();
                 
-                // V10.3: Unsubscribe
-                SignalBroadcaster.OnExternalCommand -= HandleExternalSignal;
 
                 // V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
                 // Static events survive instance disposal -- without this, dead instance handlers accumulate

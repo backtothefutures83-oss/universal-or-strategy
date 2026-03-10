@@ -217,24 +217,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             return null;
         }
 
-        private void HandleExternalSignal(object sender, SignalBroadcaster.ExternalCommandSignal e)
-        {
-            // V10.3: Only non-winners (secondary charts) need to handle the broadcast
-            // The port winner already enqueued the message locally in ListenForRemote
-            if (ipcCommandQueue != null && !isIpcRunning)
-            {
-                Print(string.Format("V10.3 DEBUG: {0} received broadcast: {1}", Instrument.MasterInstrument.Name, e.Command));
-                if (!TryEnqueueIpcCommand(e.Command, out string enqueueReason))
-                {
-                    Print(string.Format("V10.3 IPC REJECT broadcast '{0}': {1}", e.Command, enqueueReason));
-                    return;
-                }
-
-                // Force instant processing for secondary charts (so they don't wait for a tick)
-                try { TriggerCustomEvent(o => ProcessIpcCommands(), null); } catch { }
-            }
-        }
-
         private void ProcessIpcCommands()
         {
             if (ipcCommandQueue == null || ipcCommandQueue.IsEmpty) return;

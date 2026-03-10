@@ -34,7 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         // V12 SIMA: BroadcastEntrySignal and V8 Copy Trading region removed.
         // Trade copying is replaced by direct Account.All iteration in ExecuteSmartDispatchEntry.
-        // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
+        // SignalBroadcaster is retained for ClearAllSubscribers teardown (Lifecycle.cs).
 
         #region Trend Split Entry
 
@@ -203,67 +203,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
         #region RMA Intelligence (Phase 9.2)
 
-        /// <summary>
-        /// Expert logic to verify if a level is "Exhausted" and safe to trade as a reversal.
-        /// </summary>
-        private bool IsRmaSetupExhausted(double level, MarketPosition direction)
-        {
-            if (!RmaIntelligenceEnabled) return true; // Bypass if disabled
-
-            // 1. Exhaustion Pulse (2.0 ATR move over 5 bars)
-            if (BarsArray[1].Count < 6) return false;
-            double moveDist = Math.Abs(Close[0] - Highs[1][5]); // Comparison against 5 blocks ago on 5-min
-            if (direction == MarketPosition.Long) moveDist = Math.Abs(Close[0] - Lows[1][5]);
-            
-            double exhaustionThreshold = currentATR * RmaExhaustionAtrMultiplier;
-            if (moveDist < exhaustionThreshold)
-            {
-                Print(string.Format("[REJECT] No Exhaustion: Move={0:F2} vs Threshold={1:F2}", moveDist, exhaustionThreshold));
-                return false;
-            }
-
-            // 2. Stretched Candle Sense (Height > 1.0 ATR)
-            double candleHeight = High[0] - Low[0];
-            if (candleHeight < (currentATR * RmaStretchedCandleMultiplier))
-            {
-                Print(string.Format("[REJECT] Not Stretched: Height={0:F2} vs Threshold={1:F2}", candleHeight, currentATR * RmaStretchedCandleMultiplier));
-                return false;
-            }
-
-            // 3. Fresh Candle Shield (Opened too close to level)
-            double openDist = Math.Abs(Open[0] - level);
-            if (openDist < (currentATR * RmaFreshCandleBufferAtr))
-            {
-                Print(string.Format("[REJECT] Fresh Candle: Open={0:F2} is within {1:F2} of level", Open[0], currentATR * RmaFreshCandleBufferAtr));
-                return false;
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Returns a confluence score (0.0 to 1.0) based on higher timeframe levels and EMA/Fib alignment.
-        /// </summary>
-        private double GetRmaConfluenceScore(double level)
-        {
-            if (!RmaUseMtfConfluence) return 1.0;
-
-            double score = 0;
-            double tickThreshold = 2 * tickSize;
-
-            // EMA Alignment (30, 65, 200)
-            if (Math.Abs(ema30[0] - level) <= tickThreshold) score += 0.2;
-            if (Math.Abs(ema65[0] - level) <= tickThreshold) score += 0.2;
-            if (Math.Abs(ema200[0] - level) <= tickThreshold) score += 0.2;
-
-            // Fibonacci Confluence (0.5, 0.618 of Session Range)
-            double fib05 = sessionLow + (sessionRange * 0.5);
-            double fib618 = sessionLow + (sessionRange * 0.618);
-            if (Math.Abs(fib05 - level) <= tickThreshold) score += 0.2;
-            if (Math.Abs(fib618 - level) <= tickThreshold) score += 0.2;
-
-            return score;
-        }
 
         private void MonitorRmaProximity()
         {
