@@ -83,12 +83,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // V11: Update Telemetry Cache (Thread-safe for UI)
                 _ema9Val = ema9[0];
-                _ema15Val = ema15[0];
-                _ema30Val = ema30[0];
-                _ema65Val = ema65[0];
-                _ema200Val = ema200[0];
-                _orHighVal = sessionHigh;
-                _orLowVal = sessionLow;
 
                 // CRITICAL FIX: Convert from LOCAL timezone (PC) to selected timezone
                 DateTime barTimeInZone = ConvertToSelectedTimeZone(Time[0]);

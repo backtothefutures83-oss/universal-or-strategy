@@ -82,12 +82,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V11: Thread-safe Value Cache for UI Telemetry
         private double _ema9Val;
-        private double _ema15Val;
-        private double _ema30Val;
-        private double _ema65Val;
-        private double _ema200Val;
-        private double _orHighVal;
-        private double _orLowVal;
 
         // V8.7: RSI indicator for FFMA trades
         private RSI rsiIndicator;
@@ -146,8 +140,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V8.7: FFMA Mode tracking (Far From Moving Average)
         private volatile bool isFFMAModeArmed;
-        private double ffmaEntryBarHigh;   // Store entry candle high for stop (short)
-        private double ffmaEntryBarLow;    // Store entry candle low for stop (long)
 
         // V11 Logic State
         private volatile bool isTrendRmaMode = false; // False = STD (All-in), True = RMA (9/15 Split)
