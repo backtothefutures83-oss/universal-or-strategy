@@ -103,7 +103,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else if (newMode == "MOMO")
                     {
-                        isMOMOModeActive = true;
+                        ActivateMOMOMode();
                     }
                     else if (newMode == "FFMA")
                     {
