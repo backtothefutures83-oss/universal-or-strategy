@@ -59,10 +59,12 @@ To maintain code integrity, all changes must be committed to a branch and merged
 4. Do not merge into `main` during live trading. Merge after the market close or reset.
 5. AI-led persistence is mandatory: the AI agent is authorized and required to `git push` all verified repairs before closing a session.
 
-## 7. Handoff Requirements
+## 8. Proactive Support & Clipboard Handoffs
 
-When closing a coding session, the AI must confirm:
+To eliminate friction in multi-agent workflows, the AI agent MUST be proactive in supporting the USER's cross-platform interactions:
 
-1. "All files hardlinked and verified via fsutil."
-2. "Current code signature is [BUILD_TAG]."
-3. "User advised to press F5 in NinjaTrader."
+1. **Clipboard Proactivity:** Whenever the AI generates a prompt, mission brief, or technical report intended for another agent (e.g., Grok, Claude, Codex), it MUST automatically copy that content to the system clipboard using the `Set-Clipboard` command.
+2. **Context Bundling:** Handoffs to expert models MUST include the forensic timeline, critical code snippets, and specific failure hypotheses in-line. Avoid relying on external ZIP files unless explicitly requested, to prevent "unsupported file" rejections.
+3. **Confirmation:** The AI must explicitly state: "Handoff prompt copied to clipboard. Ready for [Agent Name] analysis."
+
+---

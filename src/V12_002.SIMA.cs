@@ -106,7 +106,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
             expectedPositions[accountName] = value;
             if (value == 0)
-                _dispatchSyncPendingExpKeys.Remove(accountName);
+                _dispatchSyncPendingExpKeys.TryRemove(accountName, out _); // [B967-FIX-02]
             // REAP-01: Stamp timestamp when a position is reserved so REAPER can apply
             // a grace window and avoid false "Critical Desync" during the broker-confirm lag.
             // Build 935 [REAPER-B935-002]: Also stamp per-account dictionary for scoped grace.
@@ -136,19 +136,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void MarkDispatchSyncPending(string expectedKey)
         {
             if (string.IsNullOrEmpty(expectedKey)) return;
-            _dispatchSyncPendingExpKeys.Add(expectedKey);
+            _dispatchSyncPendingExpKeys.TryAdd(expectedKey, 0); // [B967-FIX-02]
         }
 
         private void ClearDispatchSyncPending(string expectedKey)
         {
             if (string.IsNullOrEmpty(expectedKey)) return;
-            _dispatchSyncPendingExpKeys.Remove(expectedKey);
+            _dispatchSyncPendingExpKeys.TryRemove(expectedKey, out _); // [B967-FIX-02]
         }
 
         private bool IsDispatchSyncPending(string expectedKey)
         {
             if (string.IsNullOrEmpty(expectedKey)) return false;
-            return _dispatchSyncPendingExpKeys.Contains(expectedKey);
+            return _dispatchSyncPendingExpKeys.ContainsKey(expectedKey); // [B967-FIX-02]
         }
 
         /// <summary>

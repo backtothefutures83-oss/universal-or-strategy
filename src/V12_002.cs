@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "966";  // V12.966: Atomic Unification -- full repo enqueue enclosure
+        public const string BUILD_TAG = "967";  // V12.967: Freeze Shield -- IPC stall elimination [B967-FIX-01][B967-FIX-02]
 
         #region Variables
 
@@ -253,7 +253,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile bool _simaTogglePending = false;
         // Build 935: Tracks accounts with reserved expectedPositions whose follower dispatch is still syncing.
         // Key = ExpKey(accountName). Used to suppress false REAPER repairs and flat-clears during submit windows.
-        private readonly HashSet<string> _dispatchSyncPendingExpKeys = new HashSet<string>();
+        private readonly ConcurrentDictionary<string, byte> _dispatchSyncPendingExpKeys = new ConcurrentDictionary<string, byte>(); // [B967-FIX-02]
 
         // Build 936 [FIX-1]: Async fleet dispatch -- defers acct.Submit() to TriggerCustomEvent pump cycles.
         // Each enqueued request is one account's Submit payload. PumpFleetDispatch() consumes one per cycle,
