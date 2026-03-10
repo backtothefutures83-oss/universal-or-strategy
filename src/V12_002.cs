@@ -340,5 +340,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         #endregion
+
+        #region Fleet Helpers
+
+        private bool IsFleetAccount(Account acct)
+            => acct != null && acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+
+        #endregion
     }
 }

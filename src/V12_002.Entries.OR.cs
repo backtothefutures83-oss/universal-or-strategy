@@ -198,7 +198,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CurrentTrailLevel = 0,
                     EntryOrderType = OrderType.StopMarket,
                     IsRMATrade = false,
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 ApplyTargetLadderGuard(pos);

@@ -193,7 +193,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Fallback: also sweep Account.All for any handlers from untracked subscribe paths
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (IsFleetAccount(acct))
                 {
                     acct.ExecutionUpdate -= OnAccountExecutionUpdate;
                     acct.OrderUpdate     -= OnAccountOrderUpdate;

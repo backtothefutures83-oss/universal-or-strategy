@@ -338,7 +338,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsTRENDEntry1 = isEntry1,
                 IsTRENDEntry2 = !isEntry1,
                 LinkedTRENDGroup = groupId,
-                // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                 OcoGroupId = "V12_" + GetStableHash(entryName)
             };
             return tPos;

@@ -166,7 +166,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     IsTRENDTrade = false,
                     IsRetestTrade = true,              // V8.4: Mark as retest trade
                     RetestTrailActivated = false,      // V8.4: Trail not activated yet
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 ApplyTargetLadderGuard(pos);
@@ -308,7 +307,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     IsRMATrade = true,  // Uses RMA targets
                     IsRetestTrade = true,
                     RetestTrailActivated = false,
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 ApplyTargetLadderGuard(pos);

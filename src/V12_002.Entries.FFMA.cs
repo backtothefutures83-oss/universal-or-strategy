@@ -174,7 +174,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Market,
                     IsRMATrade = false,
                     IsFFMATrade = true,
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 // Submit MARKET order (immediate execution)
@@ -312,7 +311,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Limit,
                     IsRMATrade = false,
                     IsFFMATrade = true,
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 // V12.27: Submit LIMIT order (not Market like standard FFMA)
@@ -457,7 +455,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Market,
                     IsRMATrade = false,
                     IsFFMATrade = true,
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 // Submit MARKET order (immediate execution)

@@ -107,7 +107,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (IsFleetAccount(acct))
                 {
                     simaAccountCount++;
                     { var _acct966init = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966init, 0)); } // Initialize expected position as flat
@@ -153,7 +153,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int hydratedCount = 0;
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (!IsFleetAccount(acct)) continue;
 
                 try
                 {
@@ -196,7 +196,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (!IsFleetAccount(acct)) continue;
                 try
                 {
                     foreach (Order ord in acct.Orders.ToArray())
@@ -293,7 +293,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     try
                     {
                         bool isFleet = ord.Account != null &&
-                            ord.Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                            IsFleetAccount(ord.Account) &&
                             !string.Equals(ord.Account.Name, Account.Name, StringComparison.OrdinalIgnoreCase);
                         if (isFleet)
                             ord.Account.Cancel(new[] { ord });
@@ -318,7 +318,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var v12Prefixes = new[] { "Stop_", "S_", "T1_", "T2_", "T3_", "T4_", "T5_", "Fleet_" };
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (!IsFleetAccount(acct)) continue;
                 // [P1 LIFECYCLE SAFETY]: If not a forced teardown, skip accounts with open positions
                 // to avoid leaving them naked (no bracket/stop) after their entry orders are cancelled.
                 if (!force)

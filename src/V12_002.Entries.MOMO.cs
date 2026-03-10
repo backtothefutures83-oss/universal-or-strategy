@@ -138,7 +138,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.StopMarket,
                     IsRMATrade = false,
                     IsMOMOTrade = true,  // V8.6: Mark as MOMO trade
-                    // Build 936 [FIX-2]: Deterministic OCO group ID for broker-native bracket protection.
                     OcoGroupId = "V12_" + GetStableHash(entryName)
                 };
                 ApplyTargetLadderGuard(pos);

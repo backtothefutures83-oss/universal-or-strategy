@@ -338,22 +338,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             public bool ManualBreakevenTriggered;
         }
 
-        // V12.12: Compliance snapshot for UI thread
-        private struct ComplianceSnapshot
-        {
-            public bool Enabled;
-            public bool HasAccounts;
-            public string AccountName;
-            public int TradeCount;
-            public int UniqueDays;
-            public double MaxDrawdown;
-            public string ConsistencyText;
-            public int ConsistencySeverity;
-            public string PayoutText;
-            public int PayoutSeverity;
-            public string DrawdownText;
-            public int DrawdownSeverity;
-        }
 
         #endregion
     }

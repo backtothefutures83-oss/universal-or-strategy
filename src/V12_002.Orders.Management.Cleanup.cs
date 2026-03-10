@@ -380,7 +380,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     foreach (Account acct in Account.All)
                     {
-                        if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                        if (IsFleetAccount(acct))
                         {
                             foreach (Order fleetOrder in acct.Orders)
                             {

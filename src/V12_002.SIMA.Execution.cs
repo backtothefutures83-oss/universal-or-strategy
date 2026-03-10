@@ -49,7 +49,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (IsFleetAccount(acct))
                 {
                     // V12.8: Fleet Active Check ??" skip accounts NOT registered or disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
@@ -116,7 +116,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (IsFleetAccount(acct))
                 {
                     int reservedDelta = 0;
                     try
@@ -303,7 +303,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (!IsFleetAccount(acct)) continue;
                     if (acct == this.Account) continue; // local already done
 
                     // V12.8: Fleet Manager toggle ??" skip if account NOT registered or explicitly disabled

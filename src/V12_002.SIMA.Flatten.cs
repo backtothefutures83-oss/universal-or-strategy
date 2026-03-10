@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // This is a safety mechanism ??" "Flatten All" must always be able to close everything.
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (IsFleetAccount(acct))
                     {
                         totalCount++;
                         try
@@ -112,7 +112,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // V12.12: Explicitly flatten the Master account if it was NOT covered by the prefix filter.
                 // Bug fix: If Master is "Sim101" and AccountPrefix is "Apex", the loop above skips it entirely.
-                bool masterCovered = Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+                bool masterCovered = IsFleetAccount(Account);
                 if (!masterCovered)
                 {
                     totalCount++;
@@ -267,7 +267,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (!IsFleetAccount(acct)) continue;
 
                     totalCount++;
                     try
@@ -324,7 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // Master account fallback (if not covered by AccountPrefix filter)
-                bool masterCovered = Account.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+                bool masterCovered = IsFleetAccount(Account);
                 if (!masterCovered && Account.Positions.Count > 0)
                 {
                     // V12.Phase10 [ZOMBIE-STOP-FIX]: Same zombie sweep for master account path.

@@ -122,7 +122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // ?? Fleet accounts ??
                     foreach (Account acct in Account.All)
                     {
-                        if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                        if (IsFleetAccount(acct))
                         {
                             if (acct == this.Account) continue; // already cancelled above
                             foreach (Order order in acct.Orders)
@@ -182,7 +182,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int resetAcctCount = 0;
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 || acct == this.Account)
+                    if (IsFleetAccount(acct) || acct == this.Account)
                     {
                         SetExpectedPositionLocked(ExpKey(acct.Name), 0);
                         resetAcctCount++;
@@ -207,7 +207,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int resetAcctCount = 0;
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0 || acct == this.Account)
+                    if (IsFleetAccount(acct) || acct == this.Account)
                     {
                         SetExpectedPositionLocked(ExpKey(acct.Name), 0);
                         resetAcctCount++;

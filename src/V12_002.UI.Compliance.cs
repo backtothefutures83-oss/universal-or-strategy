@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             OrderAction action = execution.Order.OrderAction;
             if (action != OrderAction.Buy && action != OrderAction.SellShort) return;
 
-            if (EnableSIMA && acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) return;
+            if (EnableSIMA && !IsFleetAccount(acct)) return;
 
             DateTime nowInZone = GetComplianceNow();
             EnsureAccountComplianceTracking(acct.Name, nowInZone);
@@ -90,7 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void UpdateAccountMetricsFromAccount(Account acct)
         {
             if (acct == null) return;
-            if (EnableSIMA && acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) < 0) return;
+            if (EnableSIMA && !IsFleetAccount(acct)) return;
 
             DateTime nowInZone = GetComplianceNow();
             EnsureAccountComplianceTracking(acct.Name, nowInZone);
@@ -201,7 +201,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (IsFleetAccount(acct))
                         accounts.Add(acct);
                 }
             }
@@ -217,167 +217,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region Snapshot & Enforcement
-
-        private ComplianceSnapshot BuildComplianceSnapshot()
-        {
-            ComplianceSnapshot snapshot = new ComplianceSnapshot
-            {
-                Enabled = EnableComplianceHub,
-                HasAccounts = false,
-                AccountName = "--",
-                TradeCount = 0,
-                UniqueDays = 0,
-                MaxDrawdown = 0,
-                ConsistencyText = "CONSISTENCY: --",
-                ConsistencySeverity = 0,
-                PayoutText = "PAYOUT: --",
-                PayoutSeverity = 0,
-                DrawdownText = "DD BUFFER: --",
-                DrawdownSeverity = 0
-            };
-
-            if (!EnableComplianceHub)
-                return snapshot;
-
-            List<Account> accounts = GetComplianceAccounts();
-            if (accounts.Count == 0)
-                return snapshot;
-
-            DateTime nowInZone = GetComplianceNow();
-            MaybeFinalizeDailySummaries(nowInZone, accounts);
-
-            double highestConsistencyRatio = 0;
-            string consistencyAccount = "--";
-            bool consistencyViolation = false;
-
-            bool payoutEligibleAll = true;
-            double worstPayoutScore = -1;
-            int payoutDaysRemaining = 0;
-            double payoutProfitRemaining = 0;
-            string payoutAccount = "--";
-
-            double minDrawdownBuffer = double.PositiveInfinity;
-            string drawdownAccount = "--";
-
-            string focusAccount = "--";
-            double focusDrawdownBuffer = double.MaxValue;
-            double focusTotalProfit = double.MinValue;
-
-            foreach (Account acct in accounts)
-            {
-                if (acct == null) continue;
-                EnsureAccountComplianceTracking(acct.Name, nowInZone);
-
-                UpdateAccountMetricsFromAccount(acct);
-
-                double dailyPL = accountDailyProfit.TryGetValue(acct.Name, out var dp) ? dp : 0;
-                double totalProfit = accountTotalProfit.GetOrAdd(acct.Name, 0) + dailyPL;
-
-                double ratio = (totalProfit > 0 && dailyPL > 0) ? (dailyPL / totalProfit) * 100.0 : 0.0;
-                if (ratio > highestConsistencyRatio)
-                {
-                    highestConsistencyRatio = ratio;
-                    consistencyAccount = acct.Name;
-                }
-                if (ratio >= ConsistencyThreshold && dailyPL > 0)
-                    consistencyViolation = true;
-
-                int uniqueDays = GetUniqueTradingDays(acct.Name);
-                bool payoutEligible = uniqueDays >= PayoutMinTradingDays && totalProfit >= PayoutMinProfit;
-                if (!payoutEligible)
-                {
-                    payoutEligibleAll = false;
-                    int daysRemaining = Math.Max(0, PayoutMinTradingDays - uniqueDays);
-                    double profitRemaining = Math.Max(0, PayoutMinProfit - totalProfit);
-                    double score = (daysRemaining * 100000.0) + profitRemaining;
-                    if (score > worstPayoutScore)
-                    {
-                        worstPayoutScore = score;
-                        payoutDaysRemaining = daysRemaining;
-                        payoutProfitRemaining = profitRemaining;
-                        payoutAccount = acct.Name;
-                    }
-                }
-
-                double balance = acct.Get(AccountItem.CashValue, Currency.UsDollar);
-                double peak = accountEquityPeak.TryGetValue(acct.Name, out var pk) ? pk : balance;
-                double buffer = TrailingDrawdownLimit > 0 ? balance - (peak - TrailingDrawdownLimit) : double.PositiveInfinity;
-
-                if (buffer < minDrawdownBuffer)
-                {
-                    minDrawdownBuffer = buffer;
-                    drawdownAccount = acct.Name;
-                }
-
-                if (TrailingDrawdownLimit > 0)
-                {
-                    if (buffer < focusDrawdownBuffer)
-                    {
-                        focusDrawdownBuffer = buffer;
-                        focusAccount = acct.Name;
-                    }
-                }
-
-                if (TrailingDrawdownLimit <= 0 && totalProfit > focusTotalProfit)
-                {
-                    focusTotalProfit = totalProfit;
-                    focusAccount = acct.Name;
-                }
-            }
-
-            if (focusAccount == "--" && accounts.Count > 0)
-                focusAccount = accounts[0].Name;
-
-            snapshot.HasAccounts = true;
-            snapshot.AccountName = focusAccount;
-            snapshot.TradeCount = accountTradeCount.TryGetValue(focusAccount, out var tc) ? tc : 0;
-            snapshot.UniqueDays = GetUniqueTradingDays(focusAccount);
-            snapshot.MaxDrawdown = accountMaxDrawdown.TryGetValue(focusAccount, out var md) ? md : 0;
-
-            if (consistencyViolation)
-            {
-                snapshot.ConsistencySeverity = 2;
-                snapshot.ConsistencyText = string.Format("CONSISTENCY: VIOLATION {0:F0}% ({1})", highestConsistencyRatio, consistencyAccount);
-            }
-            else
-            {
-                snapshot.ConsistencySeverity = 0;
-                snapshot.ConsistencyText = string.Format("CONSISTENCY: OK {0:F0}%", highestConsistencyRatio);
-            }
-
-            if (payoutEligibleAll)
-            {
-                snapshot.PayoutSeverity = 0;
-                snapshot.PayoutText = "PAYOUT: ELIGIBLE";
-            }
-            else
-            {
-                snapshot.PayoutSeverity = 1;
-                snapshot.PayoutText = string.Format("PAYOUT: NEED {0}D / ${1:F0} ({2})", payoutDaysRemaining, payoutProfitRemaining, payoutAccount);
-            }
-
-            if (TrailingDrawdownLimit <= 0 || double.IsInfinity(minDrawdownBuffer))
-            {
-                snapshot.DrawdownSeverity = 0;
-                snapshot.DrawdownText = "DD BUFFER: N/A";
-            }
-            else
-            {
-                if (minDrawdownBuffer <= 0)
-                    snapshot.DrawdownSeverity = 2;
-                else if (minDrawdownBuffer <= TrailingDrawdownWarningBuffer)
-                    snapshot.DrawdownSeverity = 1;
-                else
-                    snapshot.DrawdownSeverity = 0;
-
-                string bufferText = minDrawdownBuffer.ToString("F0");
-                string accountTag = snapshot.DrawdownSeverity > 0 ? string.Format(" ({0})", drawdownAccount) : "";
-                snapshot.DrawdownText = string.Format("DD BUFFER: ${0}{1}", bufferText, accountTag);
-            }
-
-            return snapshot;
-        }
-
         /// <summary>
         /// V12.Phase7 [C-09]: Compliance enforcement gate.
         /// Returns false if the account has breached any hard compliance limit (severity 2).

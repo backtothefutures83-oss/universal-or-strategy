@@ -164,7 +164,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private List<Account> GetFleetAccountsSnapshot()
         {
             return Account.All
-                .Where(a => a != null && a.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Where(a => IsFleetAccount(a))
                 .OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }

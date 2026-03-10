@@ -181,7 +181,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (Account acct in Account.All)
             {
-                if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (IsFleetAccount(acct))
                 {
                     double dailyPL = acct.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
                     fleet.Add(new AccountRankInfo { Account = acct, DailyPL = dailyPL, Name = acct.Name });

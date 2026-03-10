@@ -101,7 +101,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int active = 0;
                 foreach (Account acct in Account.All)
                 {
-                    if (acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (IsFleetAccount(acct))
                     {
                         total++;
                         bool isActive = false;
