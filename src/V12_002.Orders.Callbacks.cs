@@ -677,7 +677,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
                     // B957/D2: Release the SIMA dispatch-sync barrier for this account. Without this, the barrier
                     // remains permanently blocked after a follower cancel, starving future dispatches.
-                    _dispatchSyncPendingExpKeys.Remove(cancelAcctKey);
+                    _dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
                 }
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
@@ -832,24 +832,31 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExecuteFollowerCascadeCleanup(EnableSIMA, order, reason, snapshot);
         }
 
-        protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
+        protected override void OnPositionUpdate(Position position, double averagePrice,
+            int quantity, MarketPosition marketPosition)
         {
-            Enqueue(ctx => {
-                try
-                {
-                    if (marketPosition == MarketPosition.Flat)
-                        ctx.HandleFlatPositionUpdate(position);
-                    ctx.BroadcastSyncTargetState();
-                }
-                catch (Exception ex) { ctx.Print("ERROR OnPositionUpdate: " + ex.Message); }
-            });
+            // Capture only primitive/string fields -- no NT8 object in closure [B967-FIX-01]
+            string _acctName967 = position?.Account?.Name ?? "UNKNOWN"; // [B967-FIX-01]
+            var    _mp967       = marketPosition;
+            Enqueue(ctx => ctx.ProcessOnPositionUpdate(_acctName967, _mp967)); // [B967-FIX-01]
+        }
+
+        private void ProcessOnPositionUpdate(string acctName, MarketPosition marketPosition) // [B967-FIX-01]
+        {
+            try
+            {
+                if (marketPosition == MarketPosition.Flat)
+                    HandleFlatPositionUpdate(acctName); // [B967-FIX-01]
+                BroadcastSyncTargetState();
+            }
+            catch (Exception ex) { Print("ERROR OnPositionUpdate: " + ex.Message); }
         }
 
         // Build 935 [CB-B935-001]: Flat-position cleanup extracted from OnPositionUpdate.
-        private void HandleFlatPositionUpdate(Position position)
+        private void HandleFlatPositionUpdate(string acctName) // [B967-FIX-01]
         {
             // [H-14]: Sync expectedPositions on flat. Build 931: guard against spurious flat.
-            string flatAcctName = position?.Account?.Name;
+            string flatAcctName = acctName;
             if (!string.IsNullOrEmpty(flatAcctName))
             {
                 string flatExpKey = ExpKey(flatAcctName);

@@ -1,3 +1,7 @@
 {
-    "chatgpt.openOnStartup": true
+  "chatgpt.openOnStartup": true,
+  "sonarlint.connectedMode.project": {
+    "connectionId": "mkalhitti-cloud",
+    "projectKey": "mkalhitti-cloud_universal-or-strategy"
+  }
 }

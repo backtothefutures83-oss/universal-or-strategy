@@ -20,12 +20,11 @@ This document provides the immutable technical standards for all AI agents (Anth
 - **Naming:** Use `PascalCase` for Methods/Properties and `camelCase` for fields/locals.
 - **Metabolic Elegance:** Prioritize readable, surgical logic over dense one-liners.
 
-## 4. Multi-Agent Collaboration Protocol
-
-- **Advisor (Antigravity):** The **"General Manager."** Handles high-level brainstorming, diagnosing market issues, and engineering the core "Mission Prompt."
-- **Desk Supervisor and Lab (Gemini CLI):** The **"Quant and Compliance."** Uses **Conductor/ODIN** to turn Antigravity prompts into rigid technical plans. Uses the **Sandbox** to test math/logic in Python before implementation. Runs local security/lint audits.
-- **Lead Engineer (Claude/Sonnet):** The **"Execution Specialist."** Use **Sonnet** (latest) for all implementation. Sonnet is functionally autonomous: it creates its own branches, executes repairs, and **calls for automated audits** by opening PRs. **MANDATORY AUDIT GATE:** Sonnet MUST paste its `implementation_plan.md` to Antigravity for audit and receive explicit Director approval before creating any branch or PR. No branch creation without sign-off.
-- **The Loop:** Repair Mission -> Sonnet Handoff -> **Plan to Antigravity for Audit** -> Director Approval -> Branch/Code/Push -> PR Re-Audit Matrix (Opus/Gemini) -> Merge.
+- **Project Director (Antigravity):** The **"General Manager."** Handles high-level brainstorming, mission briefs, and final plan gating.
+- **Lead Software Architect (Grok):** The **"Architectural Authority."** Provides elite concurrency audits, "Deadlock Immunity" verification, and low-level blueprinting. Grok has persistent memory in `.agent/agents/grok/MEMORY.md`.
+- **Lead Engineer (Sonnet):** The **"Execution Specialist."** Handles functional implementation, branch management, and autonomous PR creation.
+- **Forensic Specialist (Codex):** The **"Data Analyst."** Provides surgical code-trace forensics and root cause identification without code modification.
+- **The Loop:** Repair Mission -> Forensic Trace (Codex) -> Architectural Blueprint (Grok/Opus) -> Sonnet Handoff -> **Plan Audit (Antigravity)** -> Branch/Code/Push -> PR Multi-Model Audit (Grok/Opus/Gemini) -> Merge.
 - **The Bridge:** Handoffs are managed via `implementation_plan.md`, `session_handoff.md`, and **Mission Brief** artifacts.
 
 ## 5. Multi-Agent Parity and Sync Protocol
@@ -56,15 +55,15 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 **HARD RULE: All C# string literals must use ASCII-only characters.**
 
-| NEVER use in string literals | Use this instead |
-| ---------------------------- | ---------------- |
-| any emoji character | `(!)` `[OK]` `[X]` `[ERR]` |
-| em dash or en dash | `--` |
-| curly or smart double quotes | `"` |
-| curly apostrophes | `'` |
-| arrow characters | `->` `<-` `^` `v` |
-| box-drawing characters | `+--+` and `|` |
-| ellipsis character | `...` |
+| NEVER use in string literals | Use this instead           |
+| ---------------------------- | -------------------------- | --- |
+| any emoji character          | `(!)` `[OK]` `[X]` `[ERR]` |
+| em dash or en dash           | `--`                       |
+| curly or smart double quotes | `"`                        |
+| curly apostrophes            | `'`                        |
+| arrow characters             | `->` `<-` `^` `v`          |
+| box-drawing characters       | `+--+` and `               | `   |
+| ellipsis character           | `...`                      |
 
 **Emergency fix if non-ASCII bytes appear in source:**
 
@@ -81,14 +80,14 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 **HARD RULE: All follower order cancel+resubmit operations MUST use the two-phase FSM.**
 
-| Rule | Detail |
-| ---- | ------ |
-| FSM required | Use `_followerReplaceSpecs` dict with `FollowerReplaceState` enum |
-| States | `PendingCancel` -> confirm in `OnAccountOrderUpdate` -> `Submitting` -> submit |
-| ATR absorption | While `PendingCancel`, update `PendingReplacementSpec` only. One cancel, one resubmit. |
-| Fill-during-gap | Before submitting replacement, check if master filled. If yes, route to REAPER repair. |
-| ChangeOrder banned | `Account.Change` silently no-ops on Apex/Tradovate. Cancel+resubmit via FSM only. |
-| Raw cancel+submit | BANNED. `Cancel()` followed immediately by `Submit()` without FSM = ghost order risk. |
+| Rule               | Detail                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| FSM required       | Use `_followerReplaceSpecs` dict with `FollowerReplaceState` enum                      |
+| States             | `PendingCancel` -> confirm in `OnAccountOrderUpdate` -> `Submitting` -> submit         |
+| ATR absorption     | While `PendingCancel`, update `PendingReplacementSpec` only. One cancel, one resubmit. |
+| Fill-during-gap    | Before submitting replacement, check if master filled. If yes, route to REAPER repair. |
+| ChangeOrder banned | `Account.Change` silently no-ops on Apex/Tradovate. Cancel+resubmit via FSM only.      |
+| Raw cancel+submit  | BANNED. `Cancel()` followed immediately by `Submit()` without FSM = ghost order risk.  |
 
 ## 9. Live Bug Triage Protocol
 
@@ -162,6 +161,7 @@ OnLineInfo ... status=open <- live untracked GTC order at broker
 
 **Based on historical friction data, all agents MUST adhere to these execution constraints:**
 
+- **The "Recursive Audit" Rule (The Phase 3 Pillar):** When instructed to fix a specific method call, state mutation, or pattern, the Agent MUST autonomously grep/search the _entire codebase_ for all other invocations of that exact same method/pattern _before_ committing. Do not just fix the line you were pointed to; fix the architectural gap repository-wide.
 - **The "Do Not Interrupt" Protocol:** Agents operating in standard execution mode should complete their logical batches and commit _autonomously_. Do not pause mid-task to ask for user check-ins unless explicitly blocked by a missing file or a hard compilation failure.
 - **.NET 4.8 Hardening Hook:** Target framework is .NET 4.8. Do NOT use C# features unavailable in .NET 4.8 (for example, range operators `[..]`, `Index`/`Range` types, default interface implementations). Always use `CultureInfo.InvariantCulture` for numeric parsing. This must be checked before every commit.
 - **The "Missing Brief" Failsafe:** Before any phase starts, the Agent MUST verify that the referenced `implementation_plan.md` or `$MISSION` artifact exists on disk. If it does not, the Agent MUST halt and ask the user for the brief, rather than attempting to guess or reverse-engineer the plan via codebase searches.
@@ -174,5 +174,16 @@ OnLineInfo ... status=open <- live untracked GTC order at broker
 
 ---
 
+## 13. Proactive Support & Multi-Agent Handoffs
+
+To ensure the "Ultimate Architecture" is maintained across all environments, agents MUST proactively eliminate handoff friction:
+
+- **The Clipboard Command:** If a file or block (e.g., a "Mega-Prompt" or Mission Brief) is generated for a separate model (Grok, Claude, Codex, etc.), the agent MUST copy it to the system clipboard using `Get-Content ... | Set-Clipboard`.
+- **Zero-Friction Bundling:** Handoff prompts MUST be "self-contained." They must include the forensic timeline, specific code locations, and failure hypotheses in the text block to prevent context-loss during handoffs.
+- **Persistent Agent Memory:** Grok's persistent architect memory is stored in the repository at `.agent/agents/grok/MEMORY.md`. All architectural sign-offs must be logged there.
+- **Autonomous Feedback Loop:** Always ask the USER for the other agent's output before proceeding with architectural implementation.
+
+---
+
 > [!NOTE]
-> This document defines **Permanent Standards**. For current active refactoring goals (for example, Phase 6.0 Simplification), refer to the specific **Implementation Plan** or **Refactoring Roadmap** files.
+> This document defines **Permanent Standards**. For current active refactoring goals, refer to the specific **Implementation Plan** or **Refactoring Roadmap** files.
