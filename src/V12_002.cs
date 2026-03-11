@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "972";  // V12.972: B948 Follower Order Loss repair [B948-FIX-A][B948-FIX-B][B948-FIX-C]
+        public const string BUILD_TAG = "973";  // V12.973: Meta-Purge Fix (FSM-Aware Guard)
 
         #region Variables
 
