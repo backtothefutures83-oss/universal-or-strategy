@@ -142,3 +142,17 @@ That path is implemented in:
 **Inference:** the most likely failure mechanism is a lock-based freeze in the master target-fill stop-reduction path, centered on `UpdateStopQuantity()` holding `stateLock` across `CancelOrder(currentStop)`.  
 **Inference:** the strongest competing explanation is a synchronous IPC stall during `OnPositionUpdate()` immediately after the broker reduced the master position to 2 contracts.  
 **Inference:** SIMA was operationally involved in the session state, but the current code does not prove that follower callback matching itself created the deadlock.
+
+## 3. Tertiary: Ghost MCP Process Saturation (Discovered 2026-03-11)
+
+**Direct Evidence:** During the March 11 stabilization mission, multiple "Ghost" Node.js processes were discovered spawning autonomously.
+- Processes: `@testsprite/testsprite-mcp` and `mcp.supermemory.ai`.
+- Source A: `%USERPROFILE%\.gemini\antigravity\mcp_config.json`
+- Source B: `%USERPROFILE%\.cursor\mcp.json`
+
+**Inference:** These processes consume platform resources and create asynchronous "silent freezes" in the agent environments (Claude/Antigravity), potentially leading to stalled execution cycles during high-velocity trading windows.
+
+**Mitigation (B973+):**
+- Deleted all `mcp_config.json` and `mcp.json` files outside of the primary `~/.claude/settings.json`.
+- Pruned `~/.claude/settings.json` to only allow `csharp-lsp` and `github` plugins.
+- Added a "Zero-Ghost" requirement to session-start protocols.

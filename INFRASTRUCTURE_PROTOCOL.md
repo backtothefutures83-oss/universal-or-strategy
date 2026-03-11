@@ -4,6 +4,15 @@
 
 ---
 
+## 9. MCP Environment Hygiene (Ghost Process Prevention)
+
+To prevent "Silent Freezes" in AI agents during live trading, the local MCP environment must be kept strictly pruned.
+
+1. **Pruning Rule:** Only `csharp-lsp` and `github` extensions are permitted in `~/.claude/settings.json`.
+2. **Forbidden Files:** Presence of `mcp.json` or `mcp_config.json` in `.gemini`, `.cursor`, or project root is a protocol violation.
+3. **Ghost Scan:** If the agent environment feels sluggish, run:
+   `Get-Process node | Select-Object Id, Path, CommandLine`
+   Immediately terminate any `testsprite` or `supermemory` processes.
 ## 1. One Source of Truth (HardLink)
 
 All strategy files in the NinjaTrader directory MUST be hardlinks to files in `C:\WSGTA\universal-or-strategy\src`.

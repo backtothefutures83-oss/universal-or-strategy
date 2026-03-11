@@ -205,9 +205,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 expectedPositions.TryGetValue(ExpKey(acctName), out gfExp);
                 if (gfExp == 0)
                 {
-                    // Build 947: clean up any in-flight FSM spec to avoid orphaned state
-                    _followerReplaceSpecs.TryRemove(matchedEntry, out _);
-                    return;
+                    // Build 973: FSM-Aware Guard for Meta-Purge Fix
+                    FollowerReplaceSpec fsmGuard;
+                    if (_followerReplaceSpecs.TryGetValue(matchedEntry, out fsmGuard)
+                        && fsmGuard.State == FollowerReplaceState.PendingCancel
+                        && fsmGuard.CancellingOrderId == order.OrderId)
+                    {
+                        Print("[META-PURGE GUARD] Rescuing PendingCancel spec " + matchedEntry + " despite 0 expected positions. Delegating to resubmit path.");
+                        // DO NOT return, DO NOT destroy spec. Fall through.
+                    }
+                    else
+                    {
+                        // Build 947: clean up any in-flight FSM spec to avoid orphaned state
+                        _followerReplaceSpecs.TryRemove(matchedEntry, out _);
+                        return;
+                    }
                 }
 
                 // Build 947 FSM: if this cancel was our PendingCancel, submit replacement instead of DESYNC
