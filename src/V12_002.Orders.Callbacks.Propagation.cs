@@ -439,9 +439,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            // Build 948 [FIX-C]: Defensive expectedPositions re-assertion.
+            // If ExecuteFollowerCascadeCleanup ran concurrently before Fix A sealed the gap,
+            // DeltaExpectedPositionLocked may have zeroed expectedPositions for this account.
+            // Without re-asserting, the replacement fill triggers REAPER Critical Desync:
+            //   actualQty != 0, expectedQty == 0 -> Emergency Flatten.
+            string _b948ExpKey = ExpKey(accountName);
+            int _b948CurrentExp = 0;
+            expectedPositions.TryGetValue(_b948ExpKey, out _b948CurrentExp);
+            if (_b948CurrentExp == 0 && qty != 0)
+            {
+                int _b948Delta = spec.EntryAction == OrderAction.Buy ? qty : -qty;
+                AddExpectedPositionDeltaLocked(_b948ExpKey, _b948Delta);
+                MarkDispatchSyncPending(_b948ExpKey);
+                Print(string.Format("[FSM-GUARD] Re-asserted expectedPositions for {0}: {1} (cascade decrement detected before replacement submit).",
+                    accountName, _b948Delta));
+            }
+
             // [FIX-PM-02c]: preserve order type so StopMarket followers remain StopMarket.
             double limitPx = !spec.IsStopType ? price : 0;
             double stopPx  =  spec.IsStopType ? price : 0;
+            string expectedKey = ExpKey(accountName);
+            int expectedDelta = 0;
+            PositionInfo trackedPos;
+            if (activePositions.TryGetValue(fleetSignalName, out trackedPos) && trackedPos != null)
+            {
+                int qtyDiff = qty - trackedPos.TotalContracts;
+                if (qtyDiff != 0)
+                    expectedDelta = trackedPos.Direction == MarketPosition.Long ? qtyDiff : -qtyDiff;
+            }
 
             // [923A-P1-GUID]: 8-char GUID fragment as ocoId; signal name = fleetSignalName (GHOST-FIX-1).
             Order newEntry = acct.CreateOrder(
@@ -449,7 +475,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 qty, limitPx, stopPx,
                 "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                 fleetSignalName, null);
-            acct.Submit(new[] { newEntry });
+
+            if (expectedDelta != 0)
+            {
+                AddExpectedPositionDeltaLocked(expectedKey, expectedDelta);
+                Print("[FSM] Replacement expected sync: "
+                    + fleetSignalName + " delta=" + expectedDelta);
+            }
+
+            try
+            {
+                acct.Submit(new[] { newEntry });
+            }
+            catch (Exception submitEx)
+            {
+                if (expectedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -expectedDelta);
+
+                Print("[FSM] SUBMIT FAIL: replacement submit threw for " + fleetSignalName + ": " + submitEx.Message);
+                return;
+            }
 
             // B966: wrap dict write + pos mutation in Enqueue so it flows through actor pipeline.
             // Order submission stays outside; captures prevent stale closure refs.

@@ -106,6 +106,92 @@ namespace NinjaTrader.NinjaScript.Strategies
             return false;
         }
 
+        private bool OrdersMatchByRefOrId(Order trackedOrder, Order order)
+        {
+            return trackedOrder == order
+                || (trackedOrder != null && order != null && trackedOrder.OrderId == order.OrderId);
+        }
+
+        private bool TryFindMasterEntryForOrder(Order order, KeyValuePair<string, PositionInfo>[] snapshot, out string masterEntryName)
+        {
+            masterEntryName = null;
+            if (order == null || snapshot == null) return false;
+
+            foreach (var kvp in snapshot)
+            {
+                PositionInfo pos = kvp.Value;
+                if (pos == null || pos.IsFollower) continue;
+
+                Order trackedEntry;
+                if (entryOrders.TryGetValue(kvp.Key, out trackedEntry) && OrdersMatchByRefOrId(trackedEntry, order))
+                {
+                    masterEntryName = kvp.Key;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryGetDispatchFollowerEntries(string masterEntryName, out string[] followerEntries)
+        {
+            followerEntries = null;
+            if (string.IsNullOrEmpty(masterEntryName)) return false;
+
+            string dispatchId;
+            SymmetryDispatchContext ctx;
+            if (!symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out dispatchId)
+                || !symmetryDispatchById.TryGetValue(dispatchId, out ctx)
+                || ctx == null)
+            {
+                return false;
+            }
+
+            lock (ctx.Sync)
+                followerEntries = ctx.FollowerEntries.ToArray();
+
+            return followerEntries != null && followerEntries.Length > 0;
+        }
+
+        private bool IsMasterReplaceCascadeCancellation(Order order, KeyValuePair<string, PositionInfo>[] snapshot,
+            out string masterEntryName, out string[] dispatchFollowers)
+        {
+            masterEntryName = null;
+            dispatchFollowers = null;
+
+            if (order == null || order.OrderState != OrderState.Cancelled || order.Account != this.Account)
+                return false;
+
+            if (!TryFindMasterEntryForOrder(order, snapshot, out masterEntryName))
+                return false;
+
+            if (!TryGetDispatchFollowerEntries(masterEntryName, out dispatchFollowers))
+                return false;
+
+            foreach (string followerEntry in dispatchFollowers)
+            {
+                FollowerReplaceSpec spec;
+                if (!_followerReplaceSpecs.TryGetValue(followerEntry, out spec) || spec == null)
+                    continue;
+
+                if (spec.State != FollowerReplaceState.PendingCancel
+                    && spec.State != FollowerReplaceState.Submitting)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(spec.MasterSignalName, masterEntryName, StringComparison.Ordinal))
+                    continue;
+
+                if (!string.Equals(spec.SignalName, followerEntry, StringComparison.Ordinal))
+                    continue;
+
+                return true;
+            }
+
+            return false;
+        }
+
         // Build 935 [R-01]: Handles a follower order positively matched to an active position.
         // Entry-not-filled -> rollback + desync label. Entry-filled or stop/target -> ghost log + cleanup.
         private void HandleMatchedFollowerOrder(string matchedEntry, PositionInfo matchedPos, Order order, string acctName, string reason)
@@ -163,6 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fsmCapture      = fsm;
                 fsm.State       = FollowerReplaceState.Submitting;
 
+                bool replacementScheduled = false;
                 try
                 {
                     TriggerCustomEvent(o =>
@@ -173,12 +260,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                         SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
                         _followerReplaceSpecs.TryRemove(sigName, out _);
                     }, null);
+                    replacementScheduled = true;
                 }
                 catch (Exception ex)
                 {
                     Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
                     _followerReplaceSpecs.TryRemove(sigName, out _);
                 }
+                if (replacementScheduled)
+                    return; // FSM-controlled replace cancel -- reservation stays live until resubmit completes.
                 } // END of PendingCancel block
 
                 // B957/C1: Check for follower TARGET replace FSM spec before doing delta rollback.
@@ -298,47 +388,92 @@ namespace NinjaTrader.NinjaScript.Strategies
             // check if any follower positions share the same base signal and tear them down.
             if (enableSima && order.OrderState == OrderState.Cancelled && order.Account == this.Account)
             {
-                string orderSignal = order.Name;
-                foreach (var kvp in snapshot)
+                string masterEntryName;
+                string[] dispatchFollowers;
+                if (IsMasterReplaceCascadeCancellation(order, snapshot, out masterEntryName, out dispatchFollowers))
                 {
-                    PositionInfo cascadePos = kvp.Value;
-                    if (!cascadePos.IsFollower) continue;
-                    if (kvp.Key.Contains(orderSignal) || orderSignal.Contains(kvp.Key))
-                    {
-                        string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
-                        if (!cascadePos.EntryFilled)
-                        {
-                            Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
-                                orderSignal, kvp.Key, cascadeAcctName));
-                            CleanupPosition(kvp.Key);
+                    Print(string.Format("[FSM] Suppressing cascade teardown for master replace cancel: {0}", masterEntryName));
+                    RemoveGhostOrderRef(order, reason);
+                    return;
+                }
 
-                            if (cascadePos.ExecutingAccount != null)
-                            {
-                                int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
-                                int currentExp = 0;
-                                expectedPositions.TryGetValue(ExpKey(cascadeAcctName), out currentExp);
-                                if (currentExp == 0)
-                                {
-                                    Print(string.Format("[GHOST_FIX] SKIP cascade delta for {0}: expectedPositions already 0 (purge-race guard). Delta suppressed.",
-                                        cascadeAcctName));
-                                }
-                                else
-                                {
-                                    DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
-                                }
-                                ClearDispatchSyncPending(ExpKey(cascadeAcctName));
-                                try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
-                            }
-                        }
-                        else
+                string orderSignal = order.Name;
+                Dictionary<string, PositionInfo> snapshotByKey = new Dictionary<string, PositionInfo>();
+                foreach (var kvp in snapshot)
+                    snapshotByKey[kvp.Key] = kvp.Value;
+
+                IEnumerable<string> followerKeys = Array.Empty<string>();
+                if (!string.IsNullOrEmpty(masterEntryName) && dispatchFollowers != null && dispatchFollowers.Length > 0)
+                {
+                    followerKeys = dispatchFollowers;
+                }
+                else
+                {
+                    // Build 948 [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
+                    // Bidirectional .Contains() caused accidental cascade of unrelated positions:
+                    // e.g. signal "OR" matched "Fleet_Apex_RETEST_OR_1" incidentally.
+                    // Anchoring on underscores prevents substring contamination across signal families.
+                    followerKeys = snapshot
+                        .Where(kvp => kvp.Value != null && kvp.Value.IsFollower
+                            && (kvp.Key == orderSignal
+                                || kvp.Key.Contains("_" + orderSignal + "_")
+                                || kvp.Key.EndsWith("_" + orderSignal)))
+                        .Select(kvp => kvp.Key)
+                        .ToArray();
+                }
+
+                foreach (string followerKey in followerKeys)
+                {
+                    PositionInfo cascadePos;
+                    if (!snapshotByKey.TryGetValue(followerKey, out cascadePos) || cascadePos == null || !cascadePos.IsFollower)
+                        continue;
+
+                    string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
+
+                    // Build 948 [FIX-A]: Skip cascade teardown if this follower has an in-flight Replace FSM.
+                    // A chart-drag cancel on the master reaches this path. Destroying the follower here zeroes
+                    // expectedPositions mid-replace; the replacement fill then triggers REAPER Critical Desync
+                    // (actualQty != 0, expectedQty == 0) -> Emergency Flatten.
+                    FollowerReplaceSpec _b948FsmSpec;
+                    if (_followerReplaceSpecs.TryGetValue(followerKey, out _b948FsmSpec))
+                    {
+                        Print(string.Format("[FSM-GUARD] SKIP cascade teardown for {0} on {1}: in-flight Replace FSM (state={2}). Chart-drag suppressed.",
+                            followerKey, cascadeAcctName, _b948FsmSpec.State));
+                        continue;
+                    }
+
+                    if (!cascadePos.EntryFilled)
+                    {
+                        Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
+                            !string.IsNullOrEmpty(masterEntryName) ? masterEntryName : orderSignal, followerKey, cascadeAcctName));
+                        CleanupPosition(followerKey);
+
+                        if (cascadePos.ExecutingAccount != null)
                         {
-                            Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} -- follower {1} on {2} is FILLED. Issuing emergency flatten.",
-                                orderSignal, kvp.Key, cascadeAcctName));
-                            if (cascadePos.ExecutingAccount != null)
+                            int rollbackDelta = (cascadePos.Direction == MarketPosition.Long) ? -cascadePos.TotalContracts : cascadePos.TotalContracts;
+                            int currentExp = 0;
+                            expectedPositions.TryGetValue(ExpKey(cascadeAcctName), out currentExp);
+                            if (currentExp == 0)
                             {
-                                Account filledFollowerAcct = cascadePos.ExecutingAccount;
-                                TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
+                                Print(string.Format("[GHOST_FIX] SKIP cascade delta for {0}: expectedPositions already 0 (purge-race guard). Delta suppressed.",
+                                    cascadeAcctName));
                             }
+                            else
+                            {
+                                DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
+                            }
+                            ClearDispatchSyncPending(ExpKey(cascadeAcctName));
+                            try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
+                        }
+                    }
+                    else
+                    {
+                        Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} -- follower {1} on {2} is FILLED. Issuing emergency flatten.",
+                            !string.IsNullOrEmpty(masterEntryName) ? masterEntryName : orderSignal, followerKey, cascadeAcctName));
+                        if (cascadePos.ExecutingAccount != null)
+                        {
+                            Account filledFollowerAcct = cascadePos.ExecutingAccount;
+                            TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
                         }
                     }
                 }
