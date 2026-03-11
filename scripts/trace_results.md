@@ -1,0 +1,143 @@
+--- EVENT / DELEGATE SCAN RESULTS ---
+ExecuteRMAEntry:
+  -> V12_002.Entries.RMA.cs:2 | // Contains: ExecuteTrendSplitEntry, GetRmaAnchorPrice, ExecuteRMAEntry,
+  -> V12_002.Entries.RMA.cs:362 | Print("ERROR ExecuteRMAEntry: " + ex.Message);
+  -> V12_002.Entries.RMA.cs:2 | // Contains: ExecuteTrendSplitEntry, GetRmaAnchorPrice, ExecuteRMAEntry,
+  -> V12_002.Entries.RMA.cs:324 | Print("ERROR ExecuteRMAEntry: " + ex.Message);
+  -> V12_002.Entries.RMA.cs:2 | // Contains: ExecuteTrendSplitEntry, GetRmaAnchorPrice, ExecuteRMAEntry,
+  -> V12_002.Entries.RMA.cs:324 | Print("ERROR ExecuteRMAEntry: " + ex.Message);
+  -> V12_002.Entries.RMA.cs:2 | // Contains: ExecuteTrendSplitEntry, ExecuteRMAEntry,
+  -> V12_002.Entries.RMA.cs:349 | Print("ERROR ExecuteRMAEntry: " + ex.Message);
+ExecuteRMAEntryCustom:
+  -> V12_002.Entries.RMA.cs:3 | //           ExecuteRMAEntryCustom, ActivateRMAMode, DeactivateRMAMode
+  -> V12_002.Entries.RMA.cs:480 | Print("Error ExecuteRMAEntryCustom: " + ex.Message);
+  -> V12_002.Entries.RMA.cs:3 | //           ExecuteRMAEntryCustom, ActivateRMAMode, DeactivateRMAMode
+  -> V12_002.Entries.RMA.cs:428 | Print("Error ExecuteRMAEntryCustom: " + ex.Message);
+  -> V12_002.Entries.RMA.cs:3 | //           ExecuteRMAEntryCustom, ActivateRMAMode, DeactivateRMAMode
+  -> V12_002.Entries.RMA.cs:428 | Print("Error ExecuteRMAEntryCustom: " + ex.Message);
+  -> V12_002.Entries.RMA.cs:3 | //           ExecuteRMAEntryCustom, DeactivateRMAMode
+  -> V12_002.Entries.RMA.cs:466 | Print("Error ExecuteRMAEntryCustom: " + ex.Message);
+HandleExternalSignal:
+  -> V12_002.cs:930 | // SignalBroadcaster.OnExternalCommand += HandleExternalSignal;
+  -> V12_002.cs:970 | SignalBroadcaster.OnExternalCommand -= HandleExternalSignal;
+  -> V12_002.Entries.RMA.cs:38 | // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
+  -> V12_002.cs:899 | // SignalBroadcaster.OnExternalCommand += HandleExternalSignal;
+  -> V12_002.cs:939 | SignalBroadcaster.OnExternalCommand -= HandleExternalSignal;
+  -> V12_002.Entries.RMA.cs:38 | // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
+  -> V12_002.cs:899 | // SignalBroadcaster.OnExternalCommand += HandleExternalSignal;
+  -> V12_002.cs:939 | SignalBroadcaster.OnExternalCommand -= HandleExternalSignal;
+  -> V12_002.Entries.RMA.cs:38 | // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
+  -> V12_002.Entries.RMA.cs:38 | // SignalBroadcaster is retained ONLY for IPC app relay (HandleExternalSignal).
+  -> V12_002.Lifecycle.cs:293 | // SignalBroadcaster.OnExternalCommand += HandleExternalSignal;
+  -> V12_002.Lifecycle.cs:333 | SignalBroadcaster.OnExternalCommand -= HandleExternalSignal;
+ListenForRemote:
+  -> V12_002.UI.IPC.cs:76 | ipcThread = new Thread(ListenForRemote);
+  -> V12_002.UI.IPC.cs:473 | // The port winner already enqueued the message locally in ListenForRemote
+  -> V12_002.UI.IPC.cs:1548 | // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
+  -> V12_002.UI.IPC.cs:76 | ipcThread = new Thread(ListenForRemote);
+  -> V12_002.UI.IPC.cs:476 | // The port winner already enqueued the message locally in ListenForRemote
+  -> V12_002.UI.IPC.cs:1547 | // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
+  -> V12_002.UI.IPC.cs:76 | ipcThread = new Thread(ListenForRemote);
+  -> V12_002.UI.IPC.cs:476 | // The port winner already enqueued the message locally in ListenForRemote
+  -> V12_002.UI.IPC.cs:1547 | // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
+  -> V12_002.UI.IPC.Commands.Misc.cs:44 | // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
+  -> V12_002.UI.IPC.cs:223 | // The port winner already enqueued the message locally in ListenForRemote
+  -> V12_002.UI.IPC.Server.cs:1 | // Build 971: UI.IPC.Server -- StartIpcServer, ListenForRemote, HandleClient, ProcessClientStream, HandleIncomingIpcLine, StopIpcServer
+  -> V12_002.UI.IPC.Server.cs:52 | ipcThread = new Thread(ListenForRemote);
+OnAccountExecutionUpdate:
+  -> V12_002.LogicAudit.cs:221 | // We simulate the queue depth here. In live, OnAccountExecutionUpdate enqueues these.
+  -> V12_002.SIMA.cs:72 | /// [STRESS_TEST Phase 9.0] When true, OnAccountExecutionUpdate injects duplicate execution events
+  -> V12_002.SIMA.cs:771 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:782 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:871 | acct.ExecutionUpdate += OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:1466 | BracketSubmitted = false,   // V12.10: deferred ??" OnAccountExecutionUpdate submits on fill
+  -> V12_002.SIMA.cs:1531 | isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
+  -> V12_002.LogicAudit.cs:221 | // We simulate the queue depth here. In live, OnAccountExecutionUpdate enqueues these.
+  -> V12_002.SIMA.cs:72 | /// [STRESS_TEST Phase 9.0] When true, OnAccountExecutionUpdate injects duplicate execution events
+  -> V12_002.SIMA.cs:765 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:776 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:853 | acct.ExecutionUpdate += OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:1446 | BracketSubmitted = false,   // V12.10: deferred ??" OnAccountExecutionUpdate submits on fill
+  -> V12_002.SIMA.cs:1513 | isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
+  -> V12_002.LogicAudit.cs:221 | // We simulate the queue depth here. In live, OnAccountExecutionUpdate enqueues these.
+  -> V12_002.SIMA.cs:72 | /// [STRESS_TEST Phase 9.0] When true, OnAccountExecutionUpdate injects duplicate execution events
+  -> V12_002.SIMA.cs:765 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:776 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:853 | acct.ExecutionUpdate += OnAccountExecutionUpdate;
+  -> V12_002.SIMA.cs:1446 | BracketSubmitted = false,   // V12.10: deferred ??" OnAccountExecutionUpdate submits on fill
+  -> V12_002.SIMA.cs:1513 | isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
+  -> V12_002.LogicAudit.cs:221 | // We simulate the queue depth here. In live, OnAccountExecutionUpdate enqueues these.
+  -> V12_002.SIMA.Execution.cs:389 | BracketSubmitted = false,   // V12.10: deferred ??" OnAccountExecutionUpdate submits on fill
+  -> V12_002.SIMA.Flatten.cs:47 | isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
+  -> V12_002.SIMA.Fleet.cs:187 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.Fleet.cs:198 | acct.ExecutionUpdate -= OnAccountExecutionUpdate;
+  -> V12_002.SIMA.Lifecycle.cs:120 | acct.ExecutionUpdate += OnAccountExecutionUpdate;
+OnAccountOrderUpdate:
+  -> V12_002.cs:322 | public string      CancellingOrderId; // matched by order ID in OnAccountOrderUpdate
+  -> V12_002.cs:413 | // final-target/trim close. Actual activePositions.TryRemove deferred to OnAccountOrderUpdate
+  -> V12_002.Orders.Callbacks.cs:2 | // Contains: OnOrderUpdate, OnAccountOrderUpdate, OnPositionUpdate, OnExecutionUpdate
+  -> V12_002.Orders.Callbacks.cs:809 | Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
+  -> V12_002.SIMA.cs:772 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.cs:783 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.cs:872 | acct.OrderUpdate += OnAccountOrderUpdate;
+  -> V12_002.Symmetry.cs:683 | // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
+  -> V12_002.Trailing.cs:1013 | // broker cancel confirmation in OnAccountOrderUpdate / SubmitFollowerTargetReplacement().
+  -> V12_002.Orders.Callbacks.cs:2 | // Contains: OnOrderUpdate, OnAccountOrderUpdate, OnPositionUpdate, OnExecutionUpdate
+  -> V12_002.Orders.Callbacks.cs:622 | // Follower orders arrive via OnAccountOrderUpdate -> this method, NOT HandleOrderCancelled.
+  -> V12_002.Orders.Callbacks.cs:811 | Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
+  -> V12_002.SIMA.cs:766 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.cs:777 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.cs:854 | acct.OrderUpdate += OnAccountOrderUpdate;
+  -> V12_002.Orders.Callbacks.cs:2 | // Contains: OnOrderUpdate, OnAccountOrderUpdate, OnPositionUpdate, OnExecutionUpdate
+  -> V12_002.Orders.Callbacks.cs:622 | // Follower orders arrive via OnAccountOrderUpdate -> this method, NOT HandleOrderCancelled.
+  -> V12_002.Orders.Callbacks.cs:811 | Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
+  -> V12_002.SIMA.cs:766 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.cs:777 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.cs:854 | acct.OrderUpdate += OnAccountOrderUpdate;
+  -> V12_002.cs:315 | public string      CancellingOrderId; // matched by order ID in OnAccountOrderUpdate
+  -> V12_002.Orders.Callbacks.AccountOrders.cs:1 | // Build 971: Orders.Callbacks.AccountOrders -- OnAccountOrderUpdate, ProcessAccountOrderQueue, TryFindOrderInPosition, HandleMatchedFollowerOrder, ExecuteFollowerCascadeCleanup, ProcessQueuedAccountOrder
+  -> V12_002.Orders.Callbacks.AccountOrders.cs:357 | Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
+  -> V12_002.Orders.Callbacks.cs:2 | // Contains: OnOrderUpdate, OnAccountOrderUpdate, OnPositionUpdate, OnExecutionUpdate
+  -> V12_002.PositionInfo.cs:104 | // final-target/trim close. Actual activePositions.TryRemove deferred to OnAccountOrderUpdate
+  -> V12_002.SIMA.Fleet.cs:188 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.Fleet.cs:199 | acct.OrderUpdate     -= OnAccountOrderUpdate;
+  -> V12_002.SIMA.Lifecycle.cs:121 | acct.OrderUpdate += OnAccountOrderUpdate;
+  -> V12_002.Symmetry.Replace.cs:202 | // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
+  -> V12_002.Trailing.Breakeven.cs:293 | // broker cancel confirmation in OnAccountOrderUpdate / SubmitFollowerTargetReplacement().
+OnBreakevenButtonClick:
+  -> V12_002.Trailing.cs:3 | //           CalculateStopForLevel, OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget
+  -> V12_002.Trailing.cs:818 | Print("ERROR OnBreakevenButtonClick: " + ex.Message);
+  -> V12_002.Trailing.cs:3 | //           CalculateStopForLevel, OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget
+  -> V12_002.Trailing.cs:791 | Print("ERROR OnBreakevenButtonClick: " + ex.Message);
+  -> V12_002.Trailing.cs:3 | //           CalculateStopForLevel, OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget
+  -> V12_002.Trailing.cs:791 | Print("ERROR OnBreakevenButtonClick: " + ex.Message);
+  -> V12_002.Trailing.Breakeven.cs:1 | // Build 971: Trailing.Breakeven -- OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget + Stop Management Helpers
+  -> V12_002.Trailing.Breakeven.cs:99 | Print("ERROR OnBreakevenButtonClick: " + ex.Message);
+  -> V12_002.Trailing.cs:3 | //           CalculateStopForLevel, OnBreakevenButtonClick, MoveStopsToBreakevenWithOffset, MoveSpecificTarget
+OnChartClick:
+  -> V12_002.UI.Callbacks.cs:59 | ChartControl.PreviewMouseLeftButtonDown += OnChartClick;
+  -> V12_002.UI.Callbacks.cs:67 | ChartControl.PreviewMouseLeftButtonDown -= OnChartClick;
+  -> V12_002.UI.Callbacks.cs:166 | Print("ERROR OnChartClick: " + ex.Message);
+  -> V12_002.UI.Callbacks.cs:59 | ChartControl.PreviewMouseLeftButtonDown += OnChartClick;
+  -> V12_002.UI.Callbacks.cs:67 | ChartControl.PreviewMouseLeftButtonDown -= OnChartClick;
+  -> V12_002.UI.Callbacks.cs:166 | Print("ERROR OnChartClick: " + ex.Message);
+  -> V12_002.UI.Callbacks.cs:59 | ChartControl.PreviewMouseLeftButtonDown += OnChartClick;
+  -> V12_002.UI.Callbacks.cs:67 | ChartControl.PreviewMouseLeftButtonDown -= OnChartClick;
+  -> V12_002.UI.Callbacks.cs:166 | Print("ERROR OnChartClick: " + ex.Message);
+  -> V12_002.UI.Callbacks.cs:59 | ChartControl.PreviewMouseLeftButtonDown += OnChartClick;
+  -> V12_002.UI.Callbacks.cs:67 | ChartControl.PreviewMouseLeftButtonDown -= OnChartClick;
+  -> V12_002.UI.Callbacks.cs:168 | Print("ERROR OnChartClick: " + ex.Message);
+OnKeyDown:
+  -> V12_002.UI.Callbacks.cs:43 | ChartControl.OwnerChart.PreviewKeyDown += OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:51 | ChartControl.OwnerChart.PreviewKeyDown -= OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:43 | ChartControl.OwnerChart.PreviewKeyDown += OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:51 | ChartControl.OwnerChart.PreviewKeyDown -= OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:43 | ChartControl.OwnerChart.PreviewKeyDown += OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:51 | ChartControl.OwnerChart.PreviewKeyDown -= OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:43 | ChartControl.OwnerChart.PreviewKeyDown += OnKeyDown;
+  -> V12_002.UI.Callbacks.cs:51 | ChartControl.OwnerChart.PreviewKeyDown -= OnKeyDown;
+ReaperLoop:
+  -> V12_002.REAPER.cs:91 | reaperThread = new Thread(ReaperLoop)
+  -> V12_002.REAPER.cs:91 | reaperThread = new Thread(ReaperLoop)
+  -> V12_002.REAPER.cs:91 | reaperThread = new Thread(ReaperLoop)
+  -> V12_002.REAPER.cs:91 | reaperThread = new Thread(ReaperLoop)

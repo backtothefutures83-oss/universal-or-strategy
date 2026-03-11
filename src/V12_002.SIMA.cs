@@ -82,7 +82,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [Phase 8.2 Part 3 - ACCOUNT_SYNC] Trace every mutation for desync audits.
             Print(string.Format("[ACCOUNT_SYNC] {0} expected: {1} -> {2}", accountName, oldVal, newVal));
             if (delta != 0)
+            {
                 Interlocked.Exchange(ref _lastExpectedPositionSetTicks, DateTime.UtcNow.Ticks);
+                if (newVal != 0)
+                    StampAccountFillGrace(accountName);
+            }
         }
 
         // V12.1101E [F-06]: Shared AddOrUpdate wrapper with stateLock serialization.
