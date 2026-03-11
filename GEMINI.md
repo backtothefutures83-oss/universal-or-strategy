@@ -31,7 +31,7 @@
 - **Binary Guard**: DO NOT commit `.exe`, `.log`, or `.bak` files. Use stashing or `.gitignore`.
 - **Clean Dashboard**: All agents (Claude, Gemini, Antigravity, Rovo Dev) MUST ensure the repo is clean before starting new missions.
 - **Dead Code Prevention**: Before opening any PR, run `python scripts/dead_code_scan.py`. A FAIL result blocks the PR.
-- **Autonomous Repair Loop**: Every fix mission should checkout a fresh branch, implement, and open a PR to trigger the **Phase 3 Omni-Audit Matrix** (Opus, Sonnet, Gemini 2.5).
+- **Autonomous Repair Loop**: Every fix mission should checkout a fresh branch, implement, and open a PR to trigger the **Phase 3 Omni-Audit Matrix** (Opus, Sonnet, Gemini 3.1).
 
 ### 5. MOVE-SYNC / Follower Order Replace Pattern (Build 947+)
 
