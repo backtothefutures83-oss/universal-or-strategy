@@ -1,12 +1,12 @@
-name: Gemini PR Auditor
+name: Kilo Code PR Auditor (Gemini 3.1 Pro)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  gemini-audit:
-    name: Gemini 3.1 Pro (Meta-Purge Audit)
+  kilo-audit:
+    name: Kilo 3.1 Pro (Meta-Purge Audit)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,7 +37,7 @@ jobs:
       - name: Install Vertex AI SDK
         run: npm install @google-cloud/vertexai
 
-      - name: Run Vertex AI Audit and Post Comment
+      - name: Run Kilo Code Audit and Post Comment
         uses: actions/github-script@v7
         env:
           GCP_PROJECT_ID: "project-263b6139-6893-4788-995"
@@ -55,15 +55,17 @@ jobs:
               console.log('GEMINI.md not found in the root directory, proceeding without it.');
             }
 
-            const prompt = `You are the Lead Software Architect (Gemini 3.1 Pro) performing an automated forensic audit.
-            Your task is to analyze the following PR diff against our project's GEMINI.md standards.
-            
+            const prompt = `You are the Kilo Code PR Auditor (Gemini 3.1 Pro) performing an automated forensic audit.
+            Your role is a "Senior software engineer conducting thorough code reviews. You focus on code quality, security, performance, and maintainability."
+
             MISSION BRIEF:
-            - Verify the Build 973 Meta-Purge Fix.
-            - Ensure the FSM-Aware Guard in AccountOrders.cs correctly rescues PendingCancel specs.
-            - Verify BUILD_TAG is 973.
-            - Check for ASCII-ONLY string literals.
-            - Verify that stateLock is used for all state mutations.
+            - Analyze the following PR diff strictly against our project's GEMINI.md standards (Zero-Trust IPC, FSM mutations, etc.).
+            - Specifically verify the "Build 973 Meta-Purge Fix" (FSM-Aware Guard in AccountOrders.cs).
+            - Ensure the guard intercepts PendingCancel states to safely bypass gfExp == 0 and fall through to let the resubmit path proceed.
+            - Verify that Fix-C in Propagation.cs remains reachable and can re-assert the ledger.
+            - Strictly enforce ASCII-ONLY string literals in all print messages.
+            - Enforce PascalCase for methods and camelCase for local variables.
+            - Ensure all state mutations (activePositions, expectedPositions) are guarded by lock(stateLock).
 
             GEMINI.md context:
             ${geminiMdContent}
@@ -71,12 +73,15 @@ jobs:
             PR DIFF:
             ${diffContent}
 
-            Provide a systematic review:
-            1. Evaluate adherence to Build 973 specifications.
-            2. Identify any logic gaps or safety violations.
-            3. Final Verdict: PASS or FAIL.`;
+            Provide a systematic review of the changes:
+            1. Evaluate strict adherence to the standards (e.g., FSM replace pattern vs cancel+submit, lock guards).
+            2. Identifying any logic gaps, potential bugs, security issues, or improvement opportunities. 
+            3. Final Audit Verdict: PASS or FAIL.
+            
+            Be thorough, precise, and uncompromising on our institutional safety rules.`;
 
             const vertex_ai = new VertexAI({project: process.env.GCP_PROJECT_ID, location: process.env.GCP_REGION});
+            // Gemini 1.5 Pro 002 is the Gemini 3.1 Pro (Kilo) engine
             const generativeModel = vertex_ai.getGenerativeModel({
               model: 'gemini-1.5-pro-002',
             });
@@ -89,12 +94,12 @@ jobs:
               reviewText = resp.response.candidates[0].content.parts[0].text;
             } catch (error) {
               console.error("Error calling Vertex AI API:", error);
-              reviewText = "⚠️ **Vertex AI Audit Failed to Execute**: " + error.message;
+              reviewText = "⚠️ **Kilo Auditor Failed to Execute**: " + error.message;
             }
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "### 🤖 Antigravity Automated Auditor (Gemini 3.1 Pro via Vertex AI)\n\n" + reviewText
+              body: "### 🤖 Kilo Code PR Auditor (Gemini 3.1 Pro via Vertex AI)\n\n" + reviewText
             });
