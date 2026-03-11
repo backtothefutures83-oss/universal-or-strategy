@@ -19,29 +19,76 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Extract PR diff
+        id: diff
+        run: |
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
 
-      - name: Install Aider (OpenAI CLI)
-        run: pip install aider-chat
-
-      - name: Run Codex Audit via OpenAI
+      - name: Run Codex Audit via OpenAI (GPT-4o)
+        uses: actions/github-script@v7
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          # Use Aider in headless mode to execute the audit using GPT-4o
-          aider --model gpt-4o --no-auto-commits --yes-always --message "Execute audit mission: .agent/brain/codex_pr25_audit.md. Read the workflows and write the final P1/P2/P3 severity report safely to audit_output.md without modifying any source files." > audit_output.md
+        with:
+          script: |
+            const fs = require('fs');
+            const diffContent = fs.readFileSync('pr.diff', 'utf8');
+            let codexBrain = '';
+            try {
+              codexBrain = fs.readFileSync('.agent/brain/codex_pr25_audit.md', 'utf8');
+            } catch (e) {
+              codexBrain = 'No specific mission brief found. Perform a general forensic audit for race conditions and ASCII compliance.';
+            }
 
-      - name: Post Audit Results to PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -f audit_output.md ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body-file audit_output.md
-          else
-            echo "Audit output file not found."
-            # Fallback if Aider stdout'd it instead
-            gh pr comment ${{ github.event.pull_request.number }} --body "The OpenAI audit finished, but the markdown file was not saved correctly. Please check action logs."
-          fi
+            const prompt = `You are Codex (GPT-4o), the Volume Laborer and Forensic Auditor.
+            Your task is to analyze the following PR diff against our project's forensic standards.
+
+            MISSION BRIEF:
+            ${codexBrain}
+
+            PR DIFF:
+            ${diffContent}
+
+            Provide a systematic P1/P2/P3 severity report:
+            1. P1 (Critical): Race conditions, ghost order risks, or thread-safety violations.
+            2. P2 (Warning): ASCII violations, logic gaps, or non-compliant FSM patterns.
+            3. P3 (Stylistic): Naming, metabolic elegance, and C# 8.0/NT8 efficiency.
+            
+            Final Verdict: PASS or FAIL.`;
+
+            try {
+              const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o',
+                  messages: [{ role: 'user', content: prompt }],
+                  temperature: 0.1
+                })
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+              }
+
+              const data = await response.json();
+              const reviewText = data.choices[0].message.content;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: "### 🔍 Codex Forensic Auditor (GPT-4o)\n\n" + reviewText
+              });
+            } catch (error) {
+              console.error("Audit failed:", error);
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: "⚠️ **Codex Auditor Failed to Execute**: " + error.message
+              });
+            }

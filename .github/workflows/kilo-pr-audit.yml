@@ -41,7 +41,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           GCP_PROJECT_ID: "project-263b6139-6893-4788-995"
-          GCP_REGION: "us-east4"
+          GCP_REGION: "us-central1"
         with:
           script: |
             const fs = require('fs');
