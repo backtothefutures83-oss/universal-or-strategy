@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "973";  // V12.973: Meta-Purge Fix (FSM-Aware Guard)
+        public const string BUILD_TAG = "972";  // V12.972: Critical repair and audit follow-up
 
         #region Variables
 

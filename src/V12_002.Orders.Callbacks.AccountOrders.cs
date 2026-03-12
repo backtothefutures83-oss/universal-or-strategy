@@ -229,58 +229,68 @@ namespace NinjaTrader.NinjaScript.Strategies
                     && fsm.CancellingOrderId == order.OrderId)
                 {
                     // Fill-during-gap guard: if master already has a live filled position, let REAPER handle
-                    PositionInfo masterPos;
-                    bool masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
-                        && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
-                        && masterPos != null
-                        && masterPos.EntryFilled
-                        && masterPos.RemainingContracts > 0;
+                    PositionInfo masterPos = null;
+                    bool masterFilled = false;
+
+                    // A1-3: Snapshot qty/price and transition state atomically under stateLock to close TOCTOU window.
+                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside
+                    // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
+                    // the snapshot and state transition can observe torn state. (Build 960 audit fix)
+                    int qty = 0;
+                    double price = 0;
+                    string acctNameCapture = acctName;
+                    string sigName = fsm.SignalName;
+                    FollowerReplaceSpec fsmCapture = fsm;
+                    lock (stateLock)
+                    {
+                        masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
+                            && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
+                            && masterPos != null
+                            && masterPos.EntryFilled
+                            && masterPos.RemainingContracts > 0;
+
+                        if (!masterFilled)
+                        {
+                            // V12.962 ACTOR: Direct field reads remain serialized by stateLock in this branch.
+                            qty             = fsm.PendingQty;
+                            price           = fsm.PendingPrice;
+                            acctNameCapture = fsm.AccountName;
+                            sigName         = fsm.SignalName;
+                            fsmCapture      = fsm;
+                            fsm.State       = FollowerReplaceState.Submitting;
+                        }
+                    }
 
                     if (masterFilled)
                     {
                         Print("[FSM] Master filled during cancel wait -- routing "
                             + fsm.SignalName + " to repair instead of replace.");
                         _followerReplaceSpecs.TryRemove(fsm.SignalName, out _);
+                        _reaperRepairQueue.Enqueue(acctName);
+                        ProcessReaperRepairQueue();
                         return;
                     }
 
-                    // A1-3: Snapshot qty/price and transition state atomically under stateLock to close TOCTOU window.
-                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside
-                // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
-                // the snapshot and state transition can observe torn state. (Build 960 audit fix)
-                int    qty;
-                double price;
-                string acctNameCapture;
-                string sigName;
-                FollowerReplaceSpec fsmCapture;
-                // V12.962 ACTOR: Direct field reads -- lock-free, serialized by _drainToken
-                qty             = fsm.PendingQty;
-                price           = fsm.PendingPrice;
-                acctNameCapture = fsm.AccountName;
-                sigName         = fsm.SignalName;
-                fsmCapture      = fsm;
-                fsm.State       = FollowerReplaceState.Submitting;
-
-                bool replacementScheduled = false;
-                try
-                {
-                    TriggerCustomEvent(o =>
+                    bool replacementScheduled = false;
+                    try
                     {
-                        // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
-                        // ATR tick absorption may have updated PendingPrice/PendingQty after the
-                        // lambda was scheduled -- using stale captures would submit wrong values.
-                        SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
+                        TriggerCustomEvent(o =>
+                        {
+                            // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
+                            // ATR tick absorption may have updated PendingPrice/PendingQty after the
+                            // lambda was scheduled -- using stale captures would submit wrong values.
+                            SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
+                            _followerReplaceSpecs.TryRemove(sigName, out _);
+                        }, null);
+                        replacementScheduled = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
                         _followerReplaceSpecs.TryRemove(sigName, out _);
-                    }, null);
-                    replacementScheduled = true;
-                }
-                catch (Exception ex)
-                {
-                    Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
-                    _followerReplaceSpecs.TryRemove(sigName, out _);
-                }
-                if (replacementScheduled)
-                    return; // FSM-controlled replace cancel -- reservation stays live until resubmit completes.
+                    }
+                    if (replacementScheduled)
+                        return; // FSM-controlled replace cancel -- reservation stays live until resubmit completes.
                 } // END of PendingCancel block
 
                 // B957/C1: Check for follower TARGET replace FSM spec before doing delta rollback.

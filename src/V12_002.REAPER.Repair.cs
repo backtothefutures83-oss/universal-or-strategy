@@ -13,6 +13,11 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region V12 REAPER Repair Engine
 
+        /// <summary>
+        /// V12.Phase8.2: Processes queued repair requests on the strategy thread.
+        /// Re-issues the original entry order for a desynced follower account.
+        /// Build 935: Per-repair logic extracted to ExecuteReaperRepair (CS-R1140 compliance).
+        /// </summary>
         private void ProcessReaperRepairQueue()
         {
             string accountName;

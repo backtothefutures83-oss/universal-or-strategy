@@ -447,7 +447,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             string _b948ExpKey = ExpKey(accountName);
             int _b948CurrentExp = 0;
             expectedPositions.TryGetValue(_b948ExpKey, out _b948CurrentExp);
-            if (_b948CurrentExp == 0 && qty != 0)
+            bool _b948ZeroStartReasserted = _b948CurrentExp == 0 && qty != 0;
+            if (_b948ZeroStartReasserted)
             {
                 int _b948Delta = spec.EntryAction == OrderAction.Buy ? qty : -qty;
                 AddExpectedPositionDeltaLocked(_b948ExpKey, _b948Delta);
@@ -462,7 +463,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             string expectedKey = ExpKey(accountName);
             int expectedDelta = 0;
             PositionInfo trackedPos;
-            if (activePositions.TryGetValue(fleetSignalName, out trackedPos) && trackedPos != null)
+            if (!_b948ZeroStartReasserted
+                && activePositions.TryGetValue(fleetSignalName, out trackedPos) && trackedPos != null)
             {
                 int qtyDiff = qty - trackedPos.TotalContracts;
                 if (qtyDiff != 0)
@@ -476,7 +478,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                 fleetSignalName, null);
 
-            if (expectedDelta != 0)
+            if (!_b948ZeroStartReasserted && expectedDelta != 0)
             {
                 AddExpectedPositionDeltaLocked(expectedKey, expectedDelta);
                 Print("[FSM] Replacement expected sync: "
@@ -489,7 +491,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception submitEx)
             {
-                if (expectedDelta != 0)
+                if (!_b948ZeroStartReasserted && expectedDelta != 0)
                     AddExpectedPositionDeltaLocked(expectedKey, -expectedDelta);
 
                 Print("[FSM] SUBMIT FAIL: replacement submit threw for " + fleetSignalName + ": " + submitEx.Message);

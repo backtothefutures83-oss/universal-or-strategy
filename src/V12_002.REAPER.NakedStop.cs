@@ -13,6 +13,11 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region V12 REAPER Emergency Stop
 
+        /// <summary>
+        /// Build 1102R: Processes queued naked-position emergency stop requests on the strategy thread.
+        /// Called via TriggerCustomEvent from the Reaper background thread.
+        /// Submits a StopMarket order at MaximumStop ticks from current close to protect the naked position.
+        /// </summary>
         private void ProcessReaperNakedStopQueue()
         {
             while (_reaperNakedStopQueue.TryDequeue(out var item))
