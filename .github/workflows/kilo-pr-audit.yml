@@ -40,8 +40,8 @@ jobs:
       - name: Run Kilo Code Audit
         id: kilo_audit
         env:
-          GCP_PROJECT_ID: "project-263b6139-6893-4788-995"
-          GCP_REGION: "us-central1"
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || 'project-263b6139-6893-4788-995' }}
+          GCP_REGION: ${{ secrets.GCP_REGION || 'us-central1' }}
         run: |
           cat << 'EOF' > kilo_audit.js
           const fs = require('fs');
@@ -83,9 +83,25 @@ jobs:
               Be thorough, precise, and uncompromising on our institutional safety rules.`;
 
               const vertex_ai = new VertexAI({project: process.env.GCP_PROJECT_ID, location: process.env.GCP_REGION});
-              const generativeModel = vertex_ai.getGenerativeModel({
-                model: 'gemini-3.1-pro-preview',
-              });
+              let generativeModel;
+              try {
+                generativeModel = vertex_ai.getGenerativeModel({
+                  model: 'gemini-3.1-pro-preview',
+                });
+                // Test call to verify access
+                await generativeModel.generateContent({
+                  contents: [{role: 'user', parts: [{text: 'ping'}]}],
+                });
+              } catch (e) {
+                if (e.message.includes('404') || e.message.includes('not found')) {
+                  console.log('Gemini 3.1 Pro Preview not found, falling back to Gemini 1.5 Pro...');
+                  generativeModel = vertex_ai.getGenerativeModel({
+                    model: 'gemini-1.5-pro-002',
+                  });
+                } else {
+                  throw e;
+                }
+              }
 
               const resp = await generativeModel.generateContent({
                 contents: [{role: 'user', parts: [{text: prompt}]}],
