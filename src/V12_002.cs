@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "967";  // V12.967: Freeze Shield -- IPC stall elimination [B967-FIX-01][B967-FIX-02]
+        public const string BUILD_TAG = "972";  // V12.972: Critical repair and audit follow-up
 
         #region Variables
 

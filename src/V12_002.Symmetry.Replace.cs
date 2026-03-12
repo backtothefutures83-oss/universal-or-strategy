@@ -71,20 +71,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             OrderAction exitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
             string signalName = SymmetryTrim(targetTag + "_" + fleetEntryName, 40);
 
-            Order replacement = pos.ExecutingAccount.CreateOrder(
-                Instrument,
-                exitAction,
-                OrderType.Limit,
-                TimeInForce.Gtc,
-                qty,
-                Instrument.MasterInstrument.RoundToTickSize(newPrice),
-                0,
-                "SGT_" + DateTime.UtcNow.Ticks.ToString(),
-                signalName,
-                null);
+            lock (stateLock)
+            {
+                Order replacement = pos.ExecutingAccount.CreateOrder(
+                    Instrument,
+                    exitAction,
+                    OrderType.Limit,
+                    TimeInForce.Gtc,
+                    qty,
+                    Instrument.MasterInstrument.RoundToTickSize(newPrice),
+                    0,
+                    "SGT_" + DateTime.UtcNow.Ticks.ToString(),
+                    signalName,
+                    null);
 
-            pos.ExecutingAccount.Submit(new[] { replacement });
-            dict[fleetEntryName] = replacement;
+                pos.ExecutingAccount.Submit(new[] { replacement });
+                dict[fleetEntryName] = replacement;
+            }
         }
 
         private void SymmetryGuardSkipFollower(
@@ -100,9 +103,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fleetEntryName, reason, fleetFillPrice, slippageTicks, slippageUsdPerContract));
 
             // A1-1: pos.EntryFilled must be inside stateLock to prevent torn read by REAPER (Build 960 audit fix)
-            pos.EntryFilled = true;
-            if (pos.RemainingContracts <= 0)
-                pos.RemainingContracts = Math.Max(1, pos.TotalContracts);
+            lock (stateLock)
+            {
+                pos.EntryFilled = true;
+                if (pos.RemainingContracts <= 0)
+                    pos.RemainingContracts = Math.Max(1, pos.TotalContracts);
+            }
 
             FlattenPositionByName(fleetEntryName);
             CleanupPosition(fleetEntryName);

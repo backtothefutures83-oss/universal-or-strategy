@@ -3,7 +3,8 @@
 - **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
 - **Concurrency**: All state mutations (activePositions, expectedPositions) MUST be guarded by lock(stateLock).
 - **Lifecycle**: Semaphores (`_simaToggleSem`) MUST be released in finally blocks.
-- **Refactoring**: Prefer explicit FirstOrDefault logic for instrument lookups (Reaper parity).
+- **Refactoring**: ALL file splits MUST use the Python extractor script (see Section 7). Manual copy-paste is BANNED for any split exceeding 50 lines.
+- **Instrument Lookups**: Prefer explicit FirstOrDefault logic for instrument lookups (Reaper parity).
 - **Style**: Use PascalCase for methods, camelCase for local variables. Avoid dense one-liners; prioritize "Metabolic Elegance."
 
 ## Protocol Hardening (V12.Phase7)
@@ -29,7 +30,8 @@
 - **Atomic Merging**: Merge and delete feature branches immediately after successful F5 compilation and initial testing.
 - **Binary Guard**: DO NOT commit `.exe`, `.log`, or `.bak` files. Use stashing or `.gitignore`.
 - **Clean Dashboard**: All agents (Claude, Gemini, Antigravity, Rovo Dev) MUST ensure the repo is clean before starting new missions.
-- **Autonomous Repair Loop**: Every fix mission should checkout a fresh branch, implement, and open a PR to trigger the **Phase 3 Omni-Audit Matrix** (Opus, Sonnet, Gemini 2.5).
+- **Dead Code Prevention**: Before opening any PR, run `python scripts/dead_code_scan.py`. A FAIL result blocks the PR.
+- **Autonomous Repair Loop**: Every fix mission should checkout a fresh branch, implement, and open a PR to trigger the **Phase 3 Omni-Audit Matrix** (Opus, Sonnet, Gemini 3.1).
 
 ### 5. MOVE-SYNC / Follower Order Replace Pattern (Build 947+)
 
@@ -63,3 +65,14 @@ AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini) MUST follow the **[.ag
 - Non-ASCII inside C# strings breaks the NinjaTrader compiler with 300+ cascading errors (Build 936 incident).
 - Allowed substitutions: `(!)` not emoji, `--` not em-dash, `->` not arrow, straight `"` not curly quotes.
 - See `.agent/standards_manifesto.md` Section 7 for the full rule table and emergency fix sequence.
+
+## Section 7: Python Extractor Protocol (Build 970 Standard)
+
+**ALL file splits MUST use a Python extractor script. Manual copy-paste is BANNED for splits exceeding 50 lines.**
+
+- **Script Location**: `scripts/<module>_split.py` in the repo root.
+- **Verbatim Extraction**: Script reads source lines by index and writes exact bytes. No edits to extracted content.
+- **Verification**: After every split, run grep count checks on critical guard fields (e.g., `TryRemove`) to confirm pre/post parity.
+- **Reusable Template**: See `.agent/workflows/code-simplifier.md` for the standard script template.
+- **Applies to ALL agents**: Claude, Codex, Antigravity, Cursor, Gemini. No exceptions.
+- **Rationale**: Build 970 REAPER split proved this method eliminates truncation, misplaced braces, and silent logic loss compared to manual copy-paste or agent streaming.
