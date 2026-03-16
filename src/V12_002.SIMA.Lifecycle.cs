@@ -360,12 +360,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Order ord = kvp.Value;
                     if (ord == null) continue;
-                    if (ord.OrderState != OrderState.Working    &&
-                        ord.OrderState != OrderState.Accepted   &&
-                        ord.OrderState != OrderState.Submitted  &&
-                        ord.OrderState != OrderState.PendingSubmit &&
-                        ord.OrderState != OrderState.ChangePending &&
-                        ord.OrderState != OrderState.ChangeSubmitted) continue;
+                    if (IsOrderTerminal(ord.OrderState)) continue;
                     try
                     {
                         bool isFleet = ord.Account != null &&
@@ -420,12 +415,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     foreach (Order ord in acct.Orders.ToArray())
                     {
                         if (ord.Instrument?.FullName != Instrument?.FullName) continue;
-                        if (ord.OrderState != OrderState.Working    &&
-                        ord.OrderState != OrderState.Accepted   &&
-                        ord.OrderState != OrderState.Submitted  &&
-                        ord.OrderState != OrderState.PendingSubmit &&
-                        ord.OrderState != OrderState.ChangePending &&
-                        ord.OrderState != OrderState.ChangeSubmitted) continue;
+                        if (IsOrderTerminal(ord.OrderState)) continue;
                         string ordName = ord.Name ?? string.Empty;
                         bool isV12 = false;
                         for (int pi = 0; pi < v12Prefixes.Length; pi++)
