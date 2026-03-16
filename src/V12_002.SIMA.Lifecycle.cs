@@ -35,13 +35,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region V12 SIMA Lifecycle
 
-        /// <summary>
-        /// V12.Phase6 [LIFECYCLE]: Centralized SIMA state transition. Handles full lifecycle:
-        /// enable ??' enumerate accounts + subscribe handlers + hydrate positions + start Reaper
-        /// disable ??' stop Reaper + unsubscribe handlers + clear fleet state
-        /// Replaces raw EnableSIMA flag toggles to prevent handler leaks and Reaper state mismatches.
-        /// </summary>
-        private void ApplySimaState(bool enabled)
+        private void ProcessApplySimaState(bool enabled)
         {
             // V12.Audit [H-10]: If a previous toggle timed out, attempt retry now.
             // We re-enter with the same `enabled` argument that was pending.
@@ -49,45 +43,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (_simaTogglePending)
                 Print("[SIMA LIFECYCLE] Retrying previously timed-out toggle (pending retry flag was set).");
 
+            // Measure lifecycle semaphore contention because this wait runs on the actor path
+            // and can stall queue drain when SIMA toggles overlap with other work.
+            Stopwatch waitTimer = Stopwatch.StartNew();
             // V12.Phase7 [H-10]: Serialize enable/disable transitions to prevent race between
             // concurrent IPC commands and UI toggles leaving SIMA in a partially initialized state.
             if (!_simaToggleSem.Wait(500))
             {
+                waitTimer.Stop();
                 // V12.Audit [H-10]: Record that this toggle did not complete so the next caller can retry.
                 _simaTogglePending = true;
-                Print("[SIMA_WARN] ApplySimaState timed out waiting for semaphore -- toggle pending, retry.");
+                Print(string.Format("[SIMA_WARN] ApplySimaState timed out waiting for semaphore after {0:F1}ms -- toggle pending, retry.", waitTimer.Elapsed.TotalMilliseconds));
                 return;
             }
             try
             {
+                waitTimer.Stop();
+                if (waitTimer.Elapsed.TotalMilliseconds >= 25.0)
+                    Print(string.Format("[LATENCY] [SIMA LIFECYCLE] Toggle semaphore wait: {0:F1}ms", waitTimer.Elapsed.TotalMilliseconds));
+
                 if (enabled)
-                {
-                    EnumerateApexAccounts(); // Unsubs first (idempotent), then re-subscribes + hydrates
-                    if (ReaperAuditEnabled)
-                        StartReaperAudit();
-                    Print("[SIMA LIFECYCLE] SIMA ENABLED -- fleet enumerated, Reaper started");
-                }
+                    ProcessInitializeSIMA();
                 else
-                {
-                    CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
-                    StopReaperAudit();
-                    UnsubscribeFromFleetAccounts();
-                    // A3-1: Drain ghost dispatch queue on SIMA disable (Build 960 audit fix)
-                    // B957/F2: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
-                    {
-                        FleetDispatchRequest ignored;
-                        while (_pendingFleetDispatches.TryDequeue(out ignored))
-                        {
-                            if (ignored.ReservedDelta != 0)
-                                AddExpectedPositionDeltaLocked(ignored.ExpectedKey, -ignored.ReservedDelta);
-                            ClearDispatchSyncPending(ignored.ExpectedKey);
-                        }
-                        Print("[SIMA] Dispatch queue cleared on shutdown with delta rollback.");
-                    }
-                    Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
-                }
+                    ProcessShutdownSIMA();
+
                 EnableSIMA = enabled;
-                // V12.Audit [H-10]: Toggle completed successfully ??" clear any pending-retry flag.
+                // V12.Audit [H-10]: Toggle completed successfully ?? clear any pending-retry flag.
                 _simaTogglePending = false;
             }
             finally
@@ -96,9 +77,37 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        private void ProcessInitializeSIMA()
+        {
+            EnumerateApexAccounts(); // Unsubs first (idempotent), then re-subscribes + hydrates
+            if (ReaperAuditEnabled)
+                StartReaperAudit();
+            Print("[SIMA LIFECYCLE] SIMA ENABLED -- fleet enumerated, Reaper started");
+        }
+
+        private void ProcessShutdownSIMA()
+        {
+            CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
+            StopReaperAudit();
+            UnsubscribeFromFleetAccounts();
+            // A3-1: Drain ghost dispatch queue on SIMA disable (Build 960 audit fix)
+            // B957/F2: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
+            {
+                FleetDispatchRequest ignored;
+                while (_pendingFleetDispatches.TryDequeue(out ignored))
+                {
+                    if (ignored.ReservedDelta != 0)
+                        AddExpectedPositionDelta(ignored.ExpectedKey, -ignored.ReservedDelta);
+                    ClearDispatchSyncPending(ignored.ExpectedKey);
+                }
+                Print("[SIMA] Dispatch queue cleared on shutdown with delta rollback.");
+            }
+            Print("[SIMA LIFECYCLE] SIMA DISABLED -- Reaper stopped, handlers unsubscribed");
+        }
+
         private void EnumerateApexAccounts()
         {
-            UnsubscribeFromFleetAccounts(); // V12.1101E [A-4]: Always unsub first ??" idempotent guard against handler accumulation
+            UnsubscribeFromFleetAccounts(); // V12.1101E [A-4]: Always unsub first ?? idempotent guard against handler accumulation
             simaAccountCount = 0;
             Print("[SIMA] ===================================================");
             Print("[SIMA] V12.12 - Fleet Symmetry & Safety Hardening Initializing");
@@ -110,10 +119,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (IsFleetAccount(acct))
                 {
                     simaAccountCount++;
-                    { var _acct966init = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966init, 0)); } // Initialize expected position as flat
+                    { var _acct966init = ExpKey(acct.Name); SetExpectedPosition(_acct966init, 0); } // Initialize expected position as flat
                     accountDailyProfit[acct.Name] = 0; // Initialize daily profit
                     EnsureAccountComplianceTracking(acct.Name, GetComplianceNow());
-                    activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE ??" wait for Fleet Manager / IPC to enable
+                    activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE ?? wait for Fleet Manager / IPC to enable
 
                     // V12.7: Always subscribe to execution updates for fleet bracket management
                     // (Also used by ComplianceHub for P/L tracking)
@@ -165,9 +174,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             && pos.MarketPosition != MarketPosition.Flat)
                         {
                             int qty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
-                            // V12.Phase7 [M-10]: Use AddOrUpdate instead of direct assignment to prevent
-                            // overwriting if called multiple times or during concurrent access.
-                            AddOrUpdateExpectedPositionLocked(ExpKey(acct.Name), qty, v => qty);
+                            // Build 980 [Nexus]: Route expected position seed through the Actor queue
+                            var capturedAcct = acct.Name;
+                            var capturedQty = qty;
+                            Enqueue(ctx => ctx.AddOrUpdateExpectedPosition(ExpKey(capturedAcct), capturedQty, v => capturedQty));
                             Print($"[SIMA HYDRATE] {acct.Name}: Seeded expected={qty} from broker ({pos.MarketPosition} {pos.Quantity})");
                             hydratedCount++;
                             break;
@@ -188,7 +198,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Derives the original entry key by stripping the well-known order-name prefix (e.g. "Stop_" -> stopOrders).
         /// Sets _orderAdoptionComplete = true when done so REAPER can resume auditing.
         /// MUST be called on the strategy thread (via TriggerCustomEvent when initiated from a callback).
-        /// All dict writes are guarded by stateLock per the StateLock Rule.
+        /// Actor-serialized lifecycle and reconnect paths update tracking dicts on the Ordered Actor Thread.
         /// </summary>
         private void HydrateWorkingOrdersFromBroker()
         {
@@ -242,6 +252,67 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (targetDict == null || key == null) continue;
 
                         targetDict[key] = ord;
+
+                        // [Build 980 Nexus] Rebuild activePositions structs so Rehydration does not lead to divergent REAPER audits.
+                        if (targetDict == entryOrders && !activePositions.ContainsKey(key))
+                        {
+                            MarketPosition mp = (ord.OrderAction == OrderAction.Buy || ord.OrderAction == OrderAction.BuyToCover) ? MarketPosition.Long : MarketPosition.Short;
+                            double ePrice = ord.LimitPrice != 0 ? ord.LimitPrice : (ord.StopPrice != 0 ? ord.StopPrice : ord.AverageFillPrice);
+                            
+                            var pos = new PositionInfo
+                            {
+                                SignalName = key,
+                                Direction = mp,
+                                TotalContracts = ord.Quantity,
+                                RemainingContracts = ord.Quantity,
+                                EntryPrice = ePrice,
+                                InitialStopPrice = 0,
+                                CurrentStopPrice = 0,
+                                EntryOrderType = ord.OrderType,
+                                EntryFilled = false,
+                                IsFollower = key.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase),
+                                ExecutingAccount = acct,
+                                BracketSubmitted = false,
+                                ExtremePriceSinceEntry = ePrice,
+                                CurrentTrailLevel = 0,
+                                OcoGroupId = "V12_" + GetStableHash(key)
+                            };
+                            
+                            // Get standard distribution
+                            int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+                            GetTargetDistribution(ord.Quantity, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
+                            pos.T1Contracts = t1Qty;
+                            pos.T2Contracts = t2Qty;
+                            pos.T3Contracts = t3Qty;
+                            pos.T4Contracts = t4Qty;
+                            pos.T5Contracts = t5Qty;
+                            
+                            // [Build 980 Phase 3]: Reconstruct trade DNA from signal name -- lost across restart.
+                            // Fleet entry names follow pattern: Fleet_<AcctName>_<TradeType>_<index>
+                            pos.IsMOMOTrade = key.IndexOf("_MOMO_", StringComparison.OrdinalIgnoreCase) >= 0;
+                            pos.IsRMATrade = key.IndexOf("_RMA_", StringComparison.OrdinalIgnoreCase) >= 0
+                                || key.IndexOf("_TREND_RMA_", StringComparison.OrdinalIgnoreCase) >= 0;
+                            pos.IsTRENDTrade = key.IndexOf("_TREND_", StringComparison.OrdinalIgnoreCase) >= 0;
+                            pos.IsRetestTrade = key.IndexOf("_RETEST_", StringComparison.OrdinalIgnoreCase) >= 0;
+                            if (pos.IsMOMOTrade) pos.IsRMATrade = false; // MOMO overrides generic RMA flag
+
+                            activePositions[key] = pos;
+                            Print(string.Format("[SIMA HYDRATE] Rebuilt activePositions struct for {0} | DNA: IsMOMO={1} IsRMA={2} IsTREND={3} IsRetest={4}",
+                                key, pos.IsMOMOTrade, pos.IsRMATrade, pos.IsTRENDTrade, pos.IsRetestTrade));
+                        }
+                        else
+                        {
+                            // [Build 980 Phase 3]: Force-sync TotalContracts and ExecutingAccount if struct already exists.
+                            PositionInfo existingPos;
+                            if (activePositions.TryGetValue(key, out existingPos))
+                            {
+                                existingPos.TotalContracts = ord.Quantity;
+                                existingPos.ExecutingAccount = acct;
+                                Print(string.Format("[SIMA HYDRATE] Force-synced TotalContracts={0} ExecutingAccount={1} for {2}",
+                                    ord.Quantity, acct.Name, key));
+                            }
+                        }
+
                         Print(string.Format("[SIMA HYDRATE] Adopted working order {0} into {1}", name, dictName));
                         adoptedCount++;
                     }
@@ -289,7 +360,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Order ord = kvp.Value;
                     if (ord == null) continue;
-                    if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                    if (ord.OrderState != OrderState.Working    &&
+                        ord.OrderState != OrderState.Accepted   &&
+                        ord.OrderState != OrderState.Submitted  &&
+                        ord.OrderState != OrderState.PendingSubmit &&
+                        ord.OrderState != OrderState.ChangePending &&
+                        ord.OrderState != OrderState.ChangeSubmitted) continue;
                     try
                     {
                         bool isFleet = ord.Account != null &&
@@ -315,7 +391,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int SweepBrokerOrders(bool force)
         {
             int brokerCancels = 0;
-            var v12Prefixes = new[] { "Stop_", "S_", "T1_", "T2_", "T3_", "T4_", "T5_", "Fleet_" };
+            var v12Prefixes = new[] { "Stop_", "S_", "T1_", "T2_", "T3_", "T4_", "T5_", "Fleet_", "RMA", "Trend", "MOMO", "OR", "RETEST", "FFMA" };
             foreach (Account acct in Account.All)
             {
                 if (!IsFleetAccount(acct)) continue;
@@ -344,7 +420,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     foreach (Order ord in acct.Orders.ToArray())
                     {
                         if (ord.Instrument?.FullName != Instrument?.FullName) continue;
-                        if (ord.OrderState != OrderState.Working && ord.OrderState != OrderState.Accepted) continue;
+                        if (ord.OrderState != OrderState.Working    &&
+                        ord.OrderState != OrderState.Accepted   &&
+                        ord.OrderState != OrderState.Submitted  &&
+                        ord.OrderState != OrderState.PendingSubmit &&
+                        ord.OrderState != OrderState.ChangePending &&
+                        ord.OrderState != OrderState.ChangeSubmitted) continue;
                         string ordName = ord.Name ?? string.Empty;
                         bool isV12 = false;
                         for (int pi = 0; pi < v12Prefixes.Length; pi++)
