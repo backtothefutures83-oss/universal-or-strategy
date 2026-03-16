@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "966";  // V12.966: Atomic Unification -- full repo enqueue enclosure
+        public const string BUILD_TAG = "981";  // V12.981: Remediation - Termination Race Condition
 
         #region Variables
 
