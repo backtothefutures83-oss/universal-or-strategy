@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (reaperThread != null && reaperThread.IsAlive)
                 {
-                    reaperThread.Join(2000); // Wait up to 2 seconds
+                    reaperThread.Join(500); // B981-FREEZE: 500ms max -- Terminated must not block NT8 login thread
                 }
             }
             catch { }

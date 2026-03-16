@@ -349,9 +349,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // [BUILD 948] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
-                // Must run while dicts are still populated and accounts still subscribed.
-                // force=true: hard terminate, cancel regardless of open positions.
-                CancelAllV12GtcOrders(true);
+                // B981-FREEZE: Run broker sweep on a background Task with a 1.5s hard timeout.
+                // acct.Orders / acct.Cancel() block when broker is disconnecting, causing login freeze.
+                try
+                {
+                    var sweepTask = Task.Run(() => CancelAllV12GtcOrders(true));
+                    if (!sweepTask.Wait(1500))
+                        Print("[B981-FREEZE] GTC sweep timed out -- broker may be disconnecting. Continuing teardown.");
+                }
+                catch (Exception sweepEx)
+                {
+                    Print("[B981-FREEZE] GTC sweep error: " + sweepEx.Message);
+                }
 
                 DrainQueuesForShutdown();
 
