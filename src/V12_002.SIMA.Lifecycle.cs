@@ -724,6 +724,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ord.OrderState != OrderState.ChangePending &&
                         ord.OrderState != OrderState.ChangeSubmitted) continue;
                         string ordName = ord.Name ?? string.Empty;
+                        if (!force &&
+                            (ordName.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("S_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("T5_", StringComparison.OrdinalIgnoreCase) ||
+                             ordName.StartsWith("Target_", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            Print(string.Format("[FIX-FF] preserving bracket order during soft sweep: acct={0} name={1} state={2}",
+                                acct.Name, ordName, ord.OrderState));
+                            continue;
+                        }
                         bool isV12 = false;
                         for (int pi = 0; pi < v12Prefixes.Length; pi++)
                         {
