@@ -6,7 +6,7 @@
 - [x] Task: Approve the repaired implementation plan. [e252651]
 
 ## Phase 2: Engineering Execution (Codex P4)
-- [~] Task: Hand off the approved `implementation_plan.md` to Codex (P4 Engineer).
-- [ ] Task: Codex implements the changes according to the repaired plan.
-- [ ] Task: Codex performs P4 Self-Audit (Grep for locks, ASCII check, Dry Run).
+- [x] Task: Hand off the approved `implementation_plan.md` to Codex (P4 Engineer). [3764ed3]
+- [x] Task: Codex implements the changes according to the repaired plan. [0abb48b]
+- [~] Task: Codex performs P4 Self-Audit (Grep for locks, ASCII check, Dry Run).
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Engineering Execution' (Protocol in workflow.md)
