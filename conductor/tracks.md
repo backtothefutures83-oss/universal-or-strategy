@@ -12,3 +12,6 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: FSM Multi-Target Terminal State Fix**
   *Link: [./tracks/fsm_multitarget_fix_20260318/](./tracks/fsm_multitarget_fix_20260318/)*
+
+- [x] **Track: GTC Sweep "Friendly Fire" Logic Repair**
+  *Link: [./tracks/gtc_sweep_fix_20260318/](./tracks/gtc_sweep_fix_20260318/)*
