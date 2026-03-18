@@ -89,9 +89,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    stopOrder = pos.Direction == MarketPosition.Long
-                        ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.StopMarket, pos.TotalContracts, 0, validatedStopPrice, bracketOcoId, "Stop_" + entryName)
-                        : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.StopMarket, pos.TotalContracts, 0, validatedStopPrice, bracketOcoId, "Stop_" + entryName);
+                    string stopSig = "Stop_" + entryName;
+                    Order sOrd = Account.CreateOrder(Instrument, bracketExitAction, OrderType.StopMarket, TimeInForce.Gtc, pos.TotalContracts, 0, validatedStopPrice, bracketOcoId, stopSig, null);
+                    if (sOrd != null) Account.Submit(new[] { sOrd });
+                    stopOrder = sOrd;
                 }
 
                 // V12.Audit [S-001]: Null-guard stop submission result. If broker rejects or drops
@@ -152,9 +153,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else
                     {
-                        limitOrder = pos.Direction == MarketPosition.Long
-                            ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Limit, targetQty, targetPrice, 0, bracketOcoId, "T" + targetNum + "_" + entryName)
-                            : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Limit, targetQty, targetPrice, 0, bracketOcoId, "T" + targetNum + "_" + entryName);
+                        string targetSig = "T" + targetNum + "_" + entryName;
+                        Order tOrd = Account.CreateOrder(Instrument, bracketExitAction, OrderType.Limit, TimeInForce.Gtc, targetQty, targetPrice, 0, bracketOcoId, targetSig, null);
+                        if (tOrd != null) Account.Submit(new[] { tOrd });
+                        limitOrder = tOrd;
                     }
 
                     var targetDict = GetTargetOrdersDictionary(targetNum);

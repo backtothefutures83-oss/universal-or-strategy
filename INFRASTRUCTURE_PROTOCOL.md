@@ -77,3 +77,7 @@ To eliminate friction in multi-agent workflows, the AI agent MUST be proactive i
 3. **Confirmation:** The AI must explicitly state: "Handoff prompt copied to clipboard. Ready for [Agent Name] analysis."
 
 ---
+
+## 10. Agentic Coding Protocol (MANDATORY)
+
+To ensure Benchmark Alignment and Zero-Regression, all coding tasks assigned to ANY agent MUST follow the multi-agent internal audit protocol (loop-critic + forensics) defined in the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)**.

@@ -251,6 +251,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                         continue;
                     }
                     string action = parts[0].Trim().ToUpperInvariant();
+                    long senderTicks = 0;
+                    for (int i = 1; i < parts.Length; i++)
+                    {
+                        if (parts[i].StartsWith("ts=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            long.TryParse(parts[i].Substring(3), out senderTicks);
+                            break;
+                        }
+                    }
+                    if (!MetadataGuardCommandTimestamp(senderTicks, action))
+                        continue;
+
                     if (!IsAllowedIpcAction(action))
                     {
                         Interlocked.Increment(ref _ipcAllowlistRejectCount);
@@ -302,7 +314,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     string queuedAction = action;
                     string[] queuedParts = parts;
-                    Enqueue(ctx => ctx.ProcessIpcCommandCore(queuedAction, queuedParts));
+                    long queuedSenderTicks = senderTicks;
+                    Enqueue(ctx => ctx.ProcessIpcCommandCore(queuedAction, queuedParts, queuedSenderTicks));
                 }
                 catch (Exception ex)
                 {
@@ -316,7 +329,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void ProcessIpcCommandCore(string action, string[] parts)
+        private void ProcessIpcCommandCore(string action, string[] parts, long senderTicks)
         {
             try
             {
@@ -328,7 +341,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Build 943: Sub-handler routing -- CS-R1140 complexity reduction
                 if (TryHandleModeCommand(action, parts))       return;
                 if (TryHandleRiskCommand(action, parts))       return;
-                if (TryHandleFleetCommand(action, parts))      return;
+                if (TryHandleFleetCommand(action, parts, senderTicks)) return;
                 if (TryHandleConfigCommand(action, parts))     return;
                 if (TryHandleComplianceCommand(action, parts)) return;
                 Print(string.Format("[IPC] WARNING: Unhandled IPC action '{0}' -- parts: {1}", action, parts != null ? string.Join("|", parts) : "<none>"));

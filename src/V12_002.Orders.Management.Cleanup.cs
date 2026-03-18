@@ -37,149 +37,157 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CleanupPosition(string entryName)
         {
             if (string.IsNullOrEmpty(entryName)) return;
-            if (!activePositions.ContainsKey(entryName)) return;
-
-            int cancelledStops = 0;
-            int cancelledTargets = 0;
-            int cancelledEntries = 0;
-
-            // Build 1102U [BUG-2a]: Fleet followers must use Account.Cancel() -- not CancelOrder() which only
-            // works for orders submitted through this strategy instance's NinjaScript order management.
-            // Follower orders are submitted via acct.Submit(), so they require the broker-level cancel API.
-            bool isFollowerForCleanup = activePositions.TryGetValue(entryName, out var cleanupPosRef)
-                && cleanupPosRef.IsFollower && cleanupPosRef.ExecutingAccount != null;
-
-            // Stop: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
-            if (stopOrders.TryGetValue(entryName, out var stopOrder))
+            try
             {
-                if (stopOrder != null)
-                {
-                    if (IsOrderTerminal(stopOrder.OrderState))
-                        stopOrders.TryRemove(entryName, out _);
-                    else
-                    {
-                        if (isFollowerForCleanup)
-                            cleanupPosRef.ExecutingAccount.Cancel(new[] { stopOrder });
-                        else
-                            CancelOrder(stopOrder);
-                        cancelledStops++;
-                    }
-                }
-                else
-                    stopOrders.TryRemove(entryName, out _);
-            }
+                int cancelledStops = 0;
+                int cancelledTargets = 0;
+                int cancelledEntries = 0;
 
-            // T1-T5: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
-            for (int tNum = 1; tNum <= 5; tNum++)
-            {
-                var tDict = GetTargetOrdersDictionary(tNum);
-                if (tDict == null) continue;
+                // Build 1102U [BUG-2a]: Fleet followers must use Account.Cancel() -- not CancelOrder() which only
+                // works for orders submitted through this strategy instance's NinjaScript order management.
+                // Follower orders are submitted via acct.Submit(), so they require the broker-level cancel API.
+                PositionInfo cleanupPosRef;
+                bool isFollowerForCleanup = activePositions.TryGetValue(entryName, out cleanupPosRef)
+                    && cleanupPosRef.IsFollower && cleanupPosRef.ExecutingAccount != null;
 
-                if (tDict.TryGetValue(entryName, out var tOrder))
+                // Stop: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
+                if (stopOrders.TryGetValue(entryName, out var stopOrder))
                 {
-                    if (tOrder != null)
+                    if (stopOrder != null)
                     {
-                        if (IsOrderTerminal(tOrder.OrderState))
-                            tDict.TryRemove(entryName, out _);
+                        if (IsOrderTerminal(stopOrder.OrderState))
+                            stopOrders.TryRemove(entryName, out _);
                         else
                         {
                             if (isFollowerForCleanup)
-                                cleanupPosRef.ExecutingAccount.Cancel(new[] { tOrder });
+                                cleanupPosRef.ExecutingAccount.Cancel(new[] { stopOrder });
                             else
-                                CancelOrder(tOrder);
-                            cancelledTargets++;
+                                CancelOrder(stopOrder);
+                            cancelledStops++;
+                        }
+                    }
+                    else
+                        stopOrders.TryRemove(entryName, out _);
+                }
+
+                // T1-T5: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
+                for (int tNum = 1; tNum <= 5; tNum++)
+                {
+                    var tDict = GetTargetOrdersDictionary(tNum);
+                    if (tDict == null) continue;
+
+                    if (tDict.TryGetValue(entryName, out var tOrder))
+                    {
+                        if (tOrder != null)
+                        {
+                            if (IsOrderTerminal(tOrder.OrderState))
+                                tDict.TryRemove(entryName, out _);
+                            else
+                            {
+                                if (isFollowerForCleanup)
+                                    cleanupPosRef.ExecutingAccount.Cancel(new[] { tOrder });
+                                else
+                                    CancelOrder(tOrder);
+                                cancelledTargets++;
+                            }
+                        }
+                        else
+                        {
+                            tDict.TryRemove(entryName, out _);
+                        }
+                    }
+                }
+
+                // Entry: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
+                if (entryOrders.TryGetValue(entryName, out var eOrder))
+                {
+                    if (eOrder != null)
+                    {
+                        if (IsOrderTerminal(eOrder.OrderState))
+                        {
+                            entryOrders.TryRemove(entryName, out _);
+                            _citNudgedKeys.TryRemove(entryName, out _);
+                        }
+                        else
+                        {
+                            if (isFollowerForCleanup)
+                                cleanupPosRef.ExecutingAccount.Cancel(new[] { eOrder });
+                            else
+                                CancelOrder(eOrder);
+                            cancelledEntries++;
                         }
                     }
                     else
                     {
-                        tDict.TryRemove(entryName, out _);
-                    }
-                }
-            }
-
-            // Entry: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
-            if (entryOrders.TryGetValue(entryName, out var eOrder))
-            {
-                if (eOrder != null)
-                {
-                    if (IsOrderTerminal(eOrder.OrderState))
-                    {
                         entryOrders.TryRemove(entryName, out _);
                         _citNudgedKeys.TryRemove(entryName, out _);
                     }
-                    else
+                }
+
+                if (pendingStopReplacements.TryRemove(entryName, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+
+                if (cancelledStops > 0 || cancelledTargets > 0 || cancelledEntries > 0)
+                    Print(string.Format("CLEANUP SUMMARY for {0}: Stops={1} Targets={2} Entries={3}",
+                        entryName, cancelledStops, cancelledTargets, cancelledEntries));
+
+                // V12.Phase8.2 [META-GUARD]: Pre-compute followerExpected before any purge decision.
+                // If the Reaper has a non-zero expectedPositions for this account, a Repair Hook is planning
+                // to re-issue the entry. Purging now would destroy the PositionInfo metadata
+                // (price/qty/direction) that the Repair Hook reads to reconstruct the order.
+                int followerExpected = 0;
+                if (activePositions.TryGetValue(entryName, out var metaGuardCheck)
+                    && metaGuardCheck.IsFollower
+                    && metaGuardCheck.ExecutingAccount != null)
+                {
+                    string followerAcctName = metaGuardCheck.ExecutingAccount.Name;
+                    // Build 1102U [BUG-1]: Must use composite key to match new ExpKey scheme.
+                    expectedPositions.TryGetValue(ExpKey(followerAcctName), out followerExpected);
+                    if (followerExpected != 0)
                     {
-                        if (isFollowerForCleanup)
-                            cleanupPosRef.ExecutingAccount.Cancel(new[] { eOrder });
-                        else
-                            CancelOrder(eOrder);
-                        cancelledEntries++;
+                        Print(string.Format("[META-GUARD] {0}: Broker is flat but expectedPositions={1}. " +
+                            "Retaining activePositions metadata for Repair Hook. Will purge after repair completes.",
+                            entryName, followerExpected));
+                        return;
                     }
                 }
-                else
+
+                // V12.1101E [DESYNC-01]: Defer activePositions removal until no dict holds an active/pending order.
+                // V12.Phase8.2 [META-GUARD]: Skip purge if Reaper Repair Hook is active (followerExpected != 0).
+                if (followerExpected == 0 && !HasActiveOrPendingOrderForEntry(entryName))
                 {
-                    entryOrders.TryRemove(entryName, out _);
-                    _citNudgedKeys.TryRemove(entryName, out _);
+                    bool removed;
+                    removed = activePositions.TryRemove(entryName, out _);
+                    if (removed) SymmetryGuardForgetEntry(entryName);
                 }
-            }
 
-            if (pendingStopReplacements.TryRemove(entryName, out _)) Interlocked.Decrement(ref pendingReplacementCount);
-
-            if (cancelledStops > 0 || cancelledTargets > 0 || cancelledEntries > 0)
-                Print(string.Format("CLEANUP SUMMARY for {0}: Stops={1} Targets={2} Entries={3}",
-                    entryName, cancelledStops, cancelledTargets, cancelledEntries));
-
-            // V12.Phase8.2 [META-GUARD]: Pre-compute followerExpected before any purge decision.
-            // If the Reaper has a non-zero expectedPositions for this account, a Repair Hook is planning
-            // to re-issue the entry. Purging now would destroy the PositionInfo metadata
-            // (price/qty/direction) that the Repair Hook reads to reconstruct the order.
-            int followerExpected = 0;
-            if (activePositions.TryGetValue(entryName, out var metaGuardCheck)
-                && metaGuardCheck.IsFollower
-                && metaGuardCheck.ExecutingAccount != null)
-            {
-                string followerAcctName = metaGuardCheck.ExecutingAccount.Name;
-                // Build 1102U [BUG-1]: Must use composite key to match new ExpKey scheme.
-                expectedPositions.TryGetValue(ExpKey(followerAcctName), out followerExpected);
-                if (followerExpected != 0)
+                // [FIX-ZP-02]: Secondary safety net for SIMA followers -- force purge if broker confirms flat.
+                // Guards against lingering non-terminal dict entries preventing HasActiveOrPendingOrderForEntry
+                // from returning false even though the actual broker position is already flat.
+                if (followerExpected == 0
+                    && activePositions.TryGetValue(entryName, out var followerCheck)
+                    && followerCheck.IsFollower
+                    && followerCheck.ExecutingAccount != null)
                 {
-                    Print(string.Format("[META-GUARD] {0}: Broker is flat but expectedPositions={1}. " +
-                        "Retaining activePositions metadata for Repair Hook. Will purge after repair completes.",
-                        entryName, followerExpected));
-                    // [Phase 8.2 Part 3] Explicit early-return: prevent fall-through into FIX-ZP-02
-                    // which would forcibly purge activePositions even when the Repair Hook is pending.
-                    return;
-                }
-            }
-
-            // V12.1101E [DESYNC-01]: Defer activePositions removal until no dict holds an active/pending order.
-            // V12.Phase8.2 [META-GUARD]: Skip purge if Reaper Repair Hook is active (followerExpected != 0).
-            if (followerExpected == 0 && !HasActiveOrPendingOrderForEntry(entryName))
-            {
-                bool removed;
-                removed = activePositions.TryRemove(entryName, out _);
-                if (removed) SymmetryGuardForgetEntry(entryName);
-            }
-
-            // [FIX-ZP-02]: Secondary safety net for SIMA followers -- force purge if broker confirms flat.
-            // Guards against lingering non-terminal dict entries preventing HasActiveOrPendingOrderForEntry
-            // from returning false even though the actual broker position is already flat.
-            if (followerExpected == 0
-                && activePositions.TryGetValue(entryName, out var followerCheck)
-                && followerCheck.IsFollower
-                && followerCheck.ExecutingAccount != null)
-            {
-                var brokerPos = followerCheck.ExecutingAccount.Positions
-                    .FirstOrDefault(p => p.Instrument == Instrument);
-                if (brokerPos != null && brokerPos.MarketPosition == MarketPosition.Flat)
-                {
-                    bool removedFZP;
-                    removedFZP = activePositions.TryRemove(entryName, out _);
-                    if (removedFZP)
+                    var brokerPos = followerCheck.ExecutingAccount.Positions
+                        .FirstOrDefault(p => p.Instrument == Instrument);
+                    if (brokerPos != null && brokerPos.MarketPosition == MarketPosition.Flat)
                     {
-                        SymmetryGuardForgetEntry(entryName);
-                        Print(string.Format("[FIXED_G] Purging {0} - confirmed flat by broker.", entryName));
+                        bool removedFZP;
+                        removedFZP = activePositions.TryRemove(entryName, out _);
+                        if (removedFZP)
+                        {
+                            SymmetryGuardForgetEntry(entryName);
+                            Print(string.Format("[FIXED_G] Purging {0} - confirmed flat by broker.", entryName));
+                        }
                     }
+                }
+            }
+            finally
+            {
+                FollowerBracketFSM removedFsm;
+                if (TryTerminateFollowerBracket(entryName, out removedFsm) && removedFsm != null)
+                {
+                    Print(string.Format("[FSM-C1] Terminated FSM for {0} (was {1})", entryName, removedFsm.State));
                 }
             }
         }

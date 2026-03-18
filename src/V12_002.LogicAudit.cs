@@ -287,7 +287,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         int realQty = kvp.Value;
                         int driftedQty = realQty + 1;
 
-                        // V12.963: Wrap expectedPositions writes in Enqueue for actor-thread compliance.
+                        // V12.963/B966: Wrap expectedPositions writes in Enqueue for actor-thread compliance.
                         // This is a test probe (drift + immediate restore); all mutations must be serialized.
                         Enqueue(ctx => {
                             ctx.expectedPositions[acctName] = driftedQty;

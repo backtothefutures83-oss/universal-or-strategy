@@ -230,6 +230,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         int masterFillQty = filled > 0 ? filled : quantity;
                         SymmetryGuardOnMasterFill(kvp.Key, pos, averageFillPrice, masterFillQty, time.ToUniversalTime());
+                        // Build 1001: Seed expectedPositions[master] immediately on fill to prevent desync in CANCEL_ALL/REAPER.
+                        SetExpectedPositionLocked(ExpKey(Account.Name), (pos.Direction == MarketPosition.Long ? masterFillQty : -masterFillQty));
                     }
 
                     if (averageFillPrice <= 0)

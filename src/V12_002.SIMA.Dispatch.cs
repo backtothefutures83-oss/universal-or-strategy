@@ -303,7 +303,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             // to happen BEFORE AddExpectedPositionDeltaLocked (L495). Deferring via Enqueue
                             // from within an existing drain would break this ordering. ConcurrentDictionary
                             // single-writes are thread-safe; PumpFleetDispatch runs on strategy thread via
-                            // TriggerCustomEvent so no reaperThread access occurs at this point.
+                            // TriggerCustomEvent so no background thread access occurs at this point.
                             activePositions[fleetEntryName] = fleetPos;
                             entryOrders[fleetEntryName] = entry;
                             stopOrders[fleetEntryName] = stop;

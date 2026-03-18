@@ -1,7 +1,7 @@
 # NinjaScript V12 Project Standards (Codex Mirror)
 
 - **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
-- **Concurrency**: All state mutations (activePositions, expectedPositions) MUST be guarded by lock(stateLock).
+- **No Internal Locks**: `lock(stateLock)` is **BANNED**. All state mutations MUST use `Enqueue(ctx => ...)` by default. Exception: Build 981 direct-write for `stopOrders` during bracket submission.
 - **Lifecycle**: Semaphores (\_simaToggleSem) MUST be released in finally blocks.
 - **Refactoring**: Prefer explicit FirstOrDefault logic for instrument lookups (Reaper parity).
 - **Style**: Use PascalCase for methods, camelCase for local variables. Avoid dense one-liners; prioritize "Metabolic Elegance."
@@ -33,6 +33,8 @@
 
 AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini) MUST follow the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** as the primary source of truth for architectural standards and safety protocols.
 
+**Clipboard Mandate**: All cross-agent handoff prompts, implementation plans, and commands MUST be automatically copied to the Director's clipboard (e.g., via PowerShell `Set-Clipboard`) so manual copying is never required.
+
 ## MOVE-SYNC / Follower Order Replace Pattern (Build 947+)
 
 - **FSM Required**: Any follower order cancel+resubmit MUST use the two-phase Replace FSM (`_followerReplaceSpecs` dict).
@@ -55,3 +57,29 @@ AI Agents (Anthropic, Codex, Antigravity, Cursor, Gemini) MUST follow the **[.ag
 - Non-ASCII inside C# strings breaks the NinjaTrader compiler with 300+ cascading errors (Build 936 incident).
 - Allowed substitutions: (!) not emoji, -- not em-dash, -> not arrow, straight " not curly " "
 - See .agent/standards_manifesto.md Section 7 for the full rule table and emergency fix sequence.
+
+## Role Assignment (V12 Director's Gate)
+
+| Role | Primary | Backup |
+|---|---|---|
+| P4 ENGINEER (code execution) | **Codex** | Jules CLI, Gemini CLI |
+| P3 ARCHITECT / P5 REVIEWER | Claude Code | -- |
+| P2 FORENSICS | Codex `forensics` agent | -- |
+| P1 ORCHESTRATOR | Antigravity | -- |
+
+Codex is the **PRIMARY code executor**. Jules CLI and Gemini CLI are identical twin backups
+dispatched only when Codex is unavailable or the Director explicitly assigns a task to them.
+
+## Agentic Patterns (Google Agentic Pattern Registry)
+
+Codex is workflow-aware and MUST follow these patterns from `.agent/workflows/`:
+
+| Slash Command | Workflow File | Pattern |
+|---|---|---|
+| `/loop-critic` | `.agent/workflows/loop_critic.md` | ENGINEER generates, ARCHITECT critiques, max 3 iterations |
+| `/coordinator` | `.agent/workflows/coordinator.md` | Antigravity routes to FORENSICS / ARCHITECT / ENGINEER |
+| `/agent-as-tool` | `.agent/workflows/agent_as_tool.md` | Stateless single-use diagnostic or surgical edit |
+| `/multi-agent-audit` | `.agent/workflows/multi_agent_audit.md` | Red-team multi-agent cross-audit |
+
+Source of truth: `.agent/workflows/` is canonical. Codex MUST NOT deviate from workflow steps
+without Director authorization. All coding tasks MUST conclude with a **/loop-critic** or **/multi-agent-audit** cycle using internal subagents before final P5 escalation.

@@ -72,7 +72,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.1101E [F-06]: Serialize expectedPositions mutations so Reaper never observes partial state.
         private void AddExpectedPositionDeltaLocked(string accountName, int delta)
         {
-            // B966: No internal Enqueue. Called from strategy-thread (Enqueue at call site) AND reaperThread
+            // B966: No internal Enqueue. Called from strategy-thread (Enqueue at call site) AND background timer.
             // (ConcurrentDictionary single-write is safe; double-wrap avoided per $PLAN_AUDIT guard).
             if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
             lock (stateLock)
@@ -106,7 +106,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.1101E [F-06]: Serialized set for expectedPositions.
         private void SetExpectedPositionLocked(string accountName, int value)
         {
-            // B966: No internal Enqueue. Called from both Enqueue-wrapped call sites and reaperThread.
+            // B966: No internal Enqueue. Called from both Enqueue-wrapped call sites and background timer.
             if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
             lock (stateLock)
             {

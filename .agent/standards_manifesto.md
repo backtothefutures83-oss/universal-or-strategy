@@ -24,8 +24,8 @@ This document provides the immutable technical standards for all AI agents (Anth
 - **ORCHESTRATOR (Antigravity):** The **"Central Switchboard."** Handles intake (P1), context management, and non-coding tools. BANNED from manual coding.
 - **FORENSICS (Codex):** The **"Logic Auditor."** Provides diagnosis (P2) and "Logical Proof of Failure" (P5).
 - **ARCHITECT (Claude Code):** The **"Strategic Planner."** Authority for Design (P3), Peer Review, and Sign-off (P5).
-- **ENGINEER (Gemini / Jules):** The **"Implementation Specialist."** Authority for surgical edits (P4) and cloud missions.
-- **The Workflow:** Forensic Trace (Codex) -> Architectural Brief (Claude) -> Implementation Plan -> User Approval -> Engineer Execution (Gemini/Jules) -> **Engineer Self-Audit (P4)** -> Architectural Audit (Claude) -> Final Handoff.
+- **ENGINEER (Any Agent):** The **"Implementation Specialist."** Primary terminal/agent for execution (P4). Must use its native subagent ecosystem or internal audit tools.
+- **The Workflow:** Forensic Trace (Codex) -> Architectural Brief (Claude) -> Implementation Plan -> User Approval -> Engineer Execution (Any Agent) -> **Internal Subagent Audit (/loop-critic)** -> Architectural Audit (Claude) -> Final Handoff.
 - **The Bridge:** Handoffs are managed via `implementation_plan.md` and **Mission Brief** artifacts.
 
 ## 5. Multi-Agent Parity and Sync Protocol
@@ -195,13 +195,13 @@ To ensure the "Ultimate Architecture" is maintained across all environments, age
 - **Self-Documenting Instructions:** Store complex agent instructions in `.agent/agents/<agent_name>/INSTRUCTIONS.md` to ensure cross-platform persistence.
 - **A2A Handoffs:** When delegating to another agent, always provide the full absolute path of the target file and the exact line numbers targeted.
 
-## 15. Engineer Self-Audit (P4) mandatory
+## 15. Engineer Self-Audit (P4) Mandatory (All Agents)
 
-Before an Engineer (Gemini/Jules) hands off a mission for architectural audit, they MUST:
-1.  **Grep Audit:** Confirm no accidental `lock(stateLock)` usage or guard deletions.
-2.  **Actor Check:** Verify all new state mutations are wrapped in `Enqueue`.
-3.  **ASCII Scan:** Run a character-level scan to ensure no curly quotes or Unicode arrows.
-4.  **Dry Run:** Perform a mental regression check against the original Mission Brief.
+Before an Engineer (P4) hands off a mission for architectural sign-off, they MUST:
+1.  **Internal Audit (/loop-critic):** Invoke the **`architect`** subagent to critique the implementation against the mission brief and design spec.
+2.  **Forensics Check:** Use the **`forensics`** subagent to confirm no accidental `lock(stateLock)` usage or legacy guard deletions.
+3.  **ASCII Scan:** Run a character-level scan (or use `check_ascii.py`) to ensure no curly quotes or Unicode arrows.
+4.  **Dry Run:** Perform a final sanity check of the logic flow and state machine transitions.
 
 ---
 

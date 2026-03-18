@@ -55,12 +55,48 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (pos != null && pos.MarketPosition != MarketPosition.Flat)
                 actualQty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
 
-            // Build 1102U [BUG-1]: Composite key + stateLock guard.
+            // Phase 4: Promote BracketFSM to primary authority for expected state
+            var accountFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
+            int fsmExpectedQty = 0;
+            foreach (var f in accountFsms)
+            {
+                // Active, Accepted, or Submitted states imply we expect the entry to fill/be-filled
+                if (f.State == FollowerBracketState.Active || f.State == FollowerBracketState.Accepted || f.State == FollowerBracketState.Submitted)
+                {
+                    if (f.EntryOrder != null)
+                    {
+                         int entrySign = (f.EntryOrder.OrderAction == OrderAction.Buy || f.EntryOrder.OrderAction == OrderAction.BuyToCover) ? 1 : -1;
+                         fsmExpectedQty += (f.EntryOrder.Quantity * entrySign);
+                    }
+                    else if (f.State == FollowerBracketState.Active)
+                    {
+                        // Hydrated Active FSM: entry was terminal (Filled) at restart, no order reference.
+                        if (actualQty != 0)
+                        {
+                            fsmExpectedQty += actualQty;
+                        }
+                        else
+                        {
+                            FollowerBracketFSM staleFsm;
+                            if (TryTerminateFollowerBracket(f.EntryName, out staleFsm))
+                            {
+                                Print(string.Format("[REAPER-C7] Stale Active FSM for {0} on {1} (broker flat) -- auto-terminating",
+                                    f.EntryName, acct.Name));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Build 999: If Position Pass failed on reconnect but FSM has since been created (replace cycle completed), clear grace.
+            if (fsmExpectedQty != 0)
+                _positionPassFailedFirstSeen.TryRemove(acct.Name, out _);
+
+            // AUTHORITY: Use FSM state from now on
             string expectedKey = ExpKey(acct.Name);
-            int expectedQty = 0;
-            bool syncPending = false;
-            expectedPositions.TryGetValue(expectedKey, out expectedQty);
-            syncPending = _dispatchSyncPendingExpKeys.ContainsKey(expectedKey); // [B967-FIX-02]
+            int expectedQty = fsmExpectedQty;
+
+            bool syncPending = _dispatchSyncPendingExpKeys.ContainsKey(expectedKey); // [B967-FIX-02]
             // Build 935 [REAPER-B935-002]: Per-account grace prevents Account A fill blocking Account B repair.
             bool inFillGrace = IsReaperFillGraceActive(expectedKey);
 
@@ -72,7 +108,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (actualQty == 0 && expectedQty != 0)
                 {
-                    // GHOST-FIX-3: Skip repair for Master -- it uses SubmitOrderUnmanaged, not follower path.
+                    // GHOST-FIX-3: Skip repair for Master -- it uses no FollowerBracketFSM -- repair path not applicable.
                     if (acct.Name == Account.Name)
                     {
                         if (shouldLog) Print($"[REAPER] {acct.Name} is the Master account -- skipping follower repair.");
@@ -95,31 +131,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (!alreadyInFlight)
                     {
-                        bool hasWorkingEntry = false;
-                        string blockingOrderName = null;
-                        OrderState blockingState = OrderState.Unknown;
-                        Dictionary<string, PositionInfo> activeSnapshot;
-                        activeSnapshot = new Dictionary<string, PositionInfo>(activePositions);
-
-                        foreach (var kvp in entryOrders.ToArray())
-                        {
-                            Order ord = kvp.Value;
-                            if (ord == null) continue;
-                            OrderState ordState = ord.OrderState;
-                            if (IsOrderTerminal(ordState)) continue;
-                            if (activeSnapshot.TryGetValue(kvp.Key, out var pi)
-                                && pi.IsFollower && pi.ExecutingAccount != null
-                                && pi.ExecutingAccount.Name == acct.Name
-                                && (ordState == OrderState.Working || ordState == OrderState.Submitted
-                                    || ordState == OrderState.Accepted || ordState == OrderState.ChangePending
-                                    || ordState == OrderState.Unknown || ordState == OrderState.Initialized))
-                            {
-                                hasWorkingEntry = true;
-                                blockingOrderName = string.IsNullOrEmpty(ord.Name) ? kvp.Key : ord.Name;
-                                blockingState = ordState;
-                                break;
-                            }
-                        }
+                        // Phase 4: Use FSM to identify working entry
+                        bool hasWorkingEntry = accountFsms.Any(f => f.State == FollowerBracketState.Submitted || f.State == FollowerBracketState.Accepted);
 
                         if (!hasWorkingEntry)
                         {
@@ -135,18 +148,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
                             }
                         }
-                        else
-                        {
-                            string throttleKey = blockingOrderName ?? acct.Name;
-                            DateTime lastLogged;
-                            bool shouldLogBlocked = !_repairBlockedLastLogged.TryGetValue(throttleKey, out lastLogged)
-                                                    || (DateTime.UtcNow - lastLogged).TotalSeconds >= 30;
-                            if (shouldLogBlocked)
-                            {
-                                _repairBlockedLastLogged[throttleKey] = DateTime.UtcNow;
-                                Print($"[REAPER] Repair BLOCKED by {blockingOrderName} in state {blockingState} (throttled: next log in 30s)");
-                            }
-                        }
                     }
                     else if (shouldLog)
                         Print($"[REAPER] {acct.Name} repair already in-flight -- skipping.");
@@ -159,6 +160,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (isCriticalDesync)
                 {
+                    // Build 999: Position Pass grace -- defer critical desync when account failed Phase 5 Position Pass.
+                    // Applies only to the case where actualQty!=0 and expectedQty==0 (no FSM created on reconnect).
+                    // Does NOT apply when sign mismatch (that is a genuine live desync -- fire immediately).
+                    if (actualQty != 0 && expectedQty == 0)
+                    {
+                        DateTime ppFailedTime;
+                        if (_positionPassFailedFirstSeen.TryGetValue(acct.Name, out ppFailedTime))
+                        {
+                            double graceElapsed = (DateTime.UtcNow - ppFailedTime).TotalSeconds;
+                            if (graceElapsed < 10.0)
+                            {
+                                if (shouldLog)
+                                    Print(string.Format("[REAPER] {0}: Position Pass grace ({1:F1}s/10s) -- deferring critical desync. Stop replace in progress.",
+                                        acct.Name, graceElapsed));
+                                return hasState; // Defer -- check again next audit cycle
+                            }
+                            // Grace expired -- clear entry and fall through to critical desync
+                            _positionPassFailedFirstSeen.TryRemove(acct.Name, out _);
+                            Print(string.Format("[REAPER] {0}: Position Pass grace expired ({1:F1}s) -- firing critical desync.",
+                                acct.Name, graceElapsed));
+                        }
+                    }
+
                     if (shouldLog) Print($"[REAPER] * CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
                     if (AutoFlattenDesync)
                     {
@@ -216,6 +240,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             return hasState;
         }
 
+        private void TerminateFsmsForAccount(string accountName)
+        {
+            foreach (var kvp in _followerBrackets.ToArray())
+            {
+                FollowerBracketFSM fsm = kvp.Value;
+                if (fsm == null || fsm.AccountName != accountName) continue;
+
+                FollowerBracketFSM removedFsm;
+                if (TryTerminateFollowerBracket(kvp.Key, out removedFsm))
+                {
+                    Print(string.Format("[FSM-C3] Terminated FSM {0} for {1} (flatten)", kvp.Key, accountName));
+                }
+            }
+        }
+
         // Build 935 [REAPER-B935-004]: Audit the Master account when it isn't covered by AccountPrefix.
         // Returns true if the master account has non-zero state.
         private bool AuditMasterAccountIfNeeded(bool shouldLog)
@@ -267,6 +306,50 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else if (shouldLog)
                         Print($"[REAPER] Minor Desync on {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
                 }
+            }
+
+            // Build 998: Master naked-position audit -- mirrors AuditSingleFleetAccount lines 160-200.
+            // AuditMasterAccountIfNeeded previously only checked expectedPositions vs actual.
+            // A naked master position (no working stop) was never detected or recovered.
+            if (masterActualQty != 0)
+            {
+                bool masterHasWorkingStop = Account.Orders.Any(o =>
+                    o.Instrument?.FullName == Instrument?.FullName &&
+                    (o.OrderState == OrderState.Working || o.OrderState == OrderState.Accepted) &&
+                    (o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit) &&
+                    (o.OrderAction == OrderAction.Sell || o.OrderAction == OrderAction.BuyToCover));
+                if (!masterHasWorkingStop)
+                {
+                    DateTime masterFirstSeen;
+                    int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
+                    if (!_nakedPositionFirstSeen.TryGetValue(Account.Name, out masterFirstSeen))
+                    {
+                        _nakedPositionFirstSeen[Account.Name] = DateTime.UtcNow;
+                        Print(string.Format("[REAPER][NAKED_POSITION] {0} (Master): {1}ct naked -- starting {2}s grace window.",
+                            Account.Name, masterActualQty, graceSeconds));
+                    }
+                    else if ((DateTime.UtcNow - masterFirstSeen).TotalSeconds >= graceSeconds)
+                    {
+                        bool alreadyNakedInFlight;
+                        alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(ExpKey(Account.Name));
+                        if (!alreadyNakedInFlight)
+                        {
+                            _reaperNakedStopInFlight.TryAdd(ExpKey(Account.Name), 0);
+                            Print(string.Format("[REAPER][NAKED_POSITION] {0} (Master): {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                                Account.Name, masterActualQty, (DateTime.UtcNow - masterFirstSeen).TotalSeconds));
+                            _reaperNakedStopQueue.Enqueue((Account.Name, masterPos.MarketPosition, Math.Abs(masterActualQty)));
+                            try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                            catch (Exception tcEx)
+                            {
+                                _reaperNakedStopInFlight.TryRemove(ExpKey(Account.Name), out _);
+                                Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0} (Master): {1} -- in-flight cleared.",
+                                    Account.Name, tcEx.Message));
+                            }
+                        }
+                    }
+                }
+                else
+                    _nakedPositionFirstSeen.TryRemove(Account.Name, out _);
             }
 
             return hasState;
@@ -345,9 +428,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print($"[REAPER] ? Emergency Market Close: {qty} contracts on {accountName}");
                         }
 
-                        // V12.1101E [F-06]: Serialize expectedPositions mutation under stateLock.
-                        // Build 1102U [BUG-1]: Composite key for instrument-scoped clear.
-                        SetExpectedPositionLocked(ExpKey(accountName), 0);
+                        // Build 1004: SetExpectedPositionLocked(0) removed -- FSM termination is the sole teardown.
+                        // expectedPositions write is vestigial once FSM is the authority source.
+                        TerminateFsmsForAccount(accountName);
                         Print($"[REAPER] ? MARSHAL-FLATTEN (Unmanaged) executed on strategy thread for {accountName}");
                     }
                     else

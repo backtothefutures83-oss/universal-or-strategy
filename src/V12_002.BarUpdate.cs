@@ -61,6 +61,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Process IPC Commands
                 ProcessIpcCommands();
 
+                // Phase 2: Drain Follower Bracket FSM Mailbox
+                DrainAccountMailbox();
+
                 // CIT Logic
                 ManageCIT();
 
@@ -82,7 +85,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 // V11: Update Telemetry Cache (Thread-safe for UI)
-                _ema9Val = ema9[0];
+                _ema9Val = (float)ema9[0];
 
                 // CRITICAL FIX: Convert from LOCAL timezone (PC) to selected timezone
                 DateTime barTimeInZone = ConvertToSelectedTimeZone(Time[0]);

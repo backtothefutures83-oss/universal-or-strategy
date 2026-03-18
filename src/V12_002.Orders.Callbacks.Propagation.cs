@@ -410,6 +410,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsStopType        = isStopType
             };
             _followerReplaceSpecs[fleetEntryName] = spec;
+            SetFsmReplacing(fleetEntryName, currentEntry.OrderId);
 
             // Cancel outside lock -- currentEntry captured inside lock above
             try
@@ -503,6 +504,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             { var _ne966 = newEntry; var _fsn966 = fleetSignalName; var _qty966 = qty;
             Enqueue(ctx => {
                 ctx.entryOrders[_fsn966] = _ne966;
+                FollowerBracketFSM fsm966;
+                if (!ctx._followerBrackets.TryGetValue(_fsn966, out fsm966) || fsm966 == null)
+                {
+                    fsm966 = new FollowerBracketFSM
+                    {
+                        AccountName = accountName,
+                        EntryName = _fsn966
+                    };
+                    ctx._followerBrackets[_fsn966] = fsm966;
+                }
+
+                if (!string.IsNullOrEmpty(fsm966.ReplacingCancelOrderId))
+                    ctx._orderIdToFsmKey.TryRemove(fsm966.ReplacingCancelOrderId, out _);
+
+                fsm966.EntryOrder = _ne966;
+                fsm966.State = FollowerBracketState.Submitted;
+                fsm966.ReplacingCancelOrderId = null;
+                fsm966.LastUpdateUtc = DateTime.UtcNow;
+                if (!string.IsNullOrEmpty(_ne966.OrderId))
+                    ctx._orderIdToFsmKey[_ne966.OrderId] = _fsn966;
+
                 // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
                 PositionInfo pos966;
                 if (ctx.activePositions.TryGetValue(_fsn966, out pos966) && pos966 != null)

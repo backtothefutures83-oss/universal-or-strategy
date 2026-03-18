@@ -166,18 +166,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // V12.Phase8.2 [RACE-GUARD]: Re-verify expectedPositions immediately before order submission.
-                int currentExpected = 0;
-                expectedPositions.TryGetValue(ExpKey(accountName), out currentExpected);
-                if (currentExpected == 0)
+                bool hasActiveFsm = _followerBrackets.Values.Any(f =>
+                    f != null
+                    && f.AccountName == accountName
+                    && (f.State == FollowerBracketState.Active
+                        || f.State == FollowerBracketState.Accepted
+                        || f.State == FollowerBracketState.Submitted
+                        || f.State == FollowerBracketState.Replacing));
+
+                if (!hasActiveFsm)
                 {
-                    Print($"[REAPER REPAIR] (!) RACE GUARD ABORT for {accountName}: " +
-                          $"expectedPositions cleared to 0 while repair was in queue. Discarding repair order.");
-                    return;
+                    // Build 1004: Replace expectedPositions fallback with dispatch-sync-pending check.
+                    // During dispatch window, FSM does not yet exist but _dispatchSyncPendingExpKeys
+                    // marks the account as reserved. If neither FSM nor dispatch reservation exists,
+                    // abort repair -- no authorization source.
+                    bool dispatchPending = _dispatchSyncPendingExpKeys.ContainsKey(ExpKey(accountName));
+                    bool hasActivePositionEntry = activePositions.Values.Any(p =>
+                        p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == accountName);
+                    if (!dispatchPending && !hasActivePositionEntry)
+                    {
+                        Print(string.Format("[FSM-RACE GUARD ABORT] {0}: no FSM, no dispatch reservation, no position -- aborted", accountName));
+                        return;
+                    }
+                    Print(string.Format("[FSM-RACE GUARD] {0}: no FSM -- dispatch/position fallback authorized", accountName));
                 }
 
+                if (!MetadataGuardRepairAuthorized(accountName, "ExecuteReaperRepair")) return;
+
                 repairPos.BracketSubmitted = false;
-                // B966: reaperThread -- Enqueue not applicable (would drain on wrong thread).
+                // B966: background timer -- Enqueue not applicable (would drain on wrong thread).
                 // ConcurrentDictionary single-write is inherently thread-safe.
                 entryOrders[repairEntryName] = repairEntry;
 

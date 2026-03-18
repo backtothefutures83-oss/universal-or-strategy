@@ -302,11 +302,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // Atomic commit before broker submission prevents REAPER race.
+            // Phase 2 [Shadow Mode]: Initialize FollowerBracketFSM
+            var fsm = new FollowerBracketFSM
+            {
+                AccountName = acct.Name,
+                EntryName = fleetEntryName,
+                OcoGroupId = ocoId,
+                State = FollowerBracketState.PendingSubmit,
+                StopOrder = stop,
+                ExpectedStopPrice = validatedStop
+            };
+            for (int i = 0; i < 5; i++) fsm.ExpectedTargetPrices[i] = 0;
+            foreach (var (tNum, tOrder) in stagedTargets)
+            {
+                if (tNum >= 1 && tNum <= 5)
+                {
+                    fsm.Targets[tNum - 1] = tOrder;
+                    fsm.ExpectedTargetPrices[tNum - 1] = tOrder.LimitPrice;
+                }
+            }
+            _followerBrackets[fleetEntryName] = fsm;
+
             // B966: Enqueue stop write so it flows through actor pipeline (strategy thread, drains synchronously).
             ordersToSubmit.Insert(0, stop);
             { var _fen966 = fleetEntryName; var _s966 = stop; Enqueue(ctx => { ctx.stopOrders[_fen966] = _s966; }); }
             foreach (var (targetNum, order) in stagedTargets)
                 GetTargetOrdersDictionary(targetNum)[fleetEntryName] = order;
+
+            fsm.State = FollowerBracketState.Submitted;
+            fsm.LastUpdateUtc = DateTime.UtcNow;
 
             acct.Submit(ordersToSubmit.ToArray());
             pos.BracketSubmitted = true;

@@ -80,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Accept new client
                     TcpClient client = ipcListener.AcceptTcpClient();
                     int clientId = Interlocked.Increment(ref _ipcClientIdSeed);
-                    connectedClients[clientId] = client;
+                    connectedClients[clientId] = new IpcClientSession(clientId, client);
                     Print($"V12 IPC: New Client Connected [id={clientId}]");
 
                     // V12.13-D: Send REQUEST_FLEET_STATE directly to the newly connected client
@@ -99,7 +99,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                     // Handle client in a separate task
-                    Task.Run(() => HandleClient(clientId, client));
+                    Task.Run(() => HandleClient(connectedClients[clientId]));
                 }
             }
             catch (Exception)
@@ -116,13 +116,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void HandleClient(int clientId, TcpClient client)
+        private void HandleClient(IpcClientSession session)
         {
             try
             {
-                using (NetworkStream stream = client.GetStream())
+                using (NetworkStream stream = session.Stream)
                 {
-                    ProcessClientStream(clientId, client, stream);
+                    ProcessClientStream(session);
                 }
             }
             catch (Exception ex)
@@ -132,14 +132,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             finally
             {
                 if (connectedClients != null)
-                    connectedClients.TryRemove(clientId, out _);
-                Print($"V12 IPC: Client Disconnected [id={clientId}]");
-                try { client.Close(); } catch { }
+                    connectedClients.TryRemove(session.ClientId, out _);
+                Print($"V12 IPC: Client Disconnected [id={session.ClientId}]");
+                try { session.Client.Close(); } catch { }
             }
         }
 
-        private void ProcessClientStream(int clientId, TcpClient client, NetworkStream stream)
+        private void ProcessClientStream(IpcClientSession session)
         {
+            int clientId = session.ClientId;
+            TcpClient client = session.Client;
+            NetworkStream stream = session.Stream;
             StringBuilder lineBuffer = new StringBuilder();
             byte[] buffer = new byte[4096];
             Decoder utf8Decoder = new UTF8Encoding(false, true).GetDecoder();
@@ -195,13 +198,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string[] lines = completeLines.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (string line in lines)
                 {
-                    HandleIncomingIpcLine(clientId, stream, line);
+                    HandleIncomingIpcLine(session, line);
                 }
             }
         }
 
-        private void HandleIncomingIpcLine(int clientId, NetworkStream stream, string line)
+        private void HandleIncomingIpcLine(IpcClientSession session, string line)
         {
+            int clientId = session.ClientId;
+            NetworkStream stream = session.Stream;
             string message = line.Trim();
             if (string.IsNullOrEmpty(message)) return;
 
@@ -275,7 +280,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     foreach (var kvp in connectedClients.ToArray())
                     {
-                        try { kvp.Value.Close(); } catch { }
+                        try { kvp.Value.Client.Close(); } catch { }
                     }
                     connectedClients.Clear();
                 }

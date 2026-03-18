@@ -51,9 +51,9 @@ claude
 
 ---
 
-## 6. ASCII-Only Protocol (MANDATORY — Build Protocol v2)
+## 6. Agentic Protocol & ASCII Safety (MANDATORY)
 
-**Why this exists:** AI agents wrote Unicode decorators in log messages (emoji, em-dashes, curly quotes).
+**Protocol Law**: Every agent-assigned coding task MUST follow the multi-agent internal audit protocol (loop-critic + forensics) defined in the **[.agent/standards_manifesto.md](file:///.agent/standards_manifesto.md)** before handoff.
 Cleanup scripts converted curly closing-quote `"` to straight `"` — which TERMINATED C# strings early.
 One broken quote in `SIMA.cs` caused 300+ cascading compile errors across all files. This cost 2 days.
 

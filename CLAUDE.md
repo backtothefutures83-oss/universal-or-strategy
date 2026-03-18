@@ -44,11 +44,13 @@
 - **Codex first**: For any live trading anomaly, run `/live-bug-triage` workflow.
 - **Codex = diagnosis, Claude = architecture, Gemini/Jules = engineer**.
 - **A2A Delegation**: Use Agent2Agent protocol to delegate surgical repair missions to local CLI agents.
+- **Clipboard Mandate**: All handoff prompts, implementation plans, and commands MUST be automatically copied to the Director's clipboard (e.g., via PowerShell `Set-Clipboard`) so manual copying is never required.
 - **Plan audit required**: Paste implementation plans to Antigravity for audit before approving.
 
-## 🕹️ Engineer Self-Audit (P4) mandatory
+## 🕹️ Engineer Self-Audit (P4) Mandatory (All Agents)
 
-Every code change must be validated by the Engineer (Gemini/Jules) before architectural sign-off:
-1. **Grep Scan**: No `lock(stateLock)` in internal logic.
-2. **Modular Audit**: Verification of partial-class destination accuracy.
-3. **ASCII Gate**: Straight quotes only; no emoji or Unicode arrows.
+Every code change must be validated by the Engineer (P4) before architectural sign-off:
+1.  **Internal Audit (/loop-critic):** Invoke the **`architect`** subagent to critique the implementation against the technical spec.
+2.  **Forensics Check:** Use the **`forensics`** subagent to confirm zero `lock(stateLock)` usage and ASCII enforcement.
+3.  **ASCII Scan:** Run a character-level scan (or use `check_ascii.py`) to ensure no curly quotes or Unicode arrows.
+4.  **Dry Run:** Final sanity check of the logic flow and state machine transitions.

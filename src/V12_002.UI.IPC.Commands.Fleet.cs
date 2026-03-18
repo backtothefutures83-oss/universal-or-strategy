@@ -1,4 +1,4 @@
-// Build 971: UI.IPC.Commands.Fleet -- TryHandleFleetCommand [Build 971] Single method >400 lines -- future refactor candidate
+// Build 1001: UI.IPC.Commands.Fleet -- TryHandleFleetCommand [Build 1001 Repair V2]
 // V12 UI.IPC Module (Extracted)
 using System;
 using System.Collections.Generic;
@@ -34,8 +34,12 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region IPC Commands Fleet
 
-        private bool TryHandleFleetCommand(string action, string[] parts)
+        private bool TryHandleFleetCommand(string action, string[] parts, long senderTicks)
         {
+            string cmdId = senderTicks > 0
+                ? action + "|" + senderTicks.ToString()
+                : action + "|" + (DateTime.UtcNow.Ticks / TimeSpan.TicksPerMinute).ToString();
+
             if (action == "TRIM_25" || action == "TRIM_50")
             {
                 HandleTrimCommand(action, parts);
@@ -60,7 +64,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else
                 {
                     Print("[V12] FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)");
-                    // CloseAllPositions(); // Native NT8 method closes positions and cancels orders usually?
                     // NT8 Flatten() cancels orders. We must use Close() on each position instead.
 
                     foreach (Position pos in Account.Positions)
@@ -78,6 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "FLATTEN")
             {
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 // V12 SIMA: Use multi-account flatten when enabled
                 if (EnableSIMA)
                 {
@@ -92,39 +97,42 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "CANCEL_ALL")
             {
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 // V12.13c: Only cancels pending entry orders (stops/targets on active positions are preserved)
                 if (EnableSIMA)
                 {
                     int cancelled = 0;
 
-                    // ?? V12.10: Cancel local account orders FIRST ??
-                    foreach (Order order in Account.Orders)
-                    {
-                        if (order != null && order.Instrument.FullName == Instrument.FullName &&
-                            (order.OrderState == OrderState.Working ||
-                             order.OrderState == OrderState.Accepted ||
-                             order.OrderState == OrderState.Submitted ||
-                             order.OrderState == OrderState.ChangePending ||
-                             order.OrderState == OrderState.ChangeSubmitted))
-                        {
-                            // V12.13c: Skip stops and targets on active positions -- only cancel pending entries
-                            string oName = order.Name;
-                            if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
-                                oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
-                                continue;
+                    // Build 1001: Use broker truth (Account.Positions) for master -- expectedPositions[master]
+                    // is not updated on entry fill, making it stale as a liveness gate. Broker truth is authoritative.
+                    bool masterHasPosition = Account.Positions
+                        .Any(p => p.Instrument != null && p.Instrument.FullName == Instrument.FullName
+                                  && p.MarketPosition != MarketPosition.Flat);
 
-                            CancelOrder(order);
-                            cancelled++;
-                        }
+                    Account masterBroker996c = Account;
+                    foreach (Order order in masterBroker996c.Orders.ToArray())
+                    {
+                        if (order == null || order.Instrument?.FullName != Instrument?.FullName) continue;
+                        if (order.OrderState == OrderState.Cancelled       ||
+                            order.OrderState == OrderState.CancelPending   ||
+                            order.OrderState == OrderState.CancelSubmitted ||
+                            order.OrderState == OrderState.Filled          ||
+                            order.OrderState == OrderState.Rejected) continue;
+                        if (masterHasPosition) continue; // Master has live position: preserve all.
+                        masterBroker996c.Cancel(new[] { order });
+                        cancelled++;
                     }
 
-                    // ?? Fleet accounts ??
+                    // Fleet accounts
                     foreach (Account acct in Account.All)
                     {
                         if (IsFleetAccount(acct))
                         {
-                            if (acct == this.Account) continue; // already cancelled above
+                            if (acct == this.Account) continue; // already processed above
+                            var acctFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
+                            bool acctHasAnyFsm = acctFsms.Count > 0;
+                            bool acctHasActiveFsm = acctFsms.Any(f => f.State == FollowerBracketState.Active);
                             foreach (Order order in acct.Orders)
                             {
                                 if (order != null && order.Instrument.FullName == Instrument.FullName &&
@@ -134,12 +142,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                                      order.OrderState == OrderState.ChangePending ||
                                      order.OrderState == OrderState.ChangeSubmitted))
                                 {
-                                    // V12.13c: Skip stops and targets -- only cancel pending entries
                                     string oName = order.Name;
                                     if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                         oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
                                         oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
-                                        continue;
+                                    {
+                                        // Build 1004: FSM Active state is sole bracket preservation gate (no expectedPositions fallback).
+                                    if (acctHasActiveFsm) continue;
+                                    }
 
                                     acct.Cancel(new[] { order });
                                     cancelled++;
@@ -147,7 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
                         }
                     }
-                    Print($"[SIMA] CANCEL_ALL -> Cancelled {cancelled} pending entry orders (local + fleet)");
+                    Print($"[SIMA] CANCEL_ALL -> Cancelled {cancelled} orders (Entries + Orphaned Brackets) (local + fleet) [1001]");
                 }
                 else
                 {
@@ -161,7 +171,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                              order.OrderState == OrderState.ChangePending ||
                              order.OrderState == OrderState.ChangeSubmitted))
                         {
-                            // V12.13c: Skip stops and targets -- only cancel pending entries
                             string oName = order.Name;
                             if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
                                 oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
@@ -175,20 +184,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print($"[V12] CANCEL_ALL -> Cancelled {cancelled} pending entry orders");
                 }
 
-                // V1102Z-HARDEN: Ghost Memory Teardown
-                // We must sweep ALL matching accounts and zero their expectedPositions for THIS instrument.
-                // Relying on activePositions.Values iteration is insufficient as failed dispatches leave entries in
-                // expectedPositions with no corresponding activePositions object.
-                int resetAcctCount = 0;
-                foreach (Account acct in Account.All)
-                {
-                    if (IsFleetAccount(acct) || acct == this.Account)
-                    {
-                        SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                        resetAcctCount++;
-                    }
-                }
-                Print($"[V1102Z] Ghost Memory Purge: Zeroed expectedPositions for {resetAcctCount} accounts on {Instrument.FullName}");
+                // V1102Z-HARDEN: Ghost Memory Teardown removed (V2 Forensic Fix)
+                // We no longer zero expectedPositions immediately upon command launch.
+                // State mutation is now reactive to broker confirmation via OnAccountOrderUpdate.
 
                 // Clean up local position objects for anything not filled
                 foreach (var kvp in activePositions.ToArray())
@@ -203,7 +201,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "RESET_MEMORY")
             {
-                // V1102Z: Manual emergency reset of all expectedPositions for this instrument
                 int resetAcctCount = 0;
                 foreach (Account acct in Account.All)
                 {
@@ -219,7 +216,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "LONG" || action == "SHORT")
             {
-                // V12.2: Handle Sync Mode
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 if (isTosSyncMode)
                 {
                     bool armed = (action == "LONG") ? isLongArmed : isShortArmed;
@@ -231,25 +229,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                     {
                         Print($"[SYNC] ToS Handshake Received -> Executing {action} Fleet Entry");
-                        // Reset armed flag after firing
                         if (action == "LONG") isLongArmed = false; else isShortArmed = false;
                     }
                 }
 
-                // V12 SIMA: Broadcast to all Apex accounts when enabled
                 if (EnableSIMA)
                 {
                     OrderAction orderAction = action == "LONG" ? OrderAction.Buy : OrderAction.SellShort;
-
-                    // [Phase 8.2 Part 3 - IPC SIZING]: Calculate ATR-sized quantity to match
-                    // what ExecuteRMAEntryV2 would use, instead of defaulting to minContracts (= 1).
-                    // This ensures manual LONG/SHORT button entries enter at the correct fleet size.
                     int qty;
                     try
                     {
-                        // [Phase 8.2 Part 4 - IPC SIZING FIX]: Use RMAStopATRMultiplier to match
-                        // the actual RMA engine risk model. StopMultiplier caused incorrect stop
-                        // distances on high-value instruments (ES/NQ), flooring qty to 1.
                         double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
                         if (stopDist <= 0)
                         {
@@ -263,7 +252,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         qty = Math.Max(1, minContracts);
                     }
-                    qty = Math.Max(1, qty); // safety floor
+                    qty = Math.Max(1, qty);
 
                     if (EnablePathB)
                     {
@@ -278,17 +267,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    // Original single-account logic
                     MarketPosition direction = action == "LONG" ? MarketPosition.Long : MarketPosition.Short;
                     double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                    // [923B-FIX-C]: Guard against zero price -- Close[0] returns 0 if the strategy
-                    // has just loaded and bars have not yet been initialized (pre-session or fresh attach).
-                    // Passing currentPrice=0 to ExecuteRMAEntryV2 would submit a Limit @ 0, which
-                    // Apex/Tradovate treats as a Market order -> instant fill without price touching level.
                     if (currentPrice <= 0)
                     {
-                        Print("[IPC] ABORT RMA dispatch: currentPrice=0 -- lastKnownPrice and Close[0] both invalid. Skipping command, continuing queue drain.");
-                        return true; // Build 929 Fix1 [P2]: skip bad-price command, keep draining queue
+                        Print("[IPC] ABORT RMA dispatch: currentPrice=0. Skipping command.");
+                        return true;
                     }
                     double stopDist  = CalculateATRStopDistance(RMAStopATRMultiplier);
                     int contracts    = CalculatePositionSize(stopDist);
@@ -296,23 +280,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 return true;
             }
-            // V10.3: OR Breakout Entry Commands
             if (action == "OR_LONG")
             {
-                // V12.2: Handle Sync Mode
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 if (isTosSyncMode)
                 {
                     if (isLongArmed)
                     {
-                        Print("[SYNC] ToS Handshake Received -> Executing OR_LONG");
                         double orStopDist = CalculateORStopDistance();
                         int orContracts   = CalculatePositionSize(orStopDist);
                         Enqueue(ctx => ctx.ExecuteLong(orContracts));
                         isLongArmed = false;
-                    }
-                    else
-                    {
-                        Print("[SYNC] ToS Signal IGNORED: OR_LONG received but Long is not ARMED locally.");
                     }
                 }
                 else
@@ -320,26 +299,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     double orStopDist = CalculateORStopDistance();
                     int orContracts   = CalculatePositionSize(orStopDist);
                     Enqueue(ctx => ctx.ExecuteLong(orContracts));
-                    Print("V10.3: OR_LONG executed via IPC");
                 }
                 return true;
             }
             if (action == "OR_SHORT")
             {
-                // V12.2: Handle Sync Mode
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 if (isTosSyncMode)
                 {
                     if (isShortArmed)
                     {
-                        Print("[SYNC] ToS Handshake Received -> Executing OR_SHORT");
                         double orStopDist = CalculateORStopDistance();
                         int orContracts   = CalculatePositionSize(orStopDist);
                         Enqueue(ctx => ctx.ExecuteShort(orContracts));
                         isShortArmed = false;
-                    }
-                    else
-                    {
-                        Print("[SYNC] ToS Signal IGNORED: OR_SHORT received but Short is not ARMED locally.");
                     }
                 }
                 else
@@ -347,79 +321,65 @@ namespace NinjaTrader.NinjaScript.Strategies
                     double orStopDist = CalculateORStopDistance();
                     int orContracts   = CalculatePositionSize(orStopDist);
                     Enqueue(ctx => ctx.ExecuteShort(orContracts));
-                    Print("V10.3: OR_SHORT executed via IPC");
                 }
                 return true;
             }
-            // V12.27: Manual entry commands from Contextual UI Submit button
             if (action == "TREND_MANUAL_LIMIT")
             {
-                // Format: TREND_MANUAL_LIMIT|<symbol>|<direction>|<price>  (symbol in parts[1] for router)
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 if (parts.Length > 3)
                 {
                     string dir = parts[2].Trim().ToUpperInvariant();
                     MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
                     if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
-                        Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double trendDist   = CalculateTRENDStopDistance();
                         int trendContracts = CalculatePositionSize(trendDist);
                         Enqueue(ctx => ctx.ExecuteTRENDManualEntry(price, mp, trendContracts));
-                    }
-                    else
-                    {
-                        Print(string.Format("V12.27 IPC: TREND_MANUAL_LIMIT invalid price: {0}", string.Join("|", parts)));
                     }
                 }
                 return true;
             }
             if (action == "RETEST_MANUAL_LIMIT")
             {
-                // Format: RETEST_MANUAL_LIMIT|<symbol>|<direction>|<price>  (symbol in parts[1] for router)
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 if (parts.Length > 3)
                 {
                     string dir = parts[2].Trim().ToUpperInvariant();
                     MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
                     if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
-                        Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double retestDist   = CalculateRetestStopDistance();
                         int retestContracts = CalculatePositionSize(retestDist);
                         Enqueue(ctx => ctx.ExecuteRetestManualEntry(price, mp, retestContracts));
-                    }
-                    else
-                    {
-                        Print(string.Format("V12.27 IPC: RETEST_MANUAL_LIMIT invalid price: {0}", string.Join("|", parts)));
                     }
                 }
                 return true;
             }
             if (action == "FFMA_MANUAL_LIMIT")
             {
-                // Format: FFMA_MANUAL_LIMIT|<symbol>|<direction>|<price>  (symbol in parts[1] for router)
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 if (parts.Length > 3)
                 {
                     string dir = parts[2].Trim().ToUpperInvariant();
                     MarketPosition mp = dir == "LONG" ? MarketPosition.Long : MarketPosition.Short;
                     if (double.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double price) && price > 0)
                     {
-                        Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT {0} @ {1:F2}", dir, price));
                         double ffmaStopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
                         if (ffmaStopDist <= 0) ffmaStopDist = MinimumStop;
                         int contracts = CalculatePositionSize(ffmaStopDist);
                         Enqueue(ctx => ctx.ExecuteFFMALimitEntry(price, mp, contracts));
-                    }
-                    else
-                    {
-                        Print(string.Format("V12.27 IPC: FFMA_MANUAL_LIMIT invalid price: {0}", string.Join("|", parts)));
                     }
                 }
                 return true;
             }
             if (action == "FFMA_MANUAL_MARKET")
             {
-                // V12.27: M.FFMA button -- instant market, direction toward 9 EMA
-                Print("V12.27 IPC: FFMA_MANUAL_MARKET -- auto-direction toward EMA9");
+                if (!MetadataGuardDuplicate(cmdId, action)) return true;
+
                 double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
                 double ema9Value = ema9[0];
                 MarketPosition direction = currentPrice < ema9Value ? MarketPosition.Long : MarketPosition.Short;
@@ -430,7 +390,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Enqueue(ctx => ctx.ExecuteFFMAManualMarketEntry(contracts));
                 return true;
             }
-            // V10.3: Target-Specific Close Commands
             if (action.StartsWith("CLOSE_T"))
             {
                 int targetNum = 0;
@@ -440,53 +399,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 return true;
             }
-            // V14: MOVE_TARGET command - Surgical target price adjustment
             if (action.StartsWith("MOVE_TARGET"))
             {
-                // Format: MOVE_TARGET|T1|1pt  or  MOVE_TARGET|T2|2pt
                 if (parts.Length >= 3)
                 {
-                    string targetId = parts[1].Trim().ToUpperInvariant(); // "T1", "T2", etc.
-                    string distance = parts[2].Trim().ToLowerInvariant(); // "1pt" or "2pt"
-
-                    // Parse distance
+                    string targetId = parts[1].Trim().ToUpperInvariant();
+                    string distance = parts[2].Trim().ToLowerInvariant();
                     double profitPoints = 0;
                     if (distance == "1pt") profitPoints = 1.0;
                     else if (distance == "2pt") profitPoints = 2.0;
-                    else
-                    {
-                        Print($"[V14] MOVE_TARGET: Invalid distance '{distance}' - expected '1pt' or '2pt'");
-                        return true;
-                    }
+                    else return true;
 
-                    // Extract target number (T1 -> 1, T2 -> 2, etc.)
                     int targetNum = 0;
                     if (targetId.Length >= 2 && targetId.StartsWith("T"))
                     {
-                        if (!int.TryParse(targetId.Substring(1), out targetNum) || targetNum < 1 || targetNum > 5)
-                        {
-                            Print($"[V14] MOVE_TARGET: Invalid target '{targetId}' - expected T1-T5");
-                            return true;
-                        }
+                        if (int.TryParse(targetId.Substring(1), out targetNum) && targetNum >= 1 && targetNum <= 5)
+                            MoveSpecificTarget(targetNum, profitPoints);
                     }
-                    else
-                    {
-                        Print($"[V14] MOVE_TARGET: Invalid target format '{targetId}'");
-                        return true;
-                    }
-
-                    Print($"[V14] MOVE_TARGET: Command received for {targetId} to +{profitPoints}pt profit");
-
-                    // Call the move handler (implemented in Orders.cs)
-                    MoveSpecificTarget(targetNum, profitPoints);
-                }
-                else
-                {
-                    Print("[V14] MOVE_TARGET: Invalid format - expected MOVE_TARGET|TX|1pt or MOVE_TARGET|TX|2pt");
                 }
                 return true;
             }
-            if (action.StartsWith("GET_FLEET"))
+            if (action.StartsWith("GET_FLEET") || action == "SET_SIMA" || action == "SET_LEADER_ACCOUNT" || action == "REQUEST_FLEET_STATE")
             {
                 HandleFleetCommand(action, parts);
                 return true;
@@ -496,30 +429,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 HandleToggleAccountCommand(parts);
                 return true;
             }
-            // V12.6: SET_SIMA|ON or SET_SIMA|OFF - Remote SIMA toggle from external panel
-            // V12.Phase6 [LIFECYCLE]: Uses centralized ApplySimaState for full lifecycle management
-            if (action == "SET_SIMA")
-            {
-                HandleFleetCommand(action, parts);
-                return true;
-            }
-            // V12.25: SET_LEADER_ACCOUNT|accountName -- Panel tells strategy which account is the leader
-            if (action == "SET_LEADER_ACCOUNT")
-            {
-                HandleFleetCommand(action, parts);
-                return true;
-            }
-            if (action == "REQUEST_FLEET_STATE")
-            {
-                HandleFleetCommand(action, parts);
-                return true;
-            }
             return false;
         }
-
-        /// <summary>
-        /// Handles configuration sync commands: CONFIG (full target/risk sync), GET_LAYOUT (fallback logger).
-        /// </summary>
 
         #endregion
     }

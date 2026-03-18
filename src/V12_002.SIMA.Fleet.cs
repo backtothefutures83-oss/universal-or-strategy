@@ -65,9 +65,68 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool syncCleared = false;
             try
             {
+                // Phase 2 [D1]: Initialize FollowerBracketFSM for Shadow Mode
+                if (!_followerBrackets.ContainsKey(req.FleetEntryName))
+                {
+                    var newFsm = new FollowerBracketFSM
+                    {
+                        AccountName = req.Account.Name,
+                        EntryName = req.FleetEntryName,
+                        State = FollowerBracketState.Submitted,
+                        LastUpdateUtc = DateTime.UtcNow
+                    };
+
+                    // Extract orders from the request to populate FSM
+                    foreach (var ord in req.Orders)
+                    {
+                        if (ord == null || string.IsNullOrEmpty(ord.Name)) continue;
+                        
+                        if (ord.Name == req.FleetEntryName)
+                        {
+                            newFsm.EntryOrder = ord;
+                            newFsm.ExpectedEntryPrice = ord.LimitPrice > 0 ? ord.LimitPrice : 0;
+                        }
+                        else if (ord.Name.StartsWith("Stop_") || ord.Name.StartsWith("S_"))
+                        {
+                            newFsm.StopOrder = ord;
+                            newFsm.ExpectedStopPrice = ord.StopPrice;
+                            newFsm.OcoGroupId = ord.Oco;
+                        }
+                        else if (ord.Name.StartsWith("T"))
+                        {
+                            // T1_Fleet... T2_...
+                            for (int tIdx = 1; tIdx <= 5; tIdx++)
+                            {
+                                if (ord.Name.StartsWith("T" + tIdx + "_"))
+                                {
+                                    newFsm.Targets[tIdx - 1] = ord;
+                                    newFsm.ExpectedTargetPrices[tIdx - 1] = ord.LimitPrice;
+                                    newFsm.OcoGroupId = ord.Oco;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    _followerBrackets.TryAdd(req.FleetEntryName, newFsm);
+                }
+
                 req.Account.Submit(req.Orders);
                 ClearDispatchSyncPending(req.ExpectedKey);
                 syncCleared = true;
+
+                // Phase 3 [Step 3]: Register all order IDs for O(1) FSM lookup
+                FollowerBracketFSM fsm;
+                if (_followerBrackets.TryGetValue(req.FleetEntryName, out fsm))
+                {
+                    foreach (var ord in req.Orders)
+                    {
+                        if (ord != null && !string.IsNullOrEmpty(ord.OrderId))
+                        {
+                            _orderIdToFsmKey[ord.OrderId] = req.FleetEntryName;
+                        }
+                    }
+                }
+
                 Print(string.Format("[PUMP] Submitted {0} orders for {1} | {2}",
                     req.Orders.Length, req.FleetEntryName, req.Account.Name));
             }
@@ -112,48 +171,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
             }
 
-            // Step 2: H-13 stale expectedPositions reconciliation.
+            // Step 2: H-13 stale state reconciliation (Build 1004: FSM-primary, no expectedPositions read).
             try
             {
                 // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
                 var brokerPos = acct.Positions.ToArray().FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
                 bool brokerFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
-                int expected;
-                expectedPositions.TryGetValue(ExpKey(acct.Name), out expected);
 
-                if (brokerFlat && Math.Abs(expected) > 0)
+                bool hasActiveFsmForAcct = _followerBrackets.Values.Any(f =>
+                    f != null
+                    && f.AccountName == acct.Name
+                    && (f.State == FollowerBracketState.Active
+                        || f.State == FollowerBracketState.Accepted
+                        || f.State == FollowerBracketState.Submitted
+                        || f.State == FollowerBracketState.Replacing));
+                bool hasActivePositionForAcct = activePositions.Values.Any(p =>
+                    p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name);
+                bool hasDispatchPending = _dispatchSyncPendingExpKeys.ContainsKey(ExpKey(acct.Name));
+
+                if (brokerFlat && !hasActiveFsmForAcct && !hasActivePositionForAcct && !hasDispatchPending)
                 {
-                    bool hasPendingRepairOrder = false;
-                    foreach (var kvp in entryOrders.ToArray())
-                    {
-                        var ord = kvp.Value;
-                        if (ord != null && !IsOrderTerminal(ord.OrderState)
-                            && activePositions.TryGetValue(kvp.Key, out var pos)
-                            && pos.IsFollower && pos.ExecutingAccount != null
-                            && pos.ExecutingAccount.Name == acct.Name)
-                        { hasPendingRepairOrder = true; break; }
-                    }
-
-                    bool hasActivePositionForAcct = activePositions.Values.Any(
-                        p => p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name);
-
-                    bool isMasterWaiting = false;
-                    foreach (var kvp in entryOrders.ToArray())
-                    {
-                        if (activePositions.TryGetValue(kvp.Key, out var pi) && !pi.IsFollower && pi.ExecutingAccount == this.Account
-                            && kvp.Value != null && (kvp.Value.OrderState == OrderState.Working
-                                || kvp.Value.OrderState == OrderState.Submitted || kvp.Value.OrderState == OrderState.Accepted))
-                        { isMasterWaiting = true; break; }
-                    }
-
-                    if (hasPendingRepairOrder || hasActivePositionForAcct || isMasterWaiting)
-                        dispatchLog.AppendLine(string.Format("[DISPATCH] H-13 SKIP: {0} Flat but {1} -- not resetting",
-                            acct.Name, isMasterWaiting ? "Master working" : (hasPendingRepairOrder ? "repair in-flight" : "activePos present")));
-                    else
-                    {
-                        { var _acct966h13 = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966h13, 0)); }
-                        dispatchLog.AppendLine(string.Format("[DISPATCH] H-13: Stale expectedPos cleared for {0} (broker Flat)", acct.Name));
-                    }
+                    // Truly stale: broker flat, no FSM, no position, no dispatch in flight. No-op (nothing to reset).
+                    dispatchLog.AppendLine(string.Format("[DISPATCH] H-13: {0} broker flat, no FSM/position/dispatch -- no action", acct.Name));
+                }
+                else if (brokerFlat && (hasActiveFsmForAcct || hasActivePositionForAcct || hasDispatchPending))
+                {
+                    dispatchLog.AppendLine(string.Format("[DISPATCH] H-13 SKIP: {0} Flat but {1} -- not resetting",
+                        acct.Name, hasActiveFsmForAcct ? "FSM active" : (hasDispatchPending ? "dispatch pending" : "activePos present")));
                 }
             }
             catch { }

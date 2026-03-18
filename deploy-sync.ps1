@@ -56,12 +56,14 @@ $Mappings = @(
     @{ src = "V12_002.UI.IPC.Commands.Misc.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.IPC.Commands.Misc.cs" },
     @{ src = "V12_002.UI.Sizing.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.Sizing.cs" },
     @{ src = "V12_002.Symmetry.cs"; dst = Join-Path $NtStrategyDir "V12_002.Symmetry.cs" },
+    @{ src = "V12_002.Symmetry.BracketFSM.cs"; dst = Join-Path $NtStrategyDir "V12_002.Symmetry.BracketFSM.cs" },
     @{ src = "V12_002.Symmetry.Follower.cs"; dst = Join-Path $NtStrategyDir "V12_002.Symmetry.Follower.cs" },
     @{ src = "V12_002.Symmetry.Replace.cs"; dst = Join-Path $NtStrategyDir "V12_002.Symmetry.Replace.cs" },
     @{ src = "V12_002.LogicAudit.cs"; dst = Join-Path $NtStrategyDir "V12_002.LogicAudit.cs" },
     @{ src = "V12_002.Trailing.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.cs" },
     @{ src = "V12_002.Trailing.StopUpdate.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.StopUpdate.cs" },
     @{ src = "V12_002.Trailing.Breakeven.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.Breakeven.cs" },
+    @{ src = "V12_002.MetadataGuard.cs"; dst = Join-Path $NtStrategyDir "V12_002.MetadataGuard.cs" },
     @{ src = "V12_002.Properties.cs"; dst = Join-Path $NtStrategyDir "V12_002.Properties.cs" },
     
     # Strategy Components

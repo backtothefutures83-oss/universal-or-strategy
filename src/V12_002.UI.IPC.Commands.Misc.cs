@@ -163,13 +163,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in connectedClients.ToArray())
             {
                 int clientId = kvp.Key;
-                TcpClient client = kvp.Value;
+                IpcClientSession session = kvp.Value;
                 try
                 {
-                    if (client.Connected && client.GetStream().CanWrite)
+                    if (session.Client.Connected && session.Stream.CanWrite)
                     {
-                        client.GetStream().Write(responseBytes, 0, responseBytes.Length);
-                        client.GetStream().Flush();
+                        session.Stream.Write(responseBytes, 0, responseBytes.Length);
+                        session.Stream.Flush();
                     }
                     else
                     {
@@ -187,7 +187,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (connectedClients.TryRemove(clientId, out var staleClient))
                 {
-                    try { staleClient.Close(); } catch { }
+                    try { staleClient.Client.Close(); } catch { }
                 }
             }
         }

@@ -1,26 +1,19 @@
 {
+  "experimental": {
+    "enableAgents": true
+  },
   "mcpServers": {
-    "TestSprite": {
-      "command": "cmd",
+    "context7": {
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
-        "@testsprite/testsprite-mcp@latest"
-      ],
-      "env": {
-        "API_KEY": "sk-user-ksFpQFI2boli7msEyOQkCi2rho1PAzCu8VamRNBGSZ0yo063nZIbcVDel9WFk_gxbbkuGqUa7kKmYw-DW7yLZlCEetkgLho5dCB-mi55Z9MBYs5ajn1gbPB_wRAHGrsK_co"
-      }
-    },
-    "mcp-supermemory-ai": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "mcp-remote@latest",
-        "https://mcp.supermemory.ai/mcp"
+        "@upstash/context7-mcp",
+        "--api-key",
+        "ctx7sk-98bb3971-d9a3-4108-97fc-54a8465d1947"
       ]
     }
+  },
+  "ide": {
+    "enabled": true
   }
 }

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "981";  // V12.981: Remediation - Termination Race Condition
+        public const string BUILD_TAG = "1004";  // V12.1004: Phase 8 REAPER FSM Authority Expansion
 
         #region Variables
         private volatile bool _isTerminating = false;
@@ -66,6 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double pointValue;
         private int minContracts;
         private int activeTargetCount = 1; // V12.Phase8.3: Dashboard target count (1--5). Isolated from minContracts to prevent risk floor corruption.
+        private int ConfiguredTargetCount { get { return activeTargetCount; } set { activeTargetCount = value; } } // B981 Alias for legacy files
         private int maxContracts;  // V12.1101E [B-9]: Upper bound from MESMaximum/MGCMaximum -- prevents runaway ATR sizer
 
         // ATR Indicator for RMA
@@ -138,6 +139,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile bool isTRENDModeActive;
         private bool pendingTRENDEntry;  // V8.2 FIX: Flag to execute TREND in OnBarUpdate when BarsInProgress=0
         private ConcurrentDictionary<string, string> linkedTRENDEntries;  // V8.30: Thread-safe - Links E1 and E2 by group ID
+
+        // V12 PERFORMANCE: Locks are BANNED in favor of the Actor model (Enqueue).
+        // Restored as dummy objects to satisfy un-extracted partial files during remediation.
+        private readonly object stateLock = new object();
+        private readonly object dailySummaryLock = new object();
 
         // V8.4: RETEST Mode tracking
         private volatile bool isRetestModeActive;
@@ -391,16 +397,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ConcurrentDictionary<int, IpcClientSession> connectedClients;
 
         // V12 SIMA: Multi-Account Execution Engine
-        private Thread reaperThread;
-        private volatile bool isReaperRunning;
+        private System.Timers.Timer _reaperTimer;
         private volatile bool isFlattenRunning; // V12.8: Guard to pause Reaper during flatten
         private volatile int _flattenScopeDepth = 0;
-        private ConcurrentDictionary<string, int> expectedPositions; // Build 1102U: Key = ExpKey(AccountName) = "AccountName_Instrument.FullName" -> Expected Quantity (+ long, - short)
+        private ConcurrentDictionary<string, int> expectedPositions; // Build 1102U: Key = ExpKey(AccountName) = "AccountName_Instrument.FullName" -> Expected Quantity (+ long, - short) | [PHASE-9-TARGET]: follower writes (AddExpectedPositionDeltaLocked/DeltaExpectedPositionLocked in SIMA.Dispatch.cs) deferred to Phase 9; master entry (AuditMasterAccountIfNeeded) retained permanently
         private int simaAccountCount = 0; // Cached count of detected Apex accounts
         private DateTime lastReaperLog = DateTime.MinValue;
 
         // V12.Phase6 [UNSUB-TRACK]: Deterministic unsubscribe -- tracks which accounts have active event handlers
         private readonly HashSet<string> _subscribedAccountNames = new HashSet<string>();
+
 
         // V12.Phase7 [H-10]: Mutex guard for SIMA enable/disable transitions -- prevents partial state
         // if two enable/disable calls interleave (e.g. IPC toggle while UI toggle in progress).
@@ -509,6 +515,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentDictionary<string, FollowerTargetReplaceSpec>
             _followerTargetReplaceSpecs = new ConcurrentDictionary<string, FollowerTargetReplaceSpec>();
 
+        // Phase 2: Follower Bracket FSMs (Shadow Mode)
+        private readonly ConcurrentDictionary<string, FollowerBracketFSM>
+            _followerBrackets = new ConcurrentDictionary<string, FollowerBracketFSM>();
+
+        // Phase 2: Actor Mailbox for account events
+        private readonly ConcurrentQueue<AccountEvent>
+            _accountMailbox = new ConcurrentQueue<AccountEvent>();
+
+        // Phase 3: O(1) lookup for FSM events
+        private readonly ConcurrentDictionary<string, string>
+            _orderIdToFsmKey = new ConcurrentDictionary<string, string>();
+
         // [BUILD 949] CIT one-shot guard: tracks keys that have already been nudged.
         // Prevents re-nudging on subsequent bars after the first limit move.
         private readonly ConcurrentDictionary<string, bool> _citNudgedKeys
@@ -529,6 +547,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool IsFleetAccount(Account acct)
             => acct != null && acct.Name.IndexOf(AccountPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+
+        #endregion
+
+        #region SIMA Method Wrappers (Legacy Compatibility)
+        // Maps legacy method names to the B966 'Locked' extraction variants.
+        private void AddExpectedPositionDelta(string accountName, int delta) => AddExpectedPositionDeltaLocked(accountName, delta);
+        private void SetExpectedPosition(string accountName, int value) => SetExpectedPositionLocked(accountName, value);
+        private void AddOrUpdateExpectedPosition(string accountName, int addValue, Func<int, int> updateExisting) => AddOrUpdateExpectedPositionLocked(accountName, addValue, updateExisting);
+        private void ApplySimaState(bool enabled) => ProcessApplySimaState(enabled);
+        #endregion
+
+        #region Queue Pumps
+
+        private void ResumeAccountOrderQueuePump()
+        {
+            if (!_accountOrderQueue.IsEmpty)
+                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+        }
+
+        private void ResumeAccountExecutionQueuePump()
+        {
+            if (!_accountExecutionQueue.IsEmpty)
+                try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
+        }
 
         #endregion
     }

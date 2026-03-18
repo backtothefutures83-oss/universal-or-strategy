@@ -1,0 +1,13 @@
+# Codex Global Configuration
+# Universal OR Strategy V12 -- Phase 6
+# Director's Gate: Antigravity (Orchestrator) is BANNED from approving plans.
+# Only the Director (User) can authorize Engineer execution.
+
+[agents]
+# MANDATORY: Upgraded to handle 50+ files in parallel (Phase 6 requirement)
+max_threads = 10
+max_depth = 1
+
+[update]
+# Automatically apply non-breaking Codex CLI updates
+auto_update = true

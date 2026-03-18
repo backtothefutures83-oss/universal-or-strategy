@@ -21,7 +21,13 @@
       "Bash(git checkout -b build-935-emergency-reform)",
       "Bash(node --input-type=commonjs:*)",
       "Bash(python3 -c \":*)",
-      "Bash(powershell -Command \":*)"
+      "Bash(powershell -Command \":*)",
+      "Bash(bash \"C:\\\\Users\\\\Mohammed Khalid\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.2\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh\" --project-dir \"C:\\\\WSGTA\\\\universal-or-strategy\")",
+      "Bash(cd:*)",
+      "Bash(find C:WSGTAuniversal-or-strategy -type f \\\\\\(-name *.md -o -name *.txt -o -name *.json \\\\\\))",
+      "Bash(ls:*)",
+      "Bash(python check_ascii.py src/V12_002.cs src/V12_002.REAPER.Repair.cs src/V12_002.SIMA.Fleet.cs src/V12_002.REAPER.Audit.cs src/V12_002.UI.IPC.Commands.Fleet.cs src/V12_002.Orders.Callbacks.AccountOrders.cs)",
+      "Bash(python -c \":*)"
     ]
   }
 }

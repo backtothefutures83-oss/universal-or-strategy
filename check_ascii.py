@@ -4,7 +4,11 @@ files = [
     'src/V12_002.REAPER.cs',
     'src/V12_002.SIMA.cs',
     'src/V12_002.cs',
-    'src/V12_002.Orders.Callbacks.cs'
+    'src/V12_002.Lifecycle.cs',
+    'src/V12_002.Orders.Callbacks.cs',
+    'src/V12_002.SIMA.Lifecycle.cs',
+    'src/V12_002.SIMA.Flatten.cs',
+    'src/V12_002.UI.IPC.Commands.Fleet.cs'
 ]
 
 for f in files:

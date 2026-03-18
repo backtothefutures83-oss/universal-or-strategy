@@ -1,4 +1,6 @@
 # NinjaScript V12 Project Standards (Gemini Mirror)
+# Gemini CLI = BACKUP ORCHESTRATOR / CO-ORCHESTRATOR (identical twin to Antigravity)
+# Primary orchestrator: Antigravity. Hot standby: Gemini CLI.
 
 - **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
 - **No Internal Locks**: Legacy `lock(stateLock)` is **BANNED** for internal logic. All state mutations must be thread-safe; use the `Enqueue(ctx => ...)` model by default EXCEPT when direct-write is required for termination safety (see Build 981).
@@ -12,15 +14,15 @@
 
 ### 1. THE "DIRECTOR'S GATE" HIERARCHY
 
-- **ORCHESTRATOR (Antigravity)**: The Central Switchboard. Intake (P1) and multi-agent coordination.
+- **ORCHESTRATOR (Antigravity / Gemini CLI)**: The Central Switchboard. Intake (P1) and multi-agent coordination. BANNED from manual coding.
 - **FORENSICS (Codex)**: Diagnosis (P2) and Logic Audits (P5). Provides "Logical Proof of Failure."
 - **ARCHITECT (Claude Code)**: Design & Strategic Planning (P3). Peer Review & Sign-off (P5).
-- **ENGINEER (Gemini / Jules)**: Implementation (P4). Execution of approved surgical edits.
+- **ENGINEER (Codex / Jules)**: Implementation (P4). Execution of approved surgical edits.
 
 ### 2. OPERATIONAL WORKFLOW
 
 - **Plan Approval**: Every code change requires an `implementation_plan.md` designed by Claude/Codex.
-- **User Mandate**: Antigravity is BANNED from approving plans. Only the USER (The Director) can authorize implementation.
+- **User Mandate**: Orchestrators (Antigravity / Gemini CLI) are BANNED from approving plans. Only the USER (The Director) can authorize implementation.
 - **Engineer Self-Audit (P4)**: Before handing off for Architectural Audit, the ENGINEER must:
   - Run `grep` audits to confirm no accidental deletions of guards or `lock` blocks.
   - Verify that all new logic is wrapped in the FSM/Actor `Enqueue` model.

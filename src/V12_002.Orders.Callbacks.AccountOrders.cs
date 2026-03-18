@@ -39,7 +39,61 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (e == null || e.Order == null) return;
 
             Order order = e.Order;
+            Account acct = sender as Account;
+            if (acct == null) return;
+
+            // Phase 2: Enqueue into Actor Mailbox for FSM processing (Shadow Mode)
+            // Only process if it's a fleet account and matches our instrument
+            if (IsFleetAccount(acct) && order.Instrument != null && order.Instrument.FullName == Instrument.FullName)
+            {
+                _accountMailbox.Enqueue(new AccountEvent
+                {
+                    AccountAlias = acct.Name,
+                    OrderId = order.OrderId,
+                    NewState = order.OrderState,
+                    FillPrice = order.AverageFillPrice,
+                    FilledQty = order.Filled,
+                    TimestampTicks = DateTime.UtcNow.Ticks,
+                    SignalName = order.Name,
+                    ErrorMessage = ""
+                });
+            }
+
             if (order.Instrument != null && order.Instrument.FullName != Instrument.FullName) return;
+
+            // Build 1000: Master account managed order tracking
+            if (acct == this.Account && order.Instrument != null && order.Instrument.FullName == Instrument.FullName)
+            {
+                if (order.OrderState == OrderState.Filled || order.OrderState == OrderState.PartFilled)
+                {
+                    if (order.Name.StartsWith("Stop_"))
+                    {
+                        // Clear naked-position grace for master when stop fills/exists
+                        _nakedPositionFirstSeen.TryRemove(Account.Name, out _);
+
+                        var mExpKey = ExpKey(Account.Name);
+                        Enqueue(ctx => ctx.SetExpectedPositionLocked(mExpKey, 0));
+                    }
+                    else if (order.Name.StartsWith("T") && order.Name.Contains("_"))
+                    {
+                        int filledQty = order.Filled;
+                        var mExpKey = ExpKey(Account.Name);
+                        Enqueue(ctx => 
+                        {
+                            if (ctx.expectedPositions != null && ctx.expectedPositions.TryGetValue(mExpKey, out int currentExp))
+                            {
+                                int newExp = 0;
+                                if (currentExp > 0)
+                                    newExp = Math.Max(0, currentExp - filledQty);
+                                else if (currentExp < 0)
+                                    newExp = Math.Min(0, currentExp + filledQty);
+                                    
+                                ctx.SetExpectedPositionLocked(mExpKey, newExp);
+                            }
+                        });
+                    }
+                }
+            }
 
             if (order.OrderState != OrderState.Cancelled && order.OrderState != OrderState.Rejected &&
                 order.OrderState != OrderState.Unknown)
@@ -201,9 +255,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 !matchedPos.EntryFilled)
             {
                 entryOrders.TryRemove(matchedEntry, out _);
-                int gfExp = 0;
-                expectedPositions.TryGetValue(ExpKey(acctName), out gfExp);
-                if (gfExp == 0)
+                // Build 1004: Replace expectedPositions guard with FSM Active/Accepted state check.
+                bool acctFsmActive = _followerBrackets.Values.Any(f =>
+                    f != null && f.AccountName == acctName
+                    && (f.State == FollowerBracketState.Active || f.State == FollowerBracketState.Accepted));
+                if (!acctFsmActive)
                 {
                     // Build 973: FSM-Aware Guard for Meta-Purge Fix
                     FollowerReplaceSpec fsmGuard;
@@ -211,7 +267,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         && fsmGuard.State == FollowerReplaceState.PendingCancel
                         && fsmGuard.CancellingOrderId == order.OrderId)
                     {
-                        Print("[META-PURGE GUARD] Rescuing PendingCancel spec " + matchedEntry + " despite 0 expected positions. Delegating to resubmit path.");
+                        Print("[META-PURGE GUARD] Rescuing PendingCancel spec " + matchedEntry + " despite no active FSM. Delegating to resubmit path.");
                         // DO NOT return, DO NOT destroy spec. Fall through.
                     }
                     else

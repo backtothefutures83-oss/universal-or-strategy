@@ -35,6 +35,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private ConcurrentDictionary<string, DateTime> _nakedPositionFirstSeen
             = new ConcurrentDictionary<string, DateTime>();
 
+        // Build 999: Tracks accounts where Phase 5 Position Pass failed (stop in CancelPending during reconnect).
+        // REAPER defers critical desync up to 10s to allow the stop-replace cycle to complete.
+        // Keyed by account name; value = UTC time of first Position Pass failure detected.
+        private ConcurrentDictionary<string, DateTime> _positionPassFailedFirstSeen
+            = new ConcurrentDictionary<string, DateTime>();
+
         // [922Z-THROTTLE]: Prevents "Repair BLOCKED" from printing every second during intentional long-sitting orders.
         // Key = blocking order name; Value = last time the message was printed.
         private ConcurrentDictionary<string, DateTime> _repairBlockedLastLogged
@@ -81,89 +87,53 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// V12 SIMA: Start the Reaper audit background thread
+        /// V12 SIMA: Start the Reaper audit timer.
+        /// Phase 3.5 Migration: Replaces background thread with strategy-thread timer.
         /// </summary>
         private void StartReaperAudit()
         {
-            if (isReaperRunning) return;
+            if (_reaperTimer != null) StopReaperAudit();
 
-            isReaperRunning = true;
-            reaperThread = new Thread(ReaperLoop)
-            {
-                IsBackground = true,
-                Name = "V12_Reaper_Audit"
-            };
-            reaperThread.Start();
-            Print("[REAPER] Audit thread STARTED - interval: " + ReaperIntervalMs + "ms");
+            _reaperTimer = new System.Timers.Timer(ReaperIntervalMs);
+            _reaperTimer.Elapsed += OnReaperTimerElapsed;
+            _reaperTimer.AutoReset = true;
+            _reaperTimer.Enabled = true;
+
+            Print("[REAPER] Audit timer STARTED - interval: " + ReaperIntervalMs + "ms (Strategy Thread)");
         }
 
         /// <summary>
-        /// V12 SIMA: Stop the Reaper audit background thread
+        /// V12 SIMA: Stop the Reaper audit timer.
         /// </summary>
         private void StopReaperAudit()
         {
-            if (!isReaperRunning) return;
+            if (_reaperTimer == null) return;
 
-            isReaperRunning = false;
-            try
-            {
-                if (reaperThread != null && reaperThread.IsAlive)
-                {
-                    reaperThread.Join(500); // B981-FREEZE: 500ms max -- Terminated must not block NT8 login thread
-                }
-            }
-            catch { }
-            Print("[REAPER] Audit thread STOPPED");
+            _reaperTimer.Stop();
+            _reaperTimer.Elapsed -= OnReaperTimerElapsed;
+            _reaperTimer.Dispose();
+            _reaperTimer = null;
+
+            Print("[REAPER] Audit timer STOPPED");
         }
 
         /// <summary>
-        /// V12 SIMA: Reaper main loop - audits positions every ReaperIntervalMs
+        /// Timer event handler. Marshals the audit call to the strategy thread.
         /// </summary>
-        private void ReaperLoop()
+        private void OnReaperTimerElapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            Print("[REAPER] Loop started - monitoring account positions...");
+            // V12.Phase8 [F-05]: Skip auditing while a flatten is actively running
+            if (isFlattenRunning || !_orderAdoptionComplete || State != State.Realtime) 
+                return;
 
-            // V12.Phase8 [F-05]: On cold start or reload the isFlattenRunning guard resets to false
-            // even if a broker-side flatten is still in flight from the previous strategy instance.
-            // Skip the very first audit cycle to allow any in-flight flatten to settle before
-            // Reaper evaluates position state. This prevents false CRITICAL DESYNC on reload.
-            bool firstCycle = true;
-
-            while (isReaperRunning)
+            try
             {
-                try
-                {
-                    Thread.Sleep(ReaperIntervalMs);
-                    if (!isReaperRunning) break;
-
-                    // V12.Phase8 [F-05]: Skip first cycle after startup -- grace period for in-flight flattens.
-                    if (firstCycle)
-                    {
-                        firstCycle = false;
-                        Print("[REAPER] Startup grace: skipping first audit cycle to allow in-flight flattens to settle.");
-                        continue;
-                    }
-
-                    // V12.8: Pause auditing while a flatten is actively running to prevent race conditions
-                    if (isFlattenRunning) continue;
-
-                    // [BUILD 948] Skip audit until working orders have been re-adopted after restart/reconnect.
-                    // Prevents false CRITICAL DESYNC or naked-position alerts during the adoption window.
-                    if (!_orderAdoptionComplete) continue;
-
-                    // V12.Hardening: Only audit in live/realtime -- skip historical replay
-                    if (State != State.Realtime) continue;
-
-                    AuditApexPositions();
-                }
-                catch (ThreadAbortException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Print("[REAPER] ERROR: " + ex.Message);
-                }
+                // Marshal to strategy thread via TriggerCustomEvent
+                TriggerCustomEvent(o => AuditApexPositions(), null);
+            }
+            catch (Exception ex)
+            {
+                Print("[REAPER] Timer Marshalling Error: " + ex.Message);
             }
         }
 

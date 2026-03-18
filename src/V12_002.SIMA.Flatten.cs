@@ -100,8 +100,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Print($"[SIMA] [OK] Flattened {closedCount} position(s) on {acct.Name}");
                             }
 
-                            // Reset expected position
-                            { var _acct966flat = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966flat, 0)); }
+                            // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
+                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
                         }
                         catch (Exception ex)
                         {
@@ -118,22 +118,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     totalCount++;
                     try
                     {
-                        // [V12.12] Cancel all working master orders before closing position.
+                        // Build 997: Name-agnostic master bracket cancel via Connection.All.
+                        Account masterBroker997 = Account;
+
                         List<Order> masterOrdersToCancel = new List<Order>();
-                        foreach (Order order in Account.Orders)
+                        foreach (Order order in masterBroker997.Orders.ToArray())
                         {
-                            if (order.Instrument.FullName == Instrument.FullName &&
-                                (order.OrderState == OrderState.Working || order.OrderState == OrderState.Submitted ||
-                                 order.OrderState == OrderState.Accepted || order.OrderState == OrderState.ChangePending ||
-                                 order.OrderState == OrderState.ChangeSubmitted))
-                            {
-                                masterOrdersToCancel.Add(order);
-                            }
+                            if (order == null || order.Instrument?.FullName != Instrument?.FullName) continue;
+                            if (order.OrderState == OrderState.Cancelled       ||
+                                order.OrderState == OrderState.CancelPending   ||
+                                order.OrderState == OrderState.CancelSubmitted ||
+                                order.OrderState == OrderState.Filled          ||
+                                order.OrderState == OrderState.Rejected) continue;
+                            masterOrdersToCancel.Add(order);
                         }
                         if (masterOrdersToCancel.Count > 0)
                         {
-                            Account.Cancel(masterOrdersToCancel);
-                            Print($"[SIMA] Cancelled {masterOrdersToCancel.Count} working order(s) on {Account.Name}");
+                            masterBroker997.Cancel(masterOrdersToCancel);
+                            Print(string.Format("[SIMA][B997] {0} (Master): Cancelled {1} instrument order(s) (Connection.All, name-agnostic).", Account.Name, masterOrdersToCancel.Count));
                         }
 
                         // Submit Market close orders via SubmitOrderUnmanaged for the master account
@@ -159,7 +161,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print($"[SIMA] V12.12 Master flatten: {masterClosedCount} position(s) on {Account.Name} (outside prefix filter)");
                         }
 
-                        { var _acct966mflat = ExpKey(Account.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966mflat, 0)); }
+                        // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
+                        SetExpectedPositionLocked(ExpKey(Account.Name), 0);
                     }
                     catch (Exception ex)
                     {
@@ -240,8 +243,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print(string.Format("[DEAD-01] EmergencyFlatten: {0} already flat -- no close order needed.", acct.Name));
                 }
 
-                // Step 3: Clear ghost memory so REAPER does not trigger a second flatten.
-                { var _acct966emg = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966emg, 0)); }
+                // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent).
+                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
             }
             catch (Exception ex)
             {
@@ -273,10 +276,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     try
                     {
                         // -- V12.Phase10 [ZOMBIE-STOP-FIX]: Zombie Sweep ------------------------------
-                        // EMERGENCY_STOP_ orders are submitted by REAPER to guard naked positions.
-                        // They are NOT OCO-linked and NOT part of any bracket structure, so they survive
-                        // FLATTEN_ONLY and become Zombies ??" reversal-fill risk after the position closes.
-                        // Stop_*, S_*, T*_ are legitimate bracket stops/targets: intentionally preserved.
+                        // Build 994: Sweep EMERGENCY_STOP_ zombies AND T1_-T5_ limit-exit targets.
+                        // T1_-T5_ are profit-exit limit orders. If a Market close is in-flight, a T*_ fill
+                        // creates a double-fill reversal (FLATTEN_ONLY race -- BUG 2). Stop_/S_ orders are
+                        // loss-protection and are intentionally preserved during the market-close fill window.
                         List<Order> zombieOrders = new List<Order>();
                         foreach (Order order in acct.Orders)
                         {
@@ -286,7 +289,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                                  order.OrderState == OrderState.Accepted      ||
                                  order.OrderState == OrderState.ChangePending ||
                                  order.OrderState == OrderState.ChangeSubmitted) &&
-                                order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase))
+                                (order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase) ||
+                                 order.Name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
+                                 order.Name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
+                                 order.Name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
+                                 order.Name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
+                                 order.Name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase)))
                             {
                                 zombieOrders.Add(order);
                             }
@@ -294,7 +302,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (zombieOrders.Count > 0)
                         {
                             acct.Cancel(zombieOrders); // V12.Phase10 [ZOMBIE-STOP-FIX]
-                            Print($"[SIMA][ZOMBIE-STOP-FIX] {acct.Name}: swept {zombieOrders.Count} system protection order(s). Deck cleared.");
+                            Print($"[SIMA][ZOMBIE-STOP-FIX] {acct.Name}: swept {zombieOrders.Count} system protection + limit-exit order(s). Deck cleared.");
                         }
                         // -----------------------------------------------------------------------------
 
@@ -315,7 +323,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print($"[SIMA] [OK] Graceful Close: {qty} {position.MarketPosition} on {acct.Name}");
                         }
 
-                        { var _acct966cpo = ExpKey(acct.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966cpo, 0)); }
+                        // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
+                        SetExpectedPositionLocked(ExpKey(acct.Name), 0);
                     }
                     catch (Exception ex)
                     {
@@ -327,25 +336,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool masterCovered = IsFleetAccount(Account);
                 if (!masterCovered && Account.Positions.Count > 0)
                 {
-                    // V12.Phase10 [ZOMBIE-STOP-FIX]: Same zombie sweep for master account path.
-                    List<Order> masterZombieOrders = new List<Order>();
-                    foreach (Order order in Account.Orders)
+                    // Build 996: Name-agnostic master bracket cancel via Connection.All.
+                    Account masterBroker996f = Account;
+                    List<Order> masterSweep996 = new List<Order>();
+                    foreach (Order _ord996 in masterBroker996f.Orders.ToArray())
                     {
-                        if (order.Instrument.FullName == Instrument.FullName &&
-                            (order.OrderState == OrderState.Working       ||
-                             order.OrderState == OrderState.Submitted     ||
-                             order.OrderState == OrderState.Accepted      ||
-                             order.OrderState == OrderState.ChangePending ||
-                             order.OrderState == OrderState.ChangeSubmitted) &&
-                            order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase))
-                        {
-                            masterZombieOrders.Add(order);
-                        }
+                        if (_ord996 == null || _ord996.Instrument?.FullName != Instrument?.FullName) continue;
+                        if (_ord996.OrderState == OrderState.Cancelled       ||
+                            _ord996.OrderState == OrderState.CancelPending   ||
+                            _ord996.OrderState == OrderState.CancelSubmitted ||
+                            _ord996.OrderState == OrderState.Filled          ||
+                            _ord996.OrderState == OrderState.Rejected) continue;
+                        masterSweep996.Add(_ord996);
                     }
-                    if (masterZombieOrders.Count > 0)
+                    if (masterSweep996.Count > 0)
                     {
-                        Account.Cancel(masterZombieOrders); // V12.Phase10 [ZOMBIE-STOP-FIX]
-                        Print($"[SIMA][ZOMBIE-STOP-FIX] {Account.Name} (master): swept {masterZombieOrders.Count} system protection order(s). Deck cleared.");
+                        masterBroker996f.Cancel(masterSweep996);
+                        Print(string.Format("[SIMA][B996] {0} (Master): Cancelled {1} instrument order(s) (Connection.All, name-agnostic).",
+                            Account.Name, masterSweep996.Count));
                     }
 
                     foreach (Position position in Account.Positions)
@@ -367,7 +375,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print($"[SIMA] ??-- Graceful Close FAILED: Master {qty} {position.MarketPosition} (SubmitOrderUnmanaged returned null)");
                         }
                     }
-                    { var _acct966cpm = ExpKey(Account.Name); Enqueue(ctx => ctx.SetExpectedPositionLocked(_acct966cpm, 0)); }
+
+                    // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
+                    SetExpectedPositionLocked(ExpKey(Account.Name), 0);
                 }
 
                 Print($"[SIMA] ====== GLOBAL POSITIONS CLOSE COMPLETE: {closeCount} positions closed ======");

@@ -350,8 +350,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // [BUILD 948] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
                 // Must run while dicts are still populated and accounts still subscribed.
-                // force=true: hard terminate, cancel regardless of open positions.
-                CancelAllV12GtcOrders(true);
+                // force=false: soft terminate, protects brackets for open positions.
+                CancelAllV12GtcOrders(false);
 
                 DrainQueuesForShutdown();
 
@@ -384,6 +384,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 target3Orders?.Clear();  // v5.13
                 target4Orders?.Clear();
                 target5Orders?.Clear();
+                _followerBrackets?.Clear();
+                if (_accountMailbox != null) { while (_accountMailbox.TryDequeue(out var _)) ; }
                 accountDailyProfit?.Clear();
                 accountTotalProfit?.Clear();
                 accountTradeCount?.Clear();
