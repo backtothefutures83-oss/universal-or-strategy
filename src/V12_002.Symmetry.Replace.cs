@@ -55,38 +55,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!dict.TryGetValue(fleetEntryName, out var oldTarget) || oldTarget == null)
                 return;
 
+            // Build 1004 [DNA-FIX]: Replace raw Cancel+lock(stateLock)+Submit with FollowerTargetReplaceSpec
+            // two-phase FSM. Mirror pattern from Trailing.Breakeven.cs Build 957 C1.
+            // Phase 1 (here): store spec and cancel only.
+            // Phase 2 (automatic): AccountOrders.cs lines 352-382 detects cancel confirm by CancellingOrderId,
+            // fires TriggerCustomEvent -> SubmitFollowerTargetReplacement() in Propagation.cs.
             if (oldTarget.OrderState == OrderState.Working ||
                 oldTarget.OrderState == OrderState.Accepted ||
                 oldTarget.OrderState == OrderState.Submitted ||
                 oldTarget.OrderState == OrderState.ChangePending)
             {
-                // A1-2: Stamp REAPER grace window before cancel to suppress false desync during replace gap (Build 960 audit fix)
+                double newPrice = GetTargetPrice(pos, targetNumber);
+                if (newPrice <= 0) return;
+
+                OrderAction exitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+                string signalName = SymmetryTrim(targetTag + "_" + fleetEntryName, 40);
+
+                var tSpec = new FollowerTargetReplaceSpec
+                {
+                    EntryName         = fleetEntryName,
+                    TargetNum         = targetNumber,
+                    NewTargetPrice    = Instrument.MasterInstrument.RoundToTickSize(newPrice),
+                    Quantity          = qty,
+                    ExitAction        = exitAction,
+                    TargetAccount     = pos.ExecutingAccount,
+                    CancellingOrderId = oldTarget.OrderId
+                };
+                _followerTargetReplaceSpecs[signalName] = tSpec;
+                // A1-2: Stamp REAPER grace window before cancel to suppress false desync during replace gap.
                 StampReaperMoveGrace();
                 pos.ExecutingAccount.Cancel(new[] { oldTarget });
-            }
-
-            double newPrice = GetTargetPrice(pos, targetNumber);
-            if (newPrice <= 0) return;
-
-            OrderAction exitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
-            string signalName = SymmetryTrim(targetTag + "_" + fleetEntryName, 40);
-
-            lock (stateLock)
-            {
-                Order replacement = pos.ExecutingAccount.CreateOrder(
-                    Instrument,
-                    exitAction,
-                    OrderType.Limit,
-                    TimeInForce.Gtc,
-                    qty,
-                    Instrument.MasterInstrument.RoundToTickSize(newPrice),
-                    0,
-                    "SGT_" + DateTime.UtcNow.Ticks.ToString(),
-                    signalName,
-                    null);
-
-                pos.ExecutingAccount.Submit(new[] { replacement });
-                dict[fleetEntryName] = replacement;
             }
         }
 
@@ -102,13 +100,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "[SYMMETRY_GUARD] SKIP | {0} | {1} | FleetFill={2:F2} | Slip={3:F1} ticks (${4:F2}/ct)",
                 fleetEntryName, reason, fleetFillPrice, slippageTicks, slippageUsdPerContract));
 
-            // A1-1: pos.EntryFilled must be inside stateLock to prevent torn read by REAPER (Build 960 audit fix)
-            lock (stateLock)
+            // Build 1004 [DNA-FIX]: Replace lock(stateLock) with Enqueue actor write (no internal locks).
+            // TotalContracts snapshot captured before lambda to prevent closure mutation.
+            int _skipContractsSnap = pos.TotalContracts;
+            Enqueue(ctx =>
             {
                 pos.EntryFilled = true;
                 if (pos.RemainingContracts <= 0)
-                    pos.RemainingContracts = Math.Max(1, pos.TotalContracts);
-            }
+                    pos.RemainingContracts = Math.Max(1, _skipContractsSnap);
+            });
 
             FlattenPositionByName(fleetEntryName);
             CleanupPosition(fleetEntryName);
