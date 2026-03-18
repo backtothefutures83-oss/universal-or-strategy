@@ -43,6 +43,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public string EntryName;         // Links to Master Position key (fleetEntryName)
             public string OcoGroupId;        // Shared ID for broker OCO
             public FollowerBracketState State = FollowerBracketState.None;
+            public int RemainingContracts;
             public string ReplacingCancelOrderId;
             public DateTime LastUpdateUtc = DateTime.UtcNow;
 
@@ -226,7 +227,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (isStop || isTarget)
                     {
-                        fsm.State = FollowerBracketState.Filled;
+                        fsm.RemainingContracts = Math.Max(0, fsm.RemainingContracts - Math.Max(0, evt.FilledQty));
+                        fsm.State = fsm.RemainingContracts <= 0 ? FollowerBracketState.Filled : FollowerBracketState.Active;
                     }
                     else if (fsm.State == FollowerBracketState.Accepted || fsm.State == FollowerBracketState.Submitted)
                     {

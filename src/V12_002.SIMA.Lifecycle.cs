@@ -455,11 +455,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else
                     continue; // Terminal state -- FSM not needed
 
+                int hydratedRemainingContracts = Math.Max(0, entryOrder.Quantity);
+                if (hydrationState == FollowerBracketState.Active)
+                {
+                    Position livePosition = pi.ExecutingAccount.Positions.ToArray().FirstOrDefault(p =>
+                        p != null
+                        && p.Instrument != null
+                        && p.Instrument.FullName == Instrument.FullName
+                        && p.MarketPosition != MarketPosition.Flat);
+                    if (livePosition != null)
+                        hydratedRemainingContracts = Math.Abs(livePosition.Quantity);
+                }
+
                 var fsm = new FollowerBracketFSM
                 {
                     AccountName = pi.ExecutingAccount.Name,
                     EntryName = entryKey,
                     State = hydrationState,
+                    RemainingContracts = hydratedRemainingContracts,
                     LastUpdateUtc = DateTime.UtcNow,
                     EntryOrder = entryOrder
                 };
@@ -563,6 +576,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     AccountName = acct.Name,
                     EntryName = recoveredKey,
                     State = FollowerBracketState.Active,
+                    RemainingContracts = Math.Abs(acctPos.Quantity),
                     LastUpdateUtc = DateTime.UtcNow,
                     EntryOrder = null // Terminal entry order
                 };

@@ -73,6 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         AccountName = req.Account.Name,
                         EntryName = req.FleetEntryName,
                         State = FollowerBracketState.Submitted,
+                        RemainingContracts = Math.Abs(req.ReservedDelta),
                         LastUpdateUtc = DateTime.UtcNow
                     };
 

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1004";  // V12.1004: Phase 8 REAPER FSM Authority Expansion
+        public const string BUILD_TAG = "1102Z";  // V12.1102Z: FSM Multi-Target Terminal State Repair
 
         #region Variables
         private volatile bool _isTerminating = false;

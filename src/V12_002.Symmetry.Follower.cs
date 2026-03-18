@@ -309,6 +309,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntryName = fleetEntryName,
                 OcoGroupId = ocoId,
                 State = FollowerBracketState.PendingSubmit,
+                RemainingContracts = pos.TotalContracts,
                 StopOrder = stop,
                 ExpectedStopPrice = validatedStop
             };
