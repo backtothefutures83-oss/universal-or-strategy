@@ -1,7 +1,7 @@
 # Implementation Plan: Phase 8 Architectural Repair
 
 ## Phase 1: Architectural Repair (Claude P3)
-- [ ] Task: Provide Claude (P3 Architect) with the `docs/brain/claude_repair_prompt.md` failure report.
+- [x] Task: Provide Claude (P3 Architect) with the `docs/brain/claude_repair_prompt.md` failure report. [104eead]
 - [ ] Task: Review the newly generated `implementation_plan.md` from Claude to ensure it contains no `lock(stateLock)` usage and uses the correct Replace FSM.
 - [ ] Task: Approve the repaired implementation plan.
 
