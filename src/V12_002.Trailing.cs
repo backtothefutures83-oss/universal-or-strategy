@@ -442,6 +442,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
+
+            // Build 1105: Shadow Mode auto-propagation (runs after fleet sync)
+            ShadowEngineCheck();
         }
 
         // V8.30: Clean up stale pending replacements that are older than 5 seconds
