@@ -326,8 +326,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     ChartControl.Dispatcher.InvokeAsync(() =>
                     {
+                        if (_isTerminating) return;
                         AttachHotkeys();
                         AttachChartClickHandler();
+                        CreatePanel();
+                        StartPanelRefresh();
                         Print("REALTIME - Hotkeys: L=Long, S=Short, Shift+Click=RMA, F=Flatten");
                     });
                 }
@@ -340,12 +343,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _dataLoadedComplete = false;
                 Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
 
+                StopPanelRefresh();
+
                 if (ChartControl != null)
                 {
                     ChartControl.Dispatcher.InvokeAsync(() =>
                     {
                         DetachHotkeys();
                         DetachChartClickHandler();
+                        DestroyPanel();
                     });
                 }
 
