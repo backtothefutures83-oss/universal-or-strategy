@@ -119,7 +119,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (IsFleetAccount(acct))
                 {
                     simaAccountCount++;
-                    { var _acct966init = ExpKey(acct.Name); SetExpectedPosition(_acct966init, 0); } // Initialize expected position as flat
+                    // Build 1105: Only init expectedPositions for master during enumeration.
+                    // Follower REAPER audit truth is owned by FSM.
+                    if (acct.Name == Account.Name)
+                    { var _acct966init = ExpKey(acct.Name); SetExpectedPosition(_acct966init, 0); }
                     accountDailyProfit[acct.Name] = 0; // Initialize daily profit
                     EnsureAccountComplianceTracking(acct.Name, GetComplianceNow());
                     activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE ?? wait for Fleet Manager / IPC to enable

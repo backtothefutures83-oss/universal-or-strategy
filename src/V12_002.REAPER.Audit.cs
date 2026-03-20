@@ -55,34 +55,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (pos != null && pos.MarketPosition != MarketPosition.Flat)
                 actualQty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
 
-            // Phase 4: Promote BracketFSM to primary authority for expected state
+            // Build 1105: FSM is the SOLE authority for follower expected position.
             var accountFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
-            int fsmExpectedQty = 0;
+            int fsmExpectedQty = GetFsmExpectedPosition(acct.Name);
+
+            // Handle hydrated Active FSMs with no order reference (restart edge case)
             foreach (var f in accountFsms)
             {
-                // Active, Accepted, or Submitted states imply we expect the entry to fill/be-filled
-                if (f.State == FollowerBracketState.Active || f.State == FollowerBracketState.Accepted || f.State == FollowerBracketState.Submitted)
+                if (f.State == FollowerBracketState.Active && f.EntryOrder == null)
                 {
-                    if (f.EntryOrder != null)
+                    if (actualQty != 0)
                     {
-                         int entrySign = (f.EntryOrder.OrderAction == OrderAction.Buy || f.EntryOrder.OrderAction == OrderAction.BuyToCover) ? 1 : -1;
-                         fsmExpectedQty += (f.EntryOrder.Quantity * entrySign);
+                        fsmExpectedQty += actualQty;
                     }
-                    else if (f.State == FollowerBracketState.Active)
+                    else
                     {
-                        // Hydrated Active FSM: entry was terminal (Filled) at restart, no order reference.
-                        if (actualQty != 0)
+                        FollowerBracketFSM staleFsm;
+                        if (TryTerminateFollowerBracket(f.EntryName, out staleFsm))
                         {
-                            fsmExpectedQty += actualQty;
-                        }
-                        else
-                        {
-                            FollowerBracketFSM staleFsm;
-                            if (TryTerminateFollowerBracket(f.EntryName, out staleFsm))
-                            {
-                                Print(string.Format("[REAPER-C7] Stale Active FSM for {0} on {1} (broker flat) -- auto-terminating",
-                                    f.EntryName, acct.Name));
-                            }
+                            Print(string.Format("[REAPER-C7] Stale Active FSM for {0} on {1} (broker flat) -- auto-terminating",
+                                f.EntryName, acct.Name));
                         }
                     }
                 }

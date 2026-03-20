@@ -400,7 +400,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private System.Timers.Timer _reaperTimer;
         private volatile bool isFlattenRunning; // V12.8: Guard to pause Reaper during flatten
         private volatile int _flattenScopeDepth = 0;
-        private ConcurrentDictionary<string, int> expectedPositions; // Build 1102U: Key = ExpKey(AccountName) = "AccountName_Instrument.FullName" -> Expected Quantity (+ long, - short) | [PHASE-9-TARGET]: follower writes (AddExpectedPositionDeltaLocked/DeltaExpectedPositionLocked in SIMA.Dispatch.cs) deferred to Phase 9; master entry (AuditMasterAccountIfNeeded) retained permanently
+        /// <summary>
+        /// [DEPRECATED for follower REAPER audit -- Build 1105] Master account audit still reads this dictionary.
+        /// Follower REAPER truth is owned by FollowerBracketFSM via GetFsmExpectedPosition().
+        /// Legacy follower expectedPositions writes remain transitional outside this phase.
+        /// </summary>
+        private ConcurrentDictionary<string, int> expectedPositions; // Build 1102U: Key = ExpKey(AccountName)
         private int simaAccountCount = 0; // Cached count of detected Apex accounts
         private DateTime lastReaperLog = DateTime.MinValue;
 

@@ -263,6 +263,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        /// <summary>
+        /// Computes the net expected position for a given account by summing all
+        /// non-terminal FollowerBracketFSMs. This is the SOLE authority for
+        /// follower expected position (Build 1105).
+        /// Master account does NOT use FSMs -- use expectedPositions dict for master.
+        /// </summary>
+        private int GetFsmExpectedPosition(string accountName)
+        {
+            int sum = 0;
+            foreach (var kvp in _followerBrackets)
+            {
+                FollowerBracketFSM f = kvp.Value;
+                if (f == null || f.AccountName != accountName) continue;
+
+                if (f.State == FollowerBracketState.Active
+                    || f.State == FollowerBracketState.Accepted
+                    || f.State == FollowerBracketState.Submitted
+                    || f.State == FollowerBracketState.Replacing
+                    || f.State == FollowerBracketState.Modifying)
+                {
+                    if (f.EntryOrder != null)
+                    {
+                        int entrySign = (f.EntryOrder.OrderAction == OrderAction.Buy
+                            || f.EntryOrder.OrderAction == OrderAction.BuyToCover) ? 1 : -1;
+                        sum += f.EntryOrder.Quantity * entrySign;
+                    }
+                    else if (f.State == FollowerBracketState.Active)
+                    {
+                        // Hydrated Active FSM: entry was terminal at restart.
+                        // Cannot determine sign without broker -- caller handles this.
+                        // Return 0 contribution; REAPER falls back to broker position.
+                    }
+                }
+            }
+            return sum;
+        }
+
         #endregion
     }
 }
