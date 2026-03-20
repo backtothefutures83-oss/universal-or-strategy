@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1102Z";  // V12.1102Z: FSM Multi-Target Terminal State Repair
+        public const string BUILD_TAG = "1105";  // Build 1105: The Monolith -- final architecture consolidation
 
         #region Variables
         private volatile bool _isTerminating = false;

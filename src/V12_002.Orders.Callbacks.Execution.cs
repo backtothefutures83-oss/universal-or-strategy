@@ -412,6 +412,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                 }
+
+                // Build 1105: Shadow callback injection -- closes 100-500ms leader flatten gap.
+                // ManageTrailingStops covers steady-state trailing. This covers immediate
+                // execution events (stop fill, target fill) where next trailing cycle is too late.
+                ShadowEngineCheck();
             }
             catch (Exception ex)
             {
