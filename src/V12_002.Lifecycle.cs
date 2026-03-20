@@ -147,6 +147,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;
                 FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES?MES fleet parity
+                ShadowModeEnabled = false; // Build 1105: Shadow Mode opt-in, default OFF for safe rollout
                 PathBStopPoints = 10.0;
                 PathBTargetPoints = 15.0;
                 ChaseIfTouchPoints = "0";

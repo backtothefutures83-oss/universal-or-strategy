@@ -335,6 +335,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int FleetParityMultiplier { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Shadow Mode", Description = "Followers auto-mirror leader stop moves and flattens", GroupName = "12. SIMA", Order = 13)]
+        public bool ShadowModeEnabled { get; set; }
+        [NinjaScriptProperty]
         [Display(Name = "Enable Compliance Hub", GroupName = "13. Compliance", Order = 1)]
         public bool EnableComplianceHub { get; set; }
 

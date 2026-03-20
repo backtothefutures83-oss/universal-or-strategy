@@ -427,6 +427,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Key = ExpKey(accountName). Used to suppress false REAPER repairs and flat-clears during submit windows.
         private readonly ConcurrentDictionary<string, byte> _dispatchSyncPendingExpKeys = new ConcurrentDictionary<string, byte>(); // [B967-FIX-02]
 
+        // Build 1105: Shadow Mode -- leader-follower autonomous propagation
+        private readonly ConcurrentDictionary<string, double> _leaderLastStopPrice =
+            new ConcurrentDictionary<string, double>();
+        private volatile bool _leaderWasInPosition = false;
         private void EnterFlattenScope()
         {
             Interlocked.Increment(ref _flattenScopeDepth);

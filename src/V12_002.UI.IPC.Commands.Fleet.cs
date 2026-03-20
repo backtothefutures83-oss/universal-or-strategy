@@ -429,6 +429,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 HandleToggleAccountCommand(parts);
                 return true;
             }
+            if (action == "SET_SHADOW")
+            {
+                if (parts.Length >= 2)
+                {
+                    bool enable = parts[1].Trim() == "true" || parts[1].Trim() == "1";
+                    ShadowModeEnabled = enable;
+                    Print(string.Format("[IPC] Shadow Mode {0}", enable ? "ENABLED" : "DISABLED"));
+                }
+                return true;
+            }
             return false;
         }
 
