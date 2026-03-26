@@ -196,11 +196,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.13b: Removed ExitLong/ExitShort block (managed-mode methods incompatible with IsUnmanaged=true)
                 // Unmanaged flatten via SubmitOrderUnmanaged is handled below at the per-position level
 
-                // 2. Clear all pending entry orders on Master
+                // 2. Clear all tracked pending entry orders using account-aware routing
                 foreach (var entryOrder in entryOrders.Values)
                 {
-                    if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
-                        CancelOrder(entryOrder);
+                    if (entryOrder != null
+                        && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted)
+                        && (entryOrder.Account == null || entryOrder.Account == Account))
+                        CancelOrderOnAccount(entryOrder, entryOrder.Account);
                 }
 
                 // 3. Flatten SIMA Fleet
@@ -259,7 +261,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
                             {
                                 if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
-                                    CancelOrder(tOrder);
+                                    CancelOrderSafe(tOrder, pos);
                             }
                         }
 
@@ -313,7 +315,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Order entryOrder = entryOrders[entryName];
                             if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
                             {
-                                CancelOrder(entryOrder);
+                                CancelOrderSafe(entryOrder, pos);
                                 Print(string.Format("FLATTEN: Cancelled pending {0} entry order @ {1:F2}",
                                     pos.Direction == MarketPosition.Long ? "LONG" : "SHORT", pos.EntryPrice));
                             }
@@ -349,8 +351,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted)
                     {
-                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { stopOrder });
-                        else CancelOrder(stopOrder);
+                        CancelOrderSafe(stopOrder, pos);
                     }
                 }
                 // Cancel all target orders (T1-T5)
@@ -361,8 +362,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted)
                         {
-                            if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { tOrder });
-                            else CancelOrder(tOrder);
+                            CancelOrderSafe(tOrder, pos);
                         }
                     }
                 }

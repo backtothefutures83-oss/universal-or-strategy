@@ -94,6 +94,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
+            // Build 1104.1: Fleet account expectedPositions tracking (symmetric with Master at line 65)
+            // Without this, expectedPositions stays stale after fleet stop/target fills,
+            // causing REAPER to see Expected != Actual and trigger false flattens.
+            else if (IsFleetAccount(acct))
+            {
+                if (order.OrderState == OrderState.Filled || order.OrderState == OrderState.PartFilled)
+                {
+                    if (order.Name.StartsWith("Stop_"))
+                    {
+                        // Fleet stop filled: position closing. Zero expectedPositions.
+                        _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+                        var fExpKey = ExpKey(acct.Name);
+                        Enqueue(ctx => ctx.SetExpectedPositionLocked(fExpKey, 0));
+                    }
+                    else if (order.Name.StartsWith("T") && order.Name.Contains("_"))
+                    {
+                        // Fleet target filled: delta-decrement expectedPositions.
+                        int fFilledQty = order.Filled;
+                        var fExpKey = ExpKey(acct.Name);
+                        Enqueue(ctx =>
+                        {
+                            if (ctx.expectedPositions != null && ctx.expectedPositions.TryGetValue(fExpKey, out int fCurrentExp))
+                            {
+                                int fNewExp;
+                                if (fCurrentExp > 0)
+                                    fNewExp = Math.Max(0, fCurrentExp - fFilledQty);
+                                else if (fCurrentExp < 0)
+                                    fNewExp = Math.Min(0, fCurrentExp + fFilledQty);
+                                else
+                                    fNewExp = 0;
+                                ctx.SetExpectedPositionLocked(fExpKey, fNewExp);
+                            }
+                        });
+                    }
+                }
+            }
 
             if (order.OrderState != OrderState.Cancelled && order.OrderState != OrderState.Rejected &&
                 order.OrderState != OrderState.Unknown)
@@ -408,7 +444,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     foreach (var _psr in pendingStopReplacements.ToArray())
                     {
-                        if (_psr.Value.OldOrder == order)
+                        if (_psr.Value.OldOrder == order
+                            || (_psr.Value.OldOrder != null && _psr.Value.OldOrder.OrderId == order.OrderId))
                         {
                             PositionInfo _rPos;
                             // Build 955: Move guard inside lock -- check and use same atomic snapshot.

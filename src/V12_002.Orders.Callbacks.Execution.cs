@@ -126,7 +126,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (stopOrders.TryGetValue(kvp.Key, out var stopOrder))
                     {
                         if (stopOrder != null && (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted))
-                            CancelOrder(stopOrder);
+                            CancelOrderSafe(stopOrder, pos);
                     }
                     for (int tNum = 1; tNum <= 5; tNum++)
                     {
@@ -134,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (tDict != null && tDict.TryGetValue(kvp.Key, out var tOrder))
                         {
                             if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted))
-                                CancelOrder(tOrder);
+                                CancelOrderSafe(tOrder, pos);
                         }
                     }
                     positionsToCleanup.Add(kvp.Key);
@@ -275,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             {
                                 if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted))
                                 {
-                                    CancelOrder(tOrder);
+                                    CancelOrderSafe(tOrder, pos);
                                     cancelledTargets++;
                                 }
                             }

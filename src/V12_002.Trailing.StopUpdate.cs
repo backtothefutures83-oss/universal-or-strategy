@@ -51,11 +51,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // If position still exists and needs protection, create emergency stop
                         if (activePositions.TryGetValue(kvp.Key, out var pos) && pos.EntryFilled && pos.RemainingContracts > 0)
                         {
-                            Print(string.Format("V8.30: Creating EMERGENCY replacement stop for {0}", kvp.Key));
+                            Print(string.Format("[1104.2] Recovery: force-initiating stop for {0}", kvp.Key));
                             // V12.1101E [F-02]: Use live RemainingContracts under stateLock instead of stale pending.Quantity
                             int replacementQty;
                             replacementQty = pos.RemainingContracts;
-                            CreateNewStopOrder(kvp.Key, replacementQty, pending.StopPrice, pending.Direction);
+                            CreateNewStopOrder(kvp.Key, replacementQty, pending.StopPrice, pending.Direction, isRecovery: true);
                             // Build 950: Also restore bracket targets after V8.30 emergency stop.
                             if (pending.BracketRestorationNeeded && pending.CapturedTargets != null)
                             {
@@ -85,12 +85,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V8.30: Thread-safe update using TryGetValue to avoid TOCTOU race
                 if (pendingStopReplacements.TryGetValue(entryName, out var existingPending))
                 {
-                    // Update the pending replacement atomically (pending is a reference type)
-                    existingPending.StopPrice = validatedStopPrice;
-                    existingPending.Quantity = pos.RemainingContracts;
-                    pos.CurrentStopPrice = validatedStopPrice;
-                    pos.CurrentTrailLevel = newTrailLevel;
-                    return;
+                    // Build 1104.2: Staleness fast-path -- if pending is older than threshold,
+                    // the original cancel likely failed or callback was missed. Purge and re-initiate.
+                    double pendingAgeSeconds = (DateTime.Now - existingPending.CreatedTime).TotalSeconds;
+                    if (pendingAgeSeconds > STALE_PENDING_FAST_PATH_SEC)
+                    {
+                        if (pendingStopReplacements.TryRemove(entryName, out _))
+                            Interlocked.Decrement(ref pendingReplacementCount);
+                        Print(string.Format("[1104.2] Stale pending purged for {0} ({1:F1}s). Re-initiating stop move.",
+                            entryName, pendingAgeSeconds));
+                    }
+                    else
+                    {
+                        // Update the pending replacement atomically (pending is a reference type)
+                        existingPending.StopPrice = validatedStopPrice;
+                        existingPending.Quantity = pos.RemainingContracts;
+                        pos.CurrentStopPrice = validatedStopPrice;
+                        pos.CurrentTrailLevel = newTrailLevel;
+                        MarkStickyDirty(); // Build 1103: Persist trail level change
+                        return;
+                    }
                 }
 
                 // V8.11 FIX: Store pending replacement BEFORE cancelling
@@ -157,6 +171,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     pos.CurrentStopPrice = validatedStopPrice;
                     pos.CurrentTrailLevel = newTrailLevel;
+                    MarkStickyDirty(); // Build 1103: Persist trail level change
                     Print(string.Format("V8.12: Stop update queued for {0} (current state: {1})", entryName, currentStop.OrderState));
                     return;
                 }
@@ -197,16 +212,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
 
-                    if (pos.ExecutingAccount != null)
-                    {
-                        pos.ExecutingAccount.Cancel(new[] { currentStop });
-                    }
-                    else
-                    {
-                        CancelOrder(currentStop);
-                    }
+                    CancelOrderForReplace(currentStop, pos);
                     pos.CurrentStopPrice = validatedStopPrice;
                     pos.CurrentTrailLevel = newTrailLevel;
+                    MarkStickyDirty(); // Build 1103: Persist trail level change
 
                     string levelName = newTrailLevel <= 0 ? "Initial" : (newTrailLevel == 1 ? "BE" : "T" + (newTrailLevel - 1));
                     Print(string.Format("STOP UPDATED: {0} -> {1:F2} (Level: {2})", entryName, validatedStopPrice, levelName));
@@ -273,6 +282,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // B957: Removed redundant stopOrders write -- already set at CreateOrder/SubmitOrderUnmanaged path above.
                 pos.CurrentStopPrice = validatedStopPrice;
                 pos.CurrentTrailLevel = newTrailLevel;
+                MarkStickyDirty(); // Build 1103: Persist trail level change
 
                 string levelName2 = newTrailLevel == 1 ? "BE" : "T" + (newTrailLevel - 1);
                 Print(string.Format("STOP UPDATED: {0} -> {1:F2} (Level: {2})", entryName, validatedStopPrice, levelName2));

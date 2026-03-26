@@ -169,12 +169,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         private RmaAnchorType currentRmaAnchor = RmaAnchorType.Ema65; // Default to 65
         // V12.1101E [D-02]: Removed unused V11 manual-anchor remnants (lastMnlPrice, isMnlArmed).
         private double cachedMnlPrice = 0; // Thread-safe cache
+        // Build 1103: Sticky State persistence
+        private string _stickyLeaderAccount;                        // Persisted leader account name
+        private Dictionary<string, bool> _pendingStickyFleetToggles; // Deferred fleet toggles (applied after enumeration)
 
         private DateTime lastStopManagementTime; // V8.13: Stop management throttling (100ms)
 
         // V8.30: Circuit breaker state - prevents cascade when too many pending replacements
         private volatile int pendingReplacementCount = 0;
         private const int CIRCUIT_BREAKER_THRESHOLD = 5;
+        private const int STALE_PENDING_FAST_PATH_SEC = 3;  // Build 1104.2: staleness threshold for pending stop replacements
         private volatile bool circuitBreakerActive = false;
         private long circuitBreakerActivatedTicks = 0; // V12.Phase8 [F-07]: long with Volatile barriers for cross-thread visibility
         private DateTime circuitBreakerActivatedTime
@@ -426,11 +430,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Build 935: Tracks accounts with reserved expectedPositions whose follower dispatch is still syncing.
         // Key = ExpKey(accountName). Used to suppress false REAPER repairs and flat-clears during submit windows.
         private readonly ConcurrentDictionary<string, byte> _dispatchSyncPendingExpKeys = new ConcurrentDictionary<string, byte>(); // [B967-FIX-02]
-
         // Build 1105: Shadow Mode -- leader-follower autonomous propagation
         private readonly ConcurrentDictionary<string, double> _leaderLastStopPrice =
             new ConcurrentDictionary<string, double>();
         private volatile bool _leaderWasInPosition = false;
+
         private void EnterFlattenScope()
         {
             Interlocked.Increment(ref _flattenScopeDepth);
@@ -523,6 +527,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         private readonly ConcurrentDictionary<string, FollowerTargetReplaceSpec>
             _followerTargetReplaceSpecs = new ConcurrentDictionary<string, FollowerTargetReplaceSpec>();
+
+        // Build 1106: Per-mode config profile for sticky memory across mode switches.
+        // Each mode (OR, RMA, RETEST, TREND, MOMO, FFMA) stores its own target/risk snapshot.
+        // Snapshot on mode-out, hydrate on mode-in.
+        private class ModeConfigProfile
+        {
+            public int TargetCount = 1;
+            public double T1, T2, T3, T4, T5;
+            public TargetMode T1Type, T2Type, T3Type, T4Type, T5Type;
+            public double StopMult;
+            public double MaxRisk;
+        }
+
+        private readonly ConcurrentDictionary<string, ModeConfigProfile> _modeProfiles
+            = new ConcurrentDictionary<string, ModeConfigProfile>();
+
+        // Build 1106: Flag signals that a mode switch hydrated new config values.
+        // Read on UI thread (250ms timer), written on strategy thread (Enqueue).
+        private volatile bool _configSyncNeeded;
 
         // Phase 2: Follower Bracket FSMs (Shadow Mode)
         private readonly ConcurrentDictionary<string, FollowerBracketFSM>

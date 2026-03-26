@@ -120,7 +120,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             order.OrderState == OrderState.Filled          ||
                             order.OrderState == OrderState.Rejected) continue;
                         if (masterHasPosition) continue; // Master has live position: preserve all.
-                        masterBroker996c.Cancel(new[] { order });
+                        CancelOrderOnAccount(order, masterBroker996c);
                         cancelled++;
                     }
 
@@ -131,7 +131,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             if (acct == this.Account) continue; // already processed above
                             var acctFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
-                            bool acctHasAnyFsm = acctFsms.Count > 0;
                             bool acctHasActiveFsm = acctFsms.Any(f => f.State == FollowerBracketState.Active);
                             foreach (Order order in acct.Orders)
                             {
@@ -147,11 +146,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                                         oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
                                         oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
                                     {
-                                        // Build 1004: FSM Active state is sole bracket preservation gate (no expectedPositions fallback).
-                                    if (acctHasActiveFsm) continue;
+                                        // Build 1104.1: Preserve brackets ONLY if FSM is active AND Master has position.
+                                        // If Master is FLAT, orphaned follower brackets MUST be swept regardless of FSM state.
+                                        if (acctHasActiveFsm && masterHasPosition) continue;
                                     }
 
-                                    acct.Cancel(new[] { order });
+                                    CancelOrderOnAccount(order, acct);
                                     cancelled++;
                                 }
                             }
@@ -177,7 +177,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
                                 continue;
 
-                            CancelOrder(order);
+                            CancelOrderOnAccount(order, order.Account);
                             cancelled++;
                         }
                     }
@@ -399,22 +399,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 return true;
             }
-            if (action.StartsWith("MOVE_TARGET"))
+            if (action.StartsWith("MOVE_TARGET") || action == "SET_TARGET_PRICE")
             {
                 if (parts.Length >= 3)
                 {
                     string targetId = parts[1].Trim().ToUpperInvariant();
-                    string distance = parts[2].Trim().ToLowerInvariant();
-                    double profitPoints = 0;
-                    if (distance == "1pt") profitPoints = 1.0;
-                    else if (distance == "2pt") profitPoints = 2.0;
-                    else return true;
-
+                    string priceStr = parts[2].Trim();
                     int targetNum = 0;
-                    if (targetId.Length >= 2 && targetId.StartsWith("T"))
+                    if (targetId.Length >= 2 && targetId.StartsWith("T")
+                        && int.TryParse(targetId.Substring(1), out targetNum)
+                        && targetNum >= 1 && targetNum <= 5)
                     {
-                        if (int.TryParse(targetId.Substring(1), out targetNum) && targetNum >= 1 && targetNum <= 5)
+                        if (action == "SET_TARGET_PRICE")
+                        {
+                            // Build 1107: Absolute price move (from live control center)
+                            double absPrice;
+                            if (double.TryParse(priceStr, NumberStyles.Float,
+                                CultureInfo.InvariantCulture, out absPrice) && absPrice > 0)
+                            {
+                                absPrice = Instrument.MasterInstrument.RoundToTickSize(absPrice);
+                                MoveSpecificTargetAbsolute(targetNum, absPrice);
+                            }
+                        }
+                        else
+                        {
+                            // Relative offset move (from context menu)
+                            string distance = priceStr.ToLowerInvariant();
+                            double profitPoints = 0;
+                            if (distance == "1pt") profitPoints = 1.0;
+                            else if (distance == "2pt") profitPoints = 2.0;
+                            else return true;
                             MoveSpecificTarget(targetNum, profitPoints);
+                        }
                     }
                 }
                 return true;

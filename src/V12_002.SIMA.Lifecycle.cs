@@ -148,11 +148,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print("[SIMA] FLEET INACTIVE - MANUAL ENABLE REQUIRED"); // V12.Phase10 [DEFAULT-FIX]
             Print("[SIMA] ===================================================");
 
+            // Build 1103: Apply persisted fleet toggles from sticky state file.
+            // Must run AFTER enumeration (dict populated) but BEFORE hydration (expected positions).
+            ApplyPendingStickyFleetToggles();
+
             // V12.Phase6 [HYDRATE]: Seed expectedPositions from live broker state
             HydrateExpectedPositionsFromBroker();
 
             // [BUILD 948] Adopt any working broker orders into tracking dicts; sets _orderAdoptionComplete = true
             HydrateWorkingOrdersFromBroker();
+
+            // Build 1103: Enrich reconstructed positions with persisted trail state.
+            // Must run AFTER Phase 3 (activePositions populated) so position keys exist.
+            EnrichTrailStateFromSticky();
         }
 
         /// <summary>
@@ -682,15 +690,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ord.OrderState != OrderState.ChangeSubmitted) continue;
                     try
                     {
-                        bool isFleet = ord.Account != null &&
-                            IsFleetAccount(ord.Account) &&
-                            !string.Equals(ord.Account.Name, Account.Name, StringComparison.OrdinalIgnoreCase);
-                        if (isFleet)
-                        {
-                            ord.Account.Cancel(new[] { ord });
-                        }
-                        else
-                            CancelOrder(ord);
+                        CancelOrderOnAccount(ord, ord.Account);
                         trackedCancels++;
                     }
                     catch { }
@@ -727,20 +727,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ord.OrderState != OrderState.ChangePending &&
                         ord.OrderState != OrderState.ChangeSubmitted) continue;
                         string ordName = ord.Name ?? string.Empty;
-                        if (!force &&
-                            (ordName.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("S_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("T5_", StringComparison.OrdinalIgnoreCase) ||
-                             ordName.StartsWith("Target_", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            Print(string.Format("[FIX-FF] preserving bracket order during soft sweep: acct={0} name={1} state={2}",
-                                acct.Name, ordName, ord.OrderState));
-                            continue;
-                        }
                         bool isV12 = false;
                         for (int pi = 0; pi < v12Prefixes.Length; pi++)
                         {
@@ -748,6 +734,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                             { isV12 = true; break; }
                         }
                         if (!isV12) continue;
+
+                        // [FIX-FF]: Explicit bracket exclusion on soft disable.
+                        // Bracket orders protect live positions -- never cancel them during
+                        // SIMA disable or soft terminate. Defensive guard against naming drift.
+                        if (!force)
+                        {
+                            bool isBracketOrder =
+                                ordName.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("S_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("T5_", StringComparison.OrdinalIgnoreCase) ||
+                                ordName.StartsWith("Target_", StringComparison.OrdinalIgnoreCase);
+                            if (isBracketOrder)
+                            {
+                                Print(string.Format("[FIX-FF] Protected bracket order from sweep: {0} on {1}",
+                                    ordName, acct.Name));
+                                continue;
+                            }
+                        }
+
                         try { acct.Cancel(new[] { ord }); brokerCancels++; } catch { }
                     }
                 }

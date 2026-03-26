@@ -317,11 +317,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int ReaperIntervalMs { get; set; }
 
         // GHOST-FIX-2 [Build 922Z]: Grace window before REAPER fires emergency stop on naked position.
-        // 3 seconds covers the normal bracket-order broker-confirmation lag after a fill.
-        // Set to 0 to disable the grace window (immediate fire -- legacy behaviour).
+        // Build 1104.1 enforces a runtime minimum of 5 seconds to absorb follower bracket lag.
+        // Stored values below 5 are clamped by REAPER at runtime.
         [NinjaScriptProperty]
         [Range(0, 10)]
-        [Display(Name = "Naked Position Grace (sec)", Description = "Seconds REAPER waits before declaring a no-stop position a true emergency. Default: 3. Prevents false EF_ during bracket confirmation lag.", GroupName = "12. SIMA", Order = 10)]
+        [Display(Name = "Naked Position Grace (sec)", Description = "Seconds REAPER waits before declaring a no-stop position a true emergency. Minimum: 5 (enforced). Prevents false EF_ during bracket confirmation lag.", GroupName = "12. SIMA", Order = 10)]
         public int NakedPositionGraceSec { get; set; }
 
         [NinjaScriptProperty]
@@ -337,6 +337,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name = "Shadow Mode", Description = "Followers auto-mirror leader stop moves and flattens", GroupName = "12. SIMA", Order = 13)]
         public bool ShadowModeEnabled { get; set; }
+
         [NinjaScriptProperty]
         [Display(Name = "Enable Compliance Hub", GroupName = "13. Compliance", Order = 1)]
         public bool EnableComplianceHub { get; set; }

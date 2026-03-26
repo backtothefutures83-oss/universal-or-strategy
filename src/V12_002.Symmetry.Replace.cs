@@ -201,10 +201,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     order.OrderState == OrderState.Accepted)
                 {
                     Print(string.Format("[CASCADE] Cancelling follower entry: {0} (Acc: {1})", followerName, pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : "Master"));
-                    if (pos.ExecutingAccount != null)
-                        pos.ExecutingAccount.Cancel(new[] { order });
-                    else
-                        CancelOrder(order);
+                    CancelOrderSafe(order, pos);
                     // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
                     // to prevent REAPER desync if the follower was microseconds from filling (Build 960 audit fix).
                 }

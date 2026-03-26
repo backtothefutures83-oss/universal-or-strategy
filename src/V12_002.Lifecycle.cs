@@ -142,7 +142,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableSIMA = false; // SAFETY: Default to OFF
                 ReaperAuditEnabled = true;
                 ReaperIntervalMs = 1000;          // 1 second audit cycle
-                NakedPositionGraceSec = 3;        // GHOST-FIX-2 [922Z]: 3s grace before emergency stop on naked position
+                NakedPositionGraceSec = 5;        // Build 1104: extend naked-position grace to 5s for stop replace round-trips
                 EnablePathB = false;
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;
@@ -296,6 +296,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 _dataLoadedComplete = true;
 
+                // Build 1103: Initialize sticky state path + hydrate persisted config.
+                // MUST run BEFORE StartIpcServer() so GET_LAYOUT serves last-synced state.
+                _stickyStatePath = System.IO.Path.Combine(logsDir,
+                    string.Format("StickyState_{0}.v12state", symbol));
+                bool stickyLoaded = LoadStickyState();
+                if (stickyLoaded)
+                    Print("[STICKY] Persisted state hydrated -- GET_LAYOUT will serve last-synced config");
+
                 // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
                 // [Build 932]: Start IPC in DataLoaded so Control Surface connects even if market is closed/offline.
                 StartIpcServer();
@@ -324,15 +332,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (ChartControl != null)
                 {
+                    // Hotkeys attach at Normal priority (fast, no visual tree dependency)
                     ChartControl.Dispatcher.InvokeAsync(() =>
                     {
                         if (_isTerminating) return;
                         AttachHotkeys();
                         AttachChartClickHandler();
+                    }, System.Windows.Threading.DispatcherPriority.Normal);
+
+                    // Panel creation deferred to Loaded priority (runs AFTER Render pass)
+                    // This ensures the Chart Trader control is in the visual tree before discovery
+                    ChartControl.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (_isTerminating) return;
                         CreatePanel();
                         StartPanelRefresh();
                         Print("REALTIME - Hotkeys: L=Long, S=Short, Shift+Click=RMA, F=Flatten");
-                    });
+                    }, System.Windows.Threading.DispatcherPriority.Loaded);
                 }
             }
             else if (state == State.Terminated)

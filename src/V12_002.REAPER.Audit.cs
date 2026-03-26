@@ -198,29 +198,51 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (!hasWorkingStop)
                 {
-                    DateTime firstSeen;
-                    int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
-                    if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
+                    bool hasPendingStopReplace = false;
+                    foreach (var psr in pendingStopReplacements.Values)
                     {
-                        _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
-                        Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked -- starting {2}s grace window.",
-                            acct.Name, actualQty, graceSeconds));
-                    }
-                    else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
-                    {
-                        bool alreadyNakedInFlight;
-                        alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(ExpKey(acct.Name)); // [Build 968]
-                        if (!alreadyNakedInFlight)
+                        PositionInfo psrPos;
+                        if (activePositions.TryGetValue(psr.EntryName, out psrPos)
+                            && psrPos != null && psrPos.ExecutingAccount != null
+                            && psrPos.ExecutingAccount.Name == acct.Name)
                         {
-                            _reaperNakedStopInFlight.TryAdd(ExpKey(acct.Name), 0); // [Build 968]
-                            Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
-                                acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
-                            _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
-                            try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
-                            catch (Exception tcEx)
+                            hasPendingStopReplace = true;
+                            break;
+                        }
+                    }
+
+                    if (hasPendingStopReplace)
+                    {
+                        _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+                        if (shouldLog)
+                            Print(string.Format("[REAPER] {0}: Stop replace in flight -- suppressing naked audit.", acct.Name));
+                    }
+                    else
+                    {
+                        DateTime firstSeen;
+                        int graceSeconds = (NakedPositionGraceSec >= 5) ? NakedPositionGraceSec : 5;
+                        if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
+                        {
+                            _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
+                            Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked -- starting {2}s grace window.",
+                                acct.Name, actualQty, graceSeconds));
+                        }
+                        else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
+                        {
+                            bool alreadyNakedInFlight;
+                            alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(ExpKey(acct.Name)); // [Build 968]
+                            if (!alreadyNakedInFlight)
                             {
-                                _reaperNakedStopInFlight.TryRemove(ExpKey(acct.Name), out _); // [Build 969]
-                                Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
+                                _reaperNakedStopInFlight.TryAdd(ExpKey(acct.Name), 0); // [Build 968]
+                                Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                                    acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
+                                _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
+                                try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                                catch (Exception tcEx)
+                                {
+                                    _reaperNakedStopInFlight.TryRemove(ExpKey(acct.Name), out _); // [Build 969]
+                                    Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
+                                }
                             }
                         }
                     }
@@ -313,7 +335,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!masterHasWorkingStop)
                 {
                     DateTime masterFirstSeen;
-                    int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
+                    int graceSeconds = (NakedPositionGraceSec >= 5) ? NakedPositionGraceSec : 5;
                     if (!_nakedPositionFirstSeen.TryGetValue(Account.Name, out masterFirstSeen))
                     {
                         _nakedPositionFirstSeen[Account.Name] = DateTime.UtcNow;
@@ -390,7 +412,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         if (ordersToCancel.Count > 0)
                         {
-                            targetAcct.Cancel(ordersToCancel);
+                            foreach (Order orderToCancel in ordersToCancel)
+                                CancelOrderOnAccount(orderToCancel, targetAcct);
                             Print($"[REAPER] Emergency Cancel: {ordersToCancel.Count} orders on {accountName}");
                         }
 

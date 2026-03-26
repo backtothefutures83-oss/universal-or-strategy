@@ -44,6 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     isRMAModeActive = enable;
                     isRMAButtonClicked = enable;
                     Print(string.Format("V12.4: SET_RMA_MODE = {0} (Chart-Click RMA {1})", enable, enable ? "ENABLED" : "DISABLED"));
+                    MarkStickyDirty(); // Build 1103: Persist RMA toggle
                 }
                 return true;
             }
@@ -80,7 +81,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     string newMode = parts[1].Trim().ToUpperInvariant();
 
-                    // V12.20: Atomic mode transition -- prevents partial state reads during switch
+                    // Build 1106 Phase 1: Snapshot outgoing mode's config before switching
+                    string outgoingMode = GetCurrentConfigMode();
+                    _modeProfiles[outgoingMode] = SnapshotCurrentConfig();
+
+                    // ATOMIC mode transition: clear all flags first
                     isRMAModeActive = false;
                     isRMAButtonClicked = false;
                     isRetestModeActive = false;
@@ -88,31 +93,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                     isMOMOModeActive = false;
                     isFFMAModeArmed = false;
 
-                    if (newMode == "RMA")
+                    if (newMode == "RMA") { isRMAModeActive = true; isRMAButtonClicked = true; }
+                    else if (newMode == "RETEST") isRetestModeActive = true;
+                    else if (newMode == "TREND") isTRENDModeActive = true;
+                    else if (newMode == "MOMO") { ActivateMOMOMode(); }
+                    else if (newMode == "FFMA") isFFMAModeArmed = true;
+
+                    // Build 1106 Phase 2: Hydrate incoming mode's config (if profile exists)
+                    ModeConfigProfile incomingProfile;
+                    if (_modeProfiles.TryGetValue(newMode, out incomingProfile))
                     {
-                        isRMAModeActive = true;
-                        isRMAButtonClicked = true;
+                        HydrateFromProfile(incomingProfile, newMode);
+                        Print(string.Format("[STICKY] Mode switch {0} -> {1}: hydrated profile (count={2})",
+                            outgoingMode, newMode, incomingProfile.TargetCount));
                     }
-                    else if (newMode == "RETEST")
+                    else
                     {
-                        isRetestModeActive = true;
+                        Print(string.Format("[STICKY] Mode switch {0} -> {1}: no saved profile, using current config",
+                            outgoingMode, newMode));
                     }
-                    else if (newMode == "TREND")
-                    {
-                        isTRENDModeActive = true;
-                    }
-                    else if (newMode == "MOMO")
-                    {
-                        ActivateMOMOMode();
-                    }
-                    else if (newMode == "FFMA")
-                    {
-                        isFFMAModeArmed = true;
-                    }
-                    // ORB/OR = all modes off (already deactivated above)
+                    _configSyncNeeded = true;
 
                     Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
                         newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
+                    MarkStickyDirty(); // Build 1103: Persist mode change
 
                     // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
                     // Sending CONFIG back here caused the Ping-Pong overwrite bug.
@@ -182,6 +186,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     ChaseIfTouchPoints = parts[1].Trim();
                     Print($"[V12] CIT updated: {ChaseIfTouchPoints}");
+                    MarkStickyDirty(); // Build 1103: Persist CIT
                 }
                 return true;
             }
@@ -211,6 +216,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     MaxRiskAmount = val;
                     RiskPerTrade = val; // Sync legacy property
                     Print($"[V12.2] SET_MAX_RISK: {val}");
+                    MarkStickyDirty(); // Build 1103: Persist max risk
                 }
                 return true;
             }
@@ -221,6 +227,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     string anchorStr = parts[1];
                     SetRmaAnchorFromIpc(anchorStr);
+                    MarkStickyDirty(); // Build 1103: Persist anchor
                 }
                 return true;
             }
@@ -238,6 +245,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Sending CONFIG back here caused the Ping-Pong overwrite bug.
                     // Build 1102Y [U-02]: Immediately sync panel visibility -- panel needs the count, not a CONFIG echo.
                     SendResponseToRemote($"SYNC_TARGET_STATE|{clamped}");
+                    MarkStickyDirty(); // Build 1103: Persist target count
                 }
                 return true;
             }
@@ -252,6 +260,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.1101E [D-02]: Legacy isMnlArmed flag purged; cachedMnlPrice + anchor state is authoritative.
 
                     Print(string.Format("IPC SET_MANUAL_PRICE: {0:F2} | Anchor set to MANUAL", manualPrice));
+                    MarkStickyDirty(); // Build 1103: Persist manual price
                 }
                 else
                 {

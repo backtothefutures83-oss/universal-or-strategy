@@ -364,6 +364,117 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("[SIMA V12.7] Error in fleet bracket submission: {0}", ex.Message));
             }
 
+            // ====================================================================
+            // Build 1104.1: Fleet Stop Fill OCO -- Cancel orphaned targets
+            // When a fleet follower's stop fills, all working targets on that
+            // account are orphaned and must be cancelled immediately.
+            // Mirrors the Master OCO logic at Orders.Callbacks.Execution.cs:257-304.
+            // ====================================================================
+            try
+            {
+                Order ocoOrder = item.EventArgs.Execution?.Order;
+                Account ocoAcct = item.Account;
+                if (ocoOrder != null && ocoAcct != null && IsFleetAccount(ocoAcct)
+                    && (ocoOrder.OrderState == OrderState.Filled || ocoOrder.OrderState == OrderState.PartFilled))
+                {
+                    string ocoName = ocoOrder.Name ?? "";
+
+                    // --- STOP FILL: Cancel all targets on this account ---
+                    if (ocoName.StartsWith("Stop_"))
+                    {
+                        int cancelledTargets = 0;
+                        foreach (Order o in ocoAcct.Orders.ToArray())
+                        {
+                            if (o == null || o.Instrument?.FullName != Instrument?.FullName) continue;
+                            if (o.OrderState != OrderState.Working && o.OrderState != OrderState.Accepted) continue;
+                            if (o.Name != null && (o.Name.StartsWith("T1_") || o.Name.StartsWith("T2_") ||
+                                o.Name.StartsWith("T3_") || o.Name.StartsWith("T4_") || o.Name.StartsWith("T5_")))
+                            {
+                                CancelOrderOnAccount(o, ocoAcct);
+                                cancelledTargets++;
+                            }
+                        }
+                        if (cancelledTargets > 0)
+                            Print(string.Format("[1104.1 OCO] Fleet {0}: stop filled -- cancelled {1} orphaned targets.",
+                                ocoAcct.Name, cancelledTargets));
+
+                        // Clear naked-position grace (stop exists = not naked)
+                        _nakedPositionFirstSeen.TryRemove(ocoAcct.Name, out _);
+
+                        // Update RemainingContracts if PositionInfo exists for this entry
+                        string ocoEntryKey = ocoName.Length > 5 ? ocoName.Substring(5) : "";
+                        int ocoLastUnderscore = ocoEntryKey.LastIndexOf('_');
+                        if (ocoLastUnderscore > 0)
+                            ocoEntryKey = ocoEntryKey.Substring(0, ocoLastUnderscore);
+                        PositionInfo ocoPos;
+                        if (!string.IsNullOrEmpty(ocoEntryKey) && activePositions.TryGetValue(ocoEntryKey, out ocoPos) && ocoPos != null)
+                        {
+                            int stopQty = Math.Max(0, item.EventArgs.Execution.Quantity);
+                            ocoPos.RemainingContracts = Math.Max(0, ocoPos.RemainingContracts - stopQty);
+                            if (ocoPos.RemainingContracts <= 0)
+                            {
+                                stopOrders.TryRemove(ocoEntryKey, out _);
+                                if (pendingStopReplacements.TryRemove(ocoEntryKey, out _))
+                                    Interlocked.Decrement(ref pendingReplacementCount);
+                                activePositions.TryRemove(ocoEntryKey, out _);
+                                entryOrders.TryRemove(ocoEntryKey, out _);
+                                SymmetryGuardForgetEntry(ocoEntryKey);
+                                Print(string.Format("[1104.1 OCO] Fleet position {0} fully closed by stop.", ocoEntryKey));
+                            }
+                        }
+                    }
+
+                    // --- TARGET FILL: First-Writer-Wins guard + RemainingContracts delta ---
+                    else if (ocoName.StartsWith("T") && ocoName.Length > 2 && ocoName[2] == '_')
+                    {
+                        int tgtNum = ocoName[1] - '0';
+                        string tgtPrefix = "T" + tgtNum + "_";
+                        string tgtEntryKey = ocoName.Substring(tgtPrefix.Length);
+                        int tgtLastUnderscore = tgtEntryKey.LastIndexOf('_');
+                        if (tgtLastUnderscore > 0)
+                            tgtEntryKey = tgtEntryKey.Substring(0, tgtLastUnderscore);
+
+                        PositionInfo tgtPos;
+                        if (!string.IsNullOrEmpty(tgtEntryKey) && activePositions.TryGetValue(tgtEntryKey, out tgtPos) && tgtPos != null)
+                        {
+                            bool tgtTerminal = ocoOrder.OrderState == OrderState.Filled;
+                            bool tgtAlreadyProcessed;
+                            int tgtApplied;
+                            int tgtRemaining;
+                            ApplyTargetFill(tgtPos, tgtNum, item.EventArgs.Execution.Quantity,
+                                tgtTerminal, out tgtAlreadyProcessed, out tgtApplied, out tgtRemaining);
+                            if (tgtAlreadyProcessed)
+                            {
+                                Print(string.Format("[1104.1 GUARD] Fleet T{0} already processed for {1} -- skipping duplicate.", tgtNum, tgtEntryKey));
+                            }
+                            else
+                            {
+                                Print(string.Format("[1104.1] Fleet TARGET {0} filled: {1} @ {2:F2}. Remaining: {3}",
+                                    tgtNum, tgtApplied, item.EventArgs.Execution.Price, tgtRemaining));
+                                if (tgtRemaining <= 0)
+                                {
+                                    // Position fully closed by targets -- cancel stop
+                                    foreach (Order o in ocoAcct.Orders.ToArray())
+                                    {
+                                        if (o == null || o.Instrument?.FullName != Instrument?.FullName) continue;
+                                        if (o.OrderState != OrderState.Working && o.OrderState != OrderState.Accepted) continue;
+                                        if (o.Name != null && o.Name.StartsWith("Stop_"))
+                                        {
+                                            CancelOrderOnAccount(o, ocoAcct);
+                                            Print(string.Format("[1104.1 OCO] Fleet {0}: all targets filled -- cancelled stop.", ocoAcct.Name));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Print(string.Format("[1104.1 OCO] Fleet OCO error: {0}", ex.Message));
+            }
+
             // EMERGENCY FIX [H-15]: After any fleet execution, check if the account is now flat.
             // Syncs expectedPositions when position is closed externally (e.g., manual UI flatten).
             // [1102Y-V4 PERSISTENCE GATE]: Skip flat-clear for entry fills. The broker Positions

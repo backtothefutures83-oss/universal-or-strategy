@@ -117,7 +117,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (TryApplyConfigRisk(key, val, configMode)) continue;
                 TryApplyConfigMode(key, val);
             }
+            // Build 1106: Update current mode's profile cache so mode-switch remembers these values
+            string currentMode = GetCurrentConfigMode();
+            _modeProfiles[currentMode] = SnapshotCurrentConfig();
+
             Print(string.Format("[V12] Sync All CONFIG ({0}) Applied: {1}", configMode, configContent));
+            MarkStickyDirty(); // Build 1103: Persist config sync
         }
 
         /// <summary>Build 945: Config sub-handler -- target values and types (T1-T5, COUNT, CIT).</summary>
@@ -235,6 +240,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // read by the strategy thread (ExecuteMultiAccountMarket) without a lock.
             activeFleetAccounts[resolvedName] = active;
             Print($"[V12.2] TOGGLE_ACCOUNT: {resolvedName} (resolved from '{parts[1]}') | Active={active}");
+            MarkStickyDirty(); // Build 1103: Persist fleet toggle
         }
 
         /// <summary>
