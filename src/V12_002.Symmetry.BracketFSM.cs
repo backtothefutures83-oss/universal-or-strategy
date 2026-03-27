@@ -280,6 +280,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (f.State == FollowerBracketState.Active
                     || f.State == FollowerBracketState.Accepted
                     || f.State == FollowerBracketState.Submitted
+                    || f.State == FollowerBracketState.PendingSubmit
                     || f.State == FollowerBracketState.Replacing
                     || f.State == FollowerBracketState.Modifying)
                 {

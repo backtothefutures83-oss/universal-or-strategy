@@ -73,6 +73,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return; // finally block at line 414 releases _simaToggleSem
                 }
 
+                // Phase 6 [MG-D1]: MetadataGuard -- reject duplicate dispatch signals.
+                // Composite fingerprint prevents the same trade from dispatching twice within 10s.
+                string dispatchSig = string.Format("SD_{0}_{1}_{2}_{3:F2}", tradeType, action, quantity, entryPrice);
+                if (!MetadataGuardDuplicate(dispatchSig, "SmartDispatch"))
+                {
+                    Print("[DISPATCH] (!) Duplicate dispatch rejected by MetadataGuard");
+                    return;
+                }
+
                 List<AccountRankInfo> fleet = GetSortedAccountFleet();
 
                 // V12.Audit [Q3-002]: Snapshot fleet active state under stateLock to prevent UI race.
@@ -317,6 +326,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                             MarkDispatchSyncPending(expectedKey);
                             syncPending = true;
 
+                            // Phase 6 [FSM-P1]: Proactive FSM -- eliminates Gap of Unknowing
+                            // between enqueue and PumpFleetDispatch. State = PendingSubmit until
+                            // pump promotes to Submitted after successful acct.Submit().
+                            if (!_followerBrackets.ContainsKey(fleetEntryName))
+                            {
+                                var proFsm = new FollowerBracketFSM
+                                {
+                                    AccountName = acct.Name,
+                                    EntryName = fleetEntryName,
+                                    State = FollowerBracketState.PendingSubmit,
+                                    RemainingContracts = followerQty,
+                                    EntryOrder = entry,
+                                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                                    StopOrder = stop,
+                                    ExpectedStopPrice = stop != null ? stop.StopPrice : 0,
+                                    OcoGroupId = ocoId,
+                                    LastUpdateUtc = DateTime.UtcNow
+                                };
+                                foreach (var st in stagedTargets)
+                                {
+                                    if (st.Num >= 1 && st.Num <= 5)
+                                    {
+                                        proFsm.Targets[st.Num - 1] = st.Order;
+                                        proFsm.ExpectedTargetPrices[st.Num - 1] = st.Price;
+                                    }
+                                }
+                                _followerBrackets.TryAdd(fleetEntryName, proFsm);
+                            }
+
                             // Build 935: Reserve follower-sized expected quantity only.
                             reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
                             AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
@@ -331,7 +369,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Orders     = ordersToSubmit.ToArray(),
                                 FleetEntryName = fleetEntryName,
                                 ExpectedKey    = expectedKey,
-                                ReservedDelta  = reservedDelta
+                                ReservedDelta  = reservedDelta,
+                                SignalTicks    = DateTime.UtcNow.Ticks
                             });
                             syncPending         = false;
                             reservedDelta       = 0;
@@ -357,6 +396,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                             MarkDispatchSyncPending(expectedKey);
                             syncPending = true;
 
+                            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
+                            if (!_followerBrackets.ContainsKey(fleetEntryName))
+                            {
+                                var proFsm = new FollowerBracketFSM
+                                {
+                                    AccountName = acct.Name,
+                                    EntryName = fleetEntryName,
+                                    State = FollowerBracketState.PendingSubmit,
+                                    RemainingContracts = followerQty,
+                                    EntryOrder = entry,
+                                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                                    LastUpdateUtc = DateTime.UtcNow
+                                };
+                                _followerBrackets.TryAdd(fleetEntryName, proFsm);
+                            }
+
                             reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
                             AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
 
@@ -368,7 +423,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 Orders     = new[] { entry },
                                 FleetEntryName = fleetEntryName,
                                 ExpectedKey    = expectedKey,
-                                ReservedDelta  = reservedDelta
+                                ReservedDelta  = reservedDelta,
+                                SignalTicks    = DateTime.UtcNow.Ticks
                             });
                             syncPending         = false;
                             reservedDelta       = 0;
@@ -404,6 +460,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     targetDict.TryRemove(fleetEntryName, out _);
                             }
                         }
+                        // Phase 6: Clean up proactive FSM on dispatch failure (no-op if not yet created)
+                        _followerBrackets.TryRemove(fleetEntryName, out _);
 
                         dispatchLog.AppendLine($"[DISPATCH] [X] FAILED on {acct.Name}: {ex.Message}");
                     }

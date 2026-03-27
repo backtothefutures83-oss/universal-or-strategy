@@ -66,6 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public string FleetEntryName;
             public string ExpectedKey;
             public int ReservedDelta;
+            public long SignalTicks; // Phase 6 [MG-T1]: UTC ticks at enqueue for stale dispatch detection
         }
 
 

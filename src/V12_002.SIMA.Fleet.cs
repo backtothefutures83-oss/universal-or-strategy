@@ -65,6 +65,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool syncCleared = false;
             try
             {
+                // Phase 6 [MG-T1]: Reject stale queued dispatch (enqueued > 5s ago)
+                if (req.SignalTicks > 0 && !MetadataGuardTimestamp(req.SignalTicks, "Pump:" + req.FleetEntryName))
+                {
+                    ClearDispatchSyncPending(req.ExpectedKey);
+                    syncCleared = true;
+                    if (req.ReservedDelta != 0)
+                        AddExpectedPositionDeltaLocked(req.ExpectedKey, -req.ReservedDelta);
+                    activePositions.TryRemove(req.FleetEntryName, out _);
+                    entryOrders.TryRemove(req.FleetEntryName, out _);
+                    stopOrders.TryRemove(req.FleetEntryName, out _);
+                    for (int tNum = 1; tNum <= 5; tNum++)
+                    {
+                        var td = GetTargetOrdersDictionary(tNum);
+                        if (td != null) td.TryRemove(req.FleetEntryName, out _);
+                    }
+                    _followerBrackets.TryRemove(req.FleetEntryName, out _);
+                    Print(string.Format("[PUMP] STALE dispatch rejected for {0} -- rolled back", req.FleetEntryName));
+                    return;
+                }
+
                 // Phase 2 [D1]: Initialize FollowerBracketFSM for Shadow Mode
                 if (!_followerBrackets.ContainsKey(req.FleetEntryName))
                 {
@@ -115,6 +135,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ClearDispatchSyncPending(req.ExpectedKey);
                 syncCleared = true;
 
+                // Phase 6 [FSM-P2]: Promote pre-created FSM from PendingSubmit to Submitted
+                FollowerBracketFSM pFsm;
+                if (_followerBrackets.TryGetValue(req.FleetEntryName, out pFsm)
+                    && pFsm != null
+                    && pFsm.State == FollowerBracketState.PendingSubmit)
+                {
+                    pFsm.State = FollowerBracketState.Submitted;
+                    pFsm.LastUpdateUtc = DateTime.UtcNow;
+                }
+
                 // Phase 3 [Step 3]: Register all order IDs for O(1) FSM lookup
                 FollowerBracketFSM fsm;
                 if (_followerBrackets.TryGetValue(req.FleetEntryName, out fsm))
@@ -149,6 +179,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (targetDict != null)
                         targetDict.TryRemove(req.FleetEntryName, out _);
                 }
+                // Phase 6: Clean up proactive FSM on Submit failure
+                _followerBrackets.TryRemove(req.FleetEntryName, out _);
             }
             finally
             {

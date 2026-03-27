@@ -205,6 +205,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            // Phase 6 [MG-D2]: MetadataGuard -- reject duplicate RMA dispatch signals.
+            string rmaSig = string.Format("RMA_{0}_{1}_{2:F2}", direction, contracts, price);
+            if (!MetadataGuardDuplicate(rmaSig, "RMA_V2"))
+            {
+                Print("[RMA V2] (!) Duplicate dispatch rejected by MetadataGuard");
+                return;
+            }
+
             try
             {
                 // Calculate stop and 5 targets using RMA profile.
@@ -399,10 +407,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                         MarkDispatchSyncPending(expectedKey);
                         syncPending = true;
 
+                        // Phase 6 [FSM-P3]: Proactive FSM for RMA V2 fleet entries.
+                        // Entry-only (brackets deferred until fill via SymmetryGuard).
+                        // State = Submitted (direct submit, no pump queue).
+                        if (!_followerBrackets.ContainsKey(fleetKey))
+                        {
+                            var rmaFsm = new FollowerBracketFSM
+                            {
+                                AccountName = acct.Name,
+                                EntryName = fleetKey,
+                                State = FollowerBracketState.Submitted,
+                                RemainingContracts = qty,
+                                EntryOrder = fEntry,
+                                ExpectedEntryPrice = price,
+                                LastUpdateUtc = DateTime.UtcNow
+                            };
+                            _followerBrackets.TryAdd(fleetKey, rmaFsm);
+                        }
+
                         reservedDelta = (direction == MarketPosition.Long) ? qty : -qty;
                         AddExpectedPositionDeltaLocked(expectedKey, reservedDelta); // SECOND: expectedPositions
 
-                        acct.Submit(new[] { fEntry }); // LAST ??" stateLock not held here
+                        acct.Submit(new[] { fEntry }); // LAST -- stateLock not held here
+
+                        // Phase 6 [FSM-P3]: Register OrderId for O(1) FSM lookup (populated by Submit)
+                        if (fEntry != null && !string.IsNullOrEmpty(fEntry.OrderId))
+                            _orderIdToFsmKey[fEntry.OrderId] = fleetKey;
+
                         ClearDispatchSyncPending(expectedKey);
                         syncPending = false;
                         // stopOrders/target1..target5 are set by follower bracket submission on fill
@@ -423,6 +454,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
                         activePositions.TryRemove(fleetKey, out _);
                         entryOrders.TryRemove(fleetKey, out _);
+                        // Phase 6: Clean up proactive FSM on dispatch failure
+                        _followerBrackets.TryRemove(fleetKey, out _);
                         Print($"[SIMA RMA V2] FAIL {acct.Name}: {ex.Message}");
                     }
                 }
