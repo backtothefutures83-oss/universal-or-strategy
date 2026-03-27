@@ -163,7 +163,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // RMA Intelligence defaults (Phase 9.2)
                 RmaIntelligenceEnabled = false; // Default to isolated/OFF
                 RmaProximityTicks = 2;
-                RmaIntelligenceCancellationTicks = 4;
+                RmaCancellationTicks = 4;
             }
             else if (state == State.Configure)
             {
