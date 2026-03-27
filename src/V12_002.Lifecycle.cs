@@ -164,6 +164,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RmaIntelligenceEnabled = false; // Default to isolated/OFF
                 RmaProximityTicks = 2;
                 RmaCancellationTicks = 4;
+                RmaMaxProbeCount = 3;         // Phase 9.2: 3 probes before exhaustion
+                RmaExhaustionEnabled = false; // Phase 9.2: Off by default, opt-in
             }
             else if (state == State.Configure)
             {

@@ -220,24 +220,59 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double level = pos.EntryPrice;
                 double distTicks = Math.Abs(currentPrice - level) / tickSize;
 
-                // Check for Proximity Miss
-                // If we were in proximity (< RmaProximityTicks) and now we've retreated (> RmaCancellationTicks)
+                // Phase 9.2: Initialize ClosestApproachTicks on first observation.
+                if (pos.ClosestApproachTicks <= 0)
+                    pos.ClosestApproachTicks = double.MaxValue;
+
+                // Phase 9.2: Track closest approach as a monotonic minimum.
+                if (distTicks < pos.ClosestApproachTicks)
+                    pos.ClosestApproachTicks = distTicks;
+
                 if (distTicks <= RmaProximityTicks)
                 {
-                    // Track that we were in proximity
+                    if (!pos.WasInProximity)
+                    {
+                        pos.WasInProximity = true;
+                        pos.ProximityProbeCount++;
+                        Print(string.Format("[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
+                            pos.ProximityProbeCount, kvp.Key, distTicks, level));
+                    }
+
+                    // Visual feedback only. Draw state is not logic state.
                     Draw.Dot(this, "Prox_" + kvp.Key, false, 0, level, Brushes.Cyan);
                 }
-                else if (distTicks >= RmaCancellationTicks)
+                else if (distTicks < RmaCancellationTicks)
                 {
-                    // If we see a Cyan dot (meaning we were close) and now we are far, we cancel
-                    if (GetDrawObject("Prox_" + kvp.Key) != null)
+                    // Dead zone hysteresis. No state transition.
+                }
+                else
+                {
+                    if (pos.WasInProximity)
                     {
-                        Print(string.Format("[SENTINEL] Proximity Miss detected for {0}. Cancelling and rotating.", kvp.Key));
-                        CancelOrderSafe(order, pos);
-                        RemoveDrawObject("Prox_" + kvp.Key);
-                        
-                        // Speak it
-                        SendResponseToRemote("SOUND|SENTINEL_PROXIMITY_CANCEL");
+                        pos.WasInProximity = false;
+
+                        if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
+                        {
+                            Print(string.Format(
+                                "[SENTINEL] EXHAUSTION: {0} probed {1}x (max={2}), closest={3:F1}t. Cancelling.",
+                                kvp.Key, pos.ProximityProbeCount, RmaMaxProbeCount, pos.ClosestApproachTicks));
+                            CancelOrderSafe(order, pos);
+                            RemoveDrawObject("Prox_" + kvp.Key);
+                            SendResponseToRemote("SOUND|SENTINEL_EXHAUSTION_CANCEL");
+                        }
+                        else
+                        {
+                            Print(string.Format(
+                                "[SENTINEL] Retreat for {0} (probe #{1}, closest={2:F1}t). Monitoring.",
+                                kvp.Key, pos.ProximityProbeCount, pos.ClosestApproachTicks));
+                            RemoveDrawObject("Prox_" + kvp.Key);
+                            SendResponseToRemote("SOUND|SENTINEL_PROXIMITY_RETREAT");
+                        }
+                    }
+                    else
+                    {
+                        if (GetDrawObject("Prox_" + kvp.Key) != null)
+                            RemoveDrawObject("Prox_" + kvp.Key);
                     }
                 }
             }

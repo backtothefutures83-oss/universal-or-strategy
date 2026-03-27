@@ -108,6 +108,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Build 960 [A3-3]: Circuit breaker counter for emergency flatten attempts from null stop submit.
             // Incremented each call to FlattenPositionByName triggered by null stop. Halts after 3 failures.
             public int FlattenAttemptCount;
+
+            // Phase 9.2 [PROBE]: RMA Proximity Intelligence -- stateful probe tracking.
+            // Draw.Dot remains visual-only; these fields are the logic source of truth.
+            public bool WasInProximity;
+            public int ProximityProbeCount;
+            public double ClosestApproachTicks;
         }
 
         private TargetMode GetTargetMode(int targetNumber)

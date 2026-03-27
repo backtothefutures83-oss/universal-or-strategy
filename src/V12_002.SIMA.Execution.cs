@@ -44,8 +44,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
             if (isFlattenRunning) return;
 
+            // [Phase 9 LATENCY] T0: Start immediately after guards, before any work.
+            var sw = Stopwatch.StartNew();
+            long t0Ticks = sw.ElapsedTicks;
+
             int successCount = 0;
             int failCount = 0;
+
+            // [Phase 9 LATENCY] T_LoopStart + batch log buffer (flushed once after loop).
+            long tLoopStartTicks = sw.ElapsedTicks;
+            var dispatchLog = new StringBuilder(512);
 
             foreach (Account acct in Account.All)
             {
@@ -54,7 +62,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.8: Fleet Active Check ??" skip accounts NOT registered or disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
-                        Print($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
+                        dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | Inactive", acct.Name));
                         continue;
                     }
 
@@ -67,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             double dailyPL = acct.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
                             if (dailyPL >= MaxDailyProfitCap)
                             {
-                                Print($"[SIMA] (!) SKIPPING {acct.Name} - Consistency Lock Active (Day P/L: ${dailyPL:F2})");
+                                dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | ConsistencyLock ${1:F2}", acct.Name, dailyPL));
                                 continue;
                             }
                         }
@@ -85,6 +93,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
 
                         successCount++;
+                        dispatchLog.AppendLine(string.Format("    OK | {0,-28} | Market       | submitted", acct.Name));
                     }
                     catch (Exception ex)
                     {
@@ -94,11 +103,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (reservedDelta != 0)
                             AddExpectedPositionDeltaLocked(ExpKey(acct.Name), -reservedDelta);
                         failCount++;
-                        Print($"[SIMA] ??-- FAILED on {acct.Name}: {ex.Message}");
+                        dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
                     }
                 }
             }
-            Print($"[SIMA] BROADCAST: {action} {quantity} | {successCount} OK / {failCount} FAIL");
+
+            // [Phase 9 LATENCY] T_Final: Fleet loop complete -- stop clock, flush forensic report.
+            sw.Stop();
+            long tFinalTicks = sw.ElapsedTicks;
+            double totalMs = tFinalTicks * 1000.0 / Stopwatch.Frequency;
+            double setupMs = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
+            double loopMs = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
+
+            var report = new StringBuilder(1024);
+            report.AppendLine("+==============================================================+");
+            report.AppendLine("|       FORENSIC PULSE REPORT  Phase 9 MULTI-ACCOUNT MARKET    |");
+            report.AppendLine("+==============================================================+");
+            report.AppendLine("|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |");
+            report.AppendLine("+==============================================================+");
+            report.Append(dispatchLog.ToString());
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine(string.Format("|  BROADCAST: {0} {1} | {2} OK / {3} FAIL", action, quantity, successCount, failCount));
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine("|  TIMING SUMMARY                                              |");
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine(string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs));
+            report.AppendLine(string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs));
+            report.AppendLine("+==============================================================+");
+            Print(report.ToString().TrimEnd());
         }
 
         /// <summary>
@@ -111,8 +143,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
             if (isFlattenRunning) return;
 
+            // [Phase 9 LATENCY] T0: Start immediately after guards, before any work.
+            var sw = Stopwatch.StartNew();
+            long t0Ticks = sw.ElapsedTicks;
+
             int successCount = 0;
             double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+
+            // [Phase 9 LATENCY] T_LoopStart + batch log buffer.
+            long tLoopStartTicks = sw.ElapsedTicks;
+            var dispatchLog = new StringBuilder(512);
 
             foreach (Account acct in Account.All)
             {
@@ -127,7 +167,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             double dailyPL = acct.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
                             if (dailyPL >= MaxDailyProfitCap)
                             {
-                                Print($"[PATH B] (!) SKIPPING {acct.Name} - Consistency Lock Active (Day P/L: ${dailyPL:F2})");
+                                dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | ConsistencyLock ${1:F2}", acct.Name, dailyPL));
                                 continue;
                             }
                         }
@@ -159,17 +199,41 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // 3. Submit as Atomic Group (Broker OCO)
                         acct.Submit(new[] { entry, stop, target });
                         successCount++;
+                        dispatchLog.AppendLine(string.Format("    OK | {0,-28} | Bracket(3)   | submitted", acct.Name));
                     }
                     catch (Exception ex)
                     {
                         // V12.Phase7 [C-02/GAP-2]: Undo expectedPositions reservation if submission failed.
                         if (reservedDelta != 0)
                             AddExpectedPositionDeltaLocked(ExpKey(acct.Name), -reservedDelta);
-                        Print($"[SIMA] ??-- BRACKET FAILED on {acct.Name}: {ex.Message}");
+                        dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
                     }
                 }
             }
-            Print($"[SIMA] PATH B BROADCAST: {successCount} Brackets Submitted");
+
+            // [Phase 9 LATENCY] T_Final: Fleet loop complete -- stop clock, flush forensic report.
+            sw.Stop();
+            long tFinalTicks = sw.ElapsedTicks;
+            double totalMs = tFinalTicks * 1000.0 / Stopwatch.Frequency;
+            double setupMs = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
+            double loopMs = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
+
+            var report = new StringBuilder(1024);
+            report.AppendLine("+==============================================================+");
+            report.AppendLine("|       FORENSIC PULSE REPORT  Phase 9 MULTI-ACCOUNT BRACKET   |");
+            report.AppendLine("+==============================================================+");
+            report.AppendLine("|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |");
+            report.AppendLine("+==============================================================+");
+            report.Append(dispatchLog.ToString());
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine(string.Format("|  PATH B BROADCAST: {0} Brackets Submitted", successCount));
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine("|  TIMING SUMMARY                                              |");
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine(string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs));
+            report.AppendLine(string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs));
+            report.AppendLine("+==============================================================+");
+            Print(report.ToString().TrimEnd());
         }
 
         /// <summary>
@@ -213,6 +277,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            // [Phase 9 LATENCY] T0: Start after validation guards pass, before setup work.
+            var sw = Stopwatch.StartNew();
+            long t0Ticks = sw.ElapsedTicks;
+
             try
             {
                 // Calculate stop and 5 targets using RMA profile.
@@ -239,6 +307,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string baseSignal = "RMA_" + DateTime.Now.Ticks;
                 OrderAction entryAction = (direction == MarketPosition.Long) ? OrderAction.Buy : OrderAction.SellShort;
                 string symmetryDispatchId = SymmetryGuardBeginDispatch("RMA", entryAction, qty, price);
+
+                // [Phase 9 LATENCY] T_SetupDone: Calculation + metadata guard complete.
+                long tSetupDoneTicks = sw.ElapsedTicks;
 
                 Print($"[SIMA RMA V2] {direction} @ {price} | Stop: {stopPrice} | T1: {t1Price} | T2: {t2Price} | T3: {t3Price} | T4: {t4Price} | T5: {t5Price} | Qty: {qty}");
 
@@ -307,7 +378,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 int fleetOk = 0;
                 int fleetSkip = 0;
-                var dispatchLog = new StringBuilder();
+                // [Phase 9 LATENCY] T_LoopStart: Fleet iteration begins.
+                long tLoopStartTicks = sw.ElapsedTicks;
+                var dispatchLog = new StringBuilder(512);
 
                 foreach (Account acct in Account.All)
                 {
@@ -317,7 +390,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // V12.8: Fleet Manager toggle ??" skip if account NOT registered or explicitly disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
-                        Print($"[SIMA] Fleet Dispatch: {acct.Name} SKIPPED (Inactive in Fleet Manager)");
+                        dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | Inactive", acct.Name));
                         fleetSkip++;
                         continue;
                     }
@@ -328,7 +401,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         double dailyPL = acct.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
                         if (dailyPL >= MaxDailyProfitCap)
                         {
-                            Print($"[SIMA RMA V2] SKIP {acct.Name} - ConsistencyLock (${dailyPL:F2})");
+                            dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | ConsistencyLock ${1:F2}", acct.Name, dailyPL));
                             fleetSkip++;
                             continue;
                         }
@@ -352,8 +425,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // Guard before reservation ??" expectedPositions not yet incremented, no rollback needed.
                         if (fEntry == null)
                         {
-                            dispatchLog.AppendLine($"[SIMA RMA V2] WARN {fleetKey} on {acct.Name}: " +
-                                "CreateOrder returned null -- account may be disconnected. Skipping.");
+                            dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | CreateOrder returned null", acct.Name));
                             continue;
                         }
 
@@ -439,6 +511,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // stopOrders/target1..target5 are set by follower bracket submission on fill
 
                         fleetOk++;
+                        dispatchLog.AppendLine(string.Format("    OK | {0,-28} | Limit RMA    | submitted", acct.Name));
                     }
                     catch (Exception ex)
                     {
@@ -456,18 +529,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                         entryOrders.TryRemove(fleetKey, out _);
                         // Phase 6: Clean up proactive FSM on dispatch failure
                         _followerBrackets.TryRemove(fleetKey, out _);
-                        Print($"[SIMA RMA V2] FAIL {acct.Name}: {ex.Message}");
+                        dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
                     }
                 }
 
-                if (dispatchLog.Length > 0)
-                {
-                    Print("== SIMA RMA V2 WARNINGS ==");
-                    Print(dispatchLog.ToString().TrimEnd());
-                    Print("==========================");
-                }
+                // [Phase 9 LATENCY] T_Final: Fleet loop complete -- stop clock, flush forensic report.
+                sw.Stop();
+                long tFinalTicks = sw.ElapsedTicks;
+                double totalMs = tFinalTicks * 1000.0 / Stopwatch.Frequency;
+                double setupMs = (tSetupDoneTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
+                double localMs = (tLoopStartTicks - tSetupDoneTicks) * 1000.0 / Stopwatch.Frequency;
+                double loopMs = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
 
-                Print($"[SIMA RMA V2] Fleet: {fleetOk} dispatched, {fleetSkip} skipped");
+                var report = new StringBuilder(1024);
+                report.AppendLine("+==============================================================+");
+                report.AppendLine("|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |");
+                report.AppendLine("+==============================================================+");
+                report.AppendLine("|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |");
+                report.AppendLine("+==============================================================+");
+                report.Append(dispatchLog.ToString());
+                report.AppendLine("+--------------------------------------------------------------+");
+                report.AppendLine(string.Format("|  FLEET: {0} dispatched, {1} skipped", fleetOk, fleetSkip));
+                report.AppendLine("+--------------------------------------------------------------+");
+                report.AppendLine("|  TIMING SUMMARY (4-phase)                                    |");
+                report.AppendLine("+--------------------------------------------------------------+");
+                report.AppendLine(string.Format("|  Setup+Calc:   {0,8:F3} ms  |  Local Acct:  {1,8:F3} ms       |", setupMs, localMs));
+                report.AppendLine(string.Format("|  Fleet Loop:   {0,8:F3} ms  |  Total:       {1,8:F3} ms       |", loopMs, totalMs));
+                report.AppendLine("+==============================================================+");
+                Print(report.ToString().TrimEnd());
             }
             catch (Exception ex)
             {

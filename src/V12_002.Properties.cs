@@ -394,6 +394,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Cancellation Ticks", GroupName = "14. RMA Intelligence", Order = 3)]
         public int RmaCancellationTicks { get; set; }
 
+        [NinjaScriptProperty]
+        [Range(1, 20)]
+        [Display(Name = "Max Probe Count", Description = "Probe-and-retreat cycles before exhaustion cancellation.", GroupName = "14. RMA Intelligence", Order = 4)]
+        public int RmaMaxProbeCount { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Exhaustion Cancel Enabled", Description = "Cancel orders after RmaMaxProbeCount probes without fill.", GroupName = "14. RMA Intelligence", Order = 5)]
+        public bool RmaExhaustionEnabled { get; set; }
+
 
         #endregion
     }

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1107.002-H";  // Build 1107.002-H: UI Recovery & Latency Dashboard
+        public const string BUILD_TAG = "1107.003";  // Build 1107.003: Latency Telemetry Port + RMA Probe Intelligence
 
         #region Variables
         private volatile bool _isTerminating = false;
