@@ -19,7 +19,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 Print("----------------------------------------------------------------");
-                Print("V12.002 RISK LOGIC AUDIT (The Testing Rig)");
+                Print(string.Format("{0} RISK LOGIC AUDIT (The Testing Rig)", BUILD_TAG));
                 Print("Date: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 Print("----------------------------------------------------------------");
 
@@ -305,7 +305,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 Print("----------------------------------------------------------------");
-                Print("V12.1101E AUDIT COMPLETE - LOGIC IS ISOLATED AND VERIFIED");
+                Print("V12.1107.002-H AUDIT COMPLETE - LOGIC IS ISOLATED AND VERIFIED");
                 Print("----------------------------------------------------------------");
             }
             catch (Exception ex)

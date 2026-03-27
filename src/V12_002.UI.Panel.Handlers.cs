@@ -554,13 +554,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     CommitLiveTargetPrice(targetNum, priceBox.Text);
                     Keyboard.ClearFocus();
-                    e.Handled = true;
                 }
                 else if (e.Key == Key.Escape)
                 {
                     // Don't commit -- just blur. Next 250ms sync restores current order price.
                     Keyboard.ClearFocus();
-                    e.Handled = true;
                 }
             };
         }

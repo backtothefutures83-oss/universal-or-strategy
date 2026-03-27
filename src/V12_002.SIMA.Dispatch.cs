@@ -485,6 +485,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 report.AppendLine("|  TYPE | ACCOUNT                       | ORDER TYPE   |   RTT  |");
                 report.AppendLine("+==============================================================+");
                 report.Append(dispatchLog.ToString());
+                report.AppendLine("+--------------------------------------------------------------+");
+                report.AppendLine("|  TIMING SUMMARY                                              |");
+                report.AppendLine("+--------------------------------------------------------------+");
+                report.AppendLine(string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs));
+                report.AppendLine(string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs));
                 report.AppendLine("+==============================================================+");
                 Print(report.ToString().TrimEnd());
             }

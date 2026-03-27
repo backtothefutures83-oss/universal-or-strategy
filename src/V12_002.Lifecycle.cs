@@ -163,7 +163,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // RMA Intelligence defaults (Phase 9.2)
                 RmaIntelligenceEnabled = false; // Default to isolated/OFF
                 RmaProximityTicks = 2;
-                RmaCancellationTicks = 4;
+                RmaIntelligenceCancellationTicks = 4;
             }
             else if (state == State.Configure)
             {
@@ -271,14 +271,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 ResetOR();
 
-                Print(string.Format("UniversalORStrategy V12.14 | {0} | Tick: {1} | PV: ${2}", symbol, tickSize, pointValue));
+                Print(string.Format("UniversalORStrategy {0} | {1} | Tick: {2} | PV: ${3}", BUILD_TAG, symbol, tickSize, pointValue));
                 Print(string.Format("Session: {0} - {1} {2} | OR: {3} min",
                     SessionStart.ToString("HH:mm"), SessionEnd.ToString("HH:mm"), SelectedTimeZone, (int)ORTimeframe));
                 Print(string.Format("Targets: T1={0}({1}) T2={2}({3}) T3={4}({5}) T4={6}({7}) T5={8}({9}) | Stop={10}xOR",
                     Target1Value, T1Type, Target2Value, T2Type, Target3Value, T3Type, Target4Value, T4Type, Target5Value, T5Type, StopMultiplier));
                 Print(string.Format("RMA: Enabled={0} ATR({1}) Stop={2}xATR",
                     RMAEnabled, RMAATRPeriod, RMAStopATRMultiplier));
-                Print("V12.9 REPAIRED: Definitive Chart-Click Fix + Logic Refresh");
+                Print(string.Format("{0} REPAIRED: Definitive Chart-Click Fix + Logic Refresh", BUILD_TAG));
                 Print(string.Format("TREND: Enabled={0} E1Stop={1}xATR E2Trail={2}xATR", TRENDEnabled, TRENDEntry1ATRMultiplier, TRENDEntry2ATRMultiplier));
                 Print(string.Format("FFMA: Enabled={0} Distance={1}pt RSI={2}/{3}", FFMAEnabled, FFMAEMADistance, FFMARSIOversold, FFMARSIOverbought));
                 Print(string.Format("V12 SIMA: {0} | AccountPrefix: \"{1}\"", EnableSIMA ? "ENABLED - Fleet mode" : "DISABLED - Single account", AccountPrefix));

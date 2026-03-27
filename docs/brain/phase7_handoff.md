@@ -1,19 +1,20 @@
-# Implementation Plan -- Phase 7 UI Keyboard Recovery & Latency Dashboard
+# CODEX HANDOFF: Phase 7 -- UI Keyboard Recovery & Latency Dashboard
 
-## Root Cause
-The current 1106-C `PreviewKeyDown` guard stops NinjaTrader chart-level keyboard hijack by marking most keys handled, but it never reinjects those keys into the `TextBox`, so focused inputs stop accepting normal typing. In `ExecuteSmartDispatchEntry`, latency timing is already measured into `setupMs`, `loopMs`, and `totalMs`, but the final forensic report drops those values before printing. Phase 7 restores the proven V12_001 manual text pipeline and appends the existing latency metrics without changing any actor, FSM, or order lifecycle behavior.
-
-## Proposed Changes
+> **Author**: P3 Architect (Claude) | **Target**: P4 Engineer (Codex/Jules)
+> **Build**: 1108 | **Branch**: `build/1105-monolith`
+> **Risk**: LOW -- proven V12_001 port + diagnostic-only append
 
 ---
 
-### UI Keyboard Recovery
+## SURGICAL EDIT LIST (2 edits, 2 files)
 
-#### [MODIFY] [V12_002.UI.Panel.Helpers.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.UI.Panel.Helpers.cs)
+---
 
-Replace the current block-only `PreviewKeyDown` handler in `CreateTextBox` with the archived V12_001 manual text pipeline so config inputs can accept manual numeric entry while still suppressing NinjaTrader symbol-search hijack.
+### E1 -- Manual Text Pipeline (Keyboard Recovery)
 
-**Before** (lines 76-82):
+**File**: `src/V12_002.UI.Panel.Helpers.cs`
+
+**FIND** (lines 76-82):
 ```csharp
             tb.PreviewKeyDown += (s, e) =>
             {
@@ -24,7 +25,7 @@ Replace the current block-only `PreviewKeyDown` handler in `CreateTextBox` with 
             return tb;
 ```
 
-**After**:
+**REPLACE**:
 ```csharp
             // Phase 7 [KB-R1]: Manual Text Pipeline -- soaks chart-level keyboard hijack
             // while explicitly managing TextBox content (port from V12_001 baseline).
@@ -83,20 +84,18 @@ Replace the current block-only `PreviewKeyDown` handler in `CreateTextBox` with 
 
 ---
 
-### Dispatch Timing Footer
+### E2 -- Latency Dashboard Timing Footer
 
-#### [MODIFY] [V12_002.SIMA.Dispatch.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.SIMA.Dispatch.cs)
+**File**: `src/V12_002.SIMA.Dispatch.cs`
 
-Append a timing summary footer to the existing forensic dispatch report using the already-computed `setupMs`, `loopMs`, and `totalMs` values.
-
-**Before** (lines 487-489):
+**FIND** (lines 487-489):
 ```csharp
                 report.Append(dispatchLog.ToString());
                 report.AppendLine("+==============================================================+");
                 Print(report.ToString().TrimEnd());
 ```
 
-**After**:
+**REPLACE**:
 ```csharp
                 report.Append(dispatchLog.ToString());
                 report.AppendLine("+--------------------------------------------------------------+");
@@ -110,25 +109,27 @@ Append a timing summary footer to the existing forensic dispatch report using th
 
 ---
 
-## DNA Compliance Checklist
-- [ ] No `lock(stateLock)` introduced
-- [ ] All new C# strings are ASCII-only
-- [ ] `Enqueue` used for state mutations (or direct write justified per Build 981)
-- [ ] FSM guard lines present if follower orders are touched
-- [ ] `rg -n "lock\(stateLock\)" src/V12_002.UI.Panel.Helpers.cs src/V12_002.SIMA.Dispatch.cs` returns 0 results
-- [ ] Targeted ASCII scan passes for the two modified files
+## SELF-AUDIT CHECKLIST (P4 Engineer)
 
-## Verification Plan
+After applying both edits, run:
 
-### Automated
-- `rg -n "lock\(stateLock\)" src/V12_002.UI.Panel.Helpers.cs src/V12_002.SIMA.Dispatch.cs` -- must return 0 results
-- Run a targeted ASCII byte scan on `src/V12_002.UI.Panel.Helpers.cs` and `src/V12_002.SIMA.Dispatch.cs`
-- `grep -r "PendingCancel\|Submitting" src/` -- not required; FSM is untouched in this mission
-
-### Manual (Director)
-- Recompile in NinjaTrader 8 with zero errors and zero warnings
-- Click any Price/Offset/Trail `TextBox` on the V12 panel and type `1234.56`
-- Verify Backspace removes the previous character and Delete removes the character at the caret
-- Verify NumPad digits behave the same as the top-row digits
-- Verify Tab still moves focus and NinjaTrader symbol search does not activate during typing
-- Trigger a market dispatch and confirm the Output window ends with the `TIMING SUMMARY` footer showing setup, fleet loop, and total elapsed values
+1. **Compile**: Zero errors, zero warnings in NinjaTrader 8
+2. **ASCII scan**: `python check_ascii.py src/V12_002.UI.Panel.Helpers.cs src/V12_002.SIMA.Dispatch.cs`
+3. **Lock audit**: `grep -n "lock(stateLock)" src/V12_002.UI.Panel.Helpers.cs src/V12_002.SIMA.Dispatch.cs` -- must return zero
+4. **Keyboard verification (VM)**:
+   - Click any Price/Offset/Trail TextBox on V12 panel
+   - Type `1234.56` -- characters must appear
+   - Backspace removes last char, Delete removes char at caret
+   - NumPad keys work identically to number row
+   - Tab moves focus to next field (not blocked)
+   - NinjaTrader symbol search must NOT activate during typing
+5. **Latency verification**: Trigger a market dispatch, verify Output Window shows:
+   ```
+   +--------------------------------------------------------------+
+   |  TIMING SUMMARY                                              |
+   +--------------------------------------------------------------+
+   |  Setup Phase:     X.XXX ms  |  Fleet Loop:     X.XXX ms       |
+   |  Total Elapsed:    X.XXX ms                                  |
+   +==============================================================+
+   ```
+6. **Commit**: `git commit -m "fix(phase-7): manual text pipeline + latency dashboard metrics"`
