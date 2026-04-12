@@ -41,6 +41,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
+                TouchStrategyHeartbeat();
+
                 // Update last known price for UI events
                 lastKnownPrice = Close[0];
 
@@ -221,6 +223,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 SyncPendingOrders();  // V12.30: Real-time sizing synchronization
+                PublishUiSnapshot();
             }
             catch (Exception ex)
             {

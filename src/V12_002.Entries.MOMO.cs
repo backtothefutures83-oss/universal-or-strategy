@@ -194,6 +194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void DeactivateMOMOMode()
         {
             isMOMOModeActive = false;
+            ClearClickTraderBorderIfInactive();
         }
 
         #endregion

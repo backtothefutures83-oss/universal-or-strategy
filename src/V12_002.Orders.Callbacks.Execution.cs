@@ -201,33 +201,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.Phase7 [C-01]: Prevent double-decrement if OnOrderUpdate + OnExecutionUpdate both fire.
                 if (!string.IsNullOrEmpty(executionId))
                 {
-                    if (!processedExecutionIds.Add(executionId))
+                    // V14.2 [ADR-011]: Zero-allocation dedup via FNV-1a hash ring
+                    long _execHash = FnvHash64(executionId);
+                    if (_executionIdRing.ContainsOrAdd(_execHash))
                     {
                         Print(string.Format("[DEDUP] Skipping duplicate execution {0} for {1}", executionId, orderName));
                         return;
                     }
-                    // Bounded pruning: keep at most MaxProcessedExecutionIds entries
-                    processedExecutionIdQueue.Enqueue(executionId);
-                    while (processedExecutionIdQueue.Count > MaxProcessedExecutionIds)
-                        processedExecutionIds.Remove(processedExecutionIdQueue.Dequeue());
                 }
                 else
                 {
-                    // V12.1101E [F-08]: Fallback dedup key when executionId is missing: (Order, FilledQuantity).
-                    // Uses runtime order object identity + cumulative filled quantity.
-                    string uniqueOrderId = !string.IsNullOrEmpty(execution.Order.OrderId) ? execution.Order.OrderId : execution.Order.Name;
-                    string dedupOrderIdentity = GetStableHash(uniqueOrderId);
-                    int dedupFilledQuantity = execution.Order.Filled > 0 ? execution.Order.Filled : Math.Max(0, quantity);
-                    string fallbackKey = string.Format("{0}|{1}", dedupOrderIdentity, dedupFilledQuantity);
-
-                    if (!processedExecutionFallbackKeys.Add(fallbackKey))
+                    // V14.2 [ADR-011]: Fallback dedup when executionId is missing
+                    // Uses execution.Order properties -- FIX-D5: correct variable mapping
+                    string uniqueOrderId = !string.IsNullOrEmpty(execution.Order.OrderId)
+                        ? execution.Order.OrderId : execution.Order.Name;
+                    int dedupFilledQty = execution.Order.Filled > 0
+                        ? execution.Order.Filled : Math.Max(0, quantity);
+                    string _fallbackKey = string.Format("{0}|{1}", uniqueOrderId, dedupFilledQty);
+                    long _fallbackHash = FnvHash64(_fallbackKey);
+                    if (_executionIdFallbackRing.ContainsOrAdd(_fallbackHash))
                     {
-                        Print(string.Format("[DEDUP] Skipping duplicate fallback execution {0} for {1}", fallbackKey, orderName));
+                        Print(string.Format("[DEDUP] Skipping duplicate execution (fallback) orderId={0}",
+                            execution.Order.OrderId));
                         return;
                     }
-                    processedExecutionFallbackQueue.Enqueue(fallbackKey);
-                    while (processedExecutionFallbackQueue.Count > MaxProcessedExecutionIds)
-                        processedExecutionFallbackKeys.Remove(processedExecutionFallbackQueue.Dequeue());
                 }
 
                 // V12.12: Compliance tracking for single-account mode
@@ -365,7 +362,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // ============================================================
                 // 5. TRIM EXECUTION - V10.3.1: Enhanced Stop Integrity
                 // ============================================================
-                // ??"? CRITICAL: When a TRIM executes, we MUST reduce the stop order quantity
+                // (!) CRITICAL: When a TRIM executes, we MUST reduce the stop order quantity
                 // to match the new position size. If we don't, hitting the stop after a trim
                 // would close more contracts than we hold, creating an unintended REVERSE position.
                 // Example: Long 4 contracts, stop at 4. Trim 2 (now Long 2). If stop stays at 4,
@@ -381,7 +378,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - Math.Max(0, quantity));
                         remainingAfterTrim = pos.RemainingContracts;
 
-                        Print(string.Format("TRIM EXECUTION: {0} contracts closed for {1}. Position: {2} ??' {3}",
+                        Print(string.Format("TRIM EXECUTION: {0} contracts closed for {1}. Position: {2} -> {3}",
                             quantity, entryName, previousQty, remainingAfterTrim));
 
                         // V10.3.1 FIX: MANDATORY stop quantity reduction to prevent reverse position

@@ -1,8 +1,6 @@
 // Build 1105: V12_001 panel port -- live state sync from strategy fields
 using System;
-using System.Linq;
 using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript.Indicators;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -15,23 +13,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void UpdatePanelState()
         {
             if (rootContainer == null || _isTerminating) return;
+            UIStateSnapshot snapshot = GetUiSnapshot();
 
-            double price = lastKnownPrice;
+            double price = snapshot.LastPrice;
             if (lastPriceText != null)
             {
                 lastPriceText.Text = price > 0
                     ? Instrument.MasterInstrument.FormatPrice(price)
                     : "--";
 
-                MarketPosition mp = Position != null ? Position.MarketPosition : MarketPosition.Flat;
+                MarketPosition mp = snapshot.MasterMarketPosition;
                 lastPriceText.Foreground = mp == MarketPosition.Long ? GreenFg
                     : mp == MarketPosition.Short ? RedFg
                     : TextPrimary;
             }
 
-            string mode = GetCurrentConfigMode();
-            if (string.Equals(mode, "OR", StringComparison.OrdinalIgnoreCase))
-                mode = "ORB";
+            string mode = string.IsNullOrEmpty(snapshot.Mode) ? "ORB" : snapshot.Mode;
 
             if (!string.Equals(_panelLastSyncedMode, mode, StringComparison.OrdinalIgnoreCase))
             {
@@ -40,14 +37,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 UpdateContextualUI(mode);
             }
 
-            // Build 1106: Reverse-sync panel config fields when mode switch hydrated a new profile
-            if (_configSyncNeeded)
+            if (snapshot.ConfigRevision != _panelAppliedConfigRevision)
             {
-                _configSyncNeeded = false;
-                SyncPanelConfigFromStrategy();
+                SyncPanelConfigFromSnapshot(snapshot);
+                _panelAppliedConfigRevision = snapshot.ConfigRevision;
             }
 
-            int count = Math.Max(1, Math.Min(5, activeTargetCount));
+            int count = Math.Max(1, Math.Min(5, snapshot.TargetCount));
             if (_panelLastSyncedTargetCount != count)
             {
                 long elapsedTicks = DateTime.UtcNow.Ticks - _panelChipClickTicks;
@@ -60,69 +56,39 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            UpdateRmaButtonVisual(isRMAModeActive);
-            if (trendRmaToggle != null) trendRmaToggle.Opacity = isTrendRmaMode ? 1.0 : 0.5;
-            if (retestRmaToggle != null) retestRmaToggle.Opacity = isRetestRmaMode ? 1.0 : 0.5;
+            UpdateRmaButtonVisual(snapshot.IsRmaModeActive);
+            if (trendRmaToggle != null) trendRmaToggle.Opacity = snapshot.IsTrendRmaMode ? 1.0 : 0.5;
+            if (retestRmaToggle != null) retestRmaToggle.Opacity = snapshot.IsRetestRmaMode ? 1.0 : 0.5;
 
-            UpdateHubStatusLed();
-            UpdateTelemetryDisplay();
-            UpdateComplianceDisplay();
-            UpdateTrendIndicator();
+            UpdateHubStatusLed(snapshot);
+            UpdateTelemetryDisplay(snapshot);
+            UpdateComplianceDisplay(snapshot);
+            UpdateTrendIndicator(snapshot);
 
-            // Build 1107: Live position control center -- dual mode switch
-            MarketPosition posMP = Position != null ? Position.MarketPosition : MarketPosition.Flat;
-            if (posMP != MarketPosition.Flat && activePositions != null)
+            UILivePositionSnapshot livePosition = snapshot.LivePosition;
+            if (livePosition != null && livePosition.HasLivePosition)
             {
-                PositionInfo livePos = FindMasterPosition(out string entryName);
-                if (livePos != null && livePos.EntryFilled && livePos.RemainingContracts > 0)
-                {
-                    if (_currentLiveEntryName == null)
-                    {
-                        // Entering live mode: hide config buttons
-                        SetConfigTargetButtonsVisible(false);
-                    }
-                    _currentLiveEntryName = entryName;
-                    SyncLiveTargetRows(entryName, livePos);
-                    if (liveStopRow != null) liveStopRow.Visibility = System.Windows.Visibility.Visible;
-                    return;
-                }
+                SetConfigTargetButtonsVisible(false, count);
+                _currentLiveEntryName = livePosition.EntryName;
+                SyncLiveTargetRows(livePosition);
+                if (liveStopRow != null)
+                    liveStopRow.Visibility = System.Windows.Visibility.Visible;
+                return;
             }
-            // Flat or no valid position: exit live mode
+
             if (_currentLiveEntryName != null)
             {
                 _currentLiveEntryName = null;
                 SetLiveTargetRowsVisible(false);
                 if (liveStopRow != null) liveStopRow.Visibility = System.Windows.Visibility.Collapsed;
-                int restoreCount = Math.Max(1, Math.Min(5, activeTargetCount));
-                UpdateTargetVisibility(restoreCount);
+                UpdateTargetVisibility(count);
             }
         }
 
-        // Build 1107: Find the primary master position for live display.
-        // Returns the first non-follower, non-cleanup, filled position with remaining contracts.
-        private PositionInfo FindMasterPosition(out string entryName)
-        {
-            entryName = null;
-            if (activePositions == null) return null;
-            foreach (var kvp in activePositions.ToArray())
-            {
-                PositionInfo pi = kvp.Value;
-                if (pi != null && !pi.IsFollower && !pi.PendingCleanup
-                    && pi.EntryFilled && pi.RemainingContracts > 0)
-                {
-                    entryName = kvp.Key;
-                    return pi;
-                }
-            }
-            return null;
-        }
-
-        private void SetConfigTargetButtonsVisible(bool visible)
+        private void SetConfigTargetButtonsVisible(bool visible, int count)
         {
             if (visible)
             {
-                // Restore based on target count (UpdateTargetVisibility handles this)
-                int count = Math.Max(1, Math.Min(5, activeTargetCount));
                 UpdateTargetVisibility(count);
             }
             else
@@ -163,53 +129,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                 row.Visibility = visible ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         }
 
-        private void SyncLiveTargetRows(string entryName, PositionInfo pos)
+        private void SyncLiveTargetRows(UILivePositionSnapshot livePosition)
         {
             for (int t = 1; t <= 5; t++)
             {
-                bool active = t <= pos.InitialTargetCount && !IsTargetFilled(pos, t);
+                UILiveTargetSnapshot target = livePosition.Targets[t - 1];
+                bool active = target != null && target.IsVisible;
                 SetLiveTargetRowVisible(t, active);
-                if (!active) continue;
+                if (!active || target == null) continue;
 
-                // Read live order data
-                var targetDict = GetTargetOrdersDictionary(t);
-                Order targetOrder = null;
-                if (targetDict != null) targetDict.TryGetValue(entryName, out targetOrder);
-
-                double price = GetTargetPrice(pos, t);
-                if (targetOrder != null && targetOrder.LimitPrice > 0)
-                    price = targetOrder.LimitPrice;
-
-                int contracts = GetTargetContracts(pos, t);
-                int filled = GetTargetFilledQuantity(pos, t);
-                bool isWorking = targetOrder != null &&
-                    (targetOrder.OrderState == OrderState.Working || targetOrder.OrderState == OrderState.Accepted);
-
-                // Update price (skip if user is editing)
                 TextBox priceBox = GetLiveTargetPriceBox(t);
                 if (priceBox != null && !priceBox.IsFocused)
-                    priceBox.Text = Instrument.MasterInstrument.FormatPrice(price);
+                {
+                    priceBox.Text = target.Price > 0
+                        ? Instrument.MasterInstrument.FormatPrice(target.Price)
+                        : "--";
+                }
 
-                // Update contract count + status color
                 TextBlock ctsBlock = GetLiveTargetCtsBlock(t);
                 if (ctsBlock != null)
                 {
-                    ctsBlock.Text = (contracts - filled) + " cts";
-                    ctsBlock.Foreground = isWorking ? GreenFg : TextMuted;
+                    ctsBlock.Text = target.RemainingContracts + " cts";
+                    ctsBlock.Foreground = target.IsWorking ? GreenFg : TextMuted;
                 }
             }
 
-            // Stop row
             if (liveStopRow != null)
             {
-                Order stopOrder = null;
-                if (stopOrders != null) stopOrders.TryGetValue(entryName, out stopOrder);
-                double stopPrice = pos.CurrentStopPrice;
-                if (stopOrder != null && stopOrder.StopPrice > 0)
-                    stopPrice = stopOrder.StopPrice;
                 if (liveStopPrice != null)
-                    liveStopPrice.Text = stopPrice > 0
-                        ? Instrument.MasterInstrument.FormatPrice(stopPrice)
+                    liveStopPrice.Text = livePosition.StopPrice > 0
+                        ? Instrument.MasterInstrument.FormatPrice(livePosition.StopPrice)
                         : "--";
                 liveStopRow.Visibility = System.Windows.Visibility.Visible;
             }
@@ -241,57 +190,59 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void UpdateHubStatusLed()
+        private void UpdateHubStatusLed(UIStateSnapshot snapshot)
         {
             if (hubStatusLed == null) return;
 
             if (_isTerminating)
                 hubStatusLed.Background = RedFg;
-            else if (Position != null && Position.MarketPosition != MarketPosition.Flat)
+            else if (snapshot.MasterMarketPosition != MarketPosition.Flat)
                 hubStatusLed.Background = GreenFg;
             else
                 hubStatusLed.Background = CyanFg;
+
+            hubStatusLed.ToolTip = snapshot.StatusMessage ?? string.Empty;
         }
 
-        private void UpdateTelemetryDisplay()
+        private void UpdateTelemetryDisplay(UIStateSnapshot snapshot)
         {
             string hiText = "--";
             string loText = "--";
             string rangeText = "--";
 
-            if (sessionHigh != double.MinValue && sessionLow != double.MaxValue)
+            if (snapshot.OrHigh > 0 && snapshot.OrLow > 0)
             {
-                double range = sessionHigh - sessionLow;
-                hiText = Instrument.MasterInstrument.FormatPrice(sessionHigh);
-                loText = Instrument.MasterInstrument.FormatPrice(sessionLow);
-                rangeText = range.ToString("0.##");
+                hiText = Instrument.MasterInstrument.FormatPrice(snapshot.OrHigh);
+                loText = Instrument.MasterInstrument.FormatPrice(snapshot.OrLow);
+                rangeText = snapshot.OrRange.ToString("0.##");
             }
 
             UpdateOrText(or5Text, "OR5", hiText, loText, rangeText);
             UpdateOrText(or15Text, "OR15", hiText, loText, rangeText);
 
-            UpdateEmaText(ema9Text, "9:", GetPriceText(GetIndicatorValue(ema9)), TextPrimary);
-            UpdateEmaText(ema15Text, "15:", GetPriceText(GetIndicatorValue(ema15)), TextPrimary);
-            UpdateEmaText(ema30Text, "30:", GetPriceText(GetIndicatorValue(ema30)), GreenFg);
-            UpdateEmaText(ema65Text, "65:", GetPriceText(GetIndicatorValue(ema65)), TextPrimary);
-            UpdateEmaText(ema200Text, "200:", GetPriceText(GetIndicatorValue(ema200)), PurpleFg);
+            UpdateEmaText(ema9Text, "9:", GetPriceText(snapshot.Ema9Value), TextPrimary);
+            UpdateEmaText(ema15Text, "15:", GetPriceText(snapshot.Ema15Value), TextPrimary);
+            UpdateEmaText(ema30Text, "30:", GetPriceText(snapshot.Ema30Value), GreenFg);
+            UpdateEmaText(ema65Text, "65:", GetPriceText(snapshot.Ema65Value), TextPrimary);
+            UpdateEmaText(ema200Text, "200:", GetPriceText(snapshot.Ema200Value), PurpleFg);
 
             if (atrText != null)
             {
-                atrText.Text = currentATR > 0
-                    ? "ATR: " + currentATR.ToString("0.##")
+                atrText.Text = snapshot.AtrValue > 0
+                    ? "ATR: " + snapshot.AtrValue.ToString("0.##")
                     : "ATR: --";
             }
         }
 
-        private void UpdateComplianceDisplay()
+        private void UpdateComplianceDisplay(UIStateSnapshot snapshot)
         {
-            string accountName = Account != null ? Account.Name : "--";
-            double dailyProfit = accountDailyProfit.TryGetValue(accountName, out var daily) ? daily : 0;
-            double totalProfit = accountTotalProfit.TryGetValue(accountName, out var total) ? total : 0;
-            int tradeCount = accountTradeCount.TryGetValue(accountName, out var trades) ? trades : 0;
-            int uniqueDays = GetUniqueTradingDays(accountName);
-            double maxDrawdown = accountMaxDrawdown.TryGetValue(accountName, out var dd) ? dd : 0;
+            UIComplianceSnapshot compliance = snapshot.Compliance ?? new UIComplianceSnapshot();
+            string accountName = string.IsNullOrEmpty(compliance.AccountName) ? "--" : compliance.AccountName;
+            double dailyProfit = compliance.DailyProfit;
+            double totalProfit = compliance.TotalProfit;
+            int tradeCount = compliance.TradeCount;
+            int uniqueDays = compliance.UniqueDays;
+            double maxDrawdown = compliance.MaxDrawdown;
 
             if (complianceSummaryText != null)
             {
@@ -314,9 +265,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (compliancePayoutText != null)
             {
-                if (PayoutMinProfit > 0)
+                if (compliance.PayoutMinProfit > 0)
                 {
-                    double payoutPct = totalProfit / PayoutMinProfit * 100.0;
+                    double payoutPct = totalProfit / compliance.PayoutMinProfit * 100.0;
                     compliancePayoutText.Text = "PAYOUT: " + payoutPct.ToString("0") + "%";
                     compliancePayoutText.Foreground = payoutPct >= 100 ? GreenFg
                         : payoutPct >= 50 ? YellowFg
@@ -331,20 +282,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (complianceDrawdownText != null)
             {
-                double ddBuffer = TrailingDrawdownLimit > 0 ? TrailingDrawdownLimit - maxDrawdown : 0;
+                double ddBuffer = compliance.TrailingDrawdownLimit > 0
+                    ? compliance.TrailingDrawdownLimit - maxDrawdown
+                    : 0;
                 complianceDrawdownText.Text = "DD BUFFER: $" + ddBuffer.ToString("0");
                 complianceDrawdownText.Foreground = ddBuffer > 0 ? GreenFg : RedFg;
             }
         }
 
-        private void UpdateTrendIndicator()
+        private void UpdateTrendIndicator(UIStateSnapshot snapshot)
         {
             if (trendText == null || trendIndicator == null) return;
 
-            double currentPrice = lastKnownPrice > 0
-                ? lastKnownPrice
-                : (CurrentBar >= 0 ? Close[0] : 0);
-            double ema9Value = GetIndicatorValue(ema9);
+            double currentPrice = snapshot.LastPrice;
+            double ema9Value = snapshot.Ema9Value;
 
             if (currentPrice <= 0 || double.IsNaN(ema9Value) || ema9Value <= 0)
             {
@@ -437,20 +388,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             target.Inlines.Add(new System.Windows.Documents.Run(value) { Foreground = valueColor });
         }
 
-        private double GetIndicatorValue(EMA indicator)
-        {
-            try
-            {
-                if (indicator == null || CurrentBar < 0)
-                    return double.NaN;
-                return indicator[0];
-            }
-            catch
-            {
-                return double.NaN;
-            }
-        }
-
         private string GetPriceText(double value)
         {
             if (double.IsNaN(value) || value <= 0)
@@ -458,38 +395,31 @@ namespace NinjaTrader.NinjaScript.Strategies
             return Instrument.MasterInstrument.FormatPrice(value);
         }
 
-        // Build 1106: One-shot reverse sync of panel config controls from strategy globals.
-        // Triggered ONLY after a mode switch hydrates a stored profile. Not called on every tick.
-        // Uses existing helpers: FormatPanelDouble (Construction.cs:1109), GetPanelTargetModeText
-        // (Construction.cs:1092), SetComboSelection (Construction.cs:1078).
-        private void SyncPanelConfigFromStrategy()
+        private void SyncPanelConfigFromSnapshot(UIStateSnapshot snapshot)
         {
-            // Target values
-            if (svT1Val != null) svT1Val.Text = FormatPanelDouble(Target1Value);
-            if (svT2Val != null) svT2Val.Text = FormatPanelDouble(Target2Value);
-            if (svT3Val != null) svT3Val.Text = FormatPanelDouble(Target3Value);
-            if (svT4Val != null) svT4Val.Text = FormatPanelDouble(Target4Value);
-            if (svT5Val != null) svT5Val.Text = FormatPanelDouble(Target5Value);
+            UIConfigSnapshot config = snapshot.Config ?? new UIConfigSnapshot();
+            if (svT1Val != null) svT1Val.Text = FormatPanelDouble(config.Target1Value);
+            if (svT2Val != null) svT2Val.Text = FormatPanelDouble(config.Target2Value);
+            if (svT3Val != null) svT3Val.Text = FormatPanelDouble(config.Target3Value);
+            if (svT4Val != null) svT4Val.Text = FormatPanelDouble(config.Target4Value);
+            if (svT5Val != null) svT5Val.Text = FormatPanelDouble(config.Target5Value);
 
-            // Target types
-            if (svT1Type != null) SetComboSelection(svT1Type, GetPanelTargetModeText(T1Type));
-            if (svT2Type != null) SetComboSelection(svT2Type, GetPanelTargetModeText(T2Type));
-            if (svT3Type != null) SetComboSelection(svT3Type, GetPanelTargetModeText(T3Type));
-            if (svT4Type != null) SetComboSelection(svT4Type, GetPanelTargetModeText(T4Type));
-            if (svT5Type != null) SetComboSelection(svT5Type, GetPanelTargetModeText(T5Type));
+            if (svT1Type != null) SetComboSelection(svT1Type, GetPanelTargetModeText(config.Target1Type));
+            if (svT2Type != null) SetComboSelection(svT2Type, GetPanelTargetModeText(config.Target2Type));
+            if (svT3Type != null) SetComboSelection(svT3Type, GetPanelTargetModeText(config.Target3Type));
+            if (svT4Type != null) SetComboSelection(svT4Type, GetPanelTargetModeText(config.Target4Type));
+            if (svT5Type != null) SetComboSelection(svT5Type, GetPanelTargetModeText(config.Target5Type));
 
-            // Stop multiplier (mode-aware)
             if (strVal != null)
-            {
-                double stopValue = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
-                strVal.Text = FormatPanelDouble(stopValue);
-            }
+                strVal.Text = FormatPanelDouble(config.StopValue);
+            if (maxVal != null)
+                maxVal.Text = FormatPanelDouble(config.MaxRiskValue);
+            if (citVal != null)
+                citVal.Text = string.IsNullOrEmpty(config.ChaseIfTouchPoints) ? "0" : config.ChaseIfTouchPoints;
+            if (svStrType != null)
+                SetComboSelection(svStrType, string.Equals(snapshot.Mode, "ORB", StringComparison.OrdinalIgnoreCase) ? "OR" : "ATR");
 
-            // Max risk
-            if (maxVal != null) maxVal.Text = FormatPanelDouble(MaxRiskAmount);
-
-            // Count chips + target row visibility
-            int count = Math.Max(1, Math.Min(5, activeTargetCount));
+            int count = Math.Max(1, Math.Min(5, snapshot.TargetCount));
             _panelLastSyncedTargetCount = count;
             SyncCountChipVisuals(count);
             UpdateTargetVisibility(count);

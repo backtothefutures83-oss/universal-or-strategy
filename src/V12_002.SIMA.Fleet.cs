@@ -36,73 +36,57 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region V12 SIMA Fleet
 
         /// <summary>
-        /// Build 936 [FIX-1]: Processes ONE pending fleet dispatch request per invocation.
-        /// Called via TriggerCustomEvent -- always runs on the strategy thread (NT8 thread-safe).
-        /// Separates acct.Submit() calls across strategy-thread cycles, eliminating the synchronous
-        /// 7-second freeze caused by submitting the full fleet in one tight loop.
-        /// Error handling mirrors ExecuteSmartDispatchEntry catch block: dict cleanup + delta rollback.
+        /// V14.2 [ADR-012]: Shared fleet dispatch processing logic.
+        /// Called by both Photon ring consumer and legacy ConcurrentQueue consumer.
+        /// Guarantees identical invariants on both paths.
         /// </summary>
-        private void PumpFleetDispatch()
+        /// <param name="poolSlotIndex">Index into PhotonOrderPool. -1 for legacy path (no pool release).</param>
+        private void ProcessFleetSlot(Account acct, Order[] orders, int orderCount,
+            string fleetEntryName, string expectedKey, int reservedDelta, long signalTicks,
+            int poolSlotIndex)
         {
-            // A3-1: Abort and drain queue if SIMA is disabled or flatten is running (Build 960 audit fix)
-            if (isFlattenRunning || !EnableSIMA)
-            {
-                // B957/F1: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
-                FleetDispatchRequest stale;
-                while (_pendingFleetDispatches.TryDequeue(out stale))
-                {
-                    if (stale.ReservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(stale.ExpectedKey, -stale.ReservedDelta);
-                    ClearDispatchSyncPending(stale.ExpectedKey);
-                }
-                Print("[PUMP] Abort: SIMA inactive or flatten running. Queue drained with delta rollback.");
-                return;
-            }
-
-            if (!_pendingFleetDispatches.TryDequeue(out var req))
-                return;
-
             bool syncCleared = false;
             try
             {
                 // Phase 6 [MG-T1]: Reject stale queued dispatch (enqueued > 5s ago)
-                if (req.SignalTicks > 0 && !MetadataGuardTimestamp(req.SignalTicks, "Pump:" + req.FleetEntryName))
+                if (signalTicks > 0 && !MetadataGuardTimestamp(signalTicks, "Pump:" + fleetEntryName))
                 {
-                    ClearDispatchSyncPending(req.ExpectedKey);
+                    ClearDispatchSyncPending(expectedKey);
                     syncCleared = true;
-                    if (req.ReservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(req.ExpectedKey, -req.ReservedDelta);
-                    activePositions.TryRemove(req.FleetEntryName, out _);
-                    entryOrders.TryRemove(req.FleetEntryName, out _);
-                    stopOrders.TryRemove(req.FleetEntryName, out _);
+                    if (reservedDelta != 0)
+                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                    activePositions.TryRemove(fleetEntryName, out _);
+                    entryOrders.TryRemove(fleetEntryName, out _);
+                    stopOrders.TryRemove(fleetEntryName, out _);
                     for (int tNum = 1; tNum <= 5; tNum++)
                     {
                         var td = GetTargetOrdersDictionary(tNum);
-                        if (td != null) td.TryRemove(req.FleetEntryName, out _);
+                        if (td != null) td.TryRemove(fleetEntryName, out _);
                     }
-                    _followerBrackets.TryRemove(req.FleetEntryName, out _);
-                    Print(string.Format("[PUMP] STALE dispatch rejected for {0} -- rolled back", req.FleetEntryName));
+                    _followerBrackets.TryRemove(fleetEntryName, out _);
+                    Print(string.Format("[PUMP] STALE dispatch rejected for {0} -- rolled back", fleetEntryName));
                     return;
                 }
 
                 // Phase 2 [D1]: Initialize FollowerBracketFSM for Shadow Mode
-                if (!_followerBrackets.ContainsKey(req.FleetEntryName))
+                if (!_followerBrackets.ContainsKey(fleetEntryName))
                 {
                     var newFsm = new FollowerBracketFSM
                     {
-                        AccountName = req.Account.Name,
-                        EntryName = req.FleetEntryName,
+                        AccountName = acct.Name,
+                        EntryName = fleetEntryName,
                         State = FollowerBracketState.Submitted,
-                        RemainingContracts = Math.Abs(req.ReservedDelta),
+                        RemainingContracts = Math.Abs(reservedDelta),
                         LastUpdateUtc = DateTime.UtcNow
                     };
 
-                    // Extract orders from the request to populate FSM
-                    foreach (var ord in req.Orders)
+                    // FIX-D2: Use bounded for-loop (pool arrays are MaxOrdersPerSlot=7, may have fewer)
+                    for (int i = 0; i < orderCount; i++)
                     {
+                        var ord = orders[i];
                         if (ord == null || string.IsNullOrEmpty(ord.Name)) continue;
-                        
-                        if (ord.Name == req.FleetEntryName)
+
+                        if (ord.Name == fleetEntryName)
                         {
                             newFsm.EntryOrder = ord;
                             newFsm.ExpectedEntryPrice = ord.LimitPrice > 0 ? ord.LimitPrice : 0;
@@ -115,7 +99,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         else if (ord.Name.StartsWith("T"))
                         {
-                            // T1_Fleet... T2_...
                             for (int tIdx = 1; tIdx <= 5; tIdx++)
                             {
                                 if (ord.Name.StartsWith("T" + tIdx + "_"))
@@ -128,16 +111,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
                         }
                     }
-                    _followerBrackets.TryAdd(req.FleetEntryName, newFsm);
+                    _followerBrackets.TryAdd(fleetEntryName, newFsm);
                 }
 
-                req.Account.Submit(req.Orders);
-                ClearDispatchSyncPending(req.ExpectedKey);
+                acct.Submit(orders);
+                ClearDispatchSyncPending(expectedKey);
                 syncCleared = true;
 
-                // Phase 6 [FSM-P2]: Promote pre-created FSM from PendingSubmit to Submitted
+                // Phase 6 [FSM-P2]: Promote from PendingSubmit to Submitted
                 FollowerBracketFSM pFsm;
-                if (_followerBrackets.TryGetValue(req.FleetEntryName, out pFsm)
+                if (_followerBrackets.TryGetValue(fleetEntryName, out pFsm)
                     && pFsm != null
                     && pFsm.State == FollowerBracketState.PendingSubmit)
                 {
@@ -147,48 +130,158 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Phase 3 [Step 3]: Register all order IDs for O(1) FSM lookup
                 FollowerBracketFSM fsm;
-                if (_followerBrackets.TryGetValue(req.FleetEntryName, out fsm))
+                if (_followerBrackets.TryGetValue(fleetEntryName, out fsm))
                 {
-                    foreach (var ord in req.Orders)
+                    for (int i = 0; i < orderCount; i++)
                     {
+                        var ord = orders[i];
                         if (ord != null && !string.IsNullOrEmpty(ord.OrderId))
-                        {
-                            _orderIdToFsmKey[ord.OrderId] = req.FleetEntryName;
-                        }
+                            _orderIdToFsmKey[ord.OrderId] = fleetEntryName;
                     }
                 }
 
                 Print(string.Format("[PUMP] Submitted {0} orders for {1} | {2}",
-                    req.Orders.Length, req.FleetEntryName, req.Account.Name));
+                    orderCount, fleetEntryName, acct.Name));
             }
             catch (Exception ex)
             {
                 Print(string.Format("[PUMP] Submit FAILED for {0} ({1}): {2}",
-                    req.FleetEntryName, req.Account.Name, ex.Message));
+                    fleetEntryName, acct.Name, ex.Message));
                 if (!syncCleared)
-                    ClearDispatchSyncPending(req.ExpectedKey);
-                if (req.ReservedDelta != 0)
-                    AddExpectedPositionDeltaLocked(req.ExpectedKey, -req.ReservedDelta);
-                // Full tracking-dict cleanup -- mirrors ExecuteSmartDispatchEntry [F-01] catch block.
-                activePositions.TryRemove(req.FleetEntryName, out _);
-                entryOrders.TryRemove(req.FleetEntryName, out _);
-                stopOrders.TryRemove(req.FleetEntryName, out _);
+                    ClearDispatchSyncPending(expectedKey);
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                activePositions.TryRemove(fleetEntryName, out _);
+                entryOrders.TryRemove(fleetEntryName, out _);
+                stopOrders.TryRemove(fleetEntryName, out _);
                 for (int tNum = 1; tNum <= 5; tNum++)
                 {
                     var targetDict = GetTargetOrdersDictionary(tNum);
                     if (targetDict != null)
-                        targetDict.TryRemove(req.FleetEntryName, out _);
+                        targetDict.TryRemove(fleetEntryName, out _);
                 }
-                // Phase 6: Clean up proactive FSM on Submit failure
-                _followerBrackets.TryRemove(req.FleetEntryName, out _);
+                _followerBrackets.TryRemove(fleetEntryName, out _);
             }
             finally
             {
+                // V14.2 FIX-D1: Release pool slot if from Photon pool
+                if (poolSlotIndex >= 0)
+                    _photonPool.ReleaseByIndex(poolSlotIndex);
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
-                // Chain next pump cycle if more requests remain in the queue.
-                if (!_pendingFleetDispatches.IsEmpty)
+                // Chain next pump -- check BOTH ring and queue (FIX-F7)
+                if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty)
+                    || !_pendingFleetDispatches.IsEmpty)
                     try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
             }
+        }
+
+        private void PumpFleetDispatch()
+        {
+            // A3-1: Abort and drain if SIMA disabled or flatten running
+            if (isFlattenRunning || !EnableSIMA)
+            {
+                // v28.0: drain Photon ring FIRST with sideband-aware delta rollback + pool release
+                FleetDispatchSlot abortSlot;
+                while (_photonDispatchRing != null && _photonDispatchRing.TryDequeue(out abortSlot))
+                {
+                    int _sbIdx = abortSlot.PoolSlotIndex;
+                    string _expectedKey = (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
+                        ? _photonSideband[_sbIdx].ExpectedKey
+                        : null;
+                    if (abortSlot.ReservedDelta != 0 && _expectedKey != null)
+                        AddExpectedPositionDeltaLocked(_expectedKey, -abortSlot.ReservedDelta);
+                    if (_expectedKey != null)
+                        ClearDispatchSyncPending(_expectedKey);
+                    if (_sbIdx >= 0)
+                    {
+                        _photonPool.ReleaseByIndex(_sbIdx);
+                        if (_sbIdx < _photonSideband.Length)
+                            _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    }
+                    Interlocked.Decrement(ref _pendingFleetDispatchCount);
+                }
+                // Then drain legacy ConcurrentQueue
+                FleetDispatchRequest stale;
+                while (_pendingFleetDispatches.TryDequeue(out stale))
+                {
+                    if (stale.ReservedDelta != 0)
+                        AddExpectedPositionDeltaLocked(stale.ExpectedKey, -stale.ReservedDelta);
+                    ClearDispatchSyncPending(stale.ExpectedKey);
+                    Interlocked.Decrement(ref _pendingFleetDispatchCount);
+                }
+                Print("[PUMP] Abort: SIMA inactive or flatten running. Ring+Queue drained with delta rollback.");
+                return;
+            }
+
+            // v28.0 [ADR-012 + ADR-016]: Photon ring, XorShadow integrity, sideband refs
+            FleetDispatchSlot _ringSlot;
+            if (_photonDispatchRing != null && _photonDispatchRing.TryDequeue(out _ringSlot))
+            {
+                int _sbIdx = _ringSlot.PoolSlotIndex;
+
+                // Sideband read (BEFORE shadow verify -- sideband is required for rollback logs)
+                FleetDispatchSideband _sb = (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
+                    ? _photonSideband[_sbIdx]
+                    : default(FleetDispatchSideband);
+
+                // XorShadow integrity verification (defense-in-depth, structurally stronger than CRC16)
+                ulong _stored   = _ringSlot.Shadow;
+                _ringSlot.Shadow = 0UL;                             // zero before recompute (compute excludes Shadow by construction, but this is belt-and-braces)
+                ulong _recomputed = ComputeFleetDispatchShadow(ref _ringSlot, _photonShadowSalt);
+                _ringSlot.Shadow = _stored;                         // restore for downstream logging
+                if (_recomputed != _stored)
+                {
+                    Interlocked.Increment(ref _photonCrcFailures);
+                    Print(string.Format(
+                        "[PHOTON_SHADOW] INTEGRITY FAILURE: expected=0x{0:X16} got=0x{1:X16} entry={2} -- SKIPPING",
+                        _stored, _recomputed, _sb.FleetEntryName));
+                    if (_ringSlot.ReservedDelta != 0 && _sb.ExpectedKey != null)
+                        AddExpectedPositionDeltaLocked(_sb.ExpectedKey, -_ringSlot.ReservedDelta);
+                    if (_sb.ExpectedKey != null)
+                        ClearDispatchSyncPending(_sb.ExpectedKey);
+                    if (_sb.FleetEntryName != null)
+                    {
+                        activePositions.TryRemove(_sb.FleetEntryName, out _);
+                        entryOrders.TryRemove(_sb.FleetEntryName, out _);
+                        stopOrders.TryRemove(_sb.FleetEntryName, out _);
+                        for (int tNum = 1; tNum <= 5; tNum++)
+                        {
+                            var td = GetTargetOrdersDictionary(tNum);
+                            if (td != null) td.TryRemove(_sb.FleetEntryName, out _);
+                        }
+                        _followerBrackets.TryRemove(_sb.FleetEntryName, out _);
+                    }
+                    if (_sbIdx >= 0)
+                    {
+                        _photonPool.ReleaseByIndex(_sbIdx);
+                        if (_sbIdx < _photonSideband.Length)
+                            _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    }
+                    Interlocked.Decrement(ref _pendingFleetDispatchCount);
+                    if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
+                        try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
+                    return;
+                }
+
+                // Valid slot -- retrieve Order[] from pool via PoolSlotIndex
+                Order[] ringOrders = _photonPool.GetByIndex(_sbIdx);
+                ProcessFleetSlot(_sb.Account, ringOrders, _ringSlot.OrderCount,
+                    _sb.FleetEntryName, _sb.ExpectedKey, _ringSlot.ReservedDelta,
+                    _ringSlot.SignalTicks, _sbIdx);
+
+                // Clear sideband to release refs (avoid stale retention across ring wraps)
+                if (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
+                    _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                return;
+            }
+
+            // Fallback: drain legacy ConcurrentQueue
+            FleetDispatchRequest req;
+            if (!_pendingFleetDispatches.TryDequeue(out req))
+                return;
+            ProcessFleetSlot(req.Account, req.Orders, req.Orders.Length,
+                req.FleetEntryName, req.ExpectedKey, req.ReservedDelta,
+                req.SignalTicks, -1);  // -1 = no pool release
         }
 
         // Build 935 [SIMA-B935-001]: Skip-logic extracted from ExecuteSmartDispatchEntry fleet loop.
@@ -247,17 +340,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         /// <summary>
-        /// V12.1101E [A-4]: Idempotent unsubscribe ??" removes all SIMA event handlers before
+        /// V12.1101E [A-4]: Idempotent unsubscribe -- removes all SIMA event handlers before
         /// re-subscribing. Prevents handler accumulation on repeated SIMA toggle cycles.
-        /// V12.Phase6 [UNSUB-TRACK]: Deterministic unsubscribe ??" uses tracked set of subscribed accounts
+        /// V12.Phase6 [UNSUB-TRACK]: Deterministic unsubscribe -- uses tracked set of subscribed accounts
         /// instead of re-scanning Account.All, which may have changed since subscribe time.
         /// </summary>
         private void UnsubscribeFromFleetAccounts()
         {
-            // First: unsubscribe from tracked set (deterministic ??" guaranteed to match subscribe)
+            // Build 1109 [FREEZE-PROOF]: Snapshot Account.All once to prevent InvalidOperationException
+            // if broker reconnects or modifies the collection during iteration.
+            Account[] _acctSnapshot = Account.All.ToArray();
+
+            // First: unsubscribe from tracked set (deterministic -- guaranteed to match subscribe)
             foreach (string acctName in _subscribedAccountNames)
             {
-                foreach (Account acct in Account.All)
+                foreach (Account acct in _acctSnapshot)
                 {
                     if (acct.Name == acctName)
                     {
@@ -267,8 +364,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
-            // Fallback: also sweep Account.All for any handlers from untracked subscribe paths
-            foreach (Account acct in Account.All)
+            // Fallback: also sweep snapshot for any handlers from untracked subscribe paths
+            foreach (Account acct in _acctSnapshot)
             {
                 if (IsFleetAccount(acct))
                 {

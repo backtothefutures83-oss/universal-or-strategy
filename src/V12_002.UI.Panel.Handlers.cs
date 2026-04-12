@@ -172,6 +172,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 isRMAModeActive = false;
                 PanelCommand("SET_RMA_MODE|OFF");
+                ClearClickTraderBorderIfInactive();
                 UpdateRmaButtonVisual(false);
             }
 
@@ -198,6 +199,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 UpdateRmaButtonVisual(false);
                 PanelCommand("SET_RMA_MODE|OFF");
+                ClearClickTraderBorderIfInactive();
             }
             TriggerGlow(PurpleFg);
         }
@@ -349,6 +351,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 isRMAModeActive = false;
                 PanelCommand("SET_RMA_MODE|OFF");
+                ClearClickTraderBorderIfInactive();
             }
             UpdateRmaButtonVisual(false);
 

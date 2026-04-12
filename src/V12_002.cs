@@ -41,7 +41,87 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1107.003";  // Build 1107.003: Latency Telemetry Port + RMA Probe Intelligence
+        public const string BUILD_TAG = "1111.002-v28.0";  // R28 v28.0 -- blittable slot + XorShadow + optional MMIO mirror
+
+        public class UILiveTargetSnapshot
+        {
+            public bool IsVisible;
+            public double Price;
+            public int RemainingContracts;
+            public bool IsWorking;
+        }
+
+        public class UILivePositionSnapshot
+        {
+            public bool HasLivePosition;
+            public string EntryName;
+            public MarketPosition Direction;
+            public double StopPrice;
+            public UILiveTargetSnapshot[] Targets = new[]
+            {
+                new UILiveTargetSnapshot(),
+                new UILiveTargetSnapshot(),
+                new UILiveTargetSnapshot(),
+                new UILiveTargetSnapshot(),
+                new UILiveTargetSnapshot()
+            };
+        }
+
+        public class UIComplianceSnapshot
+        {
+            public string AccountName;
+            public double DailyProfit;
+            public double TotalProfit;
+            public int TradeCount;
+            public int UniqueDays;
+            public double MaxDrawdown;
+            public double PayoutMinProfit;
+            public double TrailingDrawdownLimit;
+        }
+
+        public class UIConfigSnapshot
+        {
+            public double Target1Value;
+            public double Target2Value;
+            public double Target3Value;
+            public double Target4Value;
+            public double Target5Value;
+            public TargetMode Target1Type;
+            public TargetMode Target2Type;
+            public TargetMode Target3Type;
+            public TargetMode Target4Type;
+            public TargetMode Target5Type;
+            public double StopValue;
+            public double MaxRiskValue;
+            public string ChaseIfTouchPoints;
+        }
+
+        public class UIStateSnapshot
+        {
+            public double EmaValue;
+            public double AtrValue;
+            public string StatusMessage;
+            public long LastUpdateTicks;
+            public double LastPrice;
+            public MarketPosition MasterMarketPosition;
+            public string Mode;
+            public int TargetCount;
+            public bool IsRmaModeActive;
+            public bool IsTrendRmaMode;
+            public bool IsRetestRmaMode;
+            public int ConfigRevision;
+            public double OrHigh;
+            public double OrLow;
+            public double OrRange;
+            public double Ema9Value;
+            public double Ema15Value;
+            public double Ema30Value;
+            public double Ema65Value;
+            public double Ema200Value;
+            public UIConfigSnapshot Config = new UIConfigSnapshot();
+            public UIComplianceSnapshot Compliance = new UIComplianceSnapshot();
+            public UILivePositionSnapshot LivePosition = new UILivePositionSnapshot();
+        }
 
         #region Variables
         private volatile bool _isTerminating = false;
@@ -90,6 +170,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V11: Thread-safe Value Cache for UI Telemetry
         private volatile float _ema9Val;
+        private volatile UIStateSnapshot _uiSnapshot = new UIStateSnapshot();
+        private long _strategyHeartbeatTicks;
+        private int _uiConfigRevision = 1;
 
         // V8.7: RSI indicator for FFMA trades
         private RSI rsiIndicator;
@@ -112,14 +195,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V8.30: Replaced Dictionary with ConcurrentDictionary for thread-safe access
         private ConcurrentDictionary<string, PendingStopReplacement> pendingStopReplacements;
 
-        // V12.Hardening: Execution dedup guard -- prevents double-decrement from OnOrderUpdate + OnExecutionUpdate
-        private readonly HashSet<string> processedExecutionIds = new HashSet<string>();
-        private readonly Queue<string> processedExecutionIdQueue = new Queue<string>(); // For bounded pruning
-        // V12.1101E [F-08]: Secondary dedup cache when broker omits executionId.
-        private readonly HashSet<string> processedExecutionFallbackKeys = new HashSet<string>();
-        private readonly Queue<string> processedExecutionFallbackQueue = new Queue<string>(); // For bounded pruning
-        // V12.Phase7 [GAP-4]: executionDeduplicateLock removed -- C-01 unified all dedup on the serialized strategy path
-        private const int MaxProcessedExecutionIds = 500;
+        // V14.2 Sovereign Photon [ADR-011]: Lock-free execution ID dedup rings
+        // Zero string allocation. FNV-1a 64-bit hash with O(1) open-addressing lookup.
+        // Ring capacity 512 (was 500), table capacity 1024 (load factor < 0.5).
+        private ExecutionIdRing _executionIdRing;
+        private ExecutionIdRing _executionIdFallbackRing;
 
         // V12.Phase6 [CONCURRENCY-01]: Marshal broker-thread account execution events to strategy thread
         private struct QueuedAccountExecution { public Account Account; public ExecutionEventArgs EventArgs; }
@@ -134,6 +214,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // RMA Mode tracking
         private volatile bool isRMAModeActive;
         private volatile bool isRMAButtonClicked;  // One-shot mode from button
+        private volatile bool _chartHoverRedActive; // Build 1108.002: Red border gate for click-trader hover
 
         // V8.2: TREND Mode tracking
         private volatile bool isTRENDModeActive;
@@ -224,6 +305,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile int _actorYieldRequested = 0;
         private string _actorYieldReason = string.Empty;
         private string _actorYieldDetail = string.Empty;
+        // Build 1109 [FREEZE-PROOF]: Chunked flatten queue -- one account per TriggerCustomEvent cycle.
+        // Mirrors PumpFleetDispatch pattern. Prevents multi-second strategy thread freeze during fleet flatten.
+        private readonly ConcurrentQueue<FlattenWorkItem> _pendingFlattenOps
+            = new ConcurrentQueue<FlattenWorkItem>();
+
+        private struct FlattenWorkItem
+        {
+            public Account Account;
+            public bool CancelOnly;        // true = cancel orders only, no market close
+            public bool ZombieSweepOnly;   // true = only cancel zombie targets (EMERGENCY_STOP_, T1_-T5_)
+            public bool IsMaster;          // true = use SubmitOrderUnmanaged; false = use Account.Submit
+            public string Source;          // logging tag
+        }
+        // V14.2 Sovereign Photon [ADR-012]: Zero-allocation fleet dispatch infrastructure
+        private PhotonOrderPool _photonPool;
+        private SPSCRing<FleetDispatchSlot> _photonDispatchRing;
+        private MmioDispatchMirror _photonMmioMirror; // v28.0 -- optional MMIO write-through; may be null if CreateOrOpen throws
+        // Diagnostic: CRC16 verification failures (defense-in-depth -- see Ring.cs notes)
+        private long _photonCrcFailures = 0;
         private readonly System.Diagnostics.Stopwatch _actorCycleStopwatch = new System.Diagnostics.Stopwatch();
         private volatile bool _configureComplete = false;
         private volatile bool _dataLoadedComplete = false;
@@ -347,6 +447,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Instead of recursing, schedule a new drain cycle via TriggerCustomEvent.
         private void DrainActor() {
             RefreshActorOwnerThread();
+            TouchStrategyHeartbeat();
+            // Build 1109 [FREEZE-PROOF]: Early warning for queue saturation
+            int _actorQd = _cmdQueue.Count;
+            if (_actorQd > 100)
+                Print("[ACTOR_WARN] Queue depth=" + _actorQd + " -- possible backlog");
             BeginActorCycle();
             try {
                 StrategyCommand cmd;
@@ -402,6 +507,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V12 SIMA: Multi-Account Execution Engine
         private System.Timers.Timer _reaperTimer;
+        private System.Threading.Timer _watchdogTimer;
+        private int _watchdogStage = 0; // 0=idle, 1=enqueued, 2=direct fallback fired
         private volatile bool isFlattenRunning; // V12.8: Guard to pause Reaper during flatten
         private volatile int _flattenScopeDepth = 0;
         /// <summary>
@@ -542,10 +649,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private readonly ConcurrentDictionary<string, ModeConfigProfile> _modeProfiles
             = new ConcurrentDictionary<string, ModeConfigProfile>();
-
-        // Build 1106: Flag signals that a mode switch hydrated new config values.
-        // Read on UI thread (250ms timer), written on strategy thread (Enqueue).
-        private volatile bool _configSyncNeeded;
 
         // Phase 2: Follower Bracket FSMs (Shadow Mode)
         private readonly ConcurrentDictionary<string, FollowerBracketFSM>

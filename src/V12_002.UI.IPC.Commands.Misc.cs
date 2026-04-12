@@ -151,7 +151,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // ?????????????????????????????????????????????????????????????????????????????
+        // =========================================================================
 
         private void SendResponseToRemote(string response)
         {
@@ -250,6 +250,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
 
+                    // Build 1108.003 [D1]: Pre-cancel stop when closing the entire remaining position.
+                    // Without this, follower accounts can have a working stop + market exit simultaneously.
+                    if (qtyToClose >= pos.RemainingContracts)
+                    {
+                        RequestStopCancelLifecycleSafe(entryName);
+                        Print(string.Format("V10.3: Full close -- requested stop cancel for {0}", entryName));
+                    }
+
                     // Submit market order to close the target contracts
                     Order closeOrder = SubmitExitOrderForPosition(
                         pos, qtyToClose, OrderType.Market, 0, string.Format("Close{0}_{1}", targetName, entryName));
@@ -268,8 +276,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ToggleStrategyMode(string action)
         {
              // V12.20: Atomic flag mutations
-             if (action == "MODE_RMA") isRMAModeActive = !isRMAModeActive;
-             else if (action == "MODE_MOMO") isMOMOModeActive = !isMOMOModeActive;
+             if (action == "MODE_RMA")
+             {
+                 isRMAModeActive = !isRMAModeActive;
+                 ClearClickTraderBorderIfInactive();
+             }
+             else if (action == "MODE_MOMO")
+             {
+                 isMOMOModeActive = !isMOMOModeActive;
+                 ClearClickTraderBorderIfInactive();
+             }
              else if (action == "MODE_FFMA")
              {
                  isFFMAModeArmed = true;
@@ -338,6 +354,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                  int ffmaContracts = CalculatePositionSize(ffmaStopDist);
                  Enqueue(ctx => ctx.ExecuteFFMAEntry(direction, ffmaContracts));
              }
+
+             if (action == "MODE_RMA"
+                 || action == "MODE_MOMO"
+                 || action == "MODE_FFMA"
+                 || action == "FFMA_DISARM")
+             {
+                 BumpUiConfigRevision();
+             }
+
+             PublishUiSnapshot();
 
              Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4} FFMA={5}",
                 action, isRMAModeActive, isMOMOModeActive, isTrendRmaMode, isRetestRmaMode, isFFMAModeArmed));

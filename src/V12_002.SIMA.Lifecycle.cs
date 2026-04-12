@@ -46,14 +46,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Measure lifecycle semaphore contention because this wait runs on the actor path
             // and can stall queue drain when SIMA toggles overlap with other work.
             Stopwatch waitTimer = Stopwatch.StartNew();
-            // V12.Phase7 [H-10]: Serialize enable/disable transitions to prevent race between
-            // concurrent IPC commands and UI toggles leaving SIMA in a partially initialized state.
-            if (!_simaToggleSem.Wait(500))
+            // Build 1109 [FREEZE-PROOF]: Non-blocking semaphore. Wait(0) returns instantly.
+            // If contended, defer to next strategy-thread cycle via TriggerCustomEvent.
+            if (!_simaToggleSem.Wait(0))
             {
                 waitTimer.Stop();
-                // V12.Audit [H-10]: Record that this toggle did not complete so the next caller can retry.
                 _simaTogglePending = true;
-                Print(string.Format("[SIMA_WARN] ApplySimaState timed out waiting for semaphore after {0:F1}ms -- toggle pending, retry.", waitTimer.Elapsed.TotalMilliseconds));
+                bool _defEnabled = enabled;
+                Print("[SIMA_WARN] Toggle semaphore contended -- scheduling non-blocking retry");
+                try { TriggerCustomEvent(o => ProcessApplySimaState(_defEnabled), null); } catch { }
                 return;
             }
             try
@@ -68,7 +69,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ProcessShutdownSIMA();
 
                 EnableSIMA = enabled;
-                // V12.Audit [H-10]: Toggle completed successfully ?? clear any pending-retry flag.
+                // V12.Audit [H-10]: Toggle completed successfully -- clear any pending-retry flag.
                 _simaTogglePending = false;
             }
             finally
@@ -90,6 +91,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
             StopReaperAudit();
             UnsubscribeFromFleetAccounts();
+            // v28.0 shutdown drain: sideband-aware, XorShadow-free (we do not verify on shutdown;
+            // we just need to release pool + roll back delta). Sideband entries are zeroed after.
+            {
+                FleetDispatchSlot ringSlot;
+                while (_photonDispatchRing != null && _photonDispatchRing.TryDequeue(out ringSlot))
+                {
+                    int _sbIdx = ringSlot.PoolSlotIndex;
+                    string _expectedKey = (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
+                        ? _photonSideband[_sbIdx].ExpectedKey
+                        : null;
+                    if (ringSlot.ReservedDelta != 0 && _expectedKey != null)
+                        AddExpectedPositionDelta(_expectedKey, -ringSlot.ReservedDelta);
+                    if (_expectedKey != null)
+                        ClearDispatchSyncPending(_expectedKey);
+                    if (_sbIdx >= 0)
+                    {
+                        _photonPool.ReleaseByIndex(_sbIdx);
+                        if (_sbIdx < _photonSideband.Length)
+                            _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    }
+                }
+                Print("[SIMA] Photon ring cleared on shutdown with delta rollback.");
+            }
             // A3-1: Drain ghost dispatch queue on SIMA disable (Build 960 audit fix)
             // B957/F2: Rollback ReservedDelta and clear dispatch-sync barrier for each discarded request.
             {
@@ -107,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void EnumerateApexAccounts()
         {
-            UnsubscribeFromFleetAccounts(); // V12.1101E [A-4]: Always unsub first ?? idempotent guard against handler accumulation
+            UnsubscribeFromFleetAccounts(); // V12.1101E [A-4]: Always unsub first -- idempotent guard against handler accumulation
             simaAccountCount = 0;
             Print("[SIMA] ===================================================");
             Print("[SIMA] V12.12 - Fleet Symmetry & Safety Hardening Initializing");
@@ -125,7 +149,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     { var _acct966init = ExpKey(acct.Name); SetExpectedPosition(_acct966init, 0); }
                     accountDailyProfit[acct.Name] = 0; // Initialize daily profit
                     EnsureAccountComplianceTracking(acct.Name, GetComplianceNow());
-                    activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE ?? wait for Fleet Manager / IPC to enable
+                    activeFleetAccounts[acct.Name] = false; // V12.8 SIMA: Default to INACTIVE -- wait for Fleet Manager / IPC to enable
 
                     // V12.7: Always subscribe to execution updates for fleet bracket management
                     // (Also used by ComplianceHub for P/L tracking)
@@ -413,6 +437,91 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("[SIMA HYDRATE] WARNING: Could not adopt orders for {0} (Master): {1}",
                         Account.Name, ex.Message));
+                }
+            }
+
+            // Build 1108.003 [D2-A]: Reconstruct master activePositions from adopted bracket orders + broker.
+            // Filled master positions have bracket orders but no working entry order to hydrate from.
+            if (!masterIsFleetForOrders993)
+            {
+                try
+                {
+                    MarketPosition masterMP = MarketPosition.Flat;
+                    int masterQty = 0;
+                    double masterAvgPrice = 0;
+                    foreach (Position brokerPos in Account.Positions.ToArray())
+                    {
+                        if (brokerPos != null && brokerPos.Instrument != null
+                            && brokerPos.Instrument.FullName == Instrument.FullName
+                            && brokerPos.MarketPosition != MarketPosition.Flat)
+                        {
+                            masterMP = brokerPos.MarketPosition;
+                            masterQty = brokerPos.Quantity;
+                            masterAvgPrice = brokerPos.AveragePrice;
+                            break;
+                        }
+                    }
+
+                    if (masterMP != MarketPosition.Flat && masterQty > 0)
+                    {
+                        foreach (var stopKvp in stopOrders.ToArray())
+                        {
+                            string key = stopKvp.Key;
+                            if (key.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase)) continue;
+                            if (activePositions.ContainsKey(key)) continue;
+
+                            Order adoptedStop = stopKvp.Value;
+                            double stopPrice = adoptedStop != null ? adoptedStop.StopPrice : 0;
+
+                            int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+                            GetTargetDistribution(masterQty, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
+
+                            bool trendMnlMatch = key.StartsWith("TrendMnl", StringComparison.OrdinalIgnoreCase);
+                            Print(string.Format("[SIMA HYDRATE] Master stop key audit for {0}: TrendMnlStartsWith={1}",
+                                key, trendMnlMatch));
+
+                            var pos = new PositionInfo
+                            {
+                                SignalName = key,
+                                Direction = masterMP,
+                                TotalContracts = masterQty,
+                                RemainingContracts = masterQty,
+                                EntryPrice = masterAvgPrice,
+                                InitialStopPrice = stopPrice,
+                                CurrentStopPrice = stopPrice,
+                                EntryOrderType = OrderType.Market,
+                                EntryFilled = true,
+                                IsFollower = false,
+                                ExecutingAccount = null,
+                                BracketSubmitted = true,
+                                ExtremePriceSinceEntry = masterAvgPrice,
+                                CurrentTrailLevel = 0,
+                                OcoGroupId = "V12_" + GetStableHash(key),
+                                T1Contracts = t1Qty,
+                                T2Contracts = t2Qty,
+                                T3Contracts = t3Qty,
+                                T4Contracts = t4Qty,
+                                T5Contracts = t5Qty
+                            };
+
+                            pos.IsMOMOTrade = key.StartsWith("MOMO", StringComparison.OrdinalIgnoreCase);
+                            pos.IsTRENDTrade = trendMnlMatch
+                                || key.StartsWith("TRMA_", StringComparison.OrdinalIgnoreCase);
+                            pos.IsRetestTrade = key.StartsWith("Retest", StringComparison.OrdinalIgnoreCase);
+                            pos.IsRMATrade = key.StartsWith("TRMA_", StringComparison.OrdinalIgnoreCase)
+                                || pos.IsRetestTrade;
+                            pos.IsFFMATrade = key.StartsWith("FFMA", StringComparison.OrdinalIgnoreCase);
+                            if (pos.IsMOMOTrade) pos.IsRMATrade = false;
+
+                            activePositions[key] = pos;
+                            Print(string.Format("[SIMA HYDRATE] Reconstructed master position for {0} | Dir={1} Qty={2} AvgPx={3} StopPx={4}",
+                                key, masterMP, masterQty, masterAvgPrice, stopPrice));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print(string.Format("[SIMA HYDRATE] WARNING: Master position reconstruction failed: {0}", ex.Message));
                 }
             }
 

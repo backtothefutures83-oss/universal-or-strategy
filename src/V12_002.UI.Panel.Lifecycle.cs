@@ -12,6 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private System.Timers.Timer _panelRefreshTimer;
         private System.Windows.Threading.DispatcherTimer _glowTimer;
         private const int PanelRefreshMs = 250;
+        private volatile int _panelUpdateInProgress = 0;
 
         private void StartPanelRefresh()
         {
@@ -58,13 +59,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void OnPanelRefreshElapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             if (_isTerminating || rootContainer == null) return;
+            // Build 1109 [FREEZE-PROOF]: Skip if previous UpdatePanelState hasn't completed.
+            // Prevents WPF dispatcher queue backup under system stress.
+            if (Volatile.Read(ref _panelUpdateInProgress) != 0) return;
             try
             {
                 if (ChartControl != null)
-                    ChartControl.Dispatcher.InvokeAsync(() => UpdatePanelState());
+                {
+                    Interlocked.Exchange(ref _panelUpdateInProgress, 1);
+                    ChartControl.Dispatcher.InvokeAsync(() =>
+                    {
+                        try { UpdatePanelState(); }
+                        finally { Interlocked.Exchange(ref _panelUpdateInProgress, 0); }
+                    });
+                }
             }
             catch
             {
+                Interlocked.Exchange(ref _panelUpdateInProgress, 0);
             }
         }
 

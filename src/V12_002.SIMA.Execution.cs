@@ -59,7 +59,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (IsFleetAccount(acct))
                 {
-                    // V12.8: Fleet Active Check ??" skip accounts NOT registered or disabled
+                    // V12.8: Fleet Active Check -- skip accounts NOT registered or disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
                         dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | Inactive", acct.Name));
@@ -252,14 +252,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
             if (isFlattenRunning) return;
 
-            // [A1]: Defensive guard ??" caller must pre-calculate a valid quantity.
+            // [A1]: Defensive guard -- caller must pre-calculate a valid quantity.
             if (contracts <= 0)
             {
                 Print(string.Format("[RMA] ExecuteRMAEntryV2 received invalid contracts={0}. Aborting entry.", contracts));
                 return;
             }
 
-            // [923B-FIX-A]: Zero-price guard ??" a Limit order at price=0 is treated as a Market order
+            // [923B-FIX-A]: Zero-price guard -- a Limit order at price=0 is treated as a Market order
             // by Apex/Tradovate, causing an immediate fill without price ever touching the RMA level.
             // Root cause: IPC path (UI.IPC.cs) can pass currentPrice=0 if lastKnownPrice<=0 AND
             // Close[0] is not yet initialized (strategy just loaded, pre-session bars not formed).
@@ -287,7 +287,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool useRmaTargetProfile = true;
                 // [LEAK-01]: Use centralized ATR calculator (ceiling + min/max guards, fleet-ready).
                 double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
-                // [A1]: contracts parameter used directly ??" CalculatePositionSize removed from this method.
+                // [A1]: contracts parameter used directly -- CalculatePositionSize removed from this method.
                 // stopDist is retained to compute actual bracket stop price below.
                 int qty = contracts;
                 double stopPrice = (direction == MarketPosition.Long) ? price - stopDist : price + stopDist;
@@ -351,12 +351,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (L1345).
                     activePositions[localKey] = pos;
 
-                    // V12.12: Register Master account in expectedPositions (was missing ??" caused false Reaper desyncs)
+                    // V12.12: Register Master account in expectedPositions (was missing -- caused false Reaper desyncs)
                     int localDelta = (direction == MarketPosition.Long) ? qty : -qty;
                     AddExpectedPositionDeltaLocked(ExpKey(Account.Name), localDelta);
                     Print($"[SIMA] Master expectedPositions updated: {Account.Name} delta={localDelta}");
 
-                    // V12.7: Do NOT submit stop/target here ??" they will be submitted by
+                    // V12.7: Do NOT submit stop/target here -- they will be submitted by
                     // SubmitBracketOrders() when the entry limit fills in OnOrderUpdate.
                     // Submitting them now would cause instant fills on marketable targets.
 
@@ -372,7 +372,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // =======================================================
                 if (!EnableSIMA)
                 {
-                    Print("[SIMA RMA V2] ?????? EnableSIMA is FALSE - Fleet dispatch SKIPPED. Enable SIMA in strategy parameters or send SET_SIMA|ON via IPC.");
+                    Print("[SIMA RMA V2] [ERR] EnableSIMA is FALSE - Fleet dispatch SKIPPED. Enable SIMA in strategy parameters or send SET_SIMA|ON via IPC.");
                     return;
                 }
 
@@ -387,7 +387,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (!IsFleetAccount(acct)) continue;
                     if (acct == this.Account) continue; // local already done
 
-                    // V12.8: Fleet Manager toggle ??" skip if account NOT registered or explicitly disabled
+                    // V12.8: Fleet Manager toggle -- skip if account NOT registered or explicitly disabled
                     if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
                     {
                         dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | Inactive", acct.Name));
@@ -417,30 +417,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                         SymmetryGuardRegisterFollower(symmetryDispatchId, fleetKey);
                         string ocoId = fleetKey;
 
-                        // V12.10: Submit ENTRY ONLY ??" brackets deferred until fill (unified with leader)
+                        // V12.10: Submit ENTRY ONLY -- brackets deferred until fill (unified with leader)
                         Order fEntry = acct.CreateOrder(Instrument, entryAction, OrderType.Limit,
                             TimeInForce.Gtc, qty, price, 0, ocoId, fleetKey, null);
 
                         // [M8.1 NRE-01]: CreateOrder returns null for disconnected or invalid account/instrument pairs.
-                        // Guard before reservation ??" expectedPositions not yet incremented, no rollback needed.
+                        // Guard before reservation -- expectedPositions not yet incremented, no rollback needed.
                         if (fEntry == null)
                         {
                             dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | CreateOrder returned null", acct.Name));
                             continue;
                         }
 
-                        // [923B-FIX-B]: Phantom-Fix FIX-1 backport ??" register tracking dicts BEFORE
+                        // [923B-FIX-B]: Phantom-Fix FIX-1 backport -- register tracking dicts BEFORE
                         // updating expectedPositions. Mirrors the fix already applied to ExecuteSmartDispatchEntry
                         // (SIMA.cs Phantom-Fix comment at ~line 554).
                         //
-                        // OLD (broken) order: expectedPositions FIRST ??' Submit ??' entryOrders/activePositions LAST.
+                        // OLD (broken) order: expectedPositions FIRST -> Submit -> entryOrders/activePositions LAST.
                         // Race: REAPER background thread fires between steps 1 and 3, observes non-zero
-                        //       expectedPositions with no entry in entryOrders ??' hasWorkingEntry=false
-                        //       ??' phantom repair queued ??' second Limit order submitted at same price
-                        //       ??' original entry orphaned ??' double fill or naked position on price touch.
+                        //       expectedPositions with no entry in entryOrders -> hasWorkingEntry=false
+                        //       -> phantom repair queued -> second Limit order submitted at same price
+                        //       -> original entry orphaned -> double fill or naked position on price touch.
                         //
-                        // FIXED order: build PositionInfo ??' register dicts atomically (stateLock) FIRST
-                        //              ??' expectedPositions SECOND ??' Submit LAST.
+                        // FIXED order: build PositionInfo -> register dicts atomically (stateLock) FIRST
+                        //              -> expectedPositions SECOND -> Submit LAST.
                         // V12.1101E: Full 5-target distribution mirrors Master exactly.
                         PositionInfo fleetFollowerPos = new PositionInfo
                         {
@@ -466,7 +466,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             IsRMATrade = true,
                             IsFollower = true,
                             ExecutingAccount = acct,
-                            BracketSubmitted = false,   // V12.10: deferred ??" OnAccountExecutionUpdate submits on fill
+                            BracketSubmitted = false,   // V12.10: deferred -- OnAccountExecutionUpdate submits on fill
                             ExtremePriceSinceEntry = price,
                             CurrentTrailLevel = 0,
                             // Build 936 [FIX-2]: Deterministic bracket OCO group ID for broker-native stop+target linking.
@@ -521,7 +521,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             syncPending = false;
                         }
 
-                        // [923B-FIX-B]: Full rollback ??" dicts were registered before expectedPositions,
+                        // [923B-FIX-B]: Full rollback -- dicts were registered before expectedPositions,
                         // so both must be cleaned up on Submit failure (mirrors ExecuteSmartDispatchEntry catch).
                         if (reservedDelta != 0)
                             AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);

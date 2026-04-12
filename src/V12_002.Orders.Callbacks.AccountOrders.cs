@@ -152,6 +152,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ProcessAccountOrderQueue()
         {
+            // Build 1109 [FREEZE-PROOF]: Queue depth warning
+            int _oqDepth = _accountOrderQueue.Count;
+            if (_oqDepth > 50)
+                Print("[ORDER_WARN] Account order queue depth=" + _oqDepth);
             // V12.Phase7 [THREAD-01a]: Buffer-and-wait during flatten (symmetric with ProcessAccountExecutionQueue).
             if (isFlattenRunning)
             {
@@ -324,33 +328,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PositionInfo masterPos = null;
                     bool masterFilled = false;
 
-                    // A1-3: Snapshot qty/price and transition state atomically under stateLock to close TOCTOU window.
-                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside
-                    // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
-                    // the snapshot and state transition can observe torn state. (Build 960 audit fix)
+                    // Phase 10 [B960-AUDIT]: lock(stateLock) removed. Both this path (HandleMatchedFollowerOrder
+                    // via ProcessQueuedAccountOrder via TriggerCustomEvent) and PropagateFollowerEntryReplace
+                    // are serialized on the NinjaTrader strategy thread. No concurrent field access is possible.
                     int qty = 0;
                     double price = 0;
                     string acctNameCapture = acctName;
                     string sigName = fsm.SignalName;
                     FollowerReplaceSpec fsmCapture = fsm;
-                    lock (stateLock)
-                    {
-                        masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
-                            && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
-                            && masterPos != null
-                            && masterPos.EntryFilled
-                            && masterPos.RemainingContracts > 0;
 
-                        if (!masterFilled)
-                        {
-                            // V12.962 ACTOR: Direct field reads remain serialized by stateLock in this branch.
-                            qty             = fsm.PendingQty;
-                            price           = fsm.PendingPrice;
-                            acctNameCapture = fsm.AccountName;
-                            sigName         = fsm.SignalName;
-                            fsmCapture      = fsm;
-                            fsm.State       = FollowerReplaceState.Submitting;
-                        }
+                    masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
+                        && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
+                        && masterPos != null
+                        && masterPos.EntryFilled
+                        && masterPos.RemainingContracts > 0;
+
+                    if (!masterFilled)
+                    {
+                        qty             = fsm.PendingQty;
+                        price           = fsm.PendingPrice;
+                        acctNameCapture = fsm.AccountName;
+                        sigName         = fsm.SignalName;
+                        fsmCapture      = fsm;
+                        fsm.State       = FollowerReplaceState.Submitting;
                     }
 
                     if (masterFilled)

@@ -66,6 +66,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Round to tick size
                     newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
 
+                    // [Build 1108.002-HF1] Master-drives-followers: followers skip priceCleared gate.
+                    // BE is an explicit manual action -- threshold logic protects the master only.
+                    // UpdateStopOrder handles IsFollower routing (account-level cancel+resubmit).
+                    if (pos.IsFollower)
+                    {
+                        bool isBetterF = (pos.Direction == MarketPosition.Long && newStopPrice > pos.CurrentStopPrice)
+                                      || (pos.Direction == MarketPosition.Short && newStopPrice < pos.CurrentStopPrice);
+                        if (isBetterF)
+                        {
+                            UpdateStopOrder(entryName, pos, newStopPrice, 1);
+                            pos.ManualBreakevenTriggered = true;
+                            MarkStickyDirty();
+                            Print(string.Format("BE+{0} MOVED (follower): {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
+                        }
+                        continue;
+                    }
+
                     // [V12.12] ARM GUARD: If price hasn't cleared the BE threshold yet, arm instead of executing.
                     // ManageTrailingStops() will call UpdateStopOrder when price crosses the threshold.
                     if (lastKnownPrice <= 0)

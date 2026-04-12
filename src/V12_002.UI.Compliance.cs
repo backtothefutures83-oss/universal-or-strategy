@@ -100,6 +100,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             double balance = acct.Get(AccountItem.CashValue, Currency.UsDollar);
             UpdateEquityDrawdown(acct.Name, balance);
+            if (Account != null && acct.Name == Account.Name)
+                PublishUiSnapshot();
         }
 
         private int GetUniqueTradingDays(string accountName)
@@ -113,21 +115,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region CSV Reporting
 
+        // Build 1109 [FREEZE-PROOF]: One-shot guard replaces lock + File.WriteAllText.
+        // Interlocked.CompareExchange prevents double-creation without blocking strategy thread.
+        private volatile int _csvHeaderCreated = 0;
+
         private void EnsureDailySummaryCsv()
         {
             if (string.IsNullOrEmpty(dailySummaryCsvPath)) return;
-
-            if (!System.IO.File.Exists(dailySummaryCsvPath))
+            if (Volatile.Read(ref _csvHeaderCreated) != 0) return;
+            if (System.IO.File.Exists(dailySummaryCsvPath))
             {
-                lock (dailySummaryLock)
-                {
-                    if (!System.IO.File.Exists(dailySummaryCsvPath))
-                    {
-                        string header = "Date,Account,DailyPL,DailyTrades,TotalProfit,TotalTrades,MaxDrawdown,UniqueDays";
-                        System.IO.File.WriteAllText(dailySummaryCsvPath, header + Environment.NewLine);
-                    }
-                }
+                Interlocked.Exchange(ref _csvHeaderCreated, 1);
+                return;
             }
+            if (Interlocked.CompareExchange(ref _csvHeaderCreated, 1, 0) != 0) return;
+
+            string _csvPath = dailySummaryCsvPath;
+            string _csvHeader = "Date,Account,DailyPL,DailyTrades,TotalProfit,TotalTrades,MaxDrawdown,UniqueDays";
+            Task.Run(() =>
+            {
+                try { System.IO.File.WriteAllText(_csvPath, _csvHeader + Environment.NewLine); }
+                catch { Interlocked.Exchange(ref _csvHeaderCreated, 0); }
+            });
         }
 
         private void AppendDailySummary(DateTime summaryDate, string accountName, double dailyPL, int dailyTrades,
@@ -140,11 +149,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "{0},\"{1}\",{2:F2},{3},{4:F2},{5},{6:F2},{7}",
                 summaryDate.ToString("yyyy-MM-dd"), safeName, dailyPL, dailyTrades, totalProfit, totalTrades, maxDrawdown, uniqueDays);
 
-            // V12.40 FREEZE FIX: Ensure CSV header exists (fast, no I/O if already created)
-            lock (dailySummaryLock)
-            {
-                EnsureDailySummaryCsv();
-            }
+            // Build 1109: Lock removed -- EnsureDailySummaryCsv uses atomic guard internally
+            EnsureDailySummaryCsv();
 
             // V12.40 FREEZE FIX: Fire-and-forget async write -- never blocks UI thread
             string pathCopy = dailySummaryCsvPath;

@@ -34,7 +34,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region UI
 
-        // V12.1101E [D-01]: Removed legacy no-op UI stub remnants.
+        // [Build 1108.002-HF1] Overlay rectangle for click-trader border warning (no layout reflow)
+        private System.Windows.Shapes.Rectangle _chartHoverOverlay;
+        private Grid _chartOverlayParentGrid;
 
         private void AttachHotkeys()
         {
@@ -57,6 +59,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ChartControl != null)
             {
                 ChartControl.PreviewMouseLeftButtonDown += OnChartClick;
+                ChartControl.MouseMove += OnChartMouseMove;
+                ChartControl.MouseLeave += OnChartMouseLeave;
+
+                // [Build 1108.002-HF1] Create transparent overlay for border warning.
+                // Overlay avoids layout reflow from border-width mutation and caches
+                // the parent reference to avoid repeated visual-tree walks.
+                try
+                {
+                    DependencyObject parent = VisualTreeHelper.GetParent(ChartControl);
+                    while (parent != null && !(parent is Grid))
+                        parent = VisualTreeHelper.GetParent(parent);
+
+                    if (parent is Grid parentGrid)
+                    {
+                        _chartHoverOverlay = new System.Windows.Shapes.Rectangle
+                        {
+                            Fill = Brushes.Transparent,
+                            Stroke = Brushes.Red,
+                            StrokeThickness = 4,
+                            IsHitTestVisible = false,
+                            Visibility = Visibility.Collapsed
+                        };
+
+                        int colSpan = Math.Max(1, parentGrid.ColumnDefinitions.Count);
+                        int rowSpan = Math.Max(1, parentGrid.RowDefinitions.Count);
+                        Grid.SetColumnSpan(_chartHoverOverlay, colSpan);
+                        Grid.SetRowSpan(_chartHoverOverlay, rowSpan);
+                        System.Windows.Controls.Panel.SetZIndex(_chartHoverOverlay, 9999);
+
+                        parentGrid.Children.Add(_chartHoverOverlay);
+                        _chartOverlayParentGrid = parentGrid;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print("[V12] Overlay creation failed: " + ex.Message);
+                }
             }
         }
 
@@ -65,7 +104,101 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ChartControl != null)
             {
                 ChartControl.PreviewMouseLeftButtonDown -= OnChartClick;
+                ChartControl.MouseMove -= OnChartMouseMove;
+                ChartControl.MouseLeave -= OnChartMouseLeave;
+                ClearClickTraderBorderIfActive();
             }
+
+            // [Build 1108.002-HF1] Remove overlay from visual tree on teardown
+            if (_chartHoverOverlay != null && _chartOverlayParentGrid != null)
+            {
+                try
+                {
+                    _chartOverlayParentGrid.Children.Remove(_chartHoverOverlay);
+                }
+                catch { }
+            }
+            _chartHoverOverlay = null;
+            _chartOverlayParentGrid = null;
+        }
+
+        private bool IsClickTraderArmed()
+        {
+            return (RMAEnabled && isRMAModeActive) || (MOMOEnabled && isMOMOModeActive);
+        }
+
+        private bool IsPointerInPriceArea(MouseEventArgs e)
+        {
+            if (ChartPanel == null || e == null) return false;
+
+            Point mouseInPanel = e.GetPosition(ChartPanel as System.Windows.IInputElement);
+            if (mouseInPanel.X < 0 || mouseInPanel.X > ChartPanel.W || mouseInPanel.Y < 0 || mouseInPanel.Y > ChartPanel.H)
+                return false;
+
+            double effectivePriceHeight = ChartPanel.H * 0.667;
+            return mouseInPanel.Y <= effectivePriceHeight;
+        }
+
+        private void OnChartMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isTerminating) return;
+
+            bool shouldWarn = IsClickTraderArmed() && IsPointerInPriceArea(e);
+            if (shouldWarn == _chartHoverRedActive) return;
+
+            if (shouldWarn)
+            {
+                SetChartBorderWarning(true);
+                _chartHoverRedActive = true;
+            }
+            else
+            {
+                SetChartBorderWarning(false);
+                _chartHoverRedActive = false;
+            }
+        }
+
+        private void OnChartMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (!_chartHoverRedActive) return;
+
+            SetChartBorderWarning(false);
+            _chartHoverRedActive = false;
+        }
+
+        private void SetChartBorderWarning(bool active)
+        {
+            if (_chartHoverOverlay == null) return;
+            _chartHoverOverlay.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ClearClickTraderBorderIfActive()
+        {
+            if (!_chartHoverRedActive) return;
+
+            if (ChartControl == null)
+            {
+                _chartHoverRedActive = false;
+                return;
+            }
+
+            Action clearWarning = () =>
+            {
+                if (!_chartHoverRedActive) return;
+                SetChartBorderWarning(false);
+                _chartHoverRedActive = false;
+            };
+
+            if (ChartControl.Dispatcher.CheckAccess())
+                clearWarning();
+            else
+                ChartControl.Dispatcher.InvokeAsync(clearWarning);
+        }
+
+        private void ClearClickTraderBorderIfInactive()
+        {
+            if (IsClickTraderArmed()) return;
+            ClearClickTraderBorderIfActive();
         }
 
         /// <summary>
@@ -154,6 +287,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         isRMAButtonClicked = false;
                         isRMAModeActive = false;
+                        ClearClickTraderBorderIfInactive();
 
                         // V12.43: Lightweight deactivation -- only signal mode change, don't clobber config
                         SendResponseToRemote("SET_RMA_MODE|OFF");

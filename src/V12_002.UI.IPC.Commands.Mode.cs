@@ -43,8 +43,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bool enable = parts[1].Trim().ToUpperInvariant() == "ON";
                     isRMAModeActive = enable;
                     isRMAButtonClicked = enable;
+                    if (!enable)
+                        ClearClickTraderBorderIfInactive();
                     Print(string.Format("V12.4: SET_RMA_MODE = {0} (Chart-Click RMA {1})", enable, enable ? "ENABLED" : "DISABLED"));
                     MarkStickyDirty(); // Build 1103: Persist RMA toggle
+                    BumpUiConfigRevision();
+                    PublishUiSnapshot();
                 }
                 return true;
             }
@@ -112,11 +116,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print(string.Format("[STICKY] Mode switch {0} -> {1}: no saved profile, using current config",
                             outgoingMode, newMode));
                     }
-                    _configSyncNeeded = true;
+                    BumpUiConfigRevision();
+                    ClearClickTraderBorderIfInactive();
 
                     Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
                         newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
                     MarkStickyDirty(); // Build 1103: Persist mode change
+                    PublishUiSnapshot();
 
                     // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
                     // Sending CONFIG back here caused the Ping-Pong overwrite bug.
@@ -187,6 +193,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ChaseIfTouchPoints = parts[1].Trim();
                     Print($"[V12] CIT updated: {ChaseIfTouchPoints}");
                     MarkStickyDirty(); // Build 1103: Persist CIT
+                    BumpUiConfigRevision();
+                    PublishUiSnapshot();
                 }
                 return true;
             }
@@ -217,6 +225,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RiskPerTrade = val; // Sync legacy property
                     Print($"[V12.2] SET_MAX_RISK: {val}");
                     MarkStickyDirty(); // Build 1103: Persist max risk
+                    BumpUiConfigRevision();
+                    PublishUiSnapshot();
                 }
                 return true;
             }
@@ -246,6 +256,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Build 1102Y [U-02]: Immediately sync panel visibility -- panel needs the count, not a CONFIG echo.
                     SendResponseToRemote($"SYNC_TARGET_STATE|{clamped}");
                     MarkStickyDirty(); // Build 1103: Persist target count
+                    BumpUiConfigRevision();
+                    PublishUiSnapshot();
                 }
                 return true;
             }

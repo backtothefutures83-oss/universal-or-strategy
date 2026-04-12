@@ -40,142 +40,170 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!EnableSIMA)
             {
                 Print("[SIMA] DISABLED - Using single-account flatten");
-                FlattenAll(); // Call consolidated flatten
+                FlattenAll();
                 return;
             }
 
-            isFlattenRunning = true; // V12.8: Guard for Reaper + OnAccountExecutionUpdate
+            isFlattenRunning = true;
+            Print("[SIMA] ====== GLOBAL FLATTEN START (CHUNKED) ======");
+
+            // Phase 1: Snapshot + enqueue (zero broker calls on this cycle)
+            Account[] snapshot = Account.All.ToArray();
+            int enqueued = 0;
+            foreach (Account acct in snapshot)
+            {
+                if (IsFleetAccount(acct))
+                {
+                    _pendingFlattenOps.Enqueue(new FlattenWorkItem
+                    {
+                        Account = acct, CancelOnly = false, ZombieSweepOnly = false,
+                        IsMaster = false, Source = "FlattenAll"
+                    });
+                    enqueued++;
+                }
+            }
+
+            // Master account fallback (if not covered by AccountPrefix)
+            bool masterCovered = IsFleetAccount(Account);
+            if (!masterCovered)
+            {
+                _pendingFlattenOps.Enqueue(new FlattenWorkItem
+                {
+                    Account = Account, CancelOnly = false, ZombieSweepOnly = false,
+                    IsMaster = true, Source = "FlattenAll_Master"
+                });
+                enqueued++;
+            }
+
+            Print(string.Format("[SIMA] Enqueued {0} account(s) for chunked flatten", enqueued));
+
+            // Kick the pump -- one account per strategy-thread cycle
+            if (!_pendingFlattenOps.IsEmpty)
+                try { TriggerCustomEvent(o => PumpFlattenOps(), null); } catch { }
+            else
+            {
+                isFlattenRunning = false;
+                Print("[SIMA] ====== GLOBAL FLATTEN COMPLETE (no accounts matched) ======");
+            }
+        }
+
+        /// <summary>
+        /// Build 1109 [FREEZE-PROOF]: Processes ONE fleet account flatten per TriggerCustomEvent cycle.
+        /// Strategy thread yields between accounts, preventing multi-second freezes.
+        /// Mirrors PumpFleetDispatch pattern from SIMA.Dispatch.cs.
+        /// </summary>
+        private void PumpFlattenOps()
+        {
+            FlattenWorkItem item;
+            if (!_pendingFlattenOps.TryDequeue(out item))
+            {
+                isFlattenRunning = false;
+                Print("[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======");
+                return;
+            }
+
             try
             {
-                Print("[SIMA] ====== GLOBAL FLATTEN START ======");
-                int flattenCount = 0;
-                int totalCount = 0;
-
-                // V12.9: Flatten ALL matching accounts regardless of Fleet Manager status.
-                // This is a safety mechanism ??" "Flatten All" must always be able to close everything.
-                foreach (Account acct in Account.All)
+                Account acct = item.Account;
+                if (acct == null)
                 {
-                    if (IsFleetAccount(acct))
-                    {
-                        totalCount++;
-                        try
-                        {
-                            // [V12.12] Cancel all working orders for this instrument first.
-                            // acct.Flatten() is a managed API and silently no-ops in IsUnmanaged=true strategies.
-                            List<Order> ordersToCancel = new List<Order>();
-                            foreach (Order order in acct.Orders)
-                            {
-                                if (order.Instrument.FullName == Instrument.FullName &&
-                                    (order.OrderState == OrderState.Working || order.OrderState == OrderState.Submitted ||
-                                     order.OrderState == OrderState.Accepted || order.OrderState == OrderState.ChangePending ||
-                                     order.OrderState == OrderState.ChangeSubmitted))
-                                {
-                                    ordersToCancel.Add(order);
-                                }
-                            }
-                            if (ordersToCancel.Count > 0)
-                            {
-                                acct.Cancel(ordersToCancel);
-                                Print($"[SIMA] Cancelled {ordersToCancel.Count} working order(s) on {acct.Name}");
-                            }
-
-                            // Submit Market close orders for each open position
-                            int closedCount = 0;
-                            foreach (Position position in acct.Positions)
-                            {
-                                if (position.MarketPosition == MarketPosition.Flat) continue;
-                                int qty = position.Quantity;
-                                OrderAction closeAction = position.MarketPosition == MarketPosition.Long
-                                    ? OrderAction.Sell
-                                    : OrderAction.BuyToCover;
-                                string signalName = "Flatten_" + position.MarketPosition.ToString();
-                                Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market,
-                                    TimeInForce.Gtc, qty, 0, 0, "", signalName, null);
-                                acct.Submit(new[] { closeOrder });
-                                closedCount++;
-                            }
-                            if (closedCount > 0)
-                            {
-                                flattenCount++;
-                                Print($"[SIMA] [OK] Flattened {closedCount} position(s) on {acct.Name}");
-                            }
-
-                            // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
-                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                        }
-                        catch (Exception ex)
-                        {
-                            Print($"[SIMA] ??-- FLATTEN FAILED on {acct.Name}: {ex.Message}");
-                        }
-                    }
+                    Print("[FLATTEN_PUMP] NULL account in queue -- skipping");
+                    return;
                 }
 
-                // V12.12: Explicitly flatten the Master account if it was NOT covered by the prefix filter.
-                // Bug fix: If Master is "Sim101" and AccountPrefix is "Apex", the loop above skips it entirely.
-                bool masterCovered = IsFleetAccount(Account);
-                if (!masterCovered)
+                // Step 1: Cancel all working orders for this instrument
+                List<Order> ordersToCancel = new List<Order>();
+                foreach (Order order in acct.Orders.ToArray())
                 {
-                    totalCount++;
-                    try
+                    if (order == null || order.Instrument == null) continue;
+                    if (order.Instrument.FullName != Instrument.FullName) continue;
+
+                    bool isTerminal = order.OrderState == OrderState.Cancelled
+                        || order.OrderState == OrderState.CancelPending
+                        || order.OrderState == OrderState.CancelSubmitted
+                        || order.OrderState == OrderState.Filled
+                        || order.OrderState == OrderState.Rejected;
+                    if (isTerminal) continue;
+
+                    if (item.ZombieSweepOnly)
                     {
-                        // Build 997: Name-agnostic master bracket cancel via Connection.All.
-                        Account masterBroker997 = Account;
+                        // ClosePositionsOnly: Only sweep EMERGENCY_STOP_ and T1_-T5_ (zombie targets)
+                        bool isZombieTarget =
+                            order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase) ||
+                            order.Name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
+                            order.Name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
+                            order.Name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
+                            order.Name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
+                            order.Name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase);
+                        if (!isZombieTarget) continue;
+                    }
 
-                        List<Order> masterOrdersToCancel = new List<Order>();
-                        foreach (Order order in masterBroker997.Orders.ToArray())
-                        {
-                            if (order == null || order.Instrument?.FullName != Instrument?.FullName) continue;
-                            if (order.OrderState == OrderState.Cancelled       ||
-                                order.OrderState == OrderState.CancelPending   ||
-                                order.OrderState == OrderState.CancelSubmitted ||
-                                order.OrderState == OrderState.Filled          ||
-                                order.OrderState == OrderState.Rejected) continue;
-                            masterOrdersToCancel.Add(order);
-                        }
-                        if (masterOrdersToCancel.Count > 0)
-                        {
-                            masterBroker997.Cancel(masterOrdersToCancel);
-                            Print(string.Format("[SIMA][B997] {0} (Master): Cancelled {1} instrument order(s) (Connection.All, name-agnostic).", Account.Name, masterOrdersToCancel.Count));
-                        }
+                    ordersToCancel.Add(order);
+                }
 
-                        // Submit Market close orders via SubmitOrderUnmanaged for the master account
-                        int masterClosedCount = 0;
-                        foreach (Position position in Account.Positions)
+                if (ordersToCancel.Count > 0)
+                {
+                    acct.Cancel(ordersToCancel);
+                    Print(string.Format("[FLATTEN_PUMP] {0}: Cancelled {1} order(s) [{2}]",
+                        acct.Name, ordersToCancel.Count, item.Source));
+                }
+
+                // Step 2: Submit market close for each open position (skip if CancelOnly with no close intent)
+                if (!item.CancelOnly)
+                {
+                    int closedCount = 0;
+                    foreach (Position position in acct.Positions)
+                    {
+                        if (position.Instrument.FullName != Instrument.FullName) continue;
+                        if (position.MarketPosition == MarketPosition.Flat) continue;
+
+                        int qty = position.Quantity;
+                        OrderAction closeAction = position.MarketPosition == MarketPosition.Long
+                            ? OrderAction.Sell : OrderAction.BuyToCover;
+
+                        if (item.IsMaster)
                         {
-                            if (position.MarketPosition == MarketPosition.Flat) continue;
-                            int qty = position.Quantity;
-                            string signalName = position.MarketPosition == MarketPosition.Long
-                                ? "Flatten_MasterLong"
-                                : "Flatten_MasterShort";
+                            string sigName = position.MarketPosition == MarketPosition.Long
+                                ? "Flatten_MasterLong" : "Flatten_MasterShort";
                             Order masterClose = position.MarketPosition == MarketPosition.Long
-                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qty, 0, 0, "", signalName)
-                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", signalName);
-                            if (masterClose != null)
-                                masterClosedCount++;
-                            else
-                                Print($"[SIMA] ??-- Master close FAILED (SubmitOrderUnmanaged returned null): {position.MarketPosition} {qty}");
+                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qty, 0, 0, "", sigName)
+                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", sigName);
+                            if (masterClose != null) closedCount++;
+                            else Print(string.Format("[FLATTEN_PUMP] Master close FAILED (null): {0} {1}",
+                                position.MarketPosition, qty));
                         }
-                        if (masterClosedCount > 0)
+                        else
                         {
-                            flattenCount++;
-                            Print($"[SIMA] V12.12 Master flatten: {masterClosedCount} position(s) on {Account.Name} (outside prefix filter)");
+                            string sigName = "Flatten_" + position.MarketPosition.ToString();
+                            Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market,
+                                TimeInForce.Gtc, qty, 0, 0, "", sigName, null);
+                            acct.Submit(new[] { closeOrder });
+                            closedCount++;
                         }
+                    }
 
-                        // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
-                        SetExpectedPositionLocked(ExpKey(Account.Name), 0);
-                    }
-                    catch (Exception ex)
-                    {
-                        Print($"[SIMA] V12.12 Master FLATTEN FAILED on {Account.Name}: {ex.Message}");
-                    }
+                    if (closedCount > 0)
+                        Print(string.Format("[FLATTEN_PUMP] {0}: Closed {1} position(s) [{2}]",
+                            acct.Name, closedCount, item.Source));
                 }
 
-                Print($"[SIMA] ====== GLOBAL FLATTEN COMPLETE: {flattenCount} flattened across {totalCount} accounts ======");
+                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+            }
+            catch (Exception ex)
+            {
+                Print(string.Format("[FLATTEN_PUMP] ERROR on {0}: {1} [{2}]",
+                    item.Account != null ? item.Account.Name : "NULL", ex.Message, item.Source));
             }
             finally
             {
-                // V12.962 ACTOR: stateLock removed; no monitor to check. Always release guard.
-                isFlattenRunning = false; // V12.8: Always release guard, even on exception
+                // Chain to next account or release guard
+                if (!_pendingFlattenOps.IsEmpty)
+                    try { TriggerCustomEvent(o => PumpFlattenOps(), null); } catch { }
+                else
+                {
+                    isFlattenRunning = false;
+                    Print("[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======");
+                }
             }
         }
 
@@ -256,137 +284,43 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (!EnableSIMA) return;
 
-            // V12.Phase10 [ZOMBIE-STOP-FIX]: Set isFlattenRunning to suppress REAPER background thread
-            // during the naked window between zombie stop cancellation and Market close fill.
-            // REAPER.cs L97: `if (isFlattenRunning) continue;` ??" guard already exists; we activate it here.
-            // Previously this method did NOT set isFlattenRunning (V12.21 comment). Now it must, because
-            // the zombie sweep below creates a transient naked-position window the REAPER would self-heal.
             isFlattenRunning = true;
-            try
+            Print("[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======");
+
+            Account[] snapshot = Account.All.ToArray();
+            int enqueued = 0;
+            foreach (Account acct in snapshot)
             {
-                Print("[SIMA] ====== GLOBAL POSITIONS CLOSE START (System Protection Orders Swept; Limit/Stop Brackets Preserved) ======");
-                int closeCount = 0;
-                int totalCount = 0;
-
-                foreach (Account acct in Account.All)
+                if (!IsFleetAccount(acct)) continue;
+                // ZombieSweepOnly=true: cancel only zombie targets, then market close
+                _pendingFlattenOps.Enqueue(new FlattenWorkItem
                 {
-                    if (!IsFleetAccount(acct)) continue;
-
-                    totalCount++;
-                    try
-                    {
-                        // -- V12.Phase10 [ZOMBIE-STOP-FIX]: Zombie Sweep ------------------------------
-                        // Build 994: Sweep EMERGENCY_STOP_ zombies AND T1_-T5_ limit-exit targets.
-                        // T1_-T5_ are profit-exit limit orders. If a Market close is in-flight, a T*_ fill
-                        // creates a double-fill reversal (FLATTEN_ONLY race -- BUG 2). Stop_/S_ orders are
-                        // loss-protection and are intentionally preserved during the market-close fill window.
-                        List<Order> zombieOrders = new List<Order>();
-                        foreach (Order order in acct.Orders)
-                        {
-                            if (order.Instrument.FullName == Instrument.FullName &&
-                                (order.OrderState == OrderState.Working       ||
-                                 order.OrderState == OrderState.Submitted     ||
-                                 order.OrderState == OrderState.Accepted      ||
-                                 order.OrderState == OrderState.ChangePending ||
-                                 order.OrderState == OrderState.ChangeSubmitted) &&
-                                (order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase) ||
-                                 order.Name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
-                                 order.Name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
-                                 order.Name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
-                                 order.Name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
-                                 order.Name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase)))
-                            {
-                                zombieOrders.Add(order);
-                            }
-                        }
-                        if (zombieOrders.Count > 0)
-                        {
-                            acct.Cancel(zombieOrders); // V12.Phase10 [ZOMBIE-STOP-FIX]
-                            Print($"[SIMA][ZOMBIE-STOP-FIX] {acct.Name}: swept {zombieOrders.Count} system protection + limit-exit order(s). Deck cleared.");
-                        }
-                        // -----------------------------------------------------------------------------
-
-                        foreach (Position position in acct.Positions)
-                        {
-                            if (position.Instrument.FullName != Instrument.FullName) continue;
-                            if (position.MarketPosition == MarketPosition.Flat) continue;
-
-                            int qty = position.Quantity;
-                            OrderAction closeAction = position.MarketPosition == MarketPosition.Long
-                                ? OrderAction.Sell
-                                : OrderAction.BuyToCover;
-                            string signalName = "GracefulClose_" + position.MarketPosition.ToString();
-                            Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market,
-                                TimeInForce.Gtc, qty, 0, 0, "", signalName, null);
-                            acct.Submit(new[] { closeOrder });
-                            closeCount++;
-                            Print($"[SIMA] [OK] Graceful Close: {qty} {position.MarketPosition} on {acct.Name}");
-                        }
-
-                        // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
-                        SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                    }
-                    catch (Exception ex)
-                    {
-                        Print($"[SIMA] (!) CLOSE FAILED on {acct.Name}: {ex.Message}");
-                    }
-                }
-
-                // Master account fallback (if not covered by AccountPrefix filter)
-                bool masterCovered = IsFleetAccount(Account);
-                if (!masterCovered && Account.Positions.Count > 0)
-                {
-                    // Build 996: Name-agnostic master bracket cancel via Connection.All.
-                    Account masterBroker996f = Account;
-                    List<Order> masterSweep996 = new List<Order>();
-                    foreach (Order _ord996 in masterBroker996f.Orders.ToArray())
-                    {
-                        if (_ord996 == null || _ord996.Instrument?.FullName != Instrument?.FullName) continue;
-                        if (_ord996.OrderState == OrderState.Cancelled       ||
-                            _ord996.OrderState == OrderState.CancelPending   ||
-                            _ord996.OrderState == OrderState.CancelSubmitted ||
-                            _ord996.OrderState == OrderState.Filled          ||
-                            _ord996.OrderState == OrderState.Rejected) continue;
-                        masterSweep996.Add(_ord996);
-                    }
-                    if (masterSweep996.Count > 0)
-                    {
-                        masterBroker996f.Cancel(masterSweep996);
-                        Print(string.Format("[SIMA][B996] {0} (Master): Cancelled {1} instrument order(s) (Connection.All, name-agnostic).",
-                            Account.Name, masterSweep996.Count));
-                    }
-
-                    foreach (Position position in Account.Positions)
-                    {
-                        if (position.Instrument.FullName != Instrument.FullName) continue;
-                        if (position.MarketPosition == MarketPosition.Flat) continue;
-
-                        int qty = position.Quantity;
-                        Order masterClose = position.MarketPosition == MarketPosition.Long
-                            ? SubmitOrderUnmanaged(0, OrderAction.Sell,       OrderType.Market, qty, 0, 0, "", "GracefulClose_MasterLong")
-                            : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", "GracefulClose_MasterShort");
-                        if (masterClose != null)
-                        {
-                            closeCount++;
-                            Print($"[SIMA] [OK] Graceful Close: Master {qty} {position.MarketPosition}");
-                        }
-                        else
-                        {
-                            Print($"[SIMA] ??-- Graceful Close FAILED: Master {qty} {position.MarketPosition} (SubmitOrderUnmanaged returned null)");
-                        }
-                    }
-
-                    // Phase 5.5: Direct call -- strategy thread (TriggerCustomEvent), isFlattenRunning guards REAPER during transient window.
-                    SetExpectedPositionLocked(ExpKey(Account.Name), 0);
-                }
-
-                Print($"[SIMA] ====== GLOBAL POSITIONS CLOSE COMPLETE: {closeCount} positions closed ======");
+                    Account = acct, CancelOnly = false, ZombieSweepOnly = true,
+                    IsMaster = false, Source = "ClosePositionsOnly"
+                });
+                enqueued++;
             }
-            finally
+
+            // Master fallback
+            bool masterCovered = IsFleetAccount(Account);
+            if (!masterCovered && Account.Positions.Count > 0)
             {
-                // V12.Phase10 [ZOMBIE-STOP-FIX]: Always release REAPER suppression, even on exception.
-                // Mirrors FlattenAllApexAccounts() finally pattern (SIMA.cs L1274).
+                _pendingFlattenOps.Enqueue(new FlattenWorkItem
+                {
+                    Account = Account, CancelOnly = false, ZombieSweepOnly = true,
+                    IsMaster = true, Source = "ClosePositionsOnly_Master"
+                });
+                enqueued++;
+            }
+
+            Print(string.Format("[SIMA] Enqueued {0} account(s) for chunked close", enqueued));
+
+            if (!_pendingFlattenOps.IsEmpty)
+                try { TriggerCustomEvent(o => PumpFlattenOps(), null); } catch { }
+            else
+            {
                 isFlattenRunning = false;
+                Print("[SIMA] ====== GLOBAL POSITIONS CLOSE COMPLETE (no accounts) ======");
             }
         }
 

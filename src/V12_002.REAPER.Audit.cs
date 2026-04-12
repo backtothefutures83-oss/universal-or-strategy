@@ -180,17 +180,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (shouldLog) Print($"[REAPER] * QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
                         _reaperFlattenQueue.Enqueue(acct.Name);
-                        try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
+                        try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }
+                        catch (Exception _flatTriggerEx)
+                        {
+                            string _discarded;
+                            _reaperFlattenQueue.TryDequeue(out _discarded);
+                            Print("[REAPER] TriggerCustomEvent failed for flatten of "
+                                + acct.Name + ": " + _flatTriggerEx.Message
+                                + " -- dequeued, will re-detect next cycle");
+                        }
                     }
                 }
                 else if (shouldLog)
                     Print($"[REAPER] Minor Desync on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
             }
 
-            // ?? NAKED POSITION AUDIT (Build 1102R) ??????????????????????????????????
+            // --- NAKED POSITION AUDIT (Build 1102R) ---------------------------------
             if (actualQty != 0)
             {
-                bool hasWorkingStop = acct.Orders.Any(o =>
+                // Build 1108.003 [D3]: Snapshot broker orders before iteration. orderSnapshot
+                var orders = acct.Orders.ToArray();
+                bool hasWorkingStop = orders.Any(o =>
                     o.Instrument?.FullName == Instrument?.FullName &&
                     (o.OrderState == OrderState.Working || o.OrderState == OrderState.Accepted) &&
                     (o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit) &&
@@ -314,7 +324,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             if (shouldLog) Print($"[REAPER] QUEUING FLATTEN for {Account.Name} (Master) - Emergency Re-sync!");
                             _reaperFlattenQueue.Enqueue(Account.Name);
-                            try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
+                            try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }
+                            catch (Exception _mFlatTriggerEx)
+                            {
+                                string _mDiscarded;
+                                _reaperFlattenQueue.TryDequeue(out _mDiscarded);
+                                Print("[REAPER] TriggerCustomEvent failed for master flatten: "
+                                    + _mFlatTriggerEx.Message + " -- dequeued, will re-detect next cycle");
+                            }
                         }
                     }
                     else if (shouldLog)

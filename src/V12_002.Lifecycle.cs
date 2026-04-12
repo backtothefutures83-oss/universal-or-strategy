@@ -70,7 +70,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Risk defaults
                 RiskPerTrade = 200;
-                ReducedRiskPerTrade = 200; // deprecated -- hidden in UI (RISK-01)
                 StopThresholdPoints = 5.0;
                 SlippageCushionPoints = 1.0; // SLIP-01: 1pt default cushion for follower slippage
                 MESMinimum = 1;
@@ -146,7 +145,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnablePathB = false;
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;
-                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES?MES fleet parity
+                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES/MES fleet parity
                 ShadowModeEnabled = false; // Build 1105: Shadow Mode opt-in, default OFF for safe rollout
                 PathBStopPoints = 10.0;
                 PathBTargetPoints = 15.0;
@@ -198,6 +197,43 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // V12 SIMA: Initialize expected positions tracking
                 expectedPositions = new ConcurrentDictionary<string, int>(2, 20); // Up to 20 accounts
+
+                // v28.0 Sovereign Photon [ADR-012 + ADR-016]: pool + ring + sideband + salt + MMIO mirror
+                // Capacity 64: 5 concurrent signals x 12 accounts = 60 < 64
+                _photonPool = new PhotonOrderPool(PhotonPoolCapacity);
+                _photonDispatchRing = new SPSCRing<FleetDispatchSlot>(PhotonPoolCapacity);
+                _photonSideband = new FleetDispatchSideband[PhotonPoolCapacity];
+                _photonShadowSalt = unchecked((ulong)Guid.NewGuid().GetHashCode() * 0x9E3779B97F4A7C15UL);
+
+                // Static assert: Shadow must be the last 8 bytes of FleetDispatchSlot (ADR-016)
+                {
+                    int _slotSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(FleetDispatchSlot));
+                    int _shadowOffset = System.Runtime.InteropServices.Marshal.OffsetOf(typeof(FleetDispatchSlot), "Shadow").ToInt32();
+                    if (_slotSize != 64 || _shadowOffset != 56)
+                    {
+                        throw new InvalidOperationException(string.Format(
+                            "FleetDispatchSlot layout invariant violated: size={0}, shadowOffset={1}; expected size=64, offset=56",
+                            _slotSize, _shadowOffset));
+                    }
+                }
+
+                // Optional MMIO mirror. Named per-process so multiple NT instances do not collide.
+                // Failure is non-fatal: hot path runs against the heap ring even if the mirror fails.
+                try
+                {
+                    string _mmfName = "V12_FleetDispatch_" + System.Diagnostics.Process.GetCurrentProcess().Id.ToString() + "_" + _photonShadowSalt.ToString("X16");
+                    _photonMmioMirror = new MmioDispatchMirror(_mmfName, PhotonPoolCapacity, 64, _photonShadowSalt);
+                    Print(string.Format("[PHOTON MMIO] mirror online: {0}", _mmfName));
+                }
+                catch (Exception _mmioEx)
+                {
+                    _photonMmioMirror = null;
+                    Print("[PHOTON MMIO] mirror unavailable (hot path unaffected): " + _mmioEx.Message);
+                }
+
+                // V14.2 Sovereign Photon [ADR-011]: Pre-allocate execution ID dedup rings
+                _executionIdRing = new ExecutionIdRing(512, 1024);
+                _executionIdFallbackRing = new ExecutionIdRing(512, 1024);
 
                 // V12.1: Initialize Compliance Hub -- create log directory early (idempotent).
                 // Build 935 [Fix-2/3]: Symbol-specific log paths and LogicAudit moved to DataLoaded.
@@ -309,6 +345,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
                 // [Build 932]: Start IPC in DataLoaded so Control Surface connects even if market is closed/offline.
                 StartIpcServer();
+                TouchStrategyHeartbeat();
+                PublishUiSnapshot();
             }
             else if (state == State.Realtime)
             {
@@ -316,6 +354,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("|          [OK] BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE       |");
                 Print(string.Format("|          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    |", BUILD_TAG));
                 Print("+--------------------------------------------------------------+");
+                TouchStrategyHeartbeat();
+                PublishUiSnapshot();
+                StartWatchdog();
 
                 if (EnableSIMA)
                 {
@@ -356,6 +397,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (state == State.Terminated)
             {
                 _isTerminating = true;
+                StopWatchdog();
 
                 _configureComplete = false;
                 _dataLoadedComplete = false;
@@ -390,7 +432,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() -- unconditional (no EnableSIMA guard)
                 // to handle cases where flag was toggled OFF mid-session while handlers were still subscribed.
                 UnsubscribeFromFleetAccounts();
-                
+
+                // v28.0 MMIO mirror teardown
+                if (_photonMmioMirror != null)
+                {
+                    try { _photonMmioMirror.Dispose(); } catch { }
+                    _photonMmioMirror = null;
+                }
 
                 // V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
                 // Static events survive instance disposal -- without this, dead instance handlers accumulate
@@ -493,9 +541,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (marketDataUpdate.MarketDataType == MarketDataType.Last)
             {
                 if (!EnsureStartupReady(nameof(OnMarketData))) return;
+                TouchStrategyHeartbeat();
 
                 // Update last known price for real-time tracking
                 lastKnownPrice = marketDataUpdate.Price;
+                PublishUiSnapshot();
                 
                 // Process IPC commands immediately on every tick
                 // This ensures Remote App buttons work even outside session time

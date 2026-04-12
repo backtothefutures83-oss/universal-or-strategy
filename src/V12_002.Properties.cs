@@ -70,9 +70,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Risk Per Trade ($)", GroupName = "2. Risk", Order = 1)]
         public double RiskPerTrade { get; set; }
 
-        /// <summary>DEPRECATED (Phase 9.1). Never consumed by Sizing engine. Use MaxRiskAmount (=RiskPerTrade) only.</summary>
+        /// <summary>REMOVED (Phase 10). Stub retained for workspace XML backward compat.</summary>
         [Browsable(false)]
-        [NinjaScriptProperty]
+        [System.Xml.Serialization.XmlIgnore]
         public double ReducedRiskPerTrade { get; set; }
 
         [NinjaScriptProperty]

@@ -44,10 +44,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ExecuteSmartDispatchEntry(string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType = OrderType.Market, params string[] masterEntryNames)
         {
-            // V12.Phase8 [F-03]: Semaphore guard to prevent racing with SIMA lifecycle changes (ApplySimaState).
-            if (!_simaToggleSem.Wait(200))
+            // V12.Phase8 [F-03]: Semaphore guard -- non-blocking (Build 1109 freeze-proof).
+            // Wait(0) returns instantly. If contended, defer to next strategy-thread cycle.
+            if (!_simaToggleSem.Wait(0))
             {
-                Print("[DISPATCH] (!) Semaphore timeout -- skipping dispatch to avoid SIMA lifecycle race");
+                Print("[DISPATCH] Semaphore contended -- deferring dispatch (non-blocking)");
+                string _defTradeType = tradeType;
+                OrderAction _defAction = action;
+                int _defQty = quantity;
+                double _defPrice = entryPrice;
+                OrderType _defOrderType = entryOrderType;
+                string[] _defMasterNames = masterEntryNames;
+                try
+                {
+                    TriggerCustomEvent(o => ExecuteSmartDispatchEntry(
+                        _defTradeType, _defAction, _defQty, _defPrice,
+                        _defOrderType, _defMasterNames), null);
+                }
+                catch { Print("[DISPATCH] Deferred retry scheduling failed"); }
                 return;
             }
 
@@ -62,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (!EnableSIMA)
                 {
-                    Print("[DISPATCH] ?????? SIMA DISABLED - Enable in strategy parameters to copy trade");
+                    Print("[DISPATCH] [ERR] SIMA DISABLED - Enable in strategy parameters to copy trade");
                     return;
                 }
 
@@ -70,7 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (isFlattenRunning)
                 {
                     Print("[DISPATCH] (!) Aborting dispatch -- flatten in progress (isFlattenRunning=true)");
-                    return; // finally block at line 414 releases _simaToggleSem
+                    return; // finally block releases _simaToggleSem
                 }
 
                 // Phase 6 [MG-D1]: MetadataGuard -- reject duplicate dispatch signals.
@@ -106,13 +120,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (fleet.Count == 0)
                 {
-                    Print("[DISPATCH] ?????? NO APEX ACCOUNTS DETECTED - Check AccountPrefix setting");
+                    Print("[DISPATCH] [ERR] NO APEX ACCOUNTS DETECTED - Check AccountPrefix setting");
                     return;
                 }
 
                 if (activeCount == 0)
                 {
-                    Print("[DISPATCH] ?????? NO ACCOUNTS ENABLED - Toggle accounts ON in Fleet Manager panel");
+                    Print("[DISPATCH] [ERR] NO ACCOUNTS ENABLED - Toggle accounts ON in Fleet Manager panel");
                 }
 
                 int rmaCount = 0;
@@ -266,7 +280,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             var stagedTargets = new List<StagedTarget>(5);
 
                             // V12.Phase8.3: Use activeTargetCount from dashboard to restrict number of targets submitted
-                            // FIX-B [Build 1102Z]: Use dispatchTargetCount snapshot (captured before loop) ??" not live global.
+                            // FIX-B [Build 1102Z]: Use dispatchTargetCount snapshot (captured before loop) -- not live global.
                             for (int targetNum = 1; targetNum <= dispatchTargetCount; targetNum++)
                             {
                                 int targetQty = GetTargetContracts(fleetPos, targetNum);
@@ -359,19 +373,87 @@ namespace NinjaTrader.NinjaScript.Strategies
                             reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
                             AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
 
-                            // [Build 936 FIX-1]: Enqueue for async TriggerCustomEvent pump instead of blocking Submit.
-                            // Pump handler (PumpFleetDispatch) owns: Submit, ClearDispatchSyncPending, delta rollback, dict cleanup.
-                            // Transfer ownership flags so the per-account catch block does not double-cleanup.
-                            Interlocked.Increment(ref _pendingFleetDispatchCount);
-                            _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
+                            // V14.2 [ADR-012]: Zero-allocation dispatch via PhotonPool + SPSC ring
+                            int _poolSlotIndex = -1;
+                            Order[] _proxyOrders = null;
                             {
-                                Account    = acct,
-                                Orders     = ordersToSubmit.ToArray(),
-                                FleetEntryName = fleetEntryName,
-                                ExpectedKey    = expectedKey,
-                                ReservedDelta  = reservedDelta,
-                                SignalTicks    = DateTime.UtcNow.Ticks
-                            });
+                                var _claimed = _photonPool.Claim();
+                                if (_claimed.Orders != null)
+                                {
+                                    _proxyOrders = _claimed.Orders;
+                                    _poolSlotIndex = _claimed.SlotIndex;
+                                }
+                                else
+                                {
+                                    Print("[PHOTON] Pool exhausted -- fallback to heap alloc");
+                                    _proxyOrders = new Order[MaxOrdersPerSlot];
+                                    _poolSlotIndex = -1;
+                                }
+                            }
+
+                            int _orderIdx = 0;
+                            _proxyOrders[_orderIdx++] = entry;
+                            _proxyOrders[_orderIdx++] = stop;
+                            foreach (var _st in stagedTargets)
+                                _proxyOrders[_orderIdx++] = _st.Order;
+
+                            // v28.0 blittable slot + sideband-first publish
+                            if (_poolSlotIndex >= 0)
+                            {
+                                _photonSideband[_poolSlotIndex].Account        = acct;
+                                _photonSideband[_poolSlotIndex].FleetEntryName = fleetEntryName;
+                                _photonSideband[_poolSlotIndex].ExpectedKey    = expectedKey;
+                                Thread.MemoryBarrier(); // sideband writes visible before ring publish
+                            }
+
+                            FleetDispatchSlot _slot = new FleetDispatchSlot
+                            {
+                                EntryPrice    = entryPrice,
+                                StopPrice     = stopPrice,
+                                SignalTicks   = DateTime.UtcNow.Ticks,
+                                PoolSlotIndex = _poolSlotIndex,
+                                OrderCount    = _orderIdx,
+                                Quantity      = followerQty,
+                                TargetCount   = dispatchTargetCount,
+                                Action        = (int)action,
+                                ReservedDelta = reservedDelta
+                            };
+                            _slot.Shadow = ComputeFleetDispatchShadow(ref _slot, _photonShadowSalt);
+
+                            Interlocked.Increment(ref _pendingFleetDispatchCount);
+
+                            if (_poolSlotIndex >= 0 && _photonDispatchRing.TryEnqueue(ref _slot))
+                            {
+                                // Success: slot in ring, pool + sideband linked by PoolSlotIndex.
+                                // MMIO mirror is a best-effort write-through -- never blocks or fails hot path.
+                                if (_photonMmioMirror != null)
+                                {
+                                    try { _photonMmioMirror.TryPublish(ref _slot); } catch { }
+                                }
+                            }
+                            else
+                            {
+                                // Ring full or pool exhausted -- fallback to ConcurrentQueue
+                                if (_poolSlotIndex >= 0)
+                                {
+                                    // Pool succeeded but ring full -- release pool, clear sideband, heap-copy
+                                    Print("[PHOTON] Ring full -- fallback to ConcurrentQueue");
+                                    Order[] legacyOrders = new Order[_orderIdx];
+                                    Array.Copy(_proxyOrders, legacyOrders, _orderIdx);
+                                    _photonPool.ReleaseByIndex(_poolSlotIndex);
+                                    _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
+                                    _proxyOrders = legacyOrders;
+                                }
+                                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
+                                {
+                                    Account = acct,
+                                    Orders = _proxyOrders,
+                                    FleetEntryName = fleetEntryName,
+                                    ExpectedKey = expectedKey,
+                                    ReservedDelta = reservedDelta,
+                                    SignalTicks = DateTime.UtcNow.Ticks
+                                });
+                            }
                             syncPending         = false;
                             reservedDelta       = 0;
                             registeredForCleanup = false;
@@ -385,8 +467,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
                             // REAPER runs on a background thread; if it fires between the expectedPositions
-                            // update and the dict commit (the old T1??'T3 race), it observes non-zero expected
-                            // with no entry in entryOrders ??' hasWorkingEntry=false ??' phantom repair queued.
+                            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
+                            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
                             // Registering dicts first guarantees REAPER always finds the blocking entry.
                             // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
                             // ConcurrentDictionary single-writes are thread-safe here.
@@ -415,17 +497,73 @@ namespace NinjaTrader.NinjaScript.Strategies
                             reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
                             AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
 
-                            // [Build 936 FIX-1]: Enqueue for async TriggerCustomEvent pump instead of blocking Submit.
-                            Interlocked.Increment(ref _pendingFleetDispatchCount);
-                            _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
+                            int _poolSlotIndexLmt = -1;
+                            Order[] _proxyOrdersLmt = null;
                             {
-                                Account    = acct,
-                                Orders     = new[] { entry },
-                                FleetEntryName = fleetEntryName,
-                                ExpectedKey    = expectedKey,
-                                ReservedDelta  = reservedDelta,
-                                SignalTicks    = DateTime.UtcNow.Ticks
-                            });
+                                var _claimedLmt = _photonPool.Claim();
+                                if (_claimedLmt.Orders != null)
+                                {
+                                    _proxyOrdersLmt = _claimedLmt.Orders;
+                                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
+                                }
+                                else
+                                {
+                                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
+                                    _poolSlotIndexLmt = -1;
+                                }
+                            }
+                            _proxyOrdersLmt[0] = entry;
+
+                            if (_poolSlotIndexLmt >= 0)
+                            {
+                                _photonSideband[_poolSlotIndexLmt].Account        = acct;
+                                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
+                                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
+                                Thread.MemoryBarrier();
+                            }
+
+                            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
+                            {
+                                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                                StopPrice     = 0,
+                                SignalTicks   = DateTime.UtcNow.Ticks,
+                                PoolSlotIndex = _poolSlotIndexLmt,
+                                OrderCount    = 1,
+                                Quantity      = followerQty,
+                                TargetCount   = 0,
+                                Action        = (int)action,
+                                ReservedDelta = reservedDelta
+                            };
+                            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
+
+                            Interlocked.Increment(ref _pendingFleetDispatchCount);
+
+                            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
+                            {
+                                if (_photonMmioMirror != null)
+                                {
+                                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
+                                }
+                            }
+                            else
+                            {
+                                if (_poolSlotIndexLmt >= 0)
+                                {
+                                    Order[] legacyOrdersLmt = new Order[] { entry };
+                                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
+                                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
+                                    _proxyOrdersLmt = legacyOrdersLmt;
+                                }
+                                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
+                                {
+                                    Account = acct,
+                                    Orders = _proxyOrdersLmt,
+                                    FleetEntryName = fleetEntryName,
+                                    ExpectedKey = expectedKey,
+                                    ReservedDelta = reservedDelta,
+                                    SignalTicks = DateTime.UtcNow.Ticks
+                                });
+                            }
                             syncPending         = false;
                             reservedDelta       = 0;
                             registeredForCleanup = false;
@@ -467,11 +605,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                // [Build 936 FIX-1]: Prime the TriggerCustomEvent pump - one account Submit per strategy-thread cycle.
-                if (!_pendingFleetDispatches.IsEmpty)
+                // V14.2 FIX-F7: Pump prime checks BOTH ring and legacy queue
+                if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
                     try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
 
-                // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) ??" stop clock, flush forensic report.
+                // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) -- stop clock, flush forensic report.
                 sw.Stop();
                 long tFinalTicks = sw.ElapsedTicks;
                 double totalMs  = tFinalTicks        * 1000.0 / Stopwatch.Frequency;

@@ -85,6 +85,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private string _panelLastSyncedMode;
         private int _panelLastSyncedTargetCount;
+        private int _panelAppliedConfigRevision;
         private long _panelChipClickTicks;
         private int _placementRetryCount;
         private System.Windows.Threading.DispatcherTimer _placementRetryTimer;
@@ -96,6 +97,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CreatePanel()
         {
             if (rootContainer != null) return;
+            UIStateSnapshot snapshot = GetUiSnapshot();
 
             rootContainer = new Grid
             {
@@ -153,12 +155,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             AttachPanelHandlers();
             UpdateContextualUI(_panelLastSyncedMode ?? "ORB");
-            int initCount = _panelLastSyncedTargetCount > 0 ? _panelLastSyncedTargetCount : Math.Max(1, Math.Min(5, activeTargetCount));
+            int initCount = _panelLastSyncedTargetCount > 0 ? _panelLastSyncedTargetCount : Math.Max(1, Math.Min(5, snapshot.TargetCount));
             UpdateTargetVisibility(initCount);
             SyncCountChipVisuals(initCount);
-            UpdateRmaButtonVisual(isRMAModeActive);
-            if (trendRmaToggle != null) trendRmaToggle.Opacity = isTrendRmaMode ? 1.0 : 0.5;
-            if (retestRmaToggle != null) retestRmaToggle.Opacity = isRetestRmaMode ? 1.0 : 0.5;
+            UpdateRmaButtonVisual(snapshot.IsRmaModeActive);
+            if (trendRmaToggle != null) trendRmaToggle.Opacity = snapshot.IsTrendRmaMode ? 1.0 : 0.5;
+            if (retestRmaToggle != null) retestRmaToggle.Opacity = snapshot.IsRetestRmaMode ? 1.0 : 0.5;
+            _panelAppliedConfigRevision = snapshot.ConfigRevision;
+            UpdatePanelState();
 
             // Run visual tree diagnostic (once, on first creation)
             DumpVisualTree();
@@ -359,6 +363,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             _panelLastSyncedMode = null;
             _panelLastSyncedTargetCount = 0;
+            _panelAppliedConfigRevision = 0;
         }
 
         private Border CreateSection0_Identity()
@@ -942,6 +947,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private Border CreateSection3_Config()
         {
+            UIStateSnapshot snapshot = GetUiSnapshot();
+            UIConfigSnapshot config = snapshot.Config ?? new UIConfigSnapshot();
             Border section = CreateSectionBorder();
             section.BorderThickness = new Thickness(0);
             StackPanel stack = new StackPanel
@@ -957,10 +964,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             modeCountGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             modeCountGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            string currentMode = GetCurrentConfigMode();
-            if (string.Equals(currentMode, "OR", StringComparison.OrdinalIgnoreCase))
-                currentMode = "ORB";
-            int currentCount = Math.Max(1, Math.Min(5, activeTargetCount));
+            string currentMode = string.IsNullOrEmpty(snapshot.Mode) ? "ORB" : snapshot.Mode;
+            int currentCount = Math.Max(1, Math.Min(5, snapshot.TargetCount));
 
             StackPanel modeColumn = new StackPanel { Margin = new Thickness(0, 0, 1, 0), HorizontalAlignment = HorizontalAlignment.Stretch };
             modeOrbButton = CreateModeChip("ORB", string.Equals(currentMode, "ORB", StringComparison.OrdinalIgnoreCase));
@@ -997,44 +1002,44 @@ namespace NinjaTrader.NinjaScript.Strategies
             svRow1.Children.Add(new TextBlock { Text = "SV:", Foreground = TextPrimary, FontSize = 9, FontFamily = ConsolasFont, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
 
             svRow1.Children.Add(new TextBlock { Text = "T1", Foreground = GreenFg, FontSize = 9, FontFamily = ConsolasFont, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
-            svT1Val = CreateTextBox(FormatPanelDouble(Target1Value), 30); svT1Val.Height = 20; svT1Val.FontSize = 9;
+            svT1Val = CreateTextBox(FormatPanelDouble(config.Target1Value), 30); svT1Val.Height = 20; svT1Val.FontSize = 9;
             svRow1.Children.Add(svT1Val);
             svT1Type = CreateCombo(42, "ATR", "Ticks", "Pts", "Runner"); svT1Type.Height = 20; svT1Type.FontSize = 8; svT1Type.Margin = new Thickness(2, 0, 6, 0);
-            SetComboSelection(svT1Type, GetPanelTargetModeText(T1Type));
+            SetComboSelection(svT1Type, GetPanelTargetModeText(config.Target1Type));
             svRow1.Children.Add(svT1Type);
 
             svRow1.Children.Add(new TextBlock { Text = "T2", Foreground = YellowFg, FontSize = 9, FontFamily = ConsolasFont, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
-            svT2Val = CreateTextBox(FormatPanelDouble(Target2Value), 30); svT2Val.Height = 20; svT2Val.FontSize = 9;
+            svT2Val = CreateTextBox(FormatPanelDouble(config.Target2Value), 30); svT2Val.Height = 20; svT2Val.FontSize = 9;
             svRow1.Children.Add(svT2Val);
             svT2Type = CreateCombo(42, "ATR", "Ticks", "Pts", "Runner"); svT2Type.Height = 20; svT2Type.FontSize = 8;
-            SetComboSelection(svT2Type, GetPanelTargetModeText(T2Type));
+            SetComboSelection(svT2Type, GetPanelTargetModeText(config.Target2Type));
             svRow1.Children.Add(svT2Type);
             stack.Children.Add(svRow1);
 
             t3Row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
             t3Row.Children.Add(new TextBlock { Text = "       T3", Foreground = OrangeFg, FontSize = 9, FontFamily = ConsolasFont, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
-            svT3Val = CreateTextBox(FormatPanelDouble(Target3Value), 30); svT3Val.Height = 20; svT3Val.FontSize = 9;
+            svT3Val = CreateTextBox(FormatPanelDouble(config.Target3Value), 30); svT3Val.Height = 20; svT3Val.FontSize = 9;
             t3Row.Children.Add(svT3Val);
             svT3Type = CreateCombo(42, "ATR", "Ticks", "Pts", "Runner"); svT3Type.Height = 20; svT3Type.FontSize = 8; svT3Type.Margin = new Thickness(2, 0, 0, 0);
-            SetComboSelection(svT3Type, GetPanelTargetModeText(T3Type));
+            SetComboSelection(svT3Type, GetPanelTargetModeText(config.Target3Type));
             t3Row.Children.Add(svT3Type);
             stack.Children.Add(t3Row);
 
             t4Row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2), Visibility = Visibility.Collapsed };
             t4Row.Children.Add(new TextBlock { Text = "       T4", Foreground = RedFg, FontSize = 9, FontFamily = ConsolasFont, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
-            svT4Val = CreateTextBox(FormatPanelDouble(Target4Value), 30); svT4Val.Height = 20; svT4Val.FontSize = 9;
+            svT4Val = CreateTextBox(FormatPanelDouble(config.Target4Value), 30); svT4Val.Height = 20; svT4Val.FontSize = 9;
             t4Row.Children.Add(svT4Val);
             svT4Type = CreateCombo(42, "ATR", "Ticks", "Pts", "Runner"); svT4Type.Height = 20; svT4Type.FontSize = 8; svT4Type.Margin = new Thickness(2, 0, 0, 0);
-            SetComboSelection(svT4Type, GetPanelTargetModeText(T4Type));
+            SetComboSelection(svT4Type, GetPanelTargetModeText(config.Target4Type));
             t4Row.Children.Add(svT4Type);
             stack.Children.Add(t4Row);
 
             t5Row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 3), Visibility = Visibility.Collapsed };
             t5Row.Children.Add(new TextBlock { Text = "       T5", Foreground = PinkFg, FontSize = 9, FontFamily = ConsolasFont, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) });
-            svT5Val = CreateTextBox(FormatPanelDouble(Target5Value), 30); svT5Val.Height = 20; svT5Val.FontSize = 9;
+            svT5Val = CreateTextBox(FormatPanelDouble(config.Target5Value), 30); svT5Val.Height = 20; svT5Val.FontSize = 9;
             t5Row.Children.Add(svT5Val);
             svT5Type = CreateCombo(42, "ATR", "Ticks", "Pts", "Runner"); svT5Type.Height = 20; svT5Type.FontSize = 8; svT5Type.Margin = new Thickness(2, 0, 0, 0);
-            SetComboSelection(svT5Type, GetPanelTargetModeText(T5Type));
+            SetComboSelection(svT5Type, GetPanelTargetModeText(config.Target5Type));
             t5Row.Children.Add(svT5Type);
             stack.Children.Add(t5Row);
 
@@ -1049,10 +1054,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Grid.SetColumn(strLabel, 0);
             riskRow.Children.Add(strLabel);
 
-            double stopValue = string.Equals(currentMode, "RMA", StringComparison.OrdinalIgnoreCase)
-                ? RMAStopATRMultiplier
-                : StopMultiplier;
-            strVal = CreateTextBox(FormatPanelDouble(stopValue), 33); strVal.Height = 20; strVal.FontSize = 9; strVal.Foreground = OrangeFg;
+            strVal = CreateTextBox(FormatPanelDouble(config.StopValue), 33); strVal.Height = 20; strVal.FontSize = 9; strVal.Foreground = OrangeFg;
             svStrType = CreateCombo(40, "ATR", "Ticks", "Pts", "OR");
             svStrType.Height = 20; svStrType.FontSize = 8;
             if (string.Equals(currentMode, "ORB", StringComparison.OrdinalIgnoreCase))
@@ -1071,7 +1073,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Grid.SetColumn(maxLabel, 2);
             riskRow.Children.Add(maxLabel);
 
-            maxVal = CreateTextBox(FormatPanelDouble(MaxRiskAmount), 55); maxVal.Height = 20; maxVal.FontSize = 9; maxVal.Foreground = OrangeFg;
+            maxVal = CreateTextBox(FormatPanelDouble(config.MaxRiskValue), 55); maxVal.Height = 20; maxVal.FontSize = 9; maxVal.Foreground = OrangeFg;
             Grid.SetColumn(maxVal, 3);
             riskRow.Children.Add(maxVal);
             stack.Children.Add(riskRow);
@@ -1086,7 +1088,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Grid.SetColumn(citLabel, 0);
             citRow.Children.Add(citLabel);
 
-            citVal = CreateTextBox(string.IsNullOrEmpty(ChaseIfTouchPoints) ? "0" : ChaseIfTouchPoints, 55); citVal.Height = 20; citVal.FontSize = 10; citVal.Foreground = OrangeFg; citVal.FontWeight = FontWeights.Bold;
+            citVal = CreateTextBox(string.IsNullOrEmpty(config.ChaseIfTouchPoints) ? "0" : config.ChaseIfTouchPoints, 55); citVal.Height = 20; citVal.FontSize = 10; citVal.Foreground = OrangeFg; citVal.FontWeight = FontWeights.Bold;
             citVal.ToolTip = "Chase If Touch: Points offset (0 = disabled)";
             Grid.SetColumn(citVal, 1);
             citRow.Children.Add(citVal);
@@ -1101,6 +1103,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             _panelLastSyncedMode = currentMode;
             _panelLastSyncedTargetCount = currentCount;
+            _panelAppliedConfigRevision = snapshot.ConfigRevision;
             return section;
         }
 

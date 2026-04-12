@@ -374,12 +374,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (newStop == null)
                 {
-                    Print(string.Format("?? ?? CRITICAL ERROR: Stop order submission returned NULL for {0}!", entryName));
-                    Print(string.Format("?? ?? POSITION UNPROTECTED: {0} {1} contracts @ {2:F2}",
+                    Print(string.Format("(!) CRITICAL ERROR: Stop order submission returned NULL for {0}!", entryName));
+                    Print(string.Format("(!) POSITION UNPROTECTED: {0} {1} contracts @ {2:F2}",
                         direction == MarketPosition.Long ? "LONG" : "SHORT", quantity, stopPrice));
 
                     // Attempt to flatten position immediately
-                    Print(string.Format("?? ?? Attempting emergency flatten for {0}...", entryName));
+                    Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
                     FlattenPositionByName(entryName);
                     return;
                 }
@@ -402,7 +402,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print(string.Format("?? ?? ERROR CreateNewStopOrder for {0}: {1}", entryName, ex.Message));
+                Print(string.Format("(!) ERROR CreateNewStopOrder for {0}: {1}", entryName, ex.Message));
             }
         }
 

@@ -326,16 +326,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             switch (key)
             {
                 case "MODE":
-                    // Atomic mode set (same pattern as SET_MODE handler in V12_002.UI.IPC.Commands.Mode.cs:77-121)
+                    // Build 1108.002 SAFETY GATE: Click-trader modes never auto-rearm on startup.
                     isRMAModeActive = false; isRMAButtonClicked = false;
                     isRetestModeActive = false; isTRENDModeActive = false;
                     isMOMOModeActive = false; isFFMAModeArmed = false;
-                    if (val == "RMA")    { isRMAModeActive = true; isRMAButtonClicked = true; }
-                    else if (val == "TREND")  isTRENDModeActive = true;
-                    else if (val == "RETEST") isRetestModeActive = true;
-                    else if (val == "MOMO")   isMOMOModeActive = true;
-                    else if (val == "FFMA")   isFFMAModeArmed = true;
-                    // OR = all false (already done)
+                    if (val != "OR")
+                        Print(string.Format("[STICKY] MODE on disk was {0} -- forced to OR (safety gate)", val));
                     return true;
 
                 case "COUNT":

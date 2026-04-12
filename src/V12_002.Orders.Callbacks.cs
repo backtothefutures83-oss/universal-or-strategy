@@ -327,7 +327,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
-                        Print(string.Format("?? ?? CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
+                        Print(string.Format("(!) CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
                         stopOrders.TryRemove(kvp.Key, out _);
                         CreateNewStopOrder(kvp.Key, kvp.Value.RemainingContracts, kvp.Value.CurrentStopPrice, kvp.Value.Direction);
                         return true;
