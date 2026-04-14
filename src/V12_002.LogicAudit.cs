@@ -16,6 +16,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ExecuteRiskLogicAudit()
         {
+            TraceSpan _auditSpan = BeginSpan("LogicAudit");
             try
             {
                 Print("----------------------------------------------------------------");
@@ -307,10 +308,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("----------------------------------------------------------------");
                 Print("V12.1107.002-H AUDIT COMPLETE - LOGIC IS ISOLATED AND VERIFIED");
                 Print("----------------------------------------------------------------");
+                _auditSpan.End(Print);
             }
             catch (Exception ex)
             {
-                Print("AUDIT ERROR: " + ex.Message);
+                LogException("LogicAudit", "ExecuteRiskLogicAudit", ex);
             }
         }
 

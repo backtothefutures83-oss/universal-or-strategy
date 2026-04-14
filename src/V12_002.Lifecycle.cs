@@ -48,6 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _configureComplete = false;
                 _dataLoadedComplete = false;
                 Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
+                ResetTelemetry();
                 Description = "Universal OR Strategy V12.12 - Build " + BUILD_TAG;
                 Name = "V12_002";
                 Calculate = Calculate.OnPriceChange;  // CRITICAL FIX: Updates on every price tick for real-time trailing
@@ -421,6 +422,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 CancelAllV12GtcOrders(false);
 
                 DrainQueuesForShutdown();
+                EmitMetricsSummary();
 
                 // Stop IPC Server
                 StopIpcServer();

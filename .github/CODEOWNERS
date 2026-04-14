@@ -1,0 +1,22 @@
+# CODEOWNERS — V12 Universal OR Strategy
+# All code requires review from the Director (repository owner).
+# Ref: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global ownership — applies to all files not matched below
+* @mkalhitti-cloud
+
+# Core strategy kernel — highest sensitivity
+src/ @mkalhitti-cloud
+
+# Agent configuration — changes affect all AI agent sessions
+.agent/ @mkalhitti-cloud
+.claude/ @mkalhitti-cloud
+.gemini/ @mkalhitti-cloud
+AGENTS.md @mkalhitti-cloud
+CLAUDE.md @mkalhitti-cloud
+GEMINI.md @mkalhitti-cloud
+
+# CI/CD and deployment scripts — changes affect live production
+.github/ @mkalhitti-cloud
+deploy-sync.ps1 @mkalhitti-cloud
+scripts/ @mkalhitti-cloud
