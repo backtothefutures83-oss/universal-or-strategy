@@ -20,7 +20,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Written on strategy thread only; read-only from other callsites.
         private string _currentTraceId = "00000";
 
-        // ── Logic Metric Counters (Interlocked -- never lock) ──────────────────
+        // -- Logic Metric Counters (Interlocked -- never lock) ---------------------
         // Each counter tracks a distinct FSM event across the strategy lifetime.
         private long _metricFsmTransitions   = 0; // Every actor Enqueue() execution
         private long _metricSimaDispatches   = 0; // Every SIMA fleet broadcast
