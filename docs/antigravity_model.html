@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity OS | Sovereign Intelligence Model</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --cyan: #00f2ff;
+            --purple: #bc13fe;
+            --orange: #ff8c00;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #os-canvas {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- SVG Background Layer --- */
+        .flow-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .flow-line {
+            fill: none;
+            stroke-width: 2;
+            stroke-dasharray: 8, 12;
+            filter: drop-shadow(0 0 5px currentColor);
+        }
+
+        /* Animation Speeds */
+        .flow-slow { animation: flowAnim 10s linear infinite; }
+        .flow-fast { animation: flowAnim 3s linear infinite; }
+        .flow-medium { animation: flowAnim 6s linear infinite; }
+
+        @keyframes flowAnim {
+            from { stroke-dashoffset: 200; }
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* --- Nodes & Layout --- */
+        .node-container {
+            position: absolute;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .glass-node {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px 20px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .glass-node:hover {
+            transform: scale(1.1);
+            border-color: white;
+            box-shadow: 0 0 25px currentColor;
+        }
+
+        .label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.7);
+        }
+
+        /* --- Specific Node Styles --- */
+        .distillation-kernel {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid var(--purple);
+            color: var(--purple);
+            animation: pulsePurple 4s ease-in-out infinite;
+        }
+
+        .revenue-pool {
+            width: 120px;
+            height: 120px;
+            border-radius: 20%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid var(--cyan);
+            color: var(--cyan);
+            animation: pulseCyan 3s ease-in-out infinite;
+        }
+
+        @keyframes pulsePurple {
+            0%, 100% { box-shadow: 0 0 20px rgba(188, 19, 254, 0.2); }
+            50% { box-shadow: 0 0 50px rgba(188, 19, 254, 0.6); }
+        }
+
+        @keyframes pulseCyan {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(0, 242, 255, 0.5); }
+        }
+
+        /* --- Tooltips --- */
+        .tooltip {
+            visibility: hidden;
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%;
+            width: 180px;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .glass-node:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Position Modifiers */
+        .pos-top { top: 10%; }
+        .pos-bottom { bottom: 15%; }
+        .pos-left { left: 15%; }
+        .pos-right { right: 15%; }
+        .pos-center { top: 40%; }
+    </style>
+</head>
+<body>
+
+    <div id="os-canvas">
+        <svg class="flow-layer">
+            <path class="flow-line flow-slow" d="M 200,150 Q 500,100 500,300" stroke="#bc13fe" />
+            <path class="flow-line flow-slow" d="M 800,150 Q 500,100 500,300" stroke="#bc13fe" />
+            
+            <path class="flow-line flow-medium" d="M 500,450 Q 500,600 250,700" stroke="#ff8c00" />
+            
+            <path class="flow-line flow-fast" d="M 250,750 Q 500,850 500,700" stroke="#00f2ff" />
+            
+            <path class="flow-line flow-fast" d="M 750,750 Q 500,850 500,700" stroke="#00f2ff" />
+            
+            <path class="flow-line flow-medium" d="M 500,650 C 900,600 900,200 500,100" stroke="#00f2ff" />
+        </svg>
+
+        <div class="node-container pos-top pos-left">
+            <div class="label">Raw Compute</div>
+            <div class="glass-node" style="color: #bc13fe;">
+                FRONTIER PROVIDERS
+                <span class="tooltip">Distilling raw H100/A100 compute into high-order intelligence.</span>
+            </div>
+        </div>
+
+        <div class="node-container pos-top pos-right">
+            <div class="label">Data Silos</div>
+            <div class="glass-node" style="color: #bc13fe;">
+                PROPRIETARY DATA
+                <span class="tooltip">Refining siloed information into Sovereign Units.</span>
+            </div>
+        </div>
+
+        <div class="node-container pos-center">
+            <div class="label">Primary Kernel</div>
+            <div class="glass-node distillation-kernel">
+                <strong>SOVEREIGN<br>INTELLIGENCE</strong>
+                <span class="tooltip">The core OS where data and compute become agency.</span>
+            </div>
+        </div>
+
+        <div class="node-container pos-bottom pos-left">
+            <div class="label">Infrastructure Revenue</div>
+            <div class="glass-node" style="color: #ff8c00;">
+                A2A BRIDGE & KERNEL LICENSING
+                <span class="tooltip">Fixed fees for protocol access and agent communication.</span>
+            </div>
+        </div>
+
+        <div class="node-container pos-bottom pos-right">
+            <div class="label">Alpha Dividends</div>
+            <div class="glass-node" style="color: #ff8c00;">
+                DROID TRADING AGENTS
+                <span class="tooltip">5% Performance Fee generated by autonomous profit-seeking droids.</span>
+            </div>
+        </div>
+
+        <div class="node-container pos-bottom">
+            <div class="label">Network Revenue Pool</div>
+            <div class="glass-node revenue-pool">
+                <strong>RE-INVEST<br>LOOP</strong>
+                <span class="tooltip">Profits automatically buy wholesale compute to grow the OS.</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Adjust SVG paths on window resize to keep connections somewhat aligned
+        window.addEventListener('resize', () => {
+            location.reload(); 
+        });
+    </script>
+</body>
+</html>

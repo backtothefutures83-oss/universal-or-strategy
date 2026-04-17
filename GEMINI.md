@@ -1,28 +1,36 @@
 # NinjaScript V12 Project Standards (Gemini Mirror)
+
 # Gemini CLI = BACKUP ORCHESTRATOR / CO-ORCHESTRATOR (identical twin to Antigravity)
+
 # Primary orchestrator: Antigravity. Hot standby: Gemini CLI.
 
 - **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
-- **No Internal Locks**: Legacy `lock(stateLock)` is **BANNED** for internal logic. All state mutations must be thread-safe; use the `Enqueue(ctx => ...)` model by default EXCEPT when direct-write is required for termination safety (see Build 981).
+- **UltraThink & UltraPlan ALWAYS**: Permanent mandate for Build 981+. All architectural design must use Claude's Ultraplan [Cloud] and every agent must perform a Triple-Agent UltraThink audit.
+- **No Internal Locks**: Legacy `lock(stateLock)` is **BANNED** for internal logic.
 - **Build 981 Protocol**: Direct writes to `stopOrders` are MANDATORY during bracket submission. DO NOT use Enqueue for this operation as it creates a ghost-order tracking window during shutdown.
 - **Lifecycle**: Semaphores (`_simaToggleSem`) MUST be released in finally blocks.
 - **Refactoring**: ALL file splits MUST use the Python extractor script (see Section 7). Manual copy-paste is BANNED for any split exceeding 50 lines.
 - **Instrument Lookups**: Prefer explicit FirstOrDefault logic for instrument lookups (Reaper parity).
 - **Style**: Use PascalCase for methods, camelCase for local variables. Avoid dense one-liners; prioritize "Metabolic Elegance."
+- **Frontend Design (V12.15)**: Mandatory use of `.agent/skills/frontend-design/` for all UI/UX work. BANNED: Inter, Roboto, Generic AI aesthetics.
 
 ## 🛡️ Protocol Hardening (V12 Permanent DNA)
 
 ### 1. THE "DIRECTOR'S GATE" HIERARCHY
 
-- **ORCHESTRATOR (Antigravity / Gemini CLI)**: The Central Switchboard. Intake (P1) and multi-agent coordination. BANNED from manual coding.
+- **ORCHESTRATOR (Antigravity / Gemini CLI)**: The Central Switchboard. BANNED from manual coding AND BANNED from simulating sub-agent outputs (e.g., audits). Must wait for authentic logs.
+- **P5 Redundancy Mandate**: Task-splitting during a P5 audit is **STRICTLY FORBIDDEN**. Every member of the Red Team (Codex, Gemini CLI, Jules) must independently audit the **entire** implementation plan. Consensus is only valid if every agent validates every target individually.
+- **ZERO-TRUST IDENTITY**: It is STRICTLY FORBIDDEN for any agent to pretend to be another model or 'hallucinate' results if a sub-agent is unreachable. Missions must HOLD until the authentic agent responds.
+- **GITHUB-FIRST PROMPTING**: All external AI prompts (Arena AI, Gemini Web) MUST use standard GitHub links for branch or file references. Raw code-in-prompts is BANNED for large architectural reviews.
 - **FORENSICS (Codex)**: Diagnosis (P2) and Logic Audits (P5). Provides "Logical Proof of Failure."
-- **ARCHITECT (Claude Code)**: Design & Strategic Planning (P3). Peer Review & Sign-off (P5).
+- **ARCHITECT (Claude Code)**: Design, Strategic Planning (P3). **PLAN-ONLY by default** -- writes `docs/brain/implementation_plan.md`, never `src/`. Peer Review & Sign-off (P5). Exception: Director may grant execution permission explicitly for a session.
 - **ENGINEER (Codex / Jules)**: Implementation (P4). Execution of approved surgical edits.
 
 ### 2. OPERATIONAL WORKFLOW
 
-- **Plan Approval**: Every code change requires an `implementation_plan.md` designed by Claude/Codex.
+- **Plan Approval**: Every code change requires `docs/brain/implementation_plan.md` authored by Claude (ARCHITECT). Claude is BANNED from writing to `src/` -- the `.claude/hooks/pre_tool_src_guard.py` hook auto-blocks any attempt.
 - **User Mandate**: Orchestrators (Antigravity / Gemini CLI) are BANNED from approving plans. Only the USER (The Director) can authorize implementation.
+- **Post-Edit Deployment**: After every `src/` edit, ENGINEER must run `powershell -File .\deploy-sync.ps1`, then tell Director to press F5. Verify BUILD_TAG banner.
 - **Engineer Self-Audit (P4)**: Before handing off for Architectural Audit, the ENGINEER must:
   - Run `grep` audits to confirm no accidental deletions of guards or `lock` blocks.
   - Verify that all new logic is wrapped in the FSM/Actor `Enqueue` model.
@@ -48,5 +56,73 @@
 ## Section 7: Python Extractor Protocol (Permanent Standard)
 
 **ALL file splits MUST use a Python extractor script. Manual copy-paste is BANNED for splits exceeding 50 lines.**
+
 - Script Location: `scripts/<module>_split.py` in the repo root.
-- Verbatim Extraction: Script reads source lines by index and writes exact bytes. 
+- Verbatim Extraction: "send to Claude", "Claude should design", "P3 design", "architect brief", or "$battlezip".
+  When $battlezip is invoked, the Architect MUST coordinate the AMAL (Asynchronous Multi-Agent Loop)
+  automated vetting gate via `scripts/amal_harness.py` before final adjudication.
+
+## Section 8: Post-Edit Deployment Protocol (MANDATORY -- ALL AGENTS)
+
+**Root Cause**: File-edit tools create new inodes, silently breaking the hard links `deploy-sync.ps1` established between `src/` and the NinjaTrader Strategies folder. The old DLL gets compiled instead of the new source.
+
+**Required sequence after ANY `src/` file edit:**
+
+1. Run `powershell -File .\deploy-sync.ps1` -- re-establishes all hard links. ASCII Gate must PASS.
+2. Instruct the Director: "Press F5 in NinjaTrader to compile."
+3. Verify the banner shows the new BUILD_TAG.
+
+**Skipping this step is a protocol violation.** Include this sequence in every handoff block.
+
+## Section 9: AMAL Empirical Vetting Protocol (V12.15 Breakthrough)
+
+**ALL high-performance C# submissions (SPSC/MPMC/Atomic) MUST pass the AMAL automated vetting gate before architectural promotion.**
+
+- Script: `scripts/amal_harness.py`
+- Protocol: Automatic extraction from `App.tsx`, injection into benchmark templates, and zero-allocation enforcement.
+- Pass/Fail Gate: `Allocated = 0 B` and `Mean Latency < Baseline`.
+- Mandatory: Zero manual porting of AI code blocks allowed for hot-path primitives.
+
+## 🧠 Karpathy Behavioral Protocols (LLM Coding Hygiene)
+
+> Derived from Andrej Karpathy's observations on LLM coding pitfalls.
+> These principles apply to all agents including Gemini CLI as Orchestrator.
+> Bias toward caution over speed. For trivial tasks, use judgment.
+
+### Think Before Coding
+
+- State assumptions explicitly. If uncertain, ASK -- do not silently pick an interpretation.
+- If multiple interpretations exist, present them and let the Director choose.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, STOP. Name what is confusing. Ask.
+
+### Simplicity First
+
+- Minimum code / plan that solves the problem. Nothing speculative.
+- No features beyond what was asked. No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- If you write 200 lines and it could be 50, rewrite it.
+- Test: Would a senior engineer say this is overcomplicated? If yes, simplify.
+
+### Surgical Changes
+
+- Touch only what you must. Clean up only your own mess.
+- Do NOT "improve" adjacent code, comments, or formatting.
+- Do NOT refactor things that aren't broken. Match existing style.
+- If you notice unrelated dead code, MENTION it -- do not delete it.
+- Every changed line must trace directly to the user's request.
+
+### Goal-Driven Execution
+
+- For multi-step tasks, state a brief plan with explicit verify steps:
+  1. [Step] -> verify: [check]
+  2. [Step] -> verify: [check]
+  3. [Step] -> verify: [check]
+- Define "done" before starting. Strong criteria let you loop independently.
+- Weak criteria ("make it work") require constant clarification -- avoid them.
+
+## Graphify Protocols (Universal Knowledge Layer)
+
+- **Check First**: Before deep architectural exploration, always check for `graphify-out/graph.json` or `graphify-out/GRAPH_REPORT.md`.
+- **Update**: Use `graphify update .` to refresh the repo knowledge graph after major structural changes.
+- **Efficiency**: Use the graph to navigate codebase relationships with 71x fewer tokens than raw file reading.

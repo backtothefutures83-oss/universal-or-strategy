@@ -3,4 +3,8 @@
 **CRITICAL INSTRUCTION FOR CURSOR AI:**
 You must read, ingest, and strictly adhere to the permanent project standards defined in the `c:\WSGTA\universal-or-strategy\.agent\standards_manifesto.md` file before making any code suggestions or architectural decisions.
 
+- **UltraThink Always**: Perform P2 Diagnosis and P5 Side-Effect Audits for all edits.
+- **UltraPlan Always**: Use Claude Ultraplan for architectural designs.
+- **No Internal Locks**: Use the Actor/FSM `Enqueue` model for state mutations.
+
 Do not deviate from those rules. The manifesto is the absolute single source of truth for architecture, locking, repo hygiene, and multi-agent parity.

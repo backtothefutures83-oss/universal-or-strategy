@@ -1,7 +1,14 @@
 {
   "chatgpt.openOnStartup": true,
+  "antigravity.expectedCdpPort": 9222,
+  "antigravity.cdpPort": 9222,
   "sonarlint.connectedMode.project": {
     "connectionId": "mkalhitti-cloud",
     "projectKey": "mkalhitti-cloud_universal-or-strategy"
-  }
+  },
+  "dotrush.roslyn.projectOrSolutionFiles": [
+    "c:\\WSGTA\\universal-or-strategy\\universal-or-strategy.sln",
+    "c:\\WSGTA\\universal-or-strategy\\.claude\\worktrees\\charming-archimedes\\universal-or-strategy.sln"
+  ],
+  "dotnet.defaultSolution": "universal-or-strategy.sln"
 }

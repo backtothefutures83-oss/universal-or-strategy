@@ -182,10 +182,9 @@ Update `docs/brain/nexus_a2a.json`:
 - `"last_relay"` → `{ "agent": "Claude", "time": "<now UTC>", "status": "<SIGNED_OFF|AWAITING_SIGNOFF|FAIL>" }`
 - `"last_updated"` → current UTC timestamp
 
-### Step 9 — Director's Handoff Block
+### Step 9 — Unified Director's Handoff Block
 
-End every response with the block defined in `references/handoff_template.md`.
-The Engineer prompt must be copy-paste ready with no gaps.
+End every response with the block defined in `references/handoff_template.md`. When a mission involves multiple agents (e.g., Round 28 Forensic Audit), you MUST provide the complete prompt for EACH agent (Forensics, Gemini, Engineer) in separate code blocks within the same response. Do NOT use sequential clipboard gates that require the user to say "next". Efficiency and token preservation are paramount.
 
 ### Step 10 — Mandatory Post-Use Self-Improvement Audit (NON-NEGOTIABLE)
 

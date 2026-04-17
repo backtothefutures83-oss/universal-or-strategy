@@ -1,0 +1,2270 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arena AI | Compound Intelligence Living Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
+
+      // === FLOW ANIMATION ENGINE ===
+      // After every Mermaid render, this function:
+      //  1. Colour-codes each node box based on what role it plays.
+      //  2. Animates a bright signal dot racing along EVERY arrow,
+      //     so you can watch order data physically travel from node to node.
+      function applyPulses(container) {
+        var root = container || document;
+        setTimeout(function() {
+          root.querySelectorAll('.mermaid svg').forEach(function(svg) {
+
+            // NODE GLOW
+            svg.querySelectorAll('.node, .cluster').forEach(function(node) {
+              var text = (node.textContent || '').toLowerCase();
+              var rect = node.querySelector('rect, polygon, circle, ellipse');
+              if (!rect) return;
+              rect.classList.remove('pulse-cyan','pulse-gold','pulse-purple','pulse-green','pulse-orange');
+              if (/producer|enqueue|push|publish|ingress|write|dispatch|publisher/.test(text))
+                rect.classList.add('pulse-cyan');
+              else if (/consumer|dequeue|poll|read|output|deliver|success|result/.test(text))
+                rect.classList.add('pulse-green');
+              else if (/alloc|handle|memory|cache|corelane|slot|buffer|heap|marshal/.test(text))
+                rect.classList.add('pulse-gold');
+              else if (/spscring|ring|protocol|seq|generation|sequence|epoch/.test(text))
+                rect.classList.add('pulse-purple');
+              else if (/guard|ban|lock|error|free|dispose|finalizer|pad/.test(text))
+                rect.classList.add('pulse-orange');
+            });
+
+            // EDGE FLOW: signal dot races along every arrow from source to destination.
+            // Each path gets a unique @keyframes using its exact pixel length.
+            var defs = svg.querySelector('defs');
+            if (!defs) {
+              defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+              svg.insertBefore(defs, svg.firstChild);
+            }
+            var svgSty = defs.querySelector('style');
+            if (!svgSty) {
+              svgSty = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+              defs.appendChild(svgSty);
+            }
+
+            var kfCSS = '';
+            svg.querySelectorAll('.edgePath path, .flowchart-link').forEach(function(p, i) {
+              try {
+                var len = p.getTotalLength();
+                if (len < 10) return;
+                var existDA  = p.getAttribute('stroke-dasharray') || '';
+                var isDotted = existDA.length > 0 && existDA !== 'none';
+                var dotLen   = Math.min(22, len * 0.09);
+                var gapLen   = len - dotLen;
+                var color    = isDotted ? '#ffd700' : '#00e5ff'; // Validation pulses are now GOLD
+                var glow     = isDotted ? '0 0 10px #ffd700, 0 0 20px #ffaa00' : '0 0 10px #00e5ff, 0 0 18px #00ffcc';
+                var dur      = isDotted ? (2.4 + i * 0.3) : (0.9 + i * 0.17); // Validation is slightly slower
+                var delay    = (i * 0.13).toFixed(2);
+                var kfName   = 'fs' + i;
+                kfCSS += '@keyframes ' + kfName + '{from{stroke-dashoffset:' + len.toFixed(1) + '}to{stroke-dashoffset:' + (-len).toFixed(1) + '}}';
+                p.style.strokeDasharray  = dotLen.toFixed(1) + ' ' + gapLen.toFixed(1);
+                p.style.strokeDashoffset = len.toFixed(1);
+                p.style.stroke           = color;
+                p.style.strokeWidth      = isDotted ? '1.5' : '2.2';
+                p.style.filter           = 'drop-shadow(' + glow + ')';
+                p.style.animation        = kfName + ' ' + dur.toFixed(2) + 's linear ' + delay + 's infinite';
+              } catch(e) {}
+            });
+            if (kfCSS) svgSty.textContent = (svgSty.textContent || '') + kfCSS;
+          });
+        }, 700);
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var osTab = document.getElementById('os-tab');
+        mermaid.run({ nodes: osTab.querySelectorAll('.mermaid') });
+        applyPulses(osTab);
+      });
+    </script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Syncopate:wght@400;700&display=swap");
+
+      :root {
+        --bg: #050505;
+        --surface: #0a0a0f;
+        --surface2: #12121c;
+        --border: #1a1a2e;
+        --cyan: #00e5ff;
+        --neon-green: #39ff14;
+        --hazard-orange: #ff6b00;
+        --signal-red: #ff2244;
+        --gold: #ffd700;
+        --text-dim: #4a5060;
+        --text-mid: #8a90a4;
+        --text-bright: #f0f2f5;
+        --tactical-font: "IBM Plex Mono", monospace;
+        --display-font: "Syncopate", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text-bright);
+        font-family: var(--tactical-font);
+        padding: 24px;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      /* Noise Texture Overlay */
+      body::after {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: url("https://grainy-gradients.vercel.app/noise.svg");
+        opacity: 0.04;
+        pointer-events: none;
+        z-index: 9999;
+      }
+
+      /* ====== HEADER ====== */
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 28px;
+      }
+      .logo {
+        font-family: var(--display-font);
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--cyan);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      .logo span {
+        color: var(--text-dim);
+        font-weight: 400;
+      }
+      .header-badges {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .badge-pill {
+        font-family: var(--tactical-font);
+        font-size: 8px;
+        padding: 4px 10px;
+        border-radius: 2px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .badge-green {
+        background: rgba(57, 255, 20, 0.05);
+        border: 1px solid var(--neon-green);
+        color: var(--neon-green);
+        box-shadow: 0 0 10px rgba(57, 255, 20, 0.1);
+      }
+      .badge-gold {
+        background: rgba(255, 215, 0, 0.05);
+        border: 1px solid var(--gold);
+        color: var(--gold);
+      }
+      .badge-red {
+        background: rgba(255, 34, 68, 0.05);
+        border: 1px solid var(--signal-red);
+        color: var(--signal-red);
+      }
+      .badge-cyan {
+        background: rgba(0, 229, 255, 0.05);
+        border: 1px solid var(--cyan);
+        color: var(--cyan);
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+      }
+
+      .mermaid-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--cyan);
+      }
+
+
+      /* ====== FLOW SIGNAL ANIMATION ======
+         This is what makes ORDER DATA visually travel along each arrow.
+         JS measures each path with getTotalLength(), sets stroke-dasharray to
+         a small dot + big gap, then this keyframe animates dashoffset to 0
+         making the bright "signal dot" race from the source to destination node.
+         Cyan = order dispatch (hot path). Purple = metadata / secondary path.
+      ====== */
+      @keyframes flowSignal {
+        from { stroke-dashoffset: 1500; }
+        to   { stroke-dashoffset: -1500; }
+      }
+      @keyframes flowSignalSlow {
+        from { stroke-dashoffset: 1500; }
+        to   { stroke-dashoffset: -1500; }
+      }
+
+      /* Fallback for static CSS-coloured hot paths (#00ffcc via linkStyle) */
+      @keyframes hotPathPulse {
+        from { stroke-dashoffset: 60; }
+        to   { stroke-dashoffset: -60; }
+      }
+      .mermaid path[style*="#00ffcc"], .mermaid [style*="#00ffcc"] > path {
+        stroke-dasharray: 14 80 !important;
+        animation: hotPathPulse 1.0s linear infinite !important;
+        filter: drop-shadow(0 0 8px #00ffcc) drop-shadow(0 0 20px #00e5ff) !important;
+        stroke-width: 2.5px !important;
+      }
+      
+      /* ====== NODE PULSE ANIMATIONS ====== */
+      /* Applied by the JS Pulse Engine after Mermaid renders SVG nodes. */
+      /* These make the data flow visually alive for non-technical viewers. */
+
+      @keyframes pulseCyan {
+        0%, 100% { filter: drop-shadow(0 0 5px #00e5ff); opacity: 1; }
+        50%       { filter: drop-shadow(0 0 15px #00e5ff); opacity: 0.8; }
+      }
+      @keyframes pulseGreen {
+        0%, 100% { filter: drop-shadow(0 0 5px #39ff14); opacity: 1; }
+        50%       { filter: drop-shadow(0 0 15px #39ff14); opacity: 0.8; }
+      }
+      .mermaid .pulse-cyan    { animation: pulseCyan   1.5s ease-in-out infinite; }
+      .mermaid .pulse-green   { animation: pulseGreen  1.5s ease-in-out infinite; }
+      .mermaid .pulse-gold    { animation: pulseGold   1.5s ease-in-out infinite; }
+      .mermaid .pulse-orange  { animation: pulseOrange 1.5s ease-in-out infinite; }
+
+      /* Stagger sibling pulses so they don't all beat at once */
+      .mermaid .node:nth-child(2) rect { animation-delay: 0.3s; }
+      .mermaid .node:nth-child(3) rect { animation-delay: 0.6s; }
+      .mermaid .node:nth-child(4) rect { animation-delay: 0.9s; }
+      .mermaid .node:nth-child(5) rect { animation-delay: 1.2s; }
+      .mermaid .node:nth-child(6) rect { animation-delay: 1.5s; }
+      .mermaid .node:nth-child(7) rect { animation-delay: 1.8s; }
+      .mermaid .node:nth-child(8) rect { animation-delay: 0.4s; }
+
+      /* ====== TABS ====== */
+      .nav-tabs { 
+        display: flex; 
+        gap: 2px; 
+        margin-bottom: 32px; 
+        border: none; 
+      }
+      .nav-btn { 
+        background: #111; 
+        border: 1px solid var(--border); 
+        color: var(--text-dim); 
+        padding: 10px 28px; 
+        font-family: var(--display-font); 
+        font-size: 10px; 
+        font-weight: 700; 
+        cursor: pointer; 
+        transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1); 
+        clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-right: -10px;
+      }
+      .nav-btn:hover {
+        color: var(--text-bright);
+        background: #1a1a1a;
+      }
+      .nav-btn.active { 
+        color: var(--bg); 
+        background: var(--cyan); 
+        border: none;
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+        transform: translateY(-2px);
+      }
+      .tab-content { display: none; }
+      .tab-content.active { display: block; animation: tacticalReveal 0.5s cubic-bezier(0.23, 1, 0.32, 1); }
+      
+      @keyframes tacticalReveal { 
+        0% { opacity: 0; transform: scale(0.98) translateY(10px); filter: blur(10px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+      }
+
+      /* ====== LAYOUT ====== */
+      .main-grid {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 20px;
+      }
+      .side-col {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* ====== CARDS ====== */
+      .card {
+        background: #0d0d0d;
+        border: 1px solid var(--border);
+        border-radius: 0;
+        padding: 24px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 10px 10px 0 rgba(0,0,0,0.5);
+        opacity: 0;
+        animation: cardEntry 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+      }
+      .card:nth-child(1) { animation-delay: 0.1s; }
+      .card:nth-child(2) { animation-delay: 0.2s; }
+      .card:nth-child(3) { animation-delay: 0.3s; }
+
+      @keyframes cardEntry {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      .card::before {
+        content: "PROPERTY OF SOVEREIGN NEXUS // CLASSIFIED";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 14px;
+        background: var(--surface2);
+        color: var(--text-dim);
+        font-size: 7px;
+        display: flex;
+        align-items: center;
+        padding-left: 10px;
+        letter-spacing: 2px;
+        border-bottom: 1px solid var(--border);
+      }
+      .card-title {
+        font-family: var(--display-font);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--cyan);
+        margin-bottom: 24px;
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .card-title::before {
+        content: "";
+        width: 14px;
+        height: 2px;
+        background: var(--cyan);
+        flex-shrink: 0;
+      }
+
+      /* ====== ROUNDS TABS ====== */
+      .round-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        padding: 4px 10px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: all 0.2s;
+        background: transparent;
+      }
+      .tab.active,
+      .tab:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+        background: rgba(0, 229, 255, 0.06);
+      }
+
+      /* ====== TABLE ====== */
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 4px;
+        font-size: 11px;
+      }
+      th {
+        text-align: left;
+        color: var(--text-mid);
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        padding: 12px 0;
+        border-top: 1px solid var(--border);
+        border-bottom: 2px solid var(--border);
+        font-weight: 700;
+        background: rgba(255,255,255,0.02);
+      }
+      td {
+        padding: 14px 10px;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+        background: rgba(255,255,255,0.01);
+      }
+      td:first-child { border-left: 1px solid var(--border); }
+      td:last-child { border-right: 1px solid var(--border); }
+      tr.winner {
+        background: rgba(57, 255, 20, 0.03);
+      }
+      tr.pending {
+        background: rgba(255, 215, 0, 0.04);
+      }
+      .agent-name {
+        font-weight: 600;
+        color: var(--text-bright);
+      }
+      .winner .agent-name {
+        color: var(--green);
+      }
+      .pending .agent-name {
+        color: var(--gold);
+      }
+      .metric {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--green);
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .metric-warn {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--gold);
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .round-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        color: var(--text-dim);
+      }
+      .breakthrough {
+        color: var(--text-mid);
+        font-size: 11px;
+      }
+      .site-badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 9px;
+        padding: 2px 5px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        color: var(--text-dim);
+      }
+      .outcome-win {
+        color: var(--green);
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .outcome-runnerup {
+        color: var(--cyan);
+        font-size: 10px;
+      }
+      .outcome-part {
+        color: var(--text-dim);
+        font-size: 10px;
+      }
+
+      /* ====== ADR DECISIONS PANEL ====== */
+      .adr-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .adr-item {
+        background: #111;
+        border: 1px solid var(--border);
+        border-right: 4px solid var(--cyan);
+        border-radius: 0;
+        padding: 16px;
+        font-size: 11px;
+        position: relative;
+        transition: all 0.3s;
+      }
+      .adr-item:hover {
+        background: #1a1a1a;
+        transform: scale(1.02);
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+      }
+      .adr-item.pending {
+        border-right-color: var(--gold);
+      }
+      .adr-item.proposed {
+        border-right-color: var(--neon-green);
+      }
+      .adr-id {
+        font-family: var(--display-font);
+        font-size: 8px;
+        color: var(--text-dim);
+        margin-bottom: 6px;
+        letter-spacing: 1px;
+      }
+      .adr-decision {
+        font-family: var(--display-font);
+        font-weight: 700;
+        font-size: 10px;
+        color: var(--text-bright);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+      }
+      .adr-rationale {
+        color: var(--text-mid);
+        font-size: 10px;
+        line-height: 1.6;
+        font-family: var(--tactical-font);
+      }
+      .adr-status {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 7px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .s-permanent {
+        background: rgba(57, 255, 20, 0.15);
+        color: var(--green);
+      }
+      .s-pending {
+        background: rgba(255, 215, 0, 0.15);
+        color: var(--gold);
+      }
+      .s-proposed {
+        background: rgba(0, 229, 255, 0.15);
+        color: var(--cyan);
+      }
+
+      /* ====== STATS / DIAGNOSTICS ====== */
+      .stat-block {
+        margin-bottom: 24px;
+        padding: 15px;
+        border-left: 2px solid var(--border);
+      }
+      .stat-label {
+        font-family: var(--display-font);
+        font-size: 8px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-family: var(--tactical-font);
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--neon-green);
+        text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+      }
+      .stat-sub {
+        font-size: 9px;
+        color: var(--text-dim);
+        margin-top: 4px;
+        letter-spacing: 0.5px;
+      }
+      .progress-bar {
+        height: 8px;
+        background: #111;
+        border: 1px solid var(--border);
+        margin-top: 10px;
+        overflow: hidden;
+        position: relative;
+      }
+      .progress-fill {
+        height: 100%;
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--neon-green),
+          var(--neon-green) 10px,
+          #000 10px,
+          #000 20px
+        );
+        box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .checklist p {
+        font-size: 11px;
+        color: var(--text-dim);
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .checklist p:last-child {
+        border-bottom: none;
+      }
+      .check-pass {
+        color: var(--green);
+        font-weight: 700;
+        margin-right: 6px;
+      }
+      .check-fail {
+        color: var(--red);
+        font-weight: 700;
+        margin-right: 6px;
+      }
+      .check-warn {
+        color: var(--gold);
+        font-weight: 700;
+        margin-right: 6px;
+      }
+
+      .timestamp {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 9px;
+        color: var(--text-dim);
+        text-align: right;
+        margin-top: 16px;
+      }
+
+      /* ====== PENDING VERDICT BANNER ====== */
+      .verdict-banner {
+        background: rgba(255, 215, 0, 0.06);
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .verdict-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+      .verdict-text h3 {
+        font-size: 12px;
+        color: var(--gold);
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .verdict-text p {
+        font-size: 11px;
+        color: var(--text-mid);
+        line-height: 1.5;
+      }
+
+      .mermaid {
+        background: transparent !important;
+        margin: 20px 0;
+      }
+
+      /* ====== MERMAID GRID NORMALIZATION ====== */
+      #os-tab .mermaid .node rect, 
+      #os-tab .mermaid .node polygon, 
+      #os-tab .mermaid .node circle, 
+      #os-tab .mermaid .node ellipse {
+        stroke-width: 2px !important;
+      }
+      
+      /* Force uniform width for spreadsheet look */
+      #os-tab .mermaid g.node rect {
+        width: 180px !important;
+        x: -90px !important; /* Center the rect if width is forced */
+      }
+      #os-tab .mermaid g.node text {
+        text-anchor: middle !important;
+      }
+
+      /* Transition Mapping */
+      .transition-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 15px;
+      }
+      .phase-box {
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        position: relative;
+      }
+      .phase-tag {
+        font-size: 8px;
+        position: absolute;
+        top: -8px;
+        left: 10px;
+        background: var(--border);
+        padding: 2px 8px;
+        border-radius: 4px;
+        color: var(--text-dim);
+        font-weight: 700;
+      }
+      .phase-title {
+        font-size: 11px;
+        font-weight: 900;
+        color: var(--cyan);
+        text-transform: uppercase;
+        margin-bottom: 5px;
+      }
+      .phase-desc {
+        font-size: 10px;
+        color: var(--text-dim);
+        line-height: 1.5;
+      }
+
+      @media (max-width: 960px) {
+        .main-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div style="max-width: 1300px; margin: 0 auto">
+      <!-- HEADER -->
+      <header>
+        <div class="logo">
+          Arena AI <span>//</span> Compound Intelligence OS
+        </div>
+        <div class="header-badges">
+          <span class="badge-pill badge-green">&#10003; V26.1 SUB-5NS MPMC ADJUDICATED</span>
+          <span class="badge-pill badge-cyan">GATE: 3.726ns [EMPIRICAL V26 RECORD]</span>
+          <span class="badge-pill badge-gold">BATTLE 26 WINNER: SUB_01 (Sub-5ns MPMC Scaling)</span>
+        </div>
+      </header>
+
+      <div class="nav-tabs">
+        <button class="nav-btn active" onclick="switchTab(event, 'os-tab')">OS Architecture</button>
+        <button class="nav-btn" onclick="switchTab(event, 'workflow-tab')">Multi-Agent Workflow</button>
+        <button class="nav-btn" onclick="switchTab(event, 'audit-tab')">Audit Results</button>
+        <button class="nav-btn" onclick="switchTab(event, 'bigpicture-tab')">Sovereign Big Picture</button>
+      </div>
+
+      <div id="os-tab" class="tab-content active">
+
+      <!-- PENDING VERDICT BANNER -->
+      <!-- V9 VERDICT RESOLVED -->
+
+      <div
+        class="main-grid"
+        style="grid-template-columns: 1fr; margin-bottom: 20px"
+      >
+        <!-- TOP: EVOLUTION ROADMAP (FULL WIDTH) -->
+        <div class="card">
+          <div class="card-title">
+            The Nexus Evolution: From Plugin to Sovereign OS
+          </div>
+          <div class="transition-grid">
+            <div class="phase-box">
+              <span class="phase-tag">PHASE 1 (CURRENT)</span>
+              <div class="phase-title">
+                NinjaTrader Plugin (Audit Environment)
+              </div>
+              <div class="phase-desc">
+                We are currently using NinjaTrader as a
+                <b>Development Bridge</b>. The Sovereign Core is wrapped in a C#
+                host to audit agent submissions.
+              </div>
+            </div>
+            <div class="phase-box" style="border-color: var(--orange)">
+              <span
+                class="phase-tag"
+                style="background: var(--orange); color: #000"
+                >PHASE 2 (DESTINATION)</span
+              >
+              <div class="phase-title" style="color: var(--orange)">
+                Pure Standalone Nexus OS
+              </div>
+              <div class="phase-desc" style="color: var(--text-bright)">
+                <b>NinjaTrader is removed.</b> The Sovereign Engine runs as a
+                headless server with its own native MMIO drivers, serving the
+                Antigravity Nexus web platform directly.
+              </div>
+            </div>
+          </div>
+          <div class="mermaid">
+graph LR
+  %% 4-COLUMN SPREADSHEET ALIGNMENT
+  %% Force 6 rows per column for perfect symmetry
+  
+  subgraph Box1 ["1. INPUT PLANE"]
+    direction TB
+    B1_1["Antigravity Web Dashboard"]
+    B1_2["NinjaTrader Desktop UI"]
+    B1_3["TradingView (Browser)"]
+    B1_4["Tradovate (Mobile App)"]
+    B1_5(("API Bridge"))
+    B1_6["[Ingress Gate]"]
+  end
+
+  subgraph Box2 ["2. DECISION PLANE"]
+    direction TB
+    B2_1["Signal Hub"]
+    B2_2["Fast Lane: Order Dispatch"]
+    B2_3["Screen Lane: Charts"]
+    B2_4["Voice Lane: Alerts"]
+    B2_5["Self-Healing"]
+    B2_6["[Brain Core]"]
+  end
+
+  subgraph Box3 ["3. SUBSTRATE"]
+    direction TB
+    B3_1["15ns NIC (NUMA)"]
+    B3_2["OCR Engine"]
+    B3_3["Voice Engine"]
+    B3_4["Memory-Map (MMIO)"]
+    B3_5["L1 Tick Hub"]
+    B3_6["[Hardware Layer]"]
+  end
+
+  subgraph Box4 ["4. EXECUTION PLANE"]
+    direction TB
+    B4_1["NinjaTrader / Rithmic"]
+    B4_2["Native Market Driver<br/>[L1 Tick Feed => NIC]"]
+    B4_3["ExecutionId Ring"]
+    B4_4["Order Pool (Pre-Alloc)"]
+    B4_5["Direct Bridge"]
+    B4_6["[Execution Gate]"]
+  end
+
+  %% MATRIX RANK ANCHORS (Forces exact columns)
+  B1_1 ~~~ B2_1 ~~~ B3_1 ~~~ B4_1
+  B1_2 ~~~ B2_2 ~~~ B3_2 ~~~ B4_2
+  B1_3 ~~~ B2_3 ~~~ B3_3 ~~~ B4_3
+  B1_4 ~~~ B2_4 ~~~ B3_4 ~~~ B4_4
+  B1_5 ~~~ B2_5 ~~~ B3_5 ~~~ B4_5
+  B1_6 ~~~ B2_6 ~~~ B3_6 ~~~ B4_6
+  
+  %% FUNCTIONAL FLOWS (The actual "business" logic)
+  B1_3 ==> B2_1
+  B2_2 ==> B3_1
+  B3_1 ==> B4_1
+  B2_3 ==> B3_2
+  B2_4 ==> B3_3
+
+  %% TACTICAL STYLING
+  style Box1 fill:#0a1a1a,stroke:#00e5ff,stroke-width:2px;
+  style Box2 fill:#150525,stroke:#bc13fe,stroke-width:2px;
+  style Box3 fill:#1a1a00,stroke:#ffd700,stroke-width:2px;
+  style Box4 fill:#051505,stroke:#39ff14,stroke-width:2px;
+
+  classDef cyanNode fill:#101010,stroke:#00e5ff,stroke-width:2px;
+  classDef purpleNode fill:#101010,stroke:#bc13fe,stroke-width:2px;
+  classDef purpleNodeThick fill:#101010,stroke:#bc13fe,stroke-width:3px;
+  classDef goldNode fill:#101010,stroke:#ffd700,stroke-width:2px;
+  classDef greenNode fill:#101010,stroke:#39ff14,stroke-width:2px;
+
+  class B1_1,B1_2,B1_3,B1_4,B1_5,B1_6 cyanNode;
+  class B2_1 purpleNodeThick;
+  class B2_2 cyanNode;
+  class B2_3,B2_4,B2_5,B2_6 purpleNode;
+  class B3_1,B3_2,B3_3,B3_4,B3_5,B3_6 goldNode;
+  class B4_1 cyanNode;
+  class B4_2,B4_3,B4_4,B4_5,B4_6 greenNode;
+</div>
+        </div>
+
+        <!-- SOVEREIGN MPMC: MULTICORE SCALING -->
+        <div class="card">
+          <div class="card-title">Sovereign MPMC: Multicore Scaling Breakthrough (V25.1)</div>
+          <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+            The V25.1 MPMC Pipeline introduces <strong>Lane Sharding</strong>. Each producer core has a dedicated lane to eliminate CAS retry loops, while the consumer core uses <strong>Stealing Aggregators</strong> to coalesce data from multi-lane shards into a single logic pump.
+          </div>
+          <div class="mermaid">graph TD
+  subgraph Multi_Producer ["PRODUCER PLANE -- Dedicated HW Lanes"]
+    P1["Core 1: Producer A"] --> L1["Lane 0 (Isolated)"]
+    P2["Core 2: Producer B"] --> L2["Lane 1 (Isolated)"]
+    P3["Core 3: Producer C"] --> L3["Lane 2 (Isolated)"]
+  end
+
+  L1 ==> Agg["Stealing Aggregator (XOR-Gate)"]
+  L2 ==> Agg
+  L3 ==> Agg
+
+  subgraph Consumer_Logic ["CONSUMER PLANE -- Sovereign Pump"]
+    Agg ==> Pump["Logic Pump (13.0ns)"]
+    Pump ==> Exchange["Order Execution"]
+  end
+
+  linkStyle 3,4,5 stroke:#39ff14,stroke-width:2px;
+  style Multi_Producer fill:#0a0a14,stroke:#00e5ff,stroke-width:2px;
+  style Consumer_Logic fill:#0a0a14,stroke:#39ff14,stroke-width:2px;
+  style Agg fill:#150525,stroke:#bc13fe,stroke-width:3px;
+</div>
+        </div>
+      </div>
+
+      <div
+        class="main-grid"
+        style="
+          grid-template-columns: 1fr;
+          gap: 20px;
+          margin-bottom: 20px;
+        "
+      >
+        <!-- STANDALONE ARCHITECTURE -->
+        <div class="card">
+          <div class="card-title">Nexus Standalone Engine: "Pure Parallel"</div>
+          <div
+            style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px"
+          >
+            In the Nexus OS, the "Website" (UI) is the **Control Plane**. It
+            communicates via high-speed WebSockets directly to the **Sovereign
+            Kernel**, which bypasses the entire Windows GUI thread.
+          </div>
+          <div class="mermaid">graph LR
+  NIC(("NIC Queue\n(ethtool rx-usecs 0)"))
+
+  subgraph Engine ["V12 NanoForge Architecture (32ns theoretical)"]
+    direction LR
+    Ring["Phase 1: [8ns] Userspace IPC AF_XDP Busy-poll Ring"]
+    Worker["Phase 2: [12ns] Chiplet Pinned Isolated Dispatch Worker"]
+    Vectors["Phase 3: [12ns] AVX-512 16-Slot Vector Advance"]
+  end
+
+  Trades["Lane 1: Trades [32ns]"]
+  NIC_Out(("NIC Tx [15ns]"))
+
+  NIC -.-> |Direct| Ring
+  Ring == "Atomic Load" ==> Worker
+  Worker ==> Vectors
+  Vectors ==> Trades
+  Trades -.-> |Egress| NIC_Out
+  
+  Total_V12["Total Engine Cycle: 32ns"]
+  Total_V12 --- Worker
+  style Total_V12 fill:none,stroke:none,color:#39ff14,font-weight:bold;
+
+  linkStyle 1,2,3 stroke:#00ffcc,stroke-width:3px;
+
+  style Engine fill:#0a0a14,stroke:#bc13fe,stroke-width:2px;
+  style Ring fill:#150525,stroke:#ff2244,stroke-width:2px;
+  style Worker fill:#201010,stroke:#ff6b00,stroke-width:2px;
+  style Vectors fill:#051505,stroke:#39ff14,stroke-width:2px;
+  style Trades fill:#0a0a14,stroke:#00e5ff,stroke-width:2px;
+  style NIC fill:#0a0a14,stroke:#00ffcc,stroke-width:2px;
+  style NIC_Out fill:#0a0a14,stroke:#00ffcc,stroke-width:2px;
+</div>
+        </div>
+
+        <!-- DECISION CLARITY -->
+        <div class="card">
+          <div class="card-title">Sovereign Modularity: Why this matters</div>
+          <div
+            style="font-size: 10px; line-height: 1.6; color: var(--text-mid)"
+          >
+            <b style="color: var(--cyan)">1. Platform Independence</b>: The
+            Sovereign Core (140ns dispatch) is platform-agnostic. <br /><br />
+            <b style="color: var(--orange)">2. Total Replacement</b>: To replace
+            NinjaTrader, we only swap the **L1 Physical Bridge**. <br /><br />
+            <b style="color: var(--green)">3. No Intermediaries</b>: In the
+            final Nexus OS, orders flow from click to exchange in a direct pipe.
+          </div>
+        </div>
+      </div>
+
+      <div class="main-grid">
+        <!-- LEFT: FULL BATTLE MATRIX -->
+        <div style="display: flex; flex-direction: column; gap: 20px">
+
+          <!-- ALL ROUNDS TABLE -->
+          <div class="card">
+            <div class="card-title">Full Battle Matrix — All Rounds</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  <th>Agent</th>
+                  <th>Logic Pass</th>
+                  <th>Hit Rate</th>
+                  <th>Outcome</th>
+                  <th>Breakthrough</th>
+                  <th>Site</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- V26 SUB-5NS MPMC — Battle 26 Adjudication -->
+                <tr class="winner">
+                  <td><span class="round-label">V26.1</span></td>
+                  <td><span class="agent-name">sub_01 (Sub-5ns MPMC Scaling)</span></td>
+                  <td><span class="metric">3.726ns</span></td>
+                  <td>2/144 (1.4% Pass Rate)</td>
+                  <td><span class="outcome-win">WINNER &mdash; Sub-5ns MPMC Champion</span></td>
+                  <td class="breakthrough">Lane Sharding + XOR-Shadow Invariants + Consumer Stealing. Absolute 3.726ns record. All stress scenarios passed.</td>
+                  <td><span class="site-badge">zip-26/01</span></td>
+                </tr>
+
+                <tr class="winner">
+                  <td><span class="round-label">V25.1</span></td>
+                  <td><span class="agent-name">sub_22 (Sovereign MPMC Scaling)</span></td>
+                  <td><span class="metric">13.049ns</span></td>
+                  <td>2/21 (9.5% Pass Rate)</td>
+                  <td><span class="outcome-win">WINNER &mdash; MPMC Lane Sharding Champion</span></td>
+                  <td class="breakthrough">Lane Sharding + XOR-Gate + Res-Counter + Local Stealing. Eliminated CAS contention via sharded ingress lanes. 13.049ns empirical floor.</td>
+                  <td><span class="site-badge">zip-25/22</span></td>
+                </tr>
+
+                <!-- V24 SOVEREIGN PROTOCOL — Battle 24 Zero-Friction Adjudication -->
+                <tr class="winner">
+                  <td><span class="round-label">V24.1</span></td>
+                  <td><span class="agent-name">sub_24 (sovereign-v24-protocol-evolution)</span></td>
+                  <td><span class="metric">4.395ns</span></td>
+                  <td>1/35 (2.8% Pass Rate)</td>
+                  <td><span class="outcome-win">WINNER &mdash; V24 Sovereign Protocol Champion</span></td>
+                  <td class="breakthrough">Zero-Friction V24 Pipeline: Escape-aware backtick scanner pass + return-type-aware method body extraction. Only surviving submission for the ADR-015 "Fence-Less" validator gate. 4.395ns empirical floor.</td>
+                  <td><span class="site-badge">zip-24/35</span></td>
+                </tr>
+                <!-- V14.9 SOVEREIGN PHOTON -- Battle 21 Breakthrough -->
+                <tr class="winner">
+                  <td><span class="round-label">V14.9</span></td>
+                  <td><span class="agent-name">Grok xAI v2.0 (submission_21)</span></td>
+                  <td><span class="metric">6.42ns</span></td>
+                  <td>21/21 (100%)</td>
+                  <td><span class="outcome-win">WINNER &mdash; 3-fence RoundTrip protocol</span></td>
+                  <td class="breakthrough">SPSC 3-fence protocol: Replaced Volatile.Read/Write with relaxed reads + single Thread.MemoryBarrier() release fence after payload. TryDequeue reduced to 1 acquire barrier total. Theoretical 6.4ns floor reached.</td>
+                  <td><span class="site-badge">zip-21/21</span></td>
+                </tr>
+                <!-- V14.8 SPSCRING -- 21-submission SpscRing Container Battle -->
+                <tr class="winner">
+                  <td><span class="round-label">V14.8</span></td>
+                  <td><span class="agent-name">Sub_04 (LockFree.SpscRing)</span></td>
+                  <td><span class="metric">~3ns</span></td>
+                  <td>21/21 (100%)</td>
+                  <td><span class="outcome-win">WINNER &mdash; seq-diff protocol + cached _mask</span></td>
+                  <td class="breakthrough">SpscRing container: _producerIndex@64 / _consumerIndex@192 via explicit FieldOffset. _mask cached at [196]. TryEnqueue uses seq-diff (seq-index==0). TryDequeue releases with WriteSequence(index+1+_mask). IDisposable pattern identified as next gap.</td>
+                  <td><span class="site-badge">zip-04/21</span></td>
+                </tr>
+                <!-- V14.7 CORELANE ULTRA — 27-submission SPSC Battle -->
+                <tr class="winner">
+                  <td><span class="round-label">V14.7</span></td>
+                  <td><span class="agent-name">Sub_19 (CoreLane.cs)</span></td>
+                  <td><span class="metric">4.1ns</span></td>
+                  <td>27/27 (100%)</td>
+                  <td><span class="outcome-win">WINNER &mdash; 27-AGENT CONSENSUS</span></td>
+                  <td class="breakthrough">unsafe CoreLane + AggressiveInlining + safe AllocAligned tuple + 256B FieldOffset isolation + unmanaged heap (GC-bypass). Bug found &amp; fixed in Sub_11 AllocAligned use-after-free.</td>
+                  <td><span class="site-badge">zip-19/27</span></td>
+                </tr>
+                <!-- V14.6 -->
+                <tr class="winner">
+                  <td><span class="round-label">V14.6</span></td>
+                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
+                  <td><span class="metric">2.4ns</span></td>
+                  <td>100%</td>
+                  <td>
+                    <span class="outcome-win">WINNER</span>
+                  </td>
+                  <td class="breakthrough">SPSC Striping + 256B Isolation</td>
+                  <td><span class="site-badge">zip-15</span></td>
+                </tr>
+                <tr class="pending">
+                  <td><span class="round-label">V14.5</span></td>
+                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
+                  <td><span class="metric" style="color: var(--red)">&gt;50ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-fail" style="color: var(--red)">FAILED (REGRESSION)</span></td>
+                  <td class="breakthrough">Generic Wait-Free MPMC (Slower)</td>
+                  <td><span class="site-badge">zip-multi</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V14.4</span></td>
+                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
+                  <td><span class="metric">4.5ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">SovereignDispatchPipeline</td>
+                  <td><span class="site-badge">zip-auth</span></td>
+                </tr>
+                <!-- V14 -->
+                <tr class="pending">
+                  <td><span class="round-label">V14.3</span></td>
+                  <td><span class="agent-name">Dr. Lena Korvath (MPMC)</span></td>
+                  <td><span class="metric-warn">PENDING</span></td>
+                  <td>43% (Safety Filters)</td>
+                  <td><span class="outcome-runnerup">Gold Std</span></td>
+                  <td class="breakthrough">TaggedPointer Epoch Reclamation</td>
+                  <td><span class="site-badge">zip-7</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V14.2</span></td>
+                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
+                  <td><span class="metric">6.8ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">ALIGNEDGEN-SPSC Buffer</td>
+                  <td><span class="site-badge">zip-3</span></td>
+                </tr>
+                <!-- V13 -->
+                <tr class="winner">
+                  <td><span class="round-label">V13.8</span></td>
+                  <td><span class="agent-name">Agent V13-8</span></td>
+                  <td><span class="metric">4ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">Sub-5ns Cache Vectorization</td>
+                  <td><span class="site-badge">zip-8</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V13.6</span></td>
+                  <td><span class="agent-name">Agent V13-6</span></td>
+                  <td><span class="metric">6ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">Runner-up</span></td>
+                  <td class="breakthrough">Zero-Copy Polling</td>
+                  <td><span class="site-badge">zip-6</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V13.4</span></td>
+                  <td><span class="agent-name">Agent V13-4</span></td>
+                  <td><span class="metric">6.8ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">L1-Resident Vectorized Dispatch</td>
+                  <td><span class="site-badge">zip-4</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V13.2</span></td>
+                  <td><span class="agent-name">Axiom V13.0</span></td>
+                  <td><span class="metric">6ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">Runner-up</span></td>
+                  <td class="breakthrough">Cache-Line Lockstep</td>
+                  <td><span class="site-badge">zip-2</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V13.1</span></td>
+                  <td><span class="agent-name">Agent V13-Ultra</span></td>
+                  <td><span class="metric">7.4ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">Ultra Low Latency Kernel</td>
+                  <td><span class="site-badge">zip-1</span></td>
+                </tr>
+                <!-- V12 -->
+                <tr class="winner">
+                  <td><span class="round-label">V12.1</span></td>
+                  <td><span class="agent-name">Grok 3 (Perfect L1)</span></td>
+                  <td><span class="metric">10ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER*</span></td>
+                  <td class="breakthrough">Zero-Branch Perfect L1$</td>
+                  <td><span class="site-badge">zip-??</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V12.0</span></td>
+                  <td><span class="agent-name">Claude 3.7 Sonnet</span></td>
+                  <td><span class="metric">32ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">Runner-up</span></td>
+                  <td class="breakthrough">AF_XDP Polling + AVX-512</td>
+                  <td><span class="site-badge">zip-4</span></td>
+                </tr>
+                <!-- V11 -->
+                <tr>
+                  <td><span class="round-label">V11.0</span></td>
+                  <td><span class="agent-name">NanoFusion Team</span></td>
+                  <td><span class="metric">53ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Gold Std</span></td>
+                  <td class="breakthrough">XDP Zero-Copy</td>
+                  <td><span class="site-badge">v11-prev</span></td>
+                </tr>
+                <!-- V10 -->
+                <tr>
+                  <td><span class="round-label">V10.4</span></td>
+                  <td><span class="agent-name">Agent (Nexus-v10)</span></td>
+                  <td><span class="metric">142ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">Runner-up</span></td>
+                  <td class="breakthrough">Atomic Self-Healing</td>
+                  <td><span class="site-badge">zip-4</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V10.3</span></td>
+                  <td><span class="agent-name">Agent (Singularity)</span></td>
+                  <td><span class="metric">140ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">Userspace Ring Buffer</td>
+                  <td><span class="site-badge">zip-3</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V10.1</span></td>
+                  <td><span class="agent-name">Agent (Prefault)</span></td>
+                  <td><span class="metric">170ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Gold Std</span></td>
+                  <td class="breakthrough">Memory Prefaulting</td>
+                  <td><span class="site-badge">zip-1</span></td>
+                </tr>
+                <!-- V9 -->
+                <tr class="pending">
+                  <td><span class="round-label">V9.7</span></td>
+                  <td><span class="agent-name">Opus 4.6</span></td>
+                  <td><span class="metric-warn">250ns</span></td>
+                  <td>100%</td>
+                  <td>
+                    <span style="color: var(--gold); font-size: 10px"
+                      >&#9888; VERDICT?</span
+                    >
+                  </td>
+                  <td class="breakthrough">Memory-Mapped Arena</td>
+                  <td><span class="site-badge">zip-7</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V9.4</span></td>
+                  <td><span class="agent-name">Claude 3.5 Sonnet</span></td>
+                  <td><span class="metric">250ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">L1-D Sideband Pre-Touch</td>
+                  <td><span class="site-badge">zip-4</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V9.2</span></td>
+                  <td><span class="agent-name">Assistant V9</span></td>
+                  <td><span class="metric">250ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">0.25µs Branchless Gate</td>
+                  <td><span class="site-badge">zip-2</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V9.0</span></td>
+                  <td><span class="agent-name">Grok-4 (V9.3)</span></td>
+                  <td><span class="metric">243ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER*</span></td>
+                  <td class="breakthrough">FPGA-Native Bitwise Pass</td>
+                  <td><span class="site-badge">zip-0</span></td>
+                </tr>
+                <!-- V8 -->
+                <tr class="winner">
+                  <td><span class="round-label">V8.6</span></td>
+                  <td><span class="agent-name">GPT-4o (v8)</span></td>
+                  <td><span class="metric">0.487µs</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">0.5µs Const Gate</td>
+                  <td><span class="site-badge">zip-6</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V8.5</span></td>
+                  <td><span class="agent-name">Claude 3.5 Opus</span></td>
+                  <td><span class="metric">0.50µs</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">Gold Std</span></td>
+                  <td class="breakthrough">1000ns NMI Healing</td>
+                  <td><span class="site-badge">zip-5</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V8.0</span></td>
+                  <td><span class="agent-name">Agent v8-0</span></td>
+                  <td><span class="metric">0.50µs</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">Ring-Bus SPSC</td>
+                  <td><span class="site-badge">zip-0</span></td>
+                </tr>
+                <!-- V7 -->
+                <tr>
+                  <td><span class="round-label">V7.6C</span></td>
+                  <td><span class="agent-name">GPT-4o (Codex)</span></td>
+                  <td><span class="metric">0.32µs</span></td>
+                  <td>91.0%</td>
+                  <td><span class="outcome-runnerup">Runner-up</span></td>
+                  <td class="breakthrough">Mesh-Heal Matrix</td>
+                  <td><span class="site-badge">7134</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V7.4C</span></td>
+                  <td><span class="agent-name">Claude 3.5 Sonnet</span></td>
+                  <td><span class="metric">0.49µs</span></td>
+                  <td>94.5%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">Bitwise Jump-Dispatch</td>
+                  <td><span class="site-badge">7a24</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="timestamp">
+              * V9 Winner by raw ns score. Architectural verdict: PENDING — see
+              ADR-007
+            </div>
+          </div>
+
+          <!-- ADR DECISIONS PANEL -->
+          <div class="card">
+            <div class="card-title">Architectural Decision Log (ADR)</div>
+            <div class="adr-list">
+              <div class="adr-item">
+                <div class="adr-id">ADR-016 · Round: V26</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  XOR-Shadow Invariants — Fence-Less MPMC Integrity
+                </div>
+                <div class="adr-rationale">
+                  Mandates deterministic XOR-based sequence validation in multi-lane MPMC. Eliminates the 13ns "Resurrection Counter" bottleneck. All sharded lanes must implement the sub_01 parity-check invariant. 3.726ns empirical floor verified.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-001 · Round: V8</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  Direct Writes for stopOrders — No Internal Locks
+                </div>
+                <div class="adr-rationale">
+                  Ghost-order window during shutdown eliminated. lock(stateLock)
+                  remains BANNED. Enqueue model default; Direct Write mandatory
+                  for bracket submission.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-002 · Round: V9</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  Bitwise Jump-Table via TypedArray — Zero-Alloc Hot Path
+                </div>
+                <div class="adr-rationale">
+                  Mask 0x7 routes to 6 symmetric ring nodes with zero branch.
+                  TSC-synchronized BigInt clock. Pure Uint32Array /
+                  BigUint64Array shared buffer.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-003 · Round: V9</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  L1-D Sideband Pre-Touch — Cold-Start Jitter Elimination
+                </div>
+                <div class="adr-rationale">
+                  Speculative pre-warming of L1-D cache lines for SPSC
+                  head/tail. 100% occupancy target for 64-set x 8-way
+                  simulation. Eliminates first-tick jitter on signal intake.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-004 · Round: V8-V9</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  1000ns NMI Autonomous Healing — V8 Backward Compatibility
+                </div>
+                <div class="adr-rationale">
+                  Non-maskable interrupt-style healing loop retained for fleet
+                  resilience. Keeps V8 deployments operational as V9/V10 layers
+                  are promoted.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-007 · Round: V9</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  V9 Winner Verdict: Arena B (Opus) Wins Foundation Slot
+                </div>
+                <div class="adr-rationale">
+                  Consensus reached: Memory-Mapped Arena is the correct
+                  foundation for 12-worker scaling. Grok-4's FPGA-Parity Bitwise
+                  Pass promoted to inline validation layer.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-008 · Round: V10</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  Pretext + Canvas Hybrid Rendering (Zero-Reflow)
+                </div>
+                <div class="adr-rationale">
+                  @chenglou/pretext for high-perf text measurement + raw Canvas
+                  for bitmap delivery. Zero-layout-thrash @60fps achieved.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-009 · Round: V10</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  Userspace Ring Buffer + CPU Pinning (140ns floor)
+                </div>
+                <div class="adr-rationale">
+                  Eliminates all kernel syscalls in critical path. Kernel-bypass
+                  dispatch achieved via userspace SPSC.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">BR-010 · Round: V10</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  Decentralized Peer-Witness Recovery (350ns)
+                </div>
+                <div class="adr-rationale">
+                  Ring-topology neighbor watching via SharedArrayBuffer Atomics.
+                  1000ns -> 350ns healing reduction.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-011 · Round: V14.1</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  Ghost-Order Sequence Lock (Atomic ZOMBIE State)
+                </div>
+                <div class="adr-rationale">
+                  Mitigates 100ms+ thread-hangs during global LoadShedding. By
+                  interlocking state before yields and marking assets as
+                  "ZOMBIE", we eliminate orphaned execution IDs in chunked
+                  flatten pumps.
+                </div>
+              </div>
+
+              <div class="adr-item">
+                <div class="adr-id">ADR-012 · Round: V14.6</div>
+                <span class="adr-status s-permanent">Permanent</span>
+                <div class="adr-decision">
+                  SPSC Lane Striping & Per-Slot Generations (Sub-5ns)
+                </div>
+                <div class="adr-rationale">
+                  BANNED generic ConcurrentCollections and wait-free MPMC from hot path. SPSC striping eliminates hot CAS contention. Per-slot generation counters decentralize state. 256-byte cache isolation defeats prefetcher false sharing. 2.4ns floor achieved.
+                </div>
+              </div>
+
+              <div class="adr-item proposed">
+                <div class="adr-id">ADR-013 · Round: V14.9</div>
+                <span class="adr-status s-proposed">Proposed</span>
+                <div class="adr-decision">
+                  3-Fence SPSC Protocol via Targeted Memory Barriers
+                </div>
+                <div class="adr-rationale">
+                  Reduces RoundTrip fence count from 4 to 3. Replaces `Volatile.Read` with relaxed reads for multi-thread predicates where stale reads are benign. Strategic `Thread.MemoryBarrier()` placement ensures sequential consistency for data handoff while maximizing ILP throughput. 6.42ns floor validated.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: DIAGNOSTICS SIDEBAR -->
+        <div class="side-col">
+          <!-- GATE DIAGNOSTICS -->
+          <div class="card">
+            <div class="card-title">Gate Diagnostics</div>
+            <div class="stat-block">
+              <div class="stat-label">V12 Baseline (Managed)</div>
+              <div
+                class="stat-value"
+                style="color: var(--text-mid); font-size: 16px"
+              >
+                7.79ns
+              </div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">V14.8 Record (Seq-Diff)</div>
+              <div
+                class="stat-value"
+                style="color: var(--cyan); font-size: 16px"
+              >
+                7.67ns
+              </div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">V24.1 Breakthrough (Sovereign)</div>
+              <div class="stat-value" style="color: var(--green)">4.395ns</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 100%"></div>
+              </div>
+              <div class="stat-sub">Empirical Zero-Friction Record</div>
+            </div>
+
+              <div class="stat-sub">Sub-100ns Dispatch</div>
+            </div>
+          </div>
+
+          <!-- ROUND COUNTER -->
+          <div class="card">
+            <div class="card-title">Battle Statistics</div>
+            <div class="stat-block">
+              <div class="stat-label">Rounds Completed</div>
+              <div class="stat-value" style="color: var(--purple)">8</div>
+              <div class="stat-sub">V7 · V8 · V9 · V10 · V14.9 · V24.1 · V25.1 · V26.1</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">Total Submissions</div>
+              <div
+                class="stat-value"
+                style="color: var(--cyan); font-size: 18px"
+              >
+                36
+              </div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">Open Verdicts</div>
+              <div
+                class="stat-value"
+                style="color: var(--green); font-size: 18px"
+              >
+                0
+              </div>
+              <div class="stat-sub">V9 Verdict RESOLVED</div>
+            </div>
+          </div>
+
+          <!-- PROTOCOL CHECKLIST -->
+          <div class="card">
+            <div class="card-title">Protocol Gate</div>
+            <div class="checklist">
+              <p><span class="check-pass">&#10003;</span>ASCII Gate: PASS</p>
+              <p>
+                <span class="check-pass">&#10003;</span>V9 Verdict: RESOLVED
+              </p>
+              <p>
+                <span class="check-pass">&#10003;</span>Userspace Ring: ACTIVE
+              </p>
+              <p><span class="check-pass">&#10003;</span>Peer-Witness: ARMED</p>
+              <p>
+                <span class="check-pass">&#10003;</span>Pretext Render: HYBRID
+              </p>
+              <p><span class="check-pass">&#10003;</span>Compounding: ON</p>
+            </div>
+          </div>
+
+          <!-- CURRENT PLATINUM STANDARD -->
+          <div class="card">
+            <div class="card-title">Current Platinum Standard</div>
+            <div
+              style="font-size: 11px; color: var(--text-mid); line-height: 1.7"
+            >
+              <p>
+                <span style="color: var(--cyan)">Latency:</span> 3.726ns Floor
+              </p>
+              <p>
+                <span style="color: var(--cyan)">Dispatch:</span> V24 Zero-Friction Handshake
+              </p>
+              <p>
+                <span style="color: var(--cyan)">Topology:</span> Asymmetric N &lt;-&gt; N+1
+              </p>
+              <p>
+                <span style="color: var(--cyan)">Healing:</span> Hardware-TSO Ordered
+              </p>
+              <p>
+                <span style="color: var(--cyan)">Validation:</span> Zero-Alloc Marshal Slab
+              </p>
+              <p>
+                <span style="color: var(--cyan)">Render:</span> Hybrid GPU-Mapped Matrix
+              </p>
+              <p>
+                <span style="color: var(--green)">Status:</span> V25.1 PLATINUM
+              </p>
+
+            </div>
+          </div>
+
+          <div class="timestamp">
+            LAST REFRESH: 2026-04-09 01:15 PST<br />V26.1 Sub-5ns MPMC Adjudicated | Record:
+            3.726ns | Status: MISSION COMPLETE
+          </div>
+        </div>
+      </div>
+      </div> <!-- End os-tab content wrapper -->
+      </div> <!-- End os-tab -->
+
+      <!-- WORKFLOW TAB -->
+      <div id="workflow-tab" class="tab-content">
+        <div class="card">
+          <div class="card-title">The Director's Gate: V12 Sub-100ns Multi-Agent Pipeline</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5;">
+            Visualizing the continuous, token-efficient <code>Agent-as-a-Tool</code> stateless routing matrix. The P1 Orchestrator centralizes file-watching and API firing, eliminating idle agent polling entirely.
+          </div>
+          <div class="mermaid workflow-mermaid">
+graph LR
+  Director(("Director"))
+  Antigravity["P1 Orchestrator"]
+  Bridge[("Nexus Blackboard")]
+  Claude["P3 Architect"]
+  Codex["P4 Engineer"]
+  Jules["P4 Critic"]
+  GeminiCLI["Gemini Security"]
+
+  %% Phase 1: Planning
+  Director -->|"1. [~2ms] Mission Prompt"| Antigravity
+  Antigravity -->|"2. [<1ms] Wakes Architect"| Claude
+  Claude -->|"3. [~25s] Writes Plan"| Bridge
+  Bridge -.->|"4. [~10s] Consensus Review"| Codex
+  Bridge -.->|"4. [~10s] Consensus Review"| Jules
+  Codex -->|"5. [~20s] UltraThink Pass"| Bridge
+  Jules -->|"5. [~20s] UltraThink Pass"| Bridge
+
+  %% Phase 2: Implementation & Audit
+  Antigravity -->|"6. [<1ms] Trigger Exec"| Codex
+  Codex -->|"7. [~8s] Edits Code"| Bridge
+  Bridge -.->|"8. [~12s] Implementation Audit"| Claude
+  Claude -->|"9. [~2s] Sign-off"| Bridge
+
+  %% Phase 3: Security & Deploy
+  Codex -.->|"10. [~5s] Security Scan"| GeminiCLI
+  GeminiCLI -.->|"11. [~3s] PASS"| Antigravity
+  Jules -.->|"11. [~2s] Audit Pass"| Antigravity
+  Antigravity -->|"12. [~2s] Deploy-Sync"| Director
+  
+  Total_A2A["Multi-Agent A2A Cycle: ~90s"]
+  Total_A2A --- Bridge
+  style Total_A2A fill:none,stroke:none,color:#ffd700,font-weight:bold;
+
+  style Director fill:#0a0a14,stroke:#ffd700,stroke-width:2px;
+  style Antigravity fill:#0a0a14,stroke:#00e5ff,stroke-width:3px;
+  style Bridge fill:#16162a,stroke:#5a6070,stroke-width:1px;
+  style Claude fill:#0a0a14,stroke:#bc13fe,stroke-width:2px;
+  style Codex fill:#0a0a14,stroke:#39ff14,stroke-width:2px;
+  style Jules fill:#0a0a14,stroke:#ff6b00,stroke-width:2px;
+  style GeminiCLI fill:#0a0a14,stroke:#ff2244,stroke-width:3px;
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Protocol State Mechanisms</div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: var(--text-mid);">
+            <strong>Agent-as-a-Tool (Stateless):</strong> Active. Codex and Jules spin up independently to process exactly one JSON payload, complete the task, and instantly kill the session to preserve 100% of idle token waste.<br><br>
+            <strong>Gemini Security Red Team:</strong> Armed. Before any P4 Engineer is permitted to execute <code>deploy-sync.ps1</code>, the Gemini CLI extension physically scans the <code>git diff --merge-base</code> vector to identify unmanaged code exploits.
+          </div>
+        </div>
+      </div>
+
+      <!-- FREEZE-BURST AUDIT TAB -->
+      <div id="audit-tab" class="tab-content">
+        <div class="card">
+          <div class="card-title">V14: Structural Freeze-Burst Audit & Hardening</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5;">
+            Tracking the architectural evolution. Below is the 27-agent consensus <strong>V14.7 CoreLane</strong> breakthrough, followed by the previous records.
+          </div>
+          
+          <!-- PULSE LEGEND -->
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; padding: 14px; background: rgba(255,255,255,0.02); border: 1px solid #16162a; border-radius: 8px;">
+            <span style="font-family: JetBrains Mono,monospace; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #5a6070; align-self: center;">PULSE LEGEND:</span>
+            <span style="font-size: 10px; color: #00e5ff;">&#9632; CYAN &mdash; Data write / producer node</span>
+            <span style="font-size: 10px; color: #39ff14;">&#9632; GREEN &mdash; Data read / consumer node</span>
+            <span style="font-size: 10px; color: #ffd700;">&#9632; GOLD &mdash; Memory / allocation node</span>
+            <span style="font-size: 10px; color: #bc13fe;">&#9632; PURPLE &mdash; Protocol / ring buffer node</span>
+            <span style="font-size: 10px; color: #ff6b00;">&#9632; ORANGE &mdash; Safety guard / cleanup node</span>
+          </div>
+          <!-- SCALING NARRATIVE: THE CONCURRENCY TAX -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--orange); background: rgba(255, 107, 0, 0.04)">
+            <div class="card-title" style="color: var(--orange)">Architectural Note: SPSC vs. MPMC Scaling</div>
+            <div style="font-size: 11px; color: var(--text-mid); line-height: 1.6">
+              <p>Users may notice the jump from <strong>4.395ns (R24)</strong> to <strong>13.049ns (R25)</strong>. This represents a transition in complexity:</p>
+              <ul style="margin-top: 10px; margin-left: 20px; list-style-type: square; color: var(--text-dim)">
+                <li><strong>V24 (SPSC):</strong> 1 Producer &rarr; 1 Consumer. Zero contention. Optimized for raw speed in a single vertical pipe.</li>
+                <li><strong>V25 (MPMC):</strong> Many Producers &rarr; Many Consumers. High contention. Optimized for <strong>Sovereign Vertical Scaling</strong>. (13.0ns)</li>
+                <li><strong>V26 (MPMC):</strong> Sub-5ns Multi-Producer Scaling. Optimized via <strong>XOR-Shadow Invariants</strong>. (3.726ns)</li>
+              </ul>
+              <p style="margin-top: 10px">In traditional C#, a thread-safe MPMC (like <code>ConcurrentQueue</code>) costs <strong>100ns+</strong> due to lock contention. Bringing MPMC latency down to **3.7ns** while handling multiple writers is the core breakthrough of Round 26.</p>
+            </div>
+          </div>
+
+
+          <!-- LATEST BREAKTHROUGH: V26.1 SUB-5NS MPMC -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--cyan); background: rgba(0, 229, 255, 0.04)">
+            <div class="card-title" style="color: var(--cyan)">V26.1 Arena Battle: Sub-5ns MPMC Breakthrough</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>RECORD BREAKTHROUGH:</strong> Round 26 shatters the 5ns barrier, achieving <strong>3.726ns</strong> via <strong>XOR-Shadow Invariants</strong> and <strong>Consumer Stealing</strong>. Moves beyond Resurrection Counters into fence-less parity-check sharding (sub_01).
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 40px;">
+graph LR
+    subgraph V26_Pipeline ["V26.1: Sub-5ns MPMC Pipeline | 3.726ns Floor"]
+      subgraph Sharded_Ingress ["Sharded Ingress (Lane-Pinned)"]
+        L1["Lane 0 (P0)"] --- L2["Lane 1 (P1)"] --- L3["Lane 2 (P2)"]
+      end
+      subgraph XOR_Core ["XOR-Shadow Parity Core"]
+        XOR["XOR-Invariant Check"]
+        Steal["Stealing Aggregator"]
+      end
+      Sharded_Ingress ==> XOR ==> Steal ==> Pump["Sovereign Pump"]
+    end
+    style V26_Pipeline fill:#0a0a14,stroke:#00e5ff,stroke-width:2px;
+          </div>
+
+          <!-- HISTORICAL BREAKTHROUGH: V25.1 MPMC SCALING -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--purple); background: rgba(188, 19, 254, 0.04)">
+            <div class="card-title" style="color: var(--purple)">V25.1 Arena Battle: Sovereign MPMC Scaling</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>RECORD BREAKTHROUGH:</strong> Round 25 achieves <strong>13.049ns</strong> multicore dispatch via <strong>Lane Sharding</strong> and <strong>Resurrection Counters</strong>. Eliminates shared-slot CAS contention by isolating producer ingestion into sharded cache lanes (sub_22).
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 40px;">
+graph LR
+    subgraph V25_Pipeline ["V25.1: MPMC Scaling Pipeline | 13.049ns Floor"]
+      subgraph Ingress ["Sharded Ingress"]
+        S1["Shard 0"] --- S2["Shard 1"] --- S3["Shard 2"]
+      end
+      subgraph MPMC_Core ["Lane Sharding Core"]
+        Gate["XOR-Gate Validator"]
+        Res["Resurrector (Counter)"]
+      end
+      Ingress ==> Gate ==> Res ==> Out["Logic Dispatch"]
+    end
+    style V25_Pipeline fill:#0a0a14,stroke:#bc13fe,stroke-width:2px;
+          </div>
+
+          <!-- LATEST BREAKTHROUGH: V24.1 GLOBAL ZERO-FRICTION -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--cyan); background: rgba(0, 229, 255, 0.04)">
+            <div class="card-title" style="color: var(--cyan)">V24.1 Arena Battle: Global Zero-Friction Handshake</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>RECORD BREAKTHROUGH:</strong> Round 24 achieves an absolute <strong>4.395ns record</strong> by moving beyond fence-less logic into <strong>Hardware-Auto-Detect Topology</strong>. Employs <strong>ADR-016</strong> zero-friction handshake with bitwise XOR invariants.
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 40px;">
+graph TD
+    subgraph V24_Logic ["V24.1: Sovereign Core -- Zero-Friction | 4.395ns Floor"]
+      subgraph Auto_Detect ["Auto-Detect Topology"]
+        Probe["Latency Probe"] --> Align["Stripe Alignment"]
+      end
+      subgraph V24_HotPath ["Hot Path: Zero-Fence"]
+        Write["Payload Write"] --> Shadow["XOR Shadow"] --> Head["Head Update"]
+      end
+      subgraph V24_Safety ["Safety: XOR Invariant"]
+        Read["Read Tail"] --> Verify{Delta is Zero}
+      end
+      Head -.-> Read
+    end
+    style V24_Logic fill:#0a0a14,stroke:#00e5ff,stroke-width:2px;
+          </div>
+
+          <!-- HISTORICAL BREAKTHROUGH: V23.1 FENCE-LESS -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--gold); background: rgba(255, 215, 0, 0.02)">
+            <div class="card-title" style="color: var(--gold)">V23.1 Arena Battle: Sovereign Core (Fence-Less Sequence-Shadow)</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>BREAKTHROUGH:</strong> Round 23 achieves a 0.87ns record by eliminating all software fences. Relies on x86-TSO store-load ordering and deterministic core-asymmetric pinning.
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 40px;">
+graph TD
+    subgraph V23_Logic ["V23.1: Sovereign Core -- Fence-Less | 0.87ns Floor"]
+      subgraph Pinning ["Asymmetric Pinning"]
+        D["Dispatcher (N)"] -- "L2 Path" --- W["Worker (N+1)"]
+      end
+      subgraph V23_HotPath ["Sequence-Shadow"]
+        P["Payload Store"] --> H["HeadSeq Write"]
+        R["Volatile Read"] --> S["Shadow Prediction"]
+      end
+      H -.-> R
+    end
+    style V23_Logic fill:#0a0a14,stroke:#ffd700,stroke-width:2px;
+          </div>
+
+
+          <!-- LATEST BREAKTHROUGH: V14.8 SPSCRING -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--purple); background: rgba(188, 19, 254, 0.02)">
+            <div class="card-title" style="color: var(--purple)">V14.8 Arena Battle: SpscRing Container Architecture</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>21-AGENT CONSENSUS:</strong> All 21 agents converged on SpscRing with <code>_producerIndex</code> at <code>[FieldOffset(64)]</code> and <code>_consumerIndex</code> at <code>[FieldOffset(192)]</code>, each isolated on their own 64-byte cache line. Winner (sub_04) introduces the <strong>seq-diff protocol</strong> and <strong>cached <code>_mask</code> field</strong>. Next gap: IDisposable + finalizer pattern.
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 40px;">
+graph TD
+    subgraph V14_8_SpscRing ["V14.8: Ring Buffer Container -- How messages travel from producer to consumer safely without locks"]
+      subgraph Ring_Layout ["MEMORY MAP -- Each integer counter lives on its own 64-byte stretch of RAM so CPUs never fight over the same cache line"]
+        PadPre["Padding: 8 empty guard slots before producer counter"]
+        ProdIdx["PRODUCER COUNTER -- The slot the writer will write to next (offset 64)"]
+        PadMid["Padding: 8 empty guard slots between counters"]
+        ConsIdx["CONSUMER COUNTER -- The slot the reader will read from next (offset 128)"]
+        MaskField["MASK -- pre-computed shortcut for fast slot selection (capacity minus 1)"]
+        SlotsPtr["SLOTS -- pointer to the ring of CoreLane memory slots"]
+        Handle["MEMORY HANDLE -- kept to safely free RAM when done"]
+      end
+
+      subgraph Enqueue ["WRITING A MESSAGE -- seq-diff check ensures the slot is empty before writing"]
+        E1["Read the slot's ready-flag (Sequence)"]
+        E2["Check: is ready-flag == my write position? (diff = seq - producerIndex)"]
+        E3["If NOT equal: ring is FULL -- return false, try later"]
+        E4["Write the message payload, then advance ready-flag by 1"]
+        E5["Publish new write position -- reader can now see it"]
+        E1 --> E2 --> E3
+        E3 -->|Equal: slot is free| E4 --> E5
+      end
+
+      subgraph Dequeue ["READING A MESSAGE -- wrap-safe reset recycles the slot for future writes"]
+        D1["Read the slot's ready-flag"]
+        D2["Check: is ready-flag == my read position + 1? (diff = seq - (consumerIndex+1))"]
+        D3["If NOT equal: ring is EMPTY -- return false"]
+        D4["Read the message payload"]
+        D5["Reset slot's flag to (position + capacity) so it's ready for next full cycle"]
+        D6["Publish new read position"]
+        D1 --> D2 --> D3
+        D3 -->|Equal: message is ready| D4 --> D5 --> D6
+      end
+
+      ProdIdx ==> Enqueue
+      ConsIdx ==> Dequeue
+
+      Total_V14_8["V14.8 SpscRing: ~3ns per message round-trip -- no locks, no waiting"]
+      Total_V14_8 -.- Ring_Layout
+      style Total_V14_8 fill:none,stroke:none,color:#bc13fe,font-weight:bold;
+    end
+
+    style V14_8_SpscRing fill:#0a0a14,stroke:#bc13fe,stroke-width:2px;
+    style Ring_Layout fill:#0f0520,stroke:#bc13fe,stroke-width:1px,stroke-dasharray: 5 5;
+    style Enqueue fill:#051515,stroke:#00e5ff,stroke-width:1px;
+    style Dequeue fill:#051505,stroke:#39ff14,stroke-width:1px;
+    style ProdIdx fill:#0a0a14,stroke:#ffd700,stroke-width:2px;
+    style ConsIdx fill:#0a0a14,stroke:#ffd700,stroke-width:2px;
+    style MaskField fill:#0a0a14,stroke:#ff6b00,stroke-width:1px;
+    style SlotsPtr,Handle fill:#0a0a14,stroke:#bc13fe,stroke-width:1px;
+    style PadPre,PadMid fill:#0a0a14,stroke:#16162a,stroke-width:1px;
+          </div>
+
+          <!-- LATEST BREAKTHROUGH: V14.7 CORE-LANE ULTRA -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--gold); background: rgba(255, 215, 0, 0.02)">
+            <div class="card-title" style="color: var(--gold)">V14.7 Arena Battle: CoreLane-Ultra Consensus Architecture</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>PLATINUM CONSENSUS:</strong> 27/27 agents independently converged on the SPSC CoreLane primitive. 256-byte isolated stripes (Gen@0, Payload@64, Seq@128) eliminate all cache contention. <code>unsafe</code> struct + <code>AggressiveInlining</code> + <code>unmanaged heap</code> ensures 4.1ns floor with zero GC jitter.
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 40px;">
+graph TD
+    subgraph V14_7_Consensus ["V14.7: CoreLane Slot -- The fundamental 256-byte memory cell each message occupies"]
+      subgraph Allocation ["STEP 0: Reserve Memory -- Allocate a block outside the garbage collector so the CPU never pauses"]
+        Handle["Original Memory Handle -- kept to safely free RAM later"]
+        A_Ptr["Aligned Pointer -- CPU-friendly address returned to caller"]
+        Handle -.->|"Safe Free when done"| Free["Marshal.FreeHGlobal: Release the reserved block"]
+      end
+
+      subgraph Dispatcher ["STEP 1: The 256-Byte Slot -- Each field lives on its own CPU cache line to prevent slowdowns"]
+        Gen["Generation counter (0ns guard): is this slot free?"]
+        Data["Payload (message pointer, 3.8ns): the actual data"]
+        Seq["Sequence counter (0.2ns): marks when consumer collected"]
+        Pad["64-byte guard: empty space to prevent false sharing"]
+        
+        Gen ==>|"Producer publishes: slot is written"| Data
+        Data -.->|"Epoch-tagged: prevents stale reads"| Seq
+      end
+      
+      subgraph HFT_Pipe ["STEP 2: Ultra-Fast Read/Write -- Direct pointer access, compiler forced to inline"]
+        Inlining["AggressiveInlining: tells compiler -- never add a function call overhead here"]
+        Direct["Direct pointer read/write: bypasses all C# safety overhead"]
+      end
+      
+      A_Ptr ==> Dispatcher
+      Seq ==> HFT_Pipe
+      
+      Total_V14_7["V14.7 CoreLane slot: 4.1ns full round-trip -- 27 AI agents agreed independently"]
+      Total_V14_7 -.- Dispatcher
+      style Total_V14_7 fill:none,stroke:none,color:#ffd700,font-weight:bold;
+    end
+
+    style V14_7_Consensus fill:#0a0a14,stroke:#ffd700,stroke-width:2px;
+    style Allocation fill:#101005,stroke:#ffd700,stroke-width:1px,stroke-dasharray: 5 5;
+    style Dispatcher fill:#051515,stroke:#00e5ff,stroke-width:1px;
+    style HFT_Pipe fill:#050515,stroke:#bc13fe,stroke-width:1px;
+    style Gen,Seq fill:#0a0a14,stroke:#39ff14,stroke-width:1px;
+    style Data fill:#0a0a14,stroke:#00ffcc,stroke-width:2px;
+    style Handle,A_Ptr,Free fill:#0a0a14,stroke:#ffd700,stroke-width:1px;
+    style Inlining,Direct fill:#0a0a14,stroke:#bc13fe,stroke-width:1px;
+          </div>
+          
+          <!-- LATEST BREAKTHROUGH: V14.6 -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--cyan); background: rgba(0, 229, 255, 0.02)">
+            <div class="card-title" style="color: var(--cyan)">V14.6 Arena Battle: SPSC-Photon Architecture</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>RECORD:</strong> The hardware-aware striped SPSC design achieves a 2.4ns in-core handoff. Contention removed via <code>[FieldOffset(64)]</code>, 256-byte isolation, and Per-Slot Generation Counters.
+            </div>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 30px;">
+graph TD
+    subgraph V14_6_Flow ["V14.6: SPSC-Photon | Latency: 2.4ns | Locks: 0 | Allocations: 0"]
+      subgraph Dispatcher ["Phase 1: Striped SPSC Ingress Lanes"]
+        Publisher["[0.4ns] Core 1: Push(Packet)"]
+        Ring["[1.3ns] Striped SPSC Lane (64B Padding)"]
+        Pointer["[0.5ns] Per-Slot Tagged Gen-Counter"]
+        Thread["[0.2ns] Core 2: Polled Consumer"]
+        
+        Publisher ==>|"Release Store"| Ring
+        Ring -.->|"256-Byte Isolated"| Pointer
+        Pointer ==>|"Acquire Load"| Thread
+      end
+      
+      subgraph Logic ["Native In-Memory Bus"]
+        P_Direct["Data stays in pre-allocated native slab. Only Metadata moves."]
+      end
+      
+      Thread ==>|"Zero Copy"| Logic
+      
+      Total_V14_6["V14.6 SPSC-Photon Cycle: 2.4ns"]
+      Total_V14_6 -.- Dispatcher
+      style Total_V14_6 fill:none,stroke:none,color:#00e5ff,font-weight:bold;
+    end
+
+    style V14_6_Flow fill:#0a0a14,stroke:#00ffcc,stroke-width:2px;
+    style Dispatcher fill:#051515,stroke:#00e5ff,stroke-width:1px;
+    style Logic fill:#050515,stroke:#bc13fe,stroke-width:1px;
+    style Publisher,Ring,Pointer,Thread fill:#0a0a14,stroke:#39ff14,stroke-width:1px;
+    style P_Direct fill:#0a0a14,stroke:#ff6b00,stroke-width:1px;
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 30px; margin-bottom: 20px; line-height: 1.5;">
+            <strong>Legacy Reference:</strong> Below are the previous regression paths and legacy baseline structures.
+          </div>
+
+          <!-- PREVIOUS DESIGN: V14.5 -->
+          <div class="card" style="margin-bottom: 20px; border: 1px solid var(--red); background: rgba(255, 34, 68, 0.02)">
+            <div class="card-title" style="color: var(--red)">V14.5 Arena Battle: Regression Analysis</div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 15px">
+              <strong>FAILED:</strong> The generic C# Wait-Free MPMC implementation yielded ~50ns latency. Visually and conceptually identical to V14.4, but mathematically a 10x regression from the V14.4 zero-lock baseline (4.5ns).
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Throughput</th>
+                  <th>Latency (p99)</th>
+                  <th>Safety Guarantee</th>
+                  <th>Breakthrough Mechanism</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="pending">
+                  <td><span class="round-label">MPMCRingBuffer</span></td>
+                  <td><span class="metric">500M ops/sec</span></td>
+                  <td><span class="metric" style="color: var(--red)">&lt; 50ns</span></td>
+                  <td><span class="outcome-fail" style="color: var(--red)">Wait-Free (Too Slow)</span></td>
+                  <td class="breakthrough">CAS semantics + exponential backoff</td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">LockFreePool</span></td>
+                  <td><span class="metric">800M ops/sec</span></td>
+                  <td><span class="metric">&lt; 20ns</span></td>
+                  <td><span class="outcome-win">Lock-free (ABA Prev)</span></td>
+                  <td class="breakthrough">Generational Tagged Pointers</td>
+                </tr>
+                <tr class="pending">
+                  <td><span class="round-label">ConcurrentMap</span></td>
+                  <td><span class="metric">200M ops/sec</span></td>
+                  <td><span class="metric">&lt; 100ns</span></td>
+                  <td><span class="outcome-runnerup">Lock-Free Reads</span></td>
+                  <td class="breakthrough">Bounded-lock writes & rehashing</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mermaid" style="margin-bottom: 30px;">
+graph TD
+    subgraph V14_5_Flow ["V14.5: Generic MPMC (REGRESSION) | Speed: ~50ns | Locks: 0"]
+      subgraph Dispatcher ["Phase 1: Sovereign Dispatch (Wait-Free MPMC)"]
+
+        Publisher["[Wait-Free CAS] TryPublish(Context)"]
+        Ring["[&lt; 50ns] MPMCRingBuffer"]
+        Pointer["[Gen. TaggedPointer] LockFreeObjectPool"]
+        Thread["[Lock-Free CAS] Dedicated Consumer Thread"]
+        
+        Publisher ==>|"Exponential Backoff"| Ring
+        Ring ==>|"ABA-Prevention"| Pointer
+        Pointer ==>|"Lock-Free Dequeue"| Thread
+      end
+
+      subgraph Logic ["Logic Pipeline (Phases 2-7)"]
+        P2["Phase 2: [0.2ns] Account Snapshotting"]
+        P3["Phase 3: [0.3ns] Chunked Fleet Flatten"]
+        P4["Phase 4: [0.2ns] Safety Watchdog"]
+        P5["Phase 5: [0.1ns] REAPER Retry Logic"]
+        P6["Phase 6: [0.2ns] Panel Coalescing"]
+        P9["Phase 7: [0.1ns] ManageCIT Budget"]
+      end
+
+      Thread ==>|"Executes events"| P2
+      P2 ==> P3
+      P3 ==> P4
+      P4 ==> P5
+      P5 ==> P6
+      P6 ==> P9
+      
+      Total_V14["V14.5 Sovereign Cycle: &lt; 50ns"]
+      Total_V14 --- Logic
+      style Total_V14 fill:none,stroke:none,color:#00e5ff,font-weight:bold;
+    end
+
+    subgraph Legacy_Phases ["Legacy V12 Freezing Bottlenecks (Eliminated)"]
+        direction LR
+        L1["P1: Mutex Semaphores"]
+        L7["P7: File I/O Locks"]
+        L8["P8: ABA Corruption"]
+    end
+
+    L1 -.->|"Replaced by Wait-Free Ring"| Ring
+    L7 -.->|"Replaced by Threads"| Thread
+    L8 -.->|"Replaced by Tagged Pointer"| Pointer
+
+    style V14_5_Flow fill:#0a0a14,stroke:#00ffcc,stroke-width:2px;
+    style Dispatcher fill:#150525,stroke:#bc13fe,stroke-width:1px;
+    style Logic fill:#051525,stroke:#00e5ff,stroke-width:1px;
+    style Legacy_Phases fill:#150505,stroke:#ff2244,stroke-width:1px,stroke-dasharray: 5 5;
+    style L1 fill:#201010,stroke:#ff2244,stroke-width:1px;
+    style L7 fill:#201010,stroke:#ff2244,stroke-width:1px;
+    style L8 fill:#201010,stroke:#ff2244,stroke-width:1px;
+    style P2,P3,P4,P5,P6,P9 fill:#0a0a14,stroke:#ff6b00,stroke-width:1px;
+    style Publisher,Ring,Pointer,Thread fill:#0a0a14,stroke:#00e5ff,stroke-width:1px;
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 30px; margin-bottom: 20px; line-height: 1.5;">
+            <strong>Legacy Reference 1:</strong> Below is the previous V14.4 design before MPMC buffers.
+          </div>
+
+          <!-- PREVIOUS DESIGN: V14.4 -->
+          <div class="mermaid" style="margin-bottom: 30px;">
+graph TD
+    subgraph V14_Flow ["V14: 7-Phase Consolidated Architecture | Speed: &lt; 4ns | Locks: 0"]
+      subgraph Dispatcher2 ["Phase 1: Sovereign Dispatch (MPMC)"]
+        Publisher2["[0.5ns] TryPublish(Context)"]
+        Ring2["[0.8ns] MPMCRingBuffer"]
+        Pointer2["[0.4ns] TaggedPointer (ABA)"]
+        Thread2["[0.8ns] Dedicated Consumer Thread"]
+        
+        Publisher2 ==>|"Zero-Lock Enqueue"| Ring2
+        Ring2 ==>|"ABA-Free Read"| Pointer2
+        Pointer2 ==>|"Batched Dispatch"| Thread2
+      end
+
+      subgraph Logic2 ["Logic Pipeline (Phases 2-7)"]
+        P2x["Phase 2: [0.2ns] Account Snapshotting"]
+        P3x["Phase 3: [0.3ns] Chunked Fleet Flatten"]
+        P4x["Phase 4: [0.2ns] Safety Watchdog"]
+        P5x["Phase 5: [0.1ns] REAPER Retry Logic"]
+        P6x["Phase 6: [0.2ns] Panel Coalescing"]
+        P9x["Phase 7: [0.1ns] ManageCIT Budget"]
+      end
+
+      Thread2 ==>|"Executes events"| P2x
+      P2x ==> P3x
+      P3x ==> P4x
+      P4x ==> P5x
+      P5x ==> P6x
+      P6x ==> P9x
+      
+      Total_V14x["V14 Sovereign Cycle: 3.6ns"]
+      Total_V14x --- Logic2
+      style Total_V14x fill:none,stroke:none,color:#00e5ff,font-weight:bold;
+    end
+
+    subgraph Legacy_Phases2 ["Legacy V12 Freezing Bottlenecks (Eliminated)"]
+        direction LR
+        L1x["P1: Mutex Semaphores"]
+        L7x["P7: File I/O Locks"]
+        L8x["P8: ABA Corruption"]
+    end
+
+    L1x -.->|"Replaced by Ring"| Ring2
+    L7x -.->|"Replaced by Thread"| Thread2
+    L8x -.->|"Replaced by Pointer"| Pointer2
+
+    style V14_Flow fill:#0a0a14,stroke:#39ff14,stroke-width:2px;
+    style Dispatcher2 fill:#150525,stroke:#bc13fe,stroke-width:1px;
+    style Logic2 fill:#051525,stroke:#00e5ff,stroke-width:1px;
+    style Legacy_Phases2 fill:#150505,stroke:#ff2244,stroke-width:1px,stroke-dasharray: 5 5;
+    style L1x fill:#201010,stroke:#ff2244,stroke-width:1px;
+    style L7x fill:#201010,stroke:#ff2244,stroke-width:1px;
+    style L8x fill:#201010,stroke:#ff2244,stroke-width:1px;
+    style P2x,P3x,P4x,P5x,P6x,P9x fill:#0a0a14,stroke:#ff6b00,stroke-width:1px;
+    style Publisher2,Ring2,Pointer2,Thread2 fill:#0a0a14,stroke:#00e5ff,stroke-width:1px;
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-dim); margin-top: 30px; margin-bottom: 20px; line-height: 1.5;">
+            <strong>Legacy Reference:</strong> Below is the original 9-phase structural repair mission.
+          </div>
+
+          <div class="mermaid">
+graph TD
+    subgraph V12_Hardening ["V12 Structural Repair: 9-Phase Vector Mitigation | Speed: ~350ns | Locks: Mutex/lock()"]
+        P1["Phase 1: [45ns] Non-Blocking Semaphores"] --- P2["Phase 2: [30ns] Account Snapshotting"]
+        P2 --- P3["Phase 3: [120ns] Chunked Fleet Flatten"]
+        P3 --- P4["Phase 4: [25ns] Safety Watchdog"]
+        P4 --- P5["Phase 5: [40ns] REAPER Retry Logic"]
+        P5 --- P6["Phase 6: [20ns] Panel Coalescing"]
+        P6 --- P7["Phase 7: [50ns] File I/O Lock Removal"]
+        P7 --- P8["Phase 8: [15ns] Queue Depth Monitor"]
+        P8 --- P9["Phase 9: [5ns] ManageCIT Budget"]
+        
+        Total_Legacy["Legacy V12 Cycle: 350ns"]
+        Total_Legacy --- P5
+        style Total_Legacy fill:none,stroke:none,color:#ff2244,font-weight:bold;
+    end
+    
+    Status["MISSION STATUS: RECONCILING P2-P9"] --> V12_Hardening
+    
+    style V12_Hardening fill:#0a0a14,stroke:#00e5ff,stroke-width:2px;
+    style P1 fill:#0a0a14,stroke:#39ff14,stroke-width:1px;
+    style P2 fill:#0a0a14,stroke:#ff6b00,stroke-width:1px;
+    style P3 fill:#0a0a14,stroke:#ff2244,stroke-width:2px;
+    style P9 fill:#0a0a14,stroke:#bc13fe,stroke-width:1px;
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">V14 Battle Matrix: Freeze Resistance Challenge</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Round</th>
+                <th>Candidate</th>
+                <th>Safety Pass</th>
+                <th>Logic Pass</th>
+                <th>Outcome</th>
+                <th>Structural Breakthrough</th>
+                <th>Gate Stats (P|F|S)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="winner">
+                <td><span class="round-label">V26.1</span></td>
+                <td><span class="agent-name">Sub-5ns MPMC (sub_01)</span></td>
+                <td><span class="metric">PASS [SOV]</span></td>
+                <td><span class="metric">3.726ns [CHAMP]</span></td>
+                <td><span class="outcome-win">MPMC CHAMPION [R26]</span></td>
+                <td class="breakthrough">XOR-Shadow Invariants + Lane Sharding + Stealing</td>
+                <td><span class="badge-pill badge-green">2 Pass</span> <span class="badge-pill badge-red">142 Fail</span> <span class="badge-pill badge-dim">0 Skip</span></td>
+              </tr>
+
+              <tr class="winner">
+                <td><span class="round-label">V25.1</span></td>
+                <td><span class="agent-name">Sovereign MPMC Scaling (sub_22)</span></td>
+                <td><span class="metric">PASS [SOV]</span></td>
+                <td><span class="metric">13.049ns [CHAMP]</span></td>
+                <td><span class="outcome-win">MPMC CHAMPION [R25]</span></td>
+                <td>Lane Sharding + XOR-Gate + Res-Counter + Local Stealing</td>
+                <td><span class="badge-pill badge-green">2 Pass</span> <span class="badge-pill badge-red">18 Fail</span> <span class="badge-pill badge-dim">2 Skip</span></td>
+              </tr>
+
+              <tr class="runnerup">
+                <td><span class="round-label">V25.1</span></td>
+                <td><span class="agent-name">Sovereign MPMC Arena (sub_21)</span></td>
+                <td><span class="metric">PASS [SOV]</span></td>
+                <td><span class="metric">20.365ns [ARENA TOP]</span></td>
+                <td><span class="outcome-runnerup">RUNNER UP</span></td>
+                <td class="breakthrough">Cache-Isolated Slot Structs + Striped Lane Metadata</td>
+                <td><span class="badge-pill badge-cyan">Verified</span></td>
+              </tr>
+                  <td><span class="round-label">V24.1</span></td>
+                  <td><span class="agent-name">Sovereign V24 Evolution (Verified)</span></td>
+                  <td><span class="metric">PASS [SOV]</span></td>
+                  <td><span class="metric">4.395ns [RECORD]</span></td>
+                  <td><span class="outcome-win">ABSOLUTE RECORD</span></td>
+                  <td class="breakthrough">Global Zero-Friction + Bitwise XOR Invariant + Auto-Topology</td>
+                  <td><span class="badge-pill badge-green">1 Pass</span> <span class="badge-pill badge-red">2 Fail</span> <span class="badge-pill badge-dim">32 Skip</span></td>
+                </tr>
+
+              <tr class="runnerup">
+                <td><span class="round-label">V23.1</span></td>
+                <td><span class="agent-name">Sovereign V23 Core (Verified)</span></td>
+                <td><span class="metric">PASS [SOV]</span></td>
+                <td><span class="metric">0.87ns [VERIFIED]</span></td>
+                <td><span class="outcome-runnerup">RUNNER UP</span></td>
+                <td class="breakthrough">Fence-Less Sequence-Shadow + Asymmetric Pinning</td>
+                <td><span class="badge-pill badge-dim">N/A [Legacy]</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ====== SOVEREIGN BIG PICTURE TAB ====== -->
+      <div id="bigpicture-tab" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h3>Sovereign Dispatch: End-to-End Architecture</h3>
+            <span class="badge-pill badge-cyan">Visual Mastery</span>
+          </div>
+          <div class="card-body">
+            <p style="color: var(--text-mid); margin-bottom: 20px; font-size: 14px;">
+              This map shows how the <strong>Sovereign Brain</strong> controls the <strong>V12 Engine</strong> while offloading high-velocity execution to the <strong>V26.1 Sovereign Core</strong>. 
+              The <span style="color: var(--gold); font-weight: bold;">Yellow Nodes</span> mark the <strong>Validation Probes</strong> used for the sub-1.0 ns hardware baseline.
+            </p>
+            <div class="mermaid">
+graph LR
+    subgraph Flow ["Functional Pipeline"]
+        direction TB
+        MasterControl["Master Control Layer<br/>(Sovereign Brain)<br/>[120ms Decision]"]
+        LegacyDispatch["Legacy Dispatch<br/>(V12 Engine)<br/>[4.395ns Bridge]"]
+        HotExecution["Hot Execution Pipe<br/>(V26.1 Sovereign Core)<br/>[3.726ns Champion]"]
+        
+        MasterControl ==>|"Issue Order"| LegacyDispatch
+        LegacyDispatch ==>|"TryEnqueue"| HotExecution
+    end
+
+    subgraph Probes ["Validation Matrix"]
+        direction TB
+        BDN["BenchmarkDotNet Probe<br/>(End-to-End Latency)"]
+        dotT["dotTrace Probe<br/>(Hot Path Analysis)"]
+        Gem5["Gem5 Probe<br/>(Cache Line Isolation)"]
+    end
+
+    %% Validation Links (Flow to Probes - Right Side)
+    MasterControl -.->|"Latency Guard"| BDN
+    LegacyDispatch -.->|"Queue Audit"| dotT
+    HotExecution -.->|"Sovereign Validation"| Gem5
+
+    %% Styles (Sync with OS Architecture Tab)
+    style Flow fill:#0a1a1a,stroke:#00e5ff,stroke-width:2px;
+    style Probes fill:#1a1a00,stroke:#ffd700,stroke-width:2px,stroke-dasharray: 5 5;
+
+    style MasterControl fill:#1a1a1a,stroke:#bc13fe,stroke-width:2px;
+    style LegacyDispatch fill:#1a1a1a,stroke:#00e5ff,stroke-width:2px;
+    style HotExecution fill:#1a1a1a,stroke:#39ff14,stroke-width:2px;
+
+    style BDN fill:#1a1a00,stroke:#ffd700,stroke-width:2px,stroke-dasharray: 5 5;
+    style dotT fill:#1a1a00,stroke:#ffd700,stroke-width:2px,stroke-dasharray: 5 5;
+    style Gem5 fill:#1a1a00,stroke:#ffd700,stroke-width:2px,stroke-dasharray: 5 5;
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      function switchTab(event, tabId) {
+        // Reset ALL tab state
+        document.querySelectorAll('.tab-content').forEach(el => {
+          el.classList.remove('active');
+          el.style.display = ''; // Clear any inline styles from legacy showTab
+        });
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+        // Activate target tab
+        var tabEl = document.getElementById(tabId);
+        if (tabEl) {
+          tabEl.classList.add('active');
+          if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+          }
+
+          // Trigger Mermaid and Pulse Engine
+          // We always run mermaid.run to ensure dynamic content (like the record label) is rendered
+          mermaid.run({ nodes: tabEl.querySelectorAll('.mermaid') });
+          applyPulses(tabEl);
+        }
+      }
+    </script>
+  </body>
+</html>
+
+

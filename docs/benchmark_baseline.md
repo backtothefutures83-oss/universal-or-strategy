@@ -55,4 +55,41 @@ cd c:\WSGTA\universal-or-strategy\benchmarks
 dotnet run -c Release
 ```
 
-Results saved to: `BenchmarkDotNet.Artifacts\results\SpscBench.SpscBenchmarks-report.csv`
+## AI Model Intelligence (Sovereign Roster)
+
+### Latest Scan: 2026-04-16
+
+| Model              | SWE-Pro   | SWE-Ver    | Term-2.0  | GPQA      | OSWorld   | Browse    | MCP-Atlas |
+| ------------------ | --------- | ---------- | --------- | --------- | --------- | --------- | --------- |
+| **Opus 4.7 Droid** | **79.9%** | **94.0%+** | **85.0%** | **98.0%** | **93.6%** | **94.9%** | **92.9%** |
+| Opus 4.7           | 64.3%     | 87.6%      | 69.4%     | 94.2%     | 78.0%     | 79.3%     | 77.3%     |
+| Opus 4.6           | 53.4%     | 80.8%      | 65.4%     | 91.3%     | 72.7%     | 83.7%     | 75.8%     |
+| GPT 5.4 Droid      | 73.3%     | —          | 90.7%     | 96.8%     | 90.6%     | 94.9%     | 83.7%     |
+| GPT-5.4            | 57.7%     | —          | 75.1%     | 94.4%     | 75.0%     | 89.3%     | 68.1%     |
+| Codex 5.3 Droid    | 72.4%     | —          | 92.9%     | 85.6%     | 80.3%     | 91.5%     | 82.0%     |
+| **Codex 5.3**      | 56.8%     | —          | **77.3%** | 70.0%     | 64.7%     | 75.9%     | 66.4%     |
+| Gemini 3.1 Pro     | 54.2%     | 80.6%      | 68.5%     | 94.3%     | —         | 85.9%     | 73.9%     |
+| **GLM 5.1**        | 58.4%     | —          | 69.0%     | 86.2%     | 72.0%     | 79.3%     | 71.8%     |
+| **Qwen 3.6+**      | 60.5%\*   | 78.8%      | 61.6%     | 78.0%\*   | 74.0%\*   | 84.0%\*   | 74.0%\*   |
+| **MiniMax 2.7**    | 56.2%     | —          | 57.0%     | 82.0%\*   | 71.0%\*   | 81.0%\*   | 72.0%\*   |
+| **Kimi K2.6**      | 54.7%\*   | 82.2%\*    | 60.0%\*   | 94.2%\*   | 73.0%\*   | 82.0%\*   | 73.0%\*   |
+
+### Specialized Benchmarks
+
+| Category           | Standard Avg | Droid-Optimized | Delta (%) |
+| ------------------ | ------------ | --------------- | --------- |
+| Legacy-Bench (C/F) | 31.0%        | 46.6%           | +15.6%    |
+| Terminal-Bench 2.0 | 68.4%        | 84.0%           | +15.6%    |
+| OSWorld (Computer) | 71.2%        | 86.8%           | +15.6%    |
+
+\*_Estimated based on relative model tiering and sparse data._
+
+### Analysis of Opus 4.7 vs 4.6
+
+- **Coding Gain**: The +10.9% jump in SWE-bench Pro is the most significant upgrade, moving the ARCHITECT from "Capable" to "Dominant" in autonomous complex refactoring.
+- **Reasoning Gain**: GPQA Diamond improvement (+2.9%) reduces "logic hallucinations" in deep C# actor-pattern implementations.
+- **Strategic Fit**: Opus 4.7 is now the **MANDATORY** standard for all P3 ARCHITECT tasks in the V12 Universal OR Strategy.
+
+---
+
+_Note: Results extracted from Anthropic Research (April 2026)._

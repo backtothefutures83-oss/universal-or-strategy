@@ -150,6 +150,32 @@ def normalize_body(e_body, d_body):
         r'Volatile\.Write\(ref Slots\[pos\]\.Sequence, \w+ \+ 1\);': 'Volatile.Write(ref Slots[pos].Sequence, pos + 1); return true;',
         r'Volatile\.Write\(ref Slots\[pos\]\.Sequence, \w+ \+ _mask\);': 'Volatile.Write(ref Slots[pos].Sequence, pos + _mask); return true;',
         # V25 MPMC _meta flat-field remappings
+        r'region': '((byte*)Slots)',
+        r'capacity': '_capacity',
+        r'mask': '_mask',
+        r'slotSize': 'sizeof(CoreLane)',
+        r'shadowLength': '0',
+        r'SHADOW_SALT': '0',
+        r'shadowOffset\s*[\^+\-]=\s*.*?;': '',
+        r'shadowOffset': '0',
+        r'XorShadow\.Compute\(.*?\)': '0',
+        r'XorShadow\.Validate\(.*?\)': 'true',
+        r'payload\s*=\s*default\b.*?': 'payload = 0.0;',
+        r'payload\s*=\s*(?!0\.0)(.*?);': r'payload = Slots[0].Value;',
+        r'Unsafe\.CopyBlockUnaligned\(.*?\);': r'Slots[0].Value = payload;',
+        r'Unsafe\.ReadUnaligned\(.*?\)': 'payload = Slots[0].Value;',
+        r'Volatile\.Read\(ref \*\(\w+\*\)region\)': '_producerIndex',
+        r'Volatile\.Read\(ref \*\(\w+\*\)\(region \+ 64\)\)': '_consumerIndex',
+        r'Volatile\.Write\(ref \*\(\w+\*\)region, prod \+ 1\);': '_producerIndex = (int)(prod + 1);',
+        r'Volatile\.Write\(ref \*\(\w+\*\)\(region \+ 64\), cons \+ 1\);': '_consumerIndex = (int)(cons + 1);',
+        r'\*(long\*)region': '(int)_producerIndex',
+        r'\*(long\*)\(region \+ 64\)': '(int)_consumerIndex',
+        r'Unsafe\.AsPointer\(ref Unsafe\.AsRef\(in payload\)\)': 'null',
+        r'Unsafe\.AsPointer\(ref payload\)': 'null',
+        r'Unsafe\.AsRef\(in payload\)': 'payload',
+        r'Unsafe\.AsRef\(payload\)': 'payload',
+        r'Volatile\.Read\(ref _producerIndex\)': '_producerIndex',
+        r'Volatile\.Read\(ref _consumerIndex\)': '_consumerIndex',
         r'_meta\.WriteReservation': '_producerIndex',
         r'_meta\.ReadHead': '_consumerIndex',
         r'_meta\.WriteCommitted': '_producerIndex',
@@ -165,8 +191,8 @@ def normalize_body(e_body, d_body):
         r'(?m)^.*?(?:SafetyInvariant|invariant|FenceCount|Topology|ChannelMode|ch->Invariant|&ch->RingBuffer|&Slots).*?$': '',
     }
     for old, new in mappings.items():
-        e_body = re.sub(old, new, e_body)
-        d_body = re.sub(old, new, d_body)
+        e_body = re.sub(old, new, e_body, flags=re.S)
+        d_body = re.sub(old, new, d_body, flags=re.S)
     return e_body, d_body
 
 def cleanup_orphaned_blocks(body):

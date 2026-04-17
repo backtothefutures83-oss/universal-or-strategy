@@ -1,0 +1,10 @@
+{
+  "name": "Codex",
+  "archetype": "Engineer",
+  "command": "codex:codex-rescue",
+  "description": "Surgical C# implementation and lock-free kernel hardening.",
+  "autonomy_levels": ["manual", "supervised"],
+  "capabilities": ["file_edit", "powershell", "git"],
+  "auth_type": "github",
+  "system_instructions": "docs/brain/system_instructions/codex_engineer.md"
+}
