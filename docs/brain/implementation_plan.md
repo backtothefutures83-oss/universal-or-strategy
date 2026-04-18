@@ -1,1261 +1,669 @@
-# V12.15 Platinum Hardening Implementation Plan
+# Implementation Plan: ADR-019 Sovereign Substrate Repair
 
-**Mission:** V12.15 Platinum Hardening
-**Target build tag:** `1111.002-v28.1` (bump from `1111.002-v28.0`)
-**Authoritative spec:** this file
-**Architect (P3):** Claude (Opus 4.6) -- PLAN-ONLY until Director grants execution
-**Engineer (P4):** Codex (primary) / Jules (standby)
-**Planning date:** 2026-04-12
-
----
-
-## Context
-
-R28 v28.0 MmioDispatchMirror Hybrid landed and restored build integrity (UnsafeGate deleted, blittable FleetDispatchSlot + XorShadow, optional managed MMIO sidecar). The Director's P1 forensic intake for v28.1 identified four remediation targets; this plan is the P3 Architect orchestration layer that patches the remaining surface without touching the hot kernel.
-
-**This supersedes the prior R28 v28.0 orchestration content of this file.**
-
-### v28.1 P5 Adversarial Audit Changelog (Codex + Gemini consensus, 2026-04-12)
-
-The first revision of this plan was BLOCKED by the multi-agent Red Team audit recorded in `docs/brain/audit_v28_1_platinum.md`. Codex (FORENSICS) and Gemini CLI both returned `CONDITIONAL / REVISE`. Four required revisions were identified; all four are folded into this revision:
-
-| ID     | Severity             | Source                   | Issue                                                                                                                                                                                                                                                       | Plan fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------ | -------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **R1** | CRITICAL (consensus) | Codex #4 + #5, Gemini #2 | `EmergencyPurgeEntry` in Steps 10/11/12 wiped local tracking dictionaries while live broker stops + target orders still existed -- the exact ghost-order vector the plan was meant to eliminate.                                                            | Steps 10 and 11 now call `FlattenPositionByName(entryName)` BEFORE `EmergencyPurgeEntry`. Existing helper at `Orders.Management.Flatten.cs:347-425` already cancels the live stop, cancels every live T1..T5 target via `CancelOrderSafe`, clears `pendingStopReplacements`, and submits a market flatten. Step 12 (`EmergencyPurgeEntry` definition) now documents in both XML/inline comments and its log line that it is local-state-only and the caller MUST flatten first. |
-| **R2** | CRITICAL             | Codex #3                 | `dailySummaryLock` field declaration still lived at `V12_002.cs:227` even though Build 1109 retired its only call sites. Audit Gate 2 ("Zero `dailySummaryLock` in `src/`") would have failed as written. Original Finding 2 verdict (`REFUTED`) was wrong. | Finding 2 row in the table above flipped to `CONFIRMED`. New Step 12B deletes the declaration line. `stateLock` on the prior line is preserved (comment marks it as a deliberate dummy for un-extracted partial files).                                                                                                                                                                                                                                                         |
-| **R3** | WARNING              | Codex #2                 | Step 2 OLD/NEW blocks said `internal sealed class SymmetryDispatchContext`, but the working tree at `Symmetry.cs:15` says `private sealed class`. Applying the OLD/NEW verbatim would silently widen accessibility.                                         | Step 2 OLD/NEW blocks corrected to `private sealed class`. The replacement note explicitly forbids widening.                                                                                                                                                                                                                                                                                                                                                                    |
-| **R4** | WARNING              | Codex #6                 | Step 3 covered the publish path but missed `Symmetry.cs:165-168` -- the `[SYMMETRY_GUARD] MASTER ANCHOR LOCKED` Print line reads `ctx.MasterAnchorPrice` directly without a volatile load, allowing a torn double on 32-bit x86 once the lock is removed.   | Step 3 widened to lines 150-171. The publish block now stores the rounded anchor in a `publishedAnchor` local and the Print uses that local instead of `ctx.MasterAnchorPrice`.                                                                                                                                                                                                                                                                                                 |
-
-The Jules remote-VM audit (session `8072354675252587869`) transitioned to `Awaiting User Feedback` on the dashboard before completing; per CLAUDE.md `NO SIMULATION` rule, no Jules verdict is recorded here. The 2/3 quorum from Codex + Gemini already satisfied workflow Phase 2 minimum.
-
-### v28.1 P5 Adversarial Audit Changelog Round 2 (Jules remote VM, 2026-04-13)
-
-After Round 1 was published, Jules (P4 Engineer, remote VM) executed a fresh audit and returned `REVISE` with two new findings. Round 2 folds both into this plan as surgical edits to Steps 10, 11, and 14 only -- the rest of the v28.1 spec is unchanged. Round-2 Touch List for the Engineer shrinks to two files: `src/V12_002.Orders.Management.cs` and `deploy-sync.ps1`.
-
-| ID         | Severity | Source           | Issue                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Plan fix                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ---------- | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **R1-R2**  | CRITICAL | Jules Round 1 #1 | Steps 10 and 11 v28.1 NEW blocks call `FlattenPositionByName(entryName)` then `EmergencyPurgeEntry(entryName, ...)` as two sequential statements. If `FlattenPositionByName` throws (broker disconnect, margin reject, network timeout, plugin reject), `EmergencyPurgeEntry` is bypassed, the outer `SubmitBracketOrders` catch only logs, and local tracking dictionaries remain populated -- the exact ghost-order vector R1 was meant to eliminate. | Wrap the rollback sequence in `try { FlattenPositionByName(entryName); } finally { EmergencyPurgeEntry(entryName, "..."); }`. The local-state purge runs even if the broker side throws. The exception still propagates to the outer `SubmitBracketOrders` catch so forensic visibility is preserved. `EmergencyPurgeEntry` is documented and verified idempotent (Step 12).                                    |
-| **R14-R2** | CRITICAL | Jules Round 1 #2 | Step 14 v28.1 NEW blocks reference `$item.LinkType -eq "HardLink"`. The `LinkType` property was added to `FileSystemInfo` in PowerShell 6.0; it does NOT exist in Windows PowerShell 5.1 (the Director's baseline on .NET Framework 4.8). The script silently mis-detects hardlinks.                                                                                                                                                                    | Step 14 now adds a `Test-IsLink` helper function. Helper detects (a) reparse points (symlinks, junctions) via `($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0` and (b) hardlinks via `fsutil hardlink list "$Path"` line count `> 1`. Both APIs are PS 5.1 / .NET 4.8 native and do NOT require elevation. Sections 2 and 3 of `deploy-sync.ps1` both call the helper for consistency. |
-
-The Round-2 quorum requires three fresh audits: Codex (FORENSICS on the C# try-finally exception logic), Gemini CLI (logic-flow + plan integrity audit covering both R1 and Step 14), and Jules (ENGINEER audit with full code blocks). Per CLAUDE.md `NO SIMULATION`, all three audits must produce authentic verdicts before Jules executes the surgical edits.
-
-### Forensic findings (P3 re-verified against working tree on 2026-04-12)
-
-| #   | Finding                                                    | Site(s)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | P3 verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Residual `lock(ctx.Sync)` (V1101E hot-patch era)           | **11 sites total** (P3 re-grep on 2026-04-12 caught 4 missed by P1 intake). Readers: `Orders.Callbacks.AccountOrders.cs:244` (TryGetDispatchFollowerEntries), `Orders.Callbacks.Propagation.cs:126` (PropagateMasterPriceMove), `SIMA.Shadow.cs:89` (ShadowMoveFollowerStops), `Symmetry.Follower.cs:38` (OnFollowerFill precheck), `Symmetry.Follower.cs:131` (TryResolveFollower), `Symmetry.Replace.cs:127` (TryResolveFollowersForDispatch), `Symmetry.Replace.cs:189` (CascadeFollowerCleanup), `Symmetry.Replace.cs:244` (PruneDispatches). Writers: `Symmetry.cs:115` (RegisterFollower Add), `Symmetry.cs:151` (OnMasterFill compound CAS -- wraps the _entire_ if-block lines 151-163, not just the 3-line compute), `Symmetry.Replace.cs:221` (ForgetEntry Remove) | **CONFIRMED.** `stateLock` was removed post-V1101E, so `ctx.Sync` is now vestigial. Remove all 11 lock sites; publish via `volatile bool` + `Volatile.Read/Write` + `ConcurrentDictionary<string, byte>`.                                                                                                                                                                                                                                                                                    |
-| 2   | `dailySummaryLock` residual                                | `V12_002.cs:227` (declaration), `UI.Compliance.cs:122, 144` (former call sites)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | **CONFIRMED (v28.1 P5 audit correction).** Codex filesystem scan caught that the field declaration is still live at `V12_002.cs:227` -- `private readonly object dailySummaryLock = new object();`. Build 1109 replaced the lock-holding _call sites_ in `UI.Compliance.cs` with `Interlocked.CompareExchange` atomic guards, but left the field declaration orphaned. Audit Gate 2 ("Zero `dailySummaryLock` in `src/`") fails as long as the declaration remains. New Step 12B deletes it. |
-| 3   | Missing `[INTEGRITY_FAILURE]` logging + emergency rollback | `Orders.Management.cs:186` (stop audit), `Orders.Management.cs:224` (bracket target sum)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **CONFIRMED.** Both sites currently only `Print()` warnings. Harden to mirror `SIMA.Fleet.cs:236` rollback contract via new `EmergencyPurgeEntry` helper.                                                                                                                                                                                                                                                                                                                                    |
-| 4   | MMIO fence insufficient                                    | `Photon.MmioMirror.cs:102`, producer sideband at `SIMA.Dispatch.cs:406, 522`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | **ADEQUATE.** `Thread.MemoryBarrier()` already present at all three sites. Documented; no code change.                                                                                                                                                                                                                                                                                                                                                                                       |
-| 5   | `deploy-sync.ps1` V12_002.cs ResourceExists collision      | `deploy-sync.ps1:150-162` (Section 3 Fixed Mappings) and weaker variant at `134-143` (Section 2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | **CONFIRMED.** Hardlinks are NOT ReparsePoints, so the detection branch always falls through to the `.bak` path. Section 3 uses a non-timestamped `.bak`, so the 2nd deploy-sync run blows up when `V12_002.cs.bak` already exists. Section 2 uses a timestamped `.bak` (no collision) but still silently converts live hardlinks into stale backup files. Fix both.                                                                                                                         |
-
-### Ground truth verified this session
-
-| File                                          | Line             | State                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| --------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/V12_002.cs`                              | 44               | `BUILD_TAG = "1111.002-v28.0"` -- bump target confirmed                                                                                                                                                                                                                                                                                                                                                                            |
-| `src/V12_002.cs`                              | 185-192          | `activePositions`, `entryOrders`, `stopOrders`, `target1..5Orders` are `ConcurrentDictionary<string, ...>` -- `TryRemove(key, out _)` is the correct API                                                                                                                                                                                                                                                                           |
-| `src/V12_002.cs`                              | 196              | `pendingStopReplacements` same shape                                                                                                                                                                                                                                                                                                                                                                                               |
-| `src/V12_002.cs`                              | 226-227          | `private readonly object stateLock = new object();` (line 226, RETAIN -- comment marks it as dummy for un-extracted partial files) and `private readonly object dailySummaryLock = new object();` (line 227, DELETE per R2)                                                                                                                                                                                                        |
-| `src/V12_002.Orders.CancelGateway.cs`         | 18               | `private void CancelOrderSafe(Order order, PositionInfo pos)` -- existing helper, routes to `pos.ExecutingAccount.Cancel` for followers or `CancelOrder` for local. Used by R1 rollback path.                                                                                                                                                                                                                                      |
-| `src/V12_002.Orders.Management.Flatten.cs`    | 347-425          | `private void FlattenPositionByName(string entryName)` -- existing helper. Already: (a) cancels live `stopOrders[entryName]` via `CancelOrderSafe`, (b) loops T1..T5 and cancels each live target via `CancelOrderSafe`, (c) clears `pendingStopReplacements[entryName]`, (d) submits market flatten order. Safe to call inside integrity rollback because it early-returns when `!activePositions.ContainsKey` or `!EntryFilled`. |
-| `src/V12_002.Symmetry.cs`                     | 15               | Class def is `private sealed class SymmetryDispatchContext` -- note **private**, not internal. Step 2 OLD/NEW blocks must preserve `private`.                                                                                                                                                                                                                                                                                      |
-| `src/V12_002.Symmetry.cs`                     | 165-171          | `[SYMMETRY_GUARD] MASTER ANCHOR LOCKED` Print site reads `ctx.MasterAnchorPrice` directly in the format string -- torn-read hazard post-R1 lock removal. Must capture via local or `Volatile.Read` (Step 3 extension per R4).                                                                                                                                                                                                      |
-| `src/V12_002.Symmetry.cs`                     | 25-30            | `SymmetryDispatchContext` has `double MasterAnchorPrice`, `bool IsResolved`, `object Sync`, `HashSet<string> FollowerEntries`                                                                                                                                                                                                                                                                                                      |
-| `src/V12_002.Symmetry.cs`                     | 116              | Writer: `lock (ctx.Sync) ctx.FollowerEntries.Add(...)`                                                                                                                                                                                                                                                                                                                                                                             |
-| `src/V12_002.Symmetry.cs`                     | 159-160          | Publish: `ctx.MasterAnchorPrice = ...; ctx.IsResolved = true;` (unlocked)                                                                                                                                                                                                                                                                                                                                                          |
-| `src/V12_002.Symmetry.Replace.cs`             | 222              | Writer: `lock (ctx.Sync) ctx.FollowerEntries.Remove(...)`                                                                                                                                                                                                                                                                                                                                                                          |
-| `src/V12_002.Symmetry.Follower.cs`            | 38               | Reader under `lock (preCheckCtx.Sync)`                                                                                                                                                                                                                                                                                                                                                                                             |
-| `src/V12_002.Symmetry.Follower.cs`            | 131              | Reader under `lock (ctx.Sync)` (V1101E hot-patch comment)                                                                                                                                                                                                                                                                                                                                                                          |
-| `src/V12_002.Symmetry.Replace.cs`             | 127              | Reader: `lock (ctx.Sync) { foreach (string ... in ctx.FollowerEntries) ... }`                                                                                                                                                                                                                                                                                                                                                      |
-| `src/V12_002.Orders.Callbacks.Propagation.cs` | 126              | Reader: `lock (ctx.Sync) { snapshot = ctx.FollowerEntries.ToArray(); }`                                                                                                                                                                                                                                                                                                                                                            |
-| `src/V12_002.Orders.Management.cs`            | 183-193, 222-228 | Two integrity detectors that only `Print()` -- no rollback                                                                                                                                                                                                                                                                                                                                                                         |
-| `src/V12_002.UI.Compliance.cs`                | 122-162          | Already uses `Interlocked.CompareExchange` + `Volatile.Read` on `_csvHeaderCreated` (Build 1109 fix)                                                                                                                                                                                                                                                                                                                               |
-| `src/V12_002.Photon.MmioMirror.cs`            | 102              | `Thread.MemoryBarrier()` between slot write and cursor write                                                                                                                                                                                                                                                                                                                                                                       |
-| `src/V12_002.SIMA.Dispatch.cs`                | 406, 522         | `Thread.MemoryBarrier()` between sideband writes and ring enqueue                                                                                                                                                                                                                                                                                                                                                                  |
-| `src/V12_002.SIMA.Fleet.cs`                   | 236              | Existing `[PHOTON_SHADOW] INTEGRITY FAILURE` + rollback pattern to mirror                                                                                                                                                                                                                                                                                                                                                          |
-| `deploy-sync.ps1`                             | 134-142          | Section 2 dynamic: `ReparsePoint` check -> timestamped `.bak` (no collision, but hardlink path wrong)                                                                                                                                                                                                                                                                                                                              |
-| `deploy-sync.ps1`                             | 150-162          | Section 3 fixed: `ReparsePoint` check -> non-timestamped `.bak` (root cause of V12_002.cs collision)                                                                                                                                                                                                                                                                                                                               |
+- **Mission**: V12.15 Platinum Hardening -- surgical repair of 20 Red-Team-adjudicated substrate blockers.
+- **Build tag delta**: `Build 1111.002-v28.0` -> `Build 1111.003-v28.0-adr019` (`src/V12_002.Constants.cs:12`).
+- **Status**: ARENA ADJUDICATION PENDING. P4 Engineer handoff SUSPENDED per Director directive 2026-04-18.
+- **Consensus gate**: 100% (Codex + Gemini + Jules must each independently APPROVE the full plan).
+- **Architect**: Claude (P3). **Orchestrator**: Antigravity (P1). **Red Team**: Arena (P5).
 
 ---
 
-## Design Decisions
+## Section A -- Executive Summary
 
-### DD-1: Lock-free `SymmetryDispatchContext` (Finding 1)
+The V14.7-CORELANE-ULTRA substrate was adjudicated by a 14-model adversarial fleet at **11/14 (78.6%) readiness** and failed to clear the Sovereign gate. Three structural vulnerability classes were enumerated:
 
-**Primitive publish/observe.**
+| #   | Class                          | Repairs                                                                                | Scope                                                                         |
+| --- | ------------------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | Orphan Risk (kernel)           | 17 Red-Team-critical + 15 precautionary convergent = **32 lambda sites**               | `src/V12_002.*.cs` (10 files)                                                 |
+| 2   | Infrastructure Gap (substrate) | **3 blockers** (devcontainer, hook gate, label-sync) + **2 portability supplementals** | `.devcontainer/`, `.github/`, `scripts/`, `Linting.csproj`, `deploy-sync.ps1` |
+| 3   | Build Tag                      | **1 constant**                                                                         | `src/V12_002.Constants.cs:12`                                                 |
 
-- `IsResolved` becomes `volatile bool` (C# keyword, legal on `bool` in C# 7.3). Acts as release fence on write and acquire fence on read.
-- `MasterAnchorPrice` stays `double` but every read uses `System.Threading.Volatile.Read(ref ctx.MasterAnchorPrice)` and every write uses `System.Threading.Volatile.Write(ref ctx.MasterAnchorPrice, value)`.
-- Writer ordering: write `MasterAnchorPrice` first, then set `IsResolved = true`. The volatile bool write seals the happens-before edge for the double payload.
-- Reader ordering: read `IsResolved` first, then read `MasterAnchorPrice`. The volatile bool read is the acquire fence.
+**Gate flow (new)**: P3 draft -> **P5 Arena Red Team audit (100% consensus)** -> P4 Codex implementation -> P5 UltraReview -> Director sign-off.
 
-**Set replacement.**
-
-- `FollowerEntries` becomes `System.Collections.Concurrent.ConcurrentDictionary<string, byte>` with `StringComparer.Ordinal`. Byte value is a dummy placeholder.
-- `Add(name)` -> `TryAdd(name, 0)`.
-- `Remove(name)` -> `TryRemove(name, out _)`.
-- Snapshot enumeration -> `ctx.FollowerEntries.Keys.ToArray()` (consistent snapshot at the moment of call).
-- Weakly-consistent iteration in the resolve path is tolerable because every candidate is re-validated against `symmetryFleetEntryToDispatch` and `symmetryPendingFollowerFills` before being added to the worklist.
-
-**Thread-origin invariant.**
-All four read sites and all three writer sites execute on the NT8 strategy callback thread (`OnOrderUpdate`, `OnExecutionUpdate`, `OnMarketData`, `OnBarUpdate`, which NT8 serializes per strategy instance). Broker-thread callbacks are already marshalled onto the strategy thread via `_accountOrderQueue` / `_accountExecutionQueue` (see `V12_002.cs:206-209`). The lock-free design is safe even if a future producer leaks off-thread, because `ConcurrentDictionary` + `volatile`/`Volatile` preserves race-freedom.
-
-### DD-2: Integrity hardening (Finding 3)
-
-Both integrity detectors in `Orders.Management.cs` are promoted to the `SIMA.Fleet.cs:236` rollback contract:
-
-1. Log `[INTEGRITY_FAILURE] <SITE> <entryName>: <details> -- EMERGENCY ROLLBACK`.
-2. Call a new `EmergencyPurgeEntry(entryName, reason)` helper that `TryRemove`s from every tracking dictionary in the strategy.
-3. `return` immediately; do not attempt to submit additional orders on the failed flow.
-4. Non-fatal: the strategy stays alive and the next dispatch for a different entry is unaffected.
-
-### DD-3: MMIO fence audit (Finding 4)
-
-No code change. All three sites (`Photon.MmioMirror.cs:102`, `SIMA.Dispatch.cs:406`, `SIMA.Dispatch.cs:522`) already emit `Thread.MemoryBarrier()` where required. The store buffer is flushed before the cursor update lands, and the consumer's `Volatile.Read(ref _producerCursor)` is the acquire edge. A second observer process reading the MMF through its own `MemoryMappedViewAccessor` sees the same ordering because the underlying store and load target shared physical memory. Documented in this plan; no source edits.
-
-### DD-4: `deploy-sync.ps1` hardlink fix (Finding 5)
-
-Replace the `ReparsePoint`-only detection in BOTH sections with a hardlink-aware check:
-
-```powershell
-$item = Get-Item $dstPath -Force
-$isLink = ($item.LinkType -eq "HardLink") -or ($item.LinkType -eq "SymbolicLink") -or ($item.Attributes -match "ReparsePoint")
-```
-
-When `$isLink` is true, `Remove-Item $dstPath -Force` the link. The underlying inode persists as long as any other name references it (in practice, the new `New-Item -ItemType HardLink` that runs immediately afterwards re-creates the link against the same source). When it is false, fall through to a timestamped `.bak` path so repeat runs never collide.
-
-The non-timestamped `.bak` in Section 3 is the direct root cause of the V12_002.cs collision: it generates a fixed-name backup that collides on the 2nd run. Upgrading it to timestamped matches Section 2 and eliminates the collision even if the hardlink detection somehow misses.
+**Non-goals (explicit)**: no lock introduction, no refactor of lambda bodies, no rename of any public symbol, no change to the actor model, no touching of NinjaTrader DLL hints beyond the one user-profile path, no change to the hard-link `deploy-sync.ps1` contract.
 
 ---
 
-## Touch List (exact -- no stray files)
+## Section B -- Forensic Synthesis
 
-| File                                            | Action | Step(s)                                                                                                                                                          |
-| ----------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/V12_002.cs`                                | MODIFY | Step 1 (BUILD_TAG line 44), Step 12B (delete dailySummaryLock declaration line 227)                                                                              |
-| `src/V12_002.Symmetry.cs`                       | MODIFY | Steps 2 (class def, R3 private preserved), 3 (anchor publish + R4 log-site Volatile read), 4 (Add writer)                                                        |
-| `src/V12_002.Symmetry.Replace.cs`               | MODIFY | Steps 5 (Remove writer), 9 (resolve iteration), 9B (CascadeFollowerCleanup), 9C (PruneDispatches)                                                                |
-| `src/V12_002.Symmetry.Follower.cs`              | MODIFY | Steps 7 (fill reader), 8 (resolve reader)                                                                                                                        |
-| `src/V12_002.Orders.Callbacks.Propagation.cs`   | MODIFY | Step 6 (propagation reader)                                                                                                                                      |
-| `src/V12_002.Orders.Callbacks.AccountOrders.cs` | MODIFY | Step 6B (TryGetDispatchFollowerEntries reader)                                                                                                                   |
-| `src/V12_002.SIMA.Shadow.cs`                    | MODIFY | Step 6C (ShadowMoveFollowerStops reader)                                                                                                                         |
-| `src/V12_002.Orders.Management.cs`              | MODIFY | Steps 10 (R1 stop audit + FlattenPositionByName + EmergencyPurgeEntry), 11 (R1 bracket sum + Flatten + Purge), 12 (EmergencyPurgeEntry helper, local-state-only) |
-| `src/V12_002.Constants.cs`                      | MODIFY | Step 13 (Version string bump)                                                                                                                                    |
-| `deploy-sync.ps1`                               | MODIFY | Step 14 (hardlink detection in both sections)                                                                                                                    |
-| `docs/brain/nexus_a2a.json`                     | MODIFY | Step 15 (metadata bump)                                                                                                                                          |
+### B.1 Logical proof of failure -- Orphan Risk
 
-**Non-touched (verified adequate or refuted):**
+The strategy stores its termination state in a single volatile flag:
 
-- `src/V12_002.UI.Compliance.cs` -- Finding 2 refuted.
-- `src/V12_002.Photon.MmioMirror.cs` -- Finding 4 adequate.
-- `src/V12_002.SIMA.Dispatch.cs` -- producer fences already present.
+```csharp
+// src/V12_002.cs:127
+private volatile bool _isTerminating = false;
+```
+
+The flag is set exactly once, on `State.Terminated`:
+
+```csharp
+// src/V12_002.Lifecycle.cs:398-400
+else if (state == State.Terminated)
+{
+    _isTerminating = true;
+    StopWatchdog();
+```
+
+The actor-model discipline (CLAUDE.md: "No Internal Locks") requires all broker-thread callbacks to marshal to the strategy thread via `TriggerCustomEvent` or `InvokeAsync`. Two existing `InvokeAsync` lambdas at `src/V12_002.Lifecycle.cs:380-395` check the flag on entry:
+
+```csharp
+// src/V12_002.Lifecycle.cs:380-385 -- MIRROR PATTERN (already correct)
+ChartControl.Dispatcher.InvokeAsync(() =>
+{
+    if (_isTerminating) return;
+    AttachHotkeys();
+    AttachChartClickHandler();
+}, System.Windows.Threading.DispatcherPriority.Normal);
+```
+
+All other marshal lambdas lack the guard. Because `TriggerCustomEvent` is queued and can fire after `State.Terminated`, an order-submission, repair, or flatten operation can execute on a strategy that has already released its broker subscriptions -- producing a ghost order (fleet safety violation per CLAUDE.md "Ghost-Order Prevention" and Build 981 protocol).
+
+### B.2 Portability Leak
+
+Two files contain hardcoded Windows-specific paths that block environment-agnostic CI and violate the Sovereign Portability Standard. `deploy-sync.ps1` alone contains **four** hardcoded-path violations, not two as originally characterized:
+
+- `Linting.csproj:37` -- hardcoded `C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\NinjaTrader.Custom.dll`.
+- `deploy-sync.ps1` -- full enumeration:
+
+| Line | String                                                                             | Class                                          |
+| ---- | ---------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 8    | `$RepoRoot = "C:\WSGTA\universal-or-strategy"`                                     | hardcoded repo path                            |
+| 9    | `$NtCustomDir = "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom"`     | hardcoded user profile                         |
+| 89   | `# Fix: run C:\tmp\byte_purge.py, then re-run deploy-sync.ps1`                     | comment points at non-existent tool path       |
+| 99   | `Write-Host "  Fix: python C:\tmp\byte_purge.py  then re-run deploy-sync.ps1" ...` | error message points at non-existent tool path |
+
+The tool `byte_purge.py` is **not present anywhere in the repo** (verified via filesystem search `**/byte_purge.py` -> 0 matches). The repo-canonical ASCII-purity tool is `check_ascii.py` at the repo root, referenced by CLAUDE.md section "CRITICAL: ASCII-Only in All C# String Literals". Lines 89 and 99 are dead references pointing at a path no portable machine will ever resolve; they must be re-pointed at the canonical tool as part of this repair.
+
+(Note: `deploy-vm-safe.ps1:10` already uses `$env:USERPROFILE` -- that is the substitution model for user-profile paths. `$PSScriptRoot` is the substitution model for repo-anchored paths.)
+
+### B.3 Infrastructure Gaps
+
+- No `.devcontainer/` baseline. `/scripts/*.py`, `check_ascii.py`, and `scripts/install_hooks.ps1` require a reproducible Linux host for CI agents and Director Mode validation.
+- No LFS/staged-file gate. `.gitattributes` is absent; `scripts/install_hooks.ps1` enforces lock-ban and ASCII but does not reject non-LFS binaries or files > 5 MB. Risk: a 50-100 MB binary committed accidentally wedges history and burns LFS quota.
+- No `.github/workflows/label-sync.yml`. `.github/labeler.yml` maps files to labels reactively but nothing enforces the label manifest. A label deletion via the GitHub UI would silently prune SIMA / REAPER / IPC metadata.
+
+### B.4 14-model consensus posture
+
+| Model                   | Pre-repair verdict                              |
+| ----------------------- | ----------------------------------------------- |
+| Codex                   | P4-ENGINEER-READY                               |
+| Gemini 4.7              | Gemini-4.7-CLI                                  |
+| Jules                   | P5-AUDIT-VALIDATED                              |
+| 11 others (Arena fleet) | VARIOUS -- 11/14 APPROVED, 3 REQUIRING REVISION |
+
+Target post-repair: **14/14 APPROVED** (100% consensus gate).
 
 ---
 
-## Steps (exact OLD / NEW blocks)
+## Section C -- Kernel Repair: Orphan Guard Injection (32 sites)
 
-### Step 1 -- BUILD_TAG bump
+### C.1 Full site inventory
 
-**File:** `src/V12_002.cs`
-**Line:** 44
+All 32 sites receive the same one-line guard. The 17 "Red-Team-critical" order-path sites are bolded; the 15 "precautionary convergent" sites also marshal work that can outlive termination (actor drain, UI compliance queue, IPC TCP callback, pump-chain continuation) and receive the same guard for uniform safety.
 
-**OLD:**
+| #   | File                                            | Line | Enclosing Method                | Purpose                                               | Red-Team-Critical |
+| --- | ----------------------------------------------- | ---- | ------------------------------- | ----------------------------------------------------- | ----------------- |
+| 1   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 146  | `OnAccountOrderUpdate`          | `ProcessAccountOrderQueue` (broker callback enqueue)  | **Y**             |
+| 2   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 162  | `ProcessAccountOrderQueue`      | reschedule on budget exhaustion                       | **Y**             |
+| 3   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 173  | `ProcessAccountOrderQueue`      | re-enqueue on flatten contention                      | **Y**             |
+| 4   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 181  | `ProcessAccountOrderQueue`      | drain remaining queue                                 | **Y**             |
+| 5   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 369  | `HandleMatchedFollowerOrder`    | `SubmitFollowerReplacement` (FSM two-phase)           | **Y**             |
+| 6   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 410  | `HandleMatchedFollowerOrder`    | `SubmitFollowerTargetReplacement`                     | **Y**             |
+| 7   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 463  | `HandleMatchedFollowerOrder`    | `RestoreCascadedTargets` (stop-fill restore)          | **Y**             |
+| 8   | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 591  | `ExecuteFollowerCascadeCleanup` | `EmergencyFlattenSingleFleetAccount` (CASCADE-FILLED) | **Y**             |
+| 9   | `src/V12_002.Orders.Callbacks.cs`               | 389  | `HandleOrderCancelled`          | `RestoreCascadedTargets` (master-side)                | **Y**             |
+| 10  | `src/V12_002.Orders.Callbacks.Execution.cs`     | 235  | `OnAccountExecutionUpdate`      | `UpdateAccountMetricsFromAccount`                     | **Y**             |
+| 11  | `src/V12_002.REAPER.Audit.cs`                   | 136  | `AuditAccountState`             | `ProcessReaperRepairQueue` (flat desync repair)       | **Y**             |
+| 12  | `src/V12_002.REAPER.Audit.cs`                   | 183  | `AuditAccountState`             | `ProcessReaperFlattenQueue` (critical desync)         | **Y**             |
+| 13  | `src/V12_002.REAPER.Audit.cs`                   | 250  | `AuditAccountState`             | `ProcessReaperNakedStopQueue` (naked stop)            | **Y**             |
+| 14  | `src/V12_002.REAPER.Audit.cs`                   | 327  | `AuditAccountState`             | `ProcessReaperFlattenQueue` (master flatten)          | **Y**             |
+| 15  | `src/V12_002.REAPER.Audit.cs`                   | 372  | `AuditAccountState`             | `ProcessReaperNakedStopQueue` (master naked stop)     | **Y**             |
+| 16  | `src/V12_002.SIMA.Dispatch.cs`                  | 60   | `ExecuteSmartDispatchEntry`     | deferred dispatch retry (semaphore contention)        | **Y**             |
+| 17  | `src/V12_002.SIMA.Dispatch.cs`                  | 610  | `ExecuteSmartDispatchEntry`     | `PumpFleetDispatch` prime                             | **Y**             |
+| 18  | `src/V12_002.SIMA.Flatten.cs`                   | 82   | `InitiateFlattenOps`            | `PumpFlattenOps` kickoff                              | N (precautionary) |
+| 19  | `src/V12_002.SIMA.Flatten.cs`                   | 201  | `PumpFlattenOps`                | chain to next account                                 | N (precautionary) |
+| 20  | `src/V12_002.SIMA.Flatten.cs`                   | 319  | `FlattenAccountPosition`        | re-kick on completion                                 | N (precautionary) |
+| 21  | `src/V12_002.SIMA.Fleet.cs`                     | 174  | `PumpFleetDispatch`             | chain from finally                                    | N (precautionary) |
+| 22  | `src/V12_002.SIMA.Fleet.cs`                     | 262  | `PumpFleetDispatch`             | chain after XorShadow CRC fail                        | N (precautionary) |
+| 23  | `src/V12_002.SIMA.Lifecycle.cs`                 | 57   | `OnParameterChanged`            | `ProcessApplySimaState` deferred toggle               | N (precautionary) |
+| 24  | `src/V12_002.Trailing.StopUpdate.cs`            | 64   | `OnOrderUpdate`                 | `RestoreCascadedTargets` (trailing restore)           | N (precautionary) |
+| 25  | `src/V12_002.UI.Compliance.cs`                  | 286  | `OnAccountExecutionUpdate`      | `ProcessAccountExecutionQueue` (marshal)              | N (precautionary) |
+| 26  | `src/V12_002.UI.Compliance.cs`                  | 304  | `ProcessAccountExecutionQueue`  | reschedule on budget                                  | N (precautionary) |
+| 27  | `src/V12_002.UI.Compliance.cs`                  | 316  | `ProcessAccountExecutionQueue`  | flatten-contention bailout                            | N (precautionary) |
+| 28  | `src/V12_002.UI.Compliance.cs`                  | 324  | `ProcessAccountExecutionQueue`  | drain remaining                                       | N (precautionary) |
+| 29  | `src/V12_002.UI.IPC.cs`                         | 328  | `ProcessIpcCommands`            | reschedule IPC queue                                  | N (precautionary) |
+| 30  | `src/V12_002.UI.IPC.Server.cs`                  | 277  | `OnIpcCommand`                  | TCP server callback -> strategy marshal               | N (precautionary) |
+| 31  | `src/V12_002.cs`                                | 373  | `ScheduleActorDrain`            | `TryDrain` (actor mailbox)                            | N (precautionary) |
+| 32  | `src/V12_002.REAPER.cs`                         | 132  | `ReaperAuditThread`             | `AuditApexPositions` (bg thread marshal)              | N (precautionary) |
 
-```csharp
-        public const string BUILD_TAG = "1111.002-v28.0";  // R28 v28.0 -- blittable slot + XorShadow + optional MMIO mirror
+### C.2 Surgical recipe (template)
+
+Every site receives **one line** added as the first statement of the lambda body:
+
+```
+if (_isTerminating) return;  // ADR-019 orphan guard
 ```
 
-**NEW:**
+No other modifications. No lock, no memory barrier, no refactor, no rename. The volatile field already provides the happens-before relationship on the strategy thread.
+
+### C.3 Worked OLD/NEW blocks (3 representative cases)
+
+#### Case 1 -- `src/V12_002.Orders.Callbacks.AccountOrders.cs:369` (FSM follower resubmit, highest cascade risk)
+
+**OLD** (lines 367-383, verbatim):
 
 ```csharp
-        public const string BUILD_TAG = "1111.002-v28.1";  // v28.1 Platinum Hardening -- lock-free ctx.Sync + integrity rollback + deploy-sync fix
-```
-
----
-
-### Step 2 -- `SymmetryDispatchContext` class definition
-
-**File:** `src/V12_002.Symmetry.cs`
-**Lines:** 15-30 (class header + all eight fields declared in the block)
-
-**R3 correction:** Working tree shows `private sealed class` at line 15, NOT `internal`. Prior OLD block drifted. Preserve `private` -- do NOT widen accessibility. Codex must match the exact surrounding whitespace and field order in the current tree; the contract is "delete `object Sync`, convert `IsResolved` to `volatile bool`, swap `HashSet<string>` for `ConcurrentDictionary<string, byte>`, leave all other fields untouched."
-
-**OLD:**
-
-```csharp
-        private sealed class SymmetryDispatchContext
-        {
-            public string DispatchId;
-            public string TradeType;
-            public MarketPosition Direction;
-            public int ExpectedQuantity;
-            public DateTime CreatedUtc;
-
-            public double MasterWeightedFill;
-            public int MasterFilledQuantity;
-            public double MasterAnchorPrice;
-            public bool IsResolved;
-
-            public readonly object Sync = new object();
-            public readonly HashSet<string> FollowerEntries = new HashSet<string>(StringComparer.Ordinal);
-        }
-```
-
-**NEW:**
-
-```csharp
-        private sealed class SymmetryDispatchContext
-        {
-            // v28.1 Platinum Hardening: ctx.Sync removed (V1101E hot-patch vestigial,
-            // stateLock no longer exists). Lock-free publish/observe:
-            //   - MasterAnchorPrice: System.Threading.Volatile.Read / Volatile.Write
-            //     (happens-before ordered by the IsResolved volatile bool release fence).
-            //   - IsResolved: volatile bool keyword (release fence on write, acquire on read).
-            //   - FollowerEntries: ConcurrentDictionary<string, byte> for lock-free mutation.
-            // Accessibility stays `private` -- do NOT widen to `internal`.
-            public string DispatchId;
-            public string TradeType;
-            public MarketPosition Direction;
-            public int ExpectedQuantity;
-            public DateTime CreatedUtc;
-
-            public double MasterWeightedFill;
-            public int MasterFilledQuantity;
-            public double MasterAnchorPrice;
-            public volatile bool IsResolved;
-
-            public readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> FollowerEntries
-                = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-        }
-```
-
-> `object Sync` is deleted. `IsResolved` gains the `volatile` modifier. `FollowerEntries` swaps its backing store. Every other field is byte-identical.
-
----
-
-### Step 3 -- Master anchor publish + log-site read (extended per R4)
-
-**File:** `src/V12_002.Symmetry.cs`
-**Lines:** 150-171 (compound publish block PLUS the `[SYMMETRY_GUARD] MASTER ANCHOR LOCKED` Print site)
-
-**CORRECTION:** The lock wraps a compound "once-only" initialisation idiom: check `!IsResolved`, accumulate weighted fill, compute anchor, set `IsResolved = true`. Removing the lock is only safe under the thread-serialisation invariant (all NT8 callbacks serialise onto the strategy thread; broker-thread callbacks are marshaled via `_accountExecutionQueue` at `V12_002.cs:206-209`). If that invariant is violated in the future, a race here would let two callers double-accumulate. Document the invariant in the replacement comment; optional belt-and-suspenders is to gate with `Interlocked.CompareExchange` on an `int _resolvedFlag` but that is deferred to a later audit if profiling shows a non-strategy-thread caller.
-
-**R4 addendum:** Immediately after the publish block, the strategy logs `[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | ... | Anchor={1:F2} | ...` using `ctx.MasterAnchorPrice` directly in the `string.Format` argument list (line 167-168 of the working tree). Without a volatile read, a concurrent observer on 32-bit x86 could see a torn double. Capture `ctx.MasterAnchorPrice` into a local via `System.Threading.Volatile.Read` under the same logical write-then-log sequence and pass the local to the Print instead.
-
-**OLD:**
-
-```csharp
-            bool resolvedNow = false;
-            lock (ctx.Sync)
-            {
-                if (!ctx.IsResolved)
-                {
-                    ctx.MasterWeightedFill += averageFillPrice * fillQty;
-                    ctx.MasterFilledQuantity += fillQty;
-
-                    double avg = ctx.MasterWeightedFill / Math.Max(1, ctx.MasterFilledQuantity);
-                    ctx.MasterAnchorPrice = Instrument.MasterInstrument.RoundToTickSize(avg);
-                    ctx.IsResolved = true;
-                    resolvedNow = true;
-                }
-            }
-
-            if (resolvedNow)
-            {
-                Print(string.Format("[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
-                    ctx.TradeType, ctx.MasterAnchorPrice, ctx.MasterFilledQuantity));
-
-                SymmetryGuardTryResolveFollowersForDispatch(ctx.DispatchId, DateTime.UtcNow);
-            }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free publish. Relies on the NT8 strategy-thread serialisation invariant:
-            // OnOrderUpdate / OnExecutionUpdate / OnBarUpdate all run on the same strategy callback
-            // thread, and broker-thread events are marshaled via _accountExecutionQueue
-            // (V12_002.cs:206-209). Single-writer => no CAS required.
-            // Writer ordering: accumulate, Volatile.Write(MasterAnchorPrice), flag IsResolved (release).
-            // Reader ordering (paired at every read site): load IsResolved first (acquire), then
-            // Volatile.Read(ref MasterAnchorPrice).
-            bool resolvedNow = false;
-            double publishedAnchor = 0;
-            if (!ctx.IsResolved) // volatile bool -> acquire
-            {
-                ctx.MasterWeightedFill += averageFillPrice * fillQty;
-                ctx.MasterFilledQuantity += fillQty;
-
-                double avg = ctx.MasterWeightedFill / Math.Max(1, ctx.MasterFilledQuantity);
-                double rounded = Instrument.MasterInstrument.RoundToTickSize(avg);
-                System.Threading.Volatile.Write(ref ctx.MasterAnchorPrice, rounded);
-                ctx.IsResolved = true; // volatile bool -> release fence
-                publishedAnchor = rounded;
-                resolvedNow = true;
-            }
-
-            if (resolvedNow)
-            {
-                // R4: log the locally-captured anchor, not ctx.MasterAnchorPrice, to avoid a
-                // torn double read on 32-bit x86 if a concurrent observer races this line.
-                Print(string.Format("[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
-                    ctx.TradeType, publishedAnchor, ctx.MasterFilledQuantity));
-
-                SymmetryGuardTryResolveFollowersForDispatch(ctx.DispatchId, DateTime.UtcNow);
-            }
-```
-
----
-
-### Step 4 -- `FollowerEntries.Add` writer
-
-**File:** `src/V12_002.Symmetry.cs`
-**Lines:** 114-118
-
-**OLD:**
-
-```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                lock (ctx.Sync)
-                    ctx.FollowerEntries.Add(fleetEntryName);
-            }
-```
-
-**NEW:**
-
-```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                // v28.1 Lock-free: ConcurrentDictionary TryAdd replaces lock + HashSet.Add.
-                ctx.FollowerEntries.TryAdd(fleetEntryName, 0);
-            }
-```
-
----
-
-### Step 5 -- `FollowerEntries.Remove` writer
-
-**File:** `src/V12_002.Symmetry.Replace.cs`
-**Lines:** 219-223
-
-**OLD:**
-
-```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                lock (ctx.Sync)
-                    ctx.FollowerEntries.Remove(entryName);
-            }
-```
-
-**NEW:**
-
-```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                // v28.1 Lock-free: ConcurrentDictionary TryRemove replaces lock + HashSet.Remove.
-                ctx.FollowerEntries.TryRemove(entryName, out _);
-            }
-```
-
----
-
-### Step 6 -- Propagation reader (market move)
-
-**File:** `src/V12_002.Orders.Callbacks.Propagation.cs`
-**Lines:** 124-128 (around line 126 snapshot site)
-
-**OLD:**
-
-```csharp
-            string[] snapshot;
-            lock (ctx.Sync) { snapshot = ctx.FollowerEntries.ToArray(); }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free: ConcurrentDictionary.Keys.ToArray() is a consistent snapshot.
-            string[] snapshot = ctx.FollowerEntries.Keys.ToArray();
-```
-
----
-
-### Step 6B -- AccountOrders reader (`TryGetDispatchFollowerEntries`)
-
-**File:** `src/V12_002.Orders.Callbacks.AccountOrders.cs`
-**Lines:** ~244 (the `lock (ctx.Sync)` inside `TryGetDispatchFollowerEntries`)
-
-**OLD:**
-
-```csharp
-            lock (ctx.Sync)
-                followerEntries = ctx.FollowerEntries.ToArray();
-            return followerEntries != null && followerEntries.Length > 0;
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free: ConcurrentDictionary.Keys.ToArray() is a consistent snapshot.
-            followerEntries = ctx.FollowerEntries.Keys.ToArray();
-            return followerEntries != null && followerEntries.Length > 0;
-```
-
-> Codex: if the exact OLD formatting differs (whitespace, brace placement), match the actual working tree -- the contract is "delete the `lock (ctx.Sync)` wrapper, replace `FollowerEntries.ToArray()` with `FollowerEntries.Keys.ToArray()`, keep the assignment and return."
-
----
-
-### Step 6C -- Shadow engine reader (`ShadowMoveFollowerStops`)
-
-**File:** `src/V12_002.SIMA.Shadow.cs`
-**Lines:** 88-101 (the `lock (ctx.Sync)` wrapping the follower-name harvest `foreach`)
-
-**OLD:**
-
-```csharp
-            var followerEntryNames = new System.Collections.Generic.List<string>();
-            lock (ctx.Sync)
-            {
-                foreach (string followerEntryName in ctx.FollowerEntries)
-                {
-                    if (string.IsNullOrEmpty(followerEntryName))
-                        continue;
-                    if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
-                        continue;
-                    if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                        continue;
-                    followerEntryNames.Add(followerEntryName);
-                }
-            }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free: snapshot Keys then re-validate each candidate against the live
-            // dispatch dictionary. Weak consistency is safe because the second scan below
-            // (over symmetryFleetEntryToDispatch) already catches any follower missed here.
-            var followerEntryNames = new System.Collections.Generic.List<string>();
-            string[] _shadowFollowerSnapshot = ctx.FollowerEntries.Keys.ToArray();
-            for (int _i = 0; _i < _shadowFollowerSnapshot.Length; _i++)
-            {
-                string followerEntryName = _shadowFollowerSnapshot[_i];
-                if (string.IsNullOrEmpty(followerEntryName))
-                    continue;
-                if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
-                    continue;
-                if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                    continue;
-                followerEntryNames.Add(followerEntryName);
-            }
-```
-
----
-
-### Step 7 -- Follower fill reader (precheck)
-
-**File:** `src/V12_002.Symmetry.Follower.cs`
-**Lines:** 36-42
-
-**OLD:**
-
-```csharp
-                bool anchorReady;
-                double preCheckAnchor;
-                lock (preCheckCtx.Sync)
-                {
-                    anchorReady   = preCheckCtx.IsResolved;
-                    preCheckAnchor = preCheckCtx.MasterAnchorPrice;
-                }
-```
-
-**NEW:**
-
-```csharp
-                // v28.1 Lock-free: volatile bool load is the acquire fence for MasterAnchorPrice.
-                bool anchorReady = preCheckCtx.IsResolved; // volatile bool -> acquire
-                double preCheckAnchor = System.Threading.Volatile.Read(ref preCheckCtx.MasterAnchorPrice);
-```
-
----
-
-### Step 8 -- Follower resolve reader
-
-**File:** `src/V12_002.Symmetry.Follower.cs`
-**Lines:** 129-134
-
-**OLD:**
-
-```csharp
-            bool isResolved;
-            double masterAnchor;
-            lock (ctx.Sync)
-            {
-                // V1101E HOT-PATCH: Snapshot dispatch state under ctx.Sync, then release before any stateLock path.
-                isResolved = ctx.IsResolved;
-                masterAnchor = ctx.MasterAnchorPrice;
-            }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free: V1101E hot-patch retired (stateLock no longer exists).
-            // volatile bool load is the acquire fence for the MasterAnchorPrice payload.
-            bool isResolved = ctx.IsResolved;
-            double masterAnchor = System.Threading.Volatile.Read(ref ctx.MasterAnchorPrice);
-```
-
----
-
-### Step 9 -- Follower resolve iteration
-
-**File:** `src/V12_002.Symmetry.Replace.cs`
-**Lines:** 125-140
-
-**OLD:**
-
-```csharp
-            lock (ctx.Sync)
-            {
-                // V1101E HOT-PATCH: Build follower worklist under ctx.Sync only; never call stateLock paths while holding ctx.Sync.
-                foreach (string fleetEntryName in ctx.FollowerEntries)
-                {
-                    if (string.IsNullOrEmpty(fleetEntryName)) continue;
-                    if (!symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var linkedDispatch)) continue;
-                    if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal)) continue;
-                    if (!symmetryPendingFollowerFills.ContainsKey(fleetEntryName)) continue;
-                    followersToResolve.Add(fleetEntryName);
-                }
-            }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free: snapshot Keys, then re-validate each candidate against the live
-            // dispatch and pending-fill dictionaries. Weak consistency during concurrent
-            // Add/Remove is safe because every hit must pass two ContainsKey/TryGetValue gates.
-            string[] _followerSnapshot = ctx.FollowerEntries.Keys.ToArray();
-            for (int _i = 0; _i < _followerSnapshot.Length; _i++)
-            {
-                string fleetEntryName = _followerSnapshot[_i];
-                if (string.IsNullOrEmpty(fleetEntryName)) continue;
-                if (!symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var linkedDispatch)) continue;
-                if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal)) continue;
-                if (!symmetryPendingFollowerFills.ContainsKey(fleetEntryName)) continue;
-                followersToResolve.Add(fleetEntryName);
-            }
-```
-
----
-
-### Step 9B -- Cascade cleanup reader (`SymmetryGuardCascadeFollowerCleanup`)
-
-**File:** `src/V12_002.Symmetry.Replace.cs`
-**Lines:** ~188-189 (snapshot of `ctx.FollowerEntries` before iterating for cancellation)
-
-**OLD:**
-
-```csharp
-            string[] followers;
-            lock (ctx.Sync) { followers = ctx.FollowerEntries.ToArray(); }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 Lock-free: ConcurrentDictionary.Keys.ToArray() is a consistent snapshot.
-            // Followers iterated below are still re-validated by activePositions and entryOrders lookups.
-            string[] followers = ctx.FollowerEntries.Keys.ToArray();
-```
-
----
-
-### Step 9C -- Prune dispatches reader (`SymmetryGuardPruneDispatches`)
-
-**File:** `src/V12_002.Symmetry.Replace.cs`
-**Lines:** ~242-262 (the `else if (ctx.IsResolved)` branch that currently wraps the follower presence scan under `lock (ctx.Sync)`)
-
-**OLD:**
-
-```csharp
-                else if (ctx.IsResolved)
-                {
-                    bool hasActiveFollowers = false;
-                    lock (ctx.Sync)
+                    bool replacementScheduled = false;
+                    try
                     {
-                        foreach (string follower in ctx.FollowerEntries)
+                        TriggerCustomEvent(o =>
                         {
-                            // V12.Phase8 [F-04]: activePositions is a ConcurrentDictionary but
-                            // ContainsKey here is used alongside ctx.FollowerEntries iteration under
-                            // ctx.Sync -- acquire stateLock for the read to prevent torn observations
-                            // when ExecuteSmartDispatchEntry commits or removes entries concurrently.
-                            bool exists;
-                            exists = activePositions.ContainsKey(follower);
-                            if (exists)
+                            // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
+                            // ATR tick absorption may have updated PendingPrice/PendingQty after the
+                            // lambda was scheduled -- using stale captures would submit wrong values.
+                            SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
+                            _followerReplaceSpecs.TryRemove(sigName, out _);
+                        }, null);
+                        replacementScheduled = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
+                        _followerReplaceSpecs.TryRemove(sigName, out _);
+                    }
+```
+
+**NEW**:
+
+```csharp
+                    bool replacementScheduled = false;
+                    try
+                    {
+                        TriggerCustomEvent(o =>
+                        {
+                            if (_isTerminating) return;  // ADR-019 orphan guard
+                            // [P2 FSM CONSISTENCY]: Re-read price/qty from spec at execution time.
+                            // ATR tick absorption may have updated PendingPrice/PendingQty after the
+                            // lambda was scheduled -- using stale captures would submit wrong values.
+                            SubmitFollowerReplacement(sigName, acctNameCapture, fsmCapture.PendingPrice, fsmCapture.PendingQty, fsmCapture);
+                            _followerReplaceSpecs.TryRemove(sigName, out _);
+                        }, null);
+                        replacementScheduled = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[FSM] TriggerCustomEvent failed for " + sigName + ": " + ex.Message);
+                        _followerReplaceSpecs.TryRemove(sigName, out _);
+                    }
+```
+
+#### Case 2 -- `src/V12_002.REAPER.Audit.cs:136` (REAPER repair queue from background audit thread)
+
+**OLD** (lines 134-141, verbatim):
+
+```csharp
+                            _reaperRepairQueue.Enqueue(acct.Name);
+                            // B957/E1: Clear in-flight guard if TriggerCustomEvent fails, preventing permanent lockout.
+                            try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); }
+                            catch (Exception repairTriggerEx)
                             {
-                                hasActiveFollowers = true;
-                                break;
+                                _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
+                                Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
                             }
-                        }
-                    }
-                    if (!hasActiveFollowers) remove = true;
-                }
 ```
 
-**NEW:**
+**NEW**:
 
 ```csharp
-                else if (ctx.IsResolved) // volatile bool -> acquire
-                {
-                    // v28.1 Lock-free: iterate ConcurrentDictionary.Keys directly.
-                    // Weak consistency is safe: if a follower is added concurrently we may
-                    // skip the prune this pass and catch it on the next; if removed we may
-                    // still observe it briefly and keep the dispatch alive one extra pass.
-                    // Neither case can produce a torn read because activePositions is itself
-                    // a ConcurrentDictionary.
-                    bool hasActiveFollowers = false;
-                    foreach (string follower in ctx.FollowerEntries.Keys)
-                    {
-                        if (activePositions.ContainsKey(follower))
-                        {
-                            hasActiveFollowers = true;
-                            break;
-                        }
-                    }
-                    if (!hasActiveFollowers) remove = true;
-                }
+                            _reaperRepairQueue.Enqueue(acct.Name);
+                            // B957/E1: Clear in-flight guard if TriggerCustomEvent fails, preventing permanent lockout.
+                            try { TriggerCustomEvent(o => { if (_isTerminating) return; ProcessReaperRepairQueue(); }, null); }
+                            catch (Exception repairTriggerEx)
+                            {
+                                _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
+                                Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
+                            }
 ```
 
-> Codex: note the deletion of the V12.Phase8 [F-04] comment block -- its premise (`stateLock` acquisition) is stale and its guarantee is now provided by `ConcurrentDictionary` itself. Replace with the new weak-consistency justification above.
+Note: single-expression lambdas are expanded to a statement block to host the guard. No semantic change.
 
----
+**Sister sites (same Transform B, identical surgical recipe, no further worked block needed):**
 
-### Step 10 -- INTEGRITY FAILURE: stop audit (R1 broker-safe rollback)
+- `src/V12_002.REAPER.Audit.cs:183` -- `try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }` --> `try { TriggerCustomEvent(o => { if (_isTerminating) return; ProcessReaperFlattenQueue(); }, null); }`
+- `src/V12_002.REAPER.Audit.cs:250` -- `try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }` --> `try { TriggerCustomEvent(e => { if (_isTerminating) return; ProcessReaperNakedStopQueue(); }, null); }`
+- `src/V12_002.REAPER.Audit.cs:327` -- `try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }` --> `try { TriggerCustomEvent(o => { if (_isTerminating) return; ProcessReaperFlattenQueue(); }, null); }`
+- `src/V12_002.REAPER.Audit.cs:372` -- `try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }` --> `try { TriggerCustomEvent(e => { if (_isTerminating) return; ProcessReaperNakedStopQueue(); }, null); }`
 
-**File:** `src/V12_002.Orders.Management.cs`
-**Lines:** 183-193
+All four mirror Case 2 exactly. The lambda parameter name (`o` vs `e`) is preserved verbatim in each site -- do not normalize.
 
-**R1 rewrite:** By the time the stop audit fires, `stopOrders[entryName]` is already populated (line 106) and the entire T1..T5 target submission loop has run (lines 111-179). Calling `EmergencyPurgeEntry` directly would orphan the live broker stop AND any live target orders -- the exact ghost-order vector the plan is meant to eliminate (Codex + Gemini consensus CRITICAL). Fix: invoke the existing `FlattenPositionByName(entryName)` helper FIRST. That helper already cancels `stopOrders[entryName]` via `CancelOrderSafe`, loops T1..T5 and cancels every live target via `CancelOrderSafe`, clears `pendingStopReplacements[entryName]`, and submits a market flatten order for the residual position (verified at `Orders.Management.Flatten.cs:347-425`). Only after the broker side is squared do we call `EmergencyPurgeEntry` to clear the local tracking dictionaries.
+#### Case 3 -- `src/V12_002.UI.IPC.Server.cs:277` (TCP server callback to strategy marshal)
 
-**OLD:**
-
-```csharp
-            // Zero-trust stop audit: stop quantity must always cover full position.
-            if (stopOrder != null && stopOrder.Quantity != pos.TotalContracts)
-            {
-                Print(string.Format("[STOP_AUDIT] MISMATCH {0}: StopQty={1} Total={2}",
-                    entryName, stopOrder.Quantity, pos.TotalContracts));
-            }
-            else
-            {
-                Print(string.Format("[STOP_AUDIT] OK {0}: StopQty={1} NonRunnerLimits={2} RunnerQty={3}",
-                    entryName, pos.TotalContracts, nonRunnerLimitQty, runnerQty));
-            }
-```
-
-**NEW:**
+**OLD** (lines 272-280, verbatim):
 
 ```csharp
-            // v28.1 R2 Platinum: zero-trust stop audit with broker-safe integrity
-            // rollback. Mirrors the SIMA.Fleet [PHOTON_SHADOW] INTEGRITY FAILURE contract.
-            // R1 ordering (CRITICAL): cancel live broker orders + flatten BEFORE local
-            // dictionary purge. R1 R2 (Jules audit, 2026-04-13): wrap the rollback in
-            // try-finally so EmergencyPurgeEntry runs even if FlattenPositionByName throws
-            // on broker disconnect / margin reject / NT8 plugin reject. The exception
-            // still propagates to the outer SubmitBracketOrders catch so forensic
-            // visibility into the broker failure is preserved. EmergencyPurgeEntry is
-            // idempotent and safe to call after a partial broker-side flatten (Step 12
-            // contract: LOCAL-STATE-ONLY, null-checks every dict, swallows + logs every
-            // internal exception).
-            if (stopOrder != null && stopOrder.Quantity != pos.TotalContracts)
-            {
-                Print(string.Format(
-                    "[INTEGRITY_FAILURE] STOP_AUDIT {0}: StopQty={1} Total={2} -- EMERGENCY ROLLBACK",
-                    entryName, stopOrder.Quantity, pos.TotalContracts));
-                try
-                {
-                    FlattenPositionByName(entryName);              // R1: broker-side cancels + flatten
-                }
-                finally
-                {
-                    // R1 R2: local-state purge MUST run even if broker API threw above.
-                    EmergencyPurgeEntry(entryName, "STOP_AUDIT_MISMATCH");
-                }
-                return;
-            }
-            Print(string.Format("[STOP_AUDIT] OK {0}: StopQty={1} NonRunnerLimits={2} RunnerQty={3}",
-                entryName, pos.TotalContracts, nonRunnerLimitQty, runnerQty));
-```
+            Print(string.Format("V12.1 IPC ENQUEUE [client={0}] {1}", clientId, message));
 
----
-
-### Step 11 -- INTEGRITY FAILURE: bracket target sum (R1 broker-safe rollback)
-
-**File:** `src/V12_002.Orders.Management.cs`
-**Lines:** 222-228
-
-**R1 rewrite:** Same hazard class as Step 10 -- by the time the bracket-sum audit fires, both the stop and every T1..T5 target order are already live at the broker (and stored in their respective `ConcurrentDictionary` slots). A bare `EmergencyPurgeEntry` would orphan them. Fix is identical: call `FlattenPositionByName(entryName)` first (which cancels stop + all five targets via `CancelOrderSafe` and submits a market flatten), then `EmergencyPurgeEntry` to clear local tracking.
-
-**OLD:**
-
-```csharp
-            // V12.Audit [D-007]: Verify target contract sum matches total position size.
-            int _targetSum = nonRunnerLimitQty + runnerQty;
-            if (_targetSum != pos.TotalContracts)
-            {
-                Print(string.Format("[BRACKET_WARN] Target sum mismatch for {0}: targets={1} totalContracts={2}. Distribution may have lost contracts.",
-                    entryName, _targetSum, pos.TotalContracts));
-            }
-```
-
-**NEW:**
-
-```csharp
-            // v28.1 R2 Platinum: bracket target-sum integrity with broker-safe rollback.
-            // R1 ordering (CRITICAL): FlattenPositionByName cancels live stop + all T1..T5
-            // targets via CancelOrderSafe and submits a market flatten BEFORE
-            // EmergencyPurgeEntry clears local tracking. R1 R2 (Jules audit, 2026-04-13):
-            // wrap in try-finally so the local-state purge runs even if the broker API
-            // throws. Same contract as Step 10 R2.
-            int _targetSum = nonRunnerLimitQty + runnerQty;
-            if (_targetSum != pos.TotalContracts)
-            {
-                Print(string.Format(
-                    "[INTEGRITY_FAILURE] BRACKET_SUM {0}: targets={1} totalContracts={2} -- EMERGENCY ROLLBACK",
-                    entryName, _targetSum, pos.TotalContracts));
-                try
-                {
-                    FlattenPositionByName(entryName);              // R1: broker-side cancels + flatten
-                }
-                finally
-                {
-                    // R1 R2: local-state purge MUST run even if broker API threw above.
-                    EmergencyPurgeEntry(entryName, "BRACKET_SUM_MISMATCH");
-                }
-                return;
-            }
-```
-
----
-
-### Step 12 -- `EmergencyPurgeEntry` helper (new, local-state-only per R1)
-
-**File:** `src/V12_002.Orders.Management.cs`
-**Location:** Append as the last private method of the `V12_002` partial class in this file (place it after the last existing method, before the closing brace of the partial class).
-
-**R1 contract clarification:** `EmergencyPurgeEntry` is **local-state-only**. It clears tracking dictionaries; it does NOT cancel broker orders or flatten positions. Every caller is REQUIRED to have already invoked `FlattenPositionByName(entryName)` (or an equivalent broker-side cancel + flatten path) before calling this helper. The XML doc comment + inline comment make this explicit so future contributors do not introduce a fresh ghost-order vector by calling the helper in isolation.
-
-**NEW (append):**
-
-```csharp
-        // v28.1 Platinum: Emergency entry purge mirroring the SIMA.Fleet rollback contract.
-        // R1 CONTRACT (CRITICAL): This helper is LOCAL-STATE-ONLY. It does NOT cancel broker
-        // orders and it does NOT flatten positions. Every caller MUST have already invoked
-        // FlattenPositionByName(entryName) (or an equivalent broker-side cancel + flatten path)
-        // BEFORE calling this helper. Calling EmergencyPurgeEntry on an entry whose stop or
-        // target orders are still live at the broker creates the exact ghost-order vector the
-        // v28.1 hardening pass is meant to eliminate.
-        //
-        // Non-fatal: the strategy stays alive but the offending entry is removed from every
-        // tracking dictionary so downstream callbacks cannot re-amplify the mismatch.
-        // All tracking dictionaries are ConcurrentDictionary, so TryRemove(key, out _) is the
-        // correct API. Field names verified in src/V12_002.cs:185-196 on 2026-04-12.
-        private void EmergencyPurgeEntry(string entryName, string reason)
-        {
-            if (string.IsNullOrEmpty(entryName)) return;
-            Print(string.Format("[INTEGRITY_FAILURE] purge {0} reason={1} (local-state-only; broker side must already be flat)", entryName, reason));
+            // Trigger processing
             try
             {
-                if (activePositions != null) activePositions.TryRemove(entryName, out _);
-                if (entryOrders != null)    entryOrders.TryRemove(entryName, out _);
-                if (stopOrders != null)     stopOrders.TryRemove(entryName, out _);
-                if (target1Orders != null)  target1Orders.TryRemove(entryName, out _);
-                if (target2Orders != null)  target2Orders.TryRemove(entryName, out _);
-                if (target3Orders != null)  target3Orders.TryRemove(entryName, out _);
-                if (target4Orders != null)  target4Orders.TryRemove(entryName, out _);
-                if (target5Orders != null)  target5Orders.TryRemove(entryName, out _);
-                if (pendingStopReplacements != null && pendingStopReplacements.TryRemove(entryName, out _))
-                    System.Threading.Interlocked.Decrement(ref pendingReplacementCount);
+                TriggerCustomEvent(o => ProcessIpcCommands(), null);
             }
-            catch (Exception ex)
+            catch { }
+```
+
+**NEW**:
+
+```csharp
+            Print(string.Format("V12.1 IPC ENQUEUE [client={0}] {1}", clientId, message));
+
+            // Trigger processing
+            try
             {
-                Print(string.Format("[INTEGRITY_FAILURE] purge-exception {0}: {1}", entryName, ex.Message));
+                TriggerCustomEvent(o => { if (_isTerminating) return; ProcessIpcCommands(); }, null);
             }
-        }
+            catch { }
 ```
 
-> **Dictionary names verified in `src/V12_002.cs:185-196` on 2026-04-12.** If any field is renamed between planning and execution, Codex adapts the purge body to match -- the contract is "every dictionary keyed by `entryName` must be cleared, and broker-side cancellation MUST happen before the call."
+### C.4 Coverage pattern for the remaining 29 sites
 
----
+For each remaining site, the engineer applies one of two transforms:
 
-### Step 12B -- Delete `dailySummaryLock` declaration (R2 audit gate fix)
+- **Transform A (statement-body lambda)**: add `if (_isTerminating) return;  // ADR-019 orphan guard` as the first line inside the `{ ... }` block. (Sites: 1, 2, 3, 4, 6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32. -- 25 sites.)
+- **Transform B (expression-body lambda `o => Method()`)**: rewrite to `o => { if (_isTerminating) return; Method(); }`. (Sites: 11, 12, 13, 14, 15, 30. Case 2 and sister sites above; Case 3. -- 6 sites.)
 
-**File:** `src/V12_002.cs`
-**Line:** 227
+Plus Case 1 (site 5) = 1 Transform A already shown above. Total: **26 Transform A + 6 Transform B = 32 sites**, matching the C.1 inventory.
 
-**R2 rewrite:** Codex filesystem scan caught that `dailySummaryLock` is still declared at line 227 even though Build 1109 retired its only call sites in `UI.Compliance.cs`. Audit Gate 2 ("Zero `dailySummaryLock` in `src/`") fails as long as the declaration exists. Delete the declaration line. Do NOT touch the `stateLock` declaration on the line above -- the inline comment marks it as a deliberate dummy retained to satisfy un-extracted partial files during remediation, and removing it would break unrelated code.
+No existing comment, no existing `catch`, no outer block is touched. Each edit is strictly additive.
 
-**OLD:**
+### C.5 Kernel verification (post-P4)
 
-```csharp
-        // V12 PERFORMANCE: Locks are BANNED in favor of the Actor model (Enqueue).
-        // Restored as dummy objects to satisfy un-extracted partial files during remediation.
-        private readonly object stateLock = new object();
-        private readonly object dailySummaryLock = new object();
 ```
-
-**NEW:**
-
-```csharp
-        // V12 PERFORMANCE: Locks are BANNED in favor of the Actor model (Enqueue).
-        // Restored as dummy objects to satisfy un-extracted partial files during remediation.
-        // v28.1 R2: dailySummaryLock declaration removed -- Build 1109 retired its only
-        // call sites in UI.Compliance.cs (replaced with Interlocked.CompareExchange atomic
-        // guards on _csvHeaderCreated). stateLock is retained as a dummy for unrelated
-        // partial files; do not touch.
-        private readonly object stateLock = new object();
-```
-
-> **Codex pre-execution check:** before deleting, grep `src/` for any remaining `dailySummaryLock` token. Expected hits: 0 (declaration only). If anything else references it, abort and surface to the Director.
-
----
-
-### Step 13 -- `Version` bump
-
-**File:** `src/V12_002.Constants.cs`
-**Line:** 12
-
-**OLD:**
-
-```csharp
-        public const string Version = "Build 1111.002-v28.0";
-```
-
-**NEW:**
-
-```csharp
-        public const string Version = "Build 1111.002-v28.1";
-```
-
-> If `Constants.cs` currently still holds `"Build 972"` (stale per memory), Codex bumps it directly to `"Build 1111.002-v28.1"` in the same step regardless of current string value.
-
----
-
-### Step 14 -- `deploy-sync.ps1` hardlink-safe clearing
-
-**File:** `deploy-sync.ps1`
-**Lines:** 134-142 (Section 2 Dynamic Discovery), 150-162 (Section 3 Fixed Mappings), and a new `Test-IsLink` helper function inserted around line 116 (v28.1 R2 PS 5.1 fix for Jules R14).
-
-**INSERT (PS 5.1 helper, before the `# DEPLOYMENT ENGINE: Hardening Environment` header circa line 116 of the working tree script):**
-
-```powershell
-# =============================================================================
-# PS 5.1 HARDLINK DETECTION HELPER (v28.1 R2)
-# Round 2 fix for Jules R14: PowerShell 5.1 has no $item.LinkType property
-# (added in PS 6.0). Detect links via two PS 5.1 / .NET 4.8 native APIs:
-#   (a) ReparsePoint attribute  -- catches symlinks and junctions
-#   (b) fsutil hardlink list    -- count > 1 means file has one or more hardlinks
-# fsutil is built into Windows since XP and does NOT require elevation.
-# =============================================================================
-function Test-IsLink {
-    param([Parameter(Mandatory)][string]$Path)
-    $itm = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
-    if (-not $itm) { return $false }
-    if (($itm.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-        return $true
-    }
-    $hl = & fsutil hardlink list "$Path" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $count = (@($hl) | Where-Object { $_ -match '\S' } | Measure-Object).Count
-        return ($count -gt 1)
-    }
-    return $false
-}
-```
-
-**OLD (Section 2, lines 133-143):**
-
-```powershell
-    # Sync Logic
-    if (Test-Path $dstPath) {
-        $item = Get-Item $dstPath
-        $isLink = $item.Attributes -match "ReparsePoint"
-        if ($isLink) { Remove-Item $dstPath -Force }
-        else {
-            $backup = $dstPath + ".bak_" + (Get-Date -Format "yyyyMMdd_HHmm")
-            Write-Host "BACKUP: Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
-            Move-Item $dstPath $backup
-        }
-    }
-```
-
-**NEW (Section 2):**
-
-```powershell
-    # Sync Logic -- v28.1 R2 hardlink-aware (PS 5.1 compatible via Test-IsLink helper).
-    if (Test-Path $dstPath) {
-        if (Test-IsLink -Path $dstPath) {
-            Remove-Item $dstPath -Force
-        } else {
-            $backup = $dstPath + ".bak_" + (Get-Date -Format "yyyyMMdd_HHmmss")
-            Write-Host "BACKUP: Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
-            Move-Item $dstPath $backup -Force
-        }
-    }
-```
-
-**OLD (Section 3, lines 150-162):**
-
-```powershell
-# 3. Fixed Mappings Execution
-foreach ($map in $FixedMappings) {
-    $srcPath = Join-Path $srcDir $map.src
-    $dstPath = $map.dst
-    if (!(Test-Path $srcPath)) { continue }
-    if (Test-Path $dstPath) {
-        $item = Get-Item $dstPath
-        if ($item.Attributes -match "ReparsePoint") { Remove-Item $dstPath -Force }
-        else { Move-Item $dstPath ($dstPath + ".bak") }
-    }
-    Write-Host "LINKING (Fixed): $($map.src) -> NT8" -ForegroundColor Green
-    New-Item -ItemType HardLink -Path $dstPath -Value $srcPath | Out-Null
-}
-```
-
-**NEW (Section 3):**
-
-```powershell
-# 3. Fixed Mappings Execution
-# v28.1 R2 Platinum: hardlink-aware destination clearing (PS 5.1 compatible).
-# Root cause of the V12_002.cs ResourceExists collision: hardlinks are NOT
-# ReparsePoints, so the v28.0 detection branch fell through to a non-timestamped
-# Move-Item that blew up on the 2nd deploy-sync run. Test-IsLink (defined above)
-# detects both ReparsePoints AND hardlinks via fsutil hardlink list count.
-foreach ($map in $FixedMappings) {
-    $srcPath = Join-Path $srcDir $map.src
-    $dstPath = $map.dst
-    if (!(Test-Path $srcPath)) { continue }
-    if (Test-Path $dstPath) {
-        if (Test-IsLink -Path $dstPath) {
-            # Delete the link entry; the underlying inode survives if any other
-            # name references it. Safe because we are immediately re-creating
-            # the link below.
-            Remove-Item $dstPath -Force
-        } else {
-            # Real file -- preserve as TIMESTAMPED .bak to avoid colliding on
-            # repeat runs.
-            $backup = $dstPath + ".bak_" + (Get-Date -Format "yyyyMMdd_HHmmss")
-            Write-Host "BACKUP (Fixed): Archiving -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
-            Move-Item $dstPath $backup -Force
-        }
-    }
-    Write-Host "LINKING (Fixed): $($map.src) -> NT8" -ForegroundColor Green
-    New-Item -ItemType HardLink -Path $dstPath -Value $srcPath | Out-Null
-}
+grep -n 'if (_isTerminating) return;  // ADR-019 orphan guard' src/   -- expect 26 hits (Transform A)
+grep -cE 'o => \{ if \(_isTerminating\) return; [A-Za-z]+\(\); \}' src/  -- expect 6 hits (Transform B, includes 5 REAPER.Audit.cs sites)
+grep -c 'if (_isTerminating) return;' src/V12_002.REAPER.Audit.cs  -- expect 5 hits (per-file REAPER coverage)
+grep -n 'lock(stateLock)' src/   -- expect 0 hits (invariant)
 ```
 
 ---
 
-### Step 15 -- `nexus_a2a.json` metadata bump
+## Section D -- Infrastructure Repair
 
-**File:** `docs/brain/nexus_a2a.json`
+### D.1 `.devcontainer/` (NEW) -- Zero-Standard Environment baseline
 
-**OLD fields (update the four keys; leave all other fields untouched):**
+Create two files under `.devcontainer/` at repo root:
+
+**`.devcontainer/devcontainer.json`** (full content):
 
 ```json
-  "mission": "<whatever the current value is>",
-  "build_tag": "1111.002-v28.0",
-  "phase": "<whatever the current value is>",
-  "last_updated": "<whatever the current value is>"
+{
+  "name": "V12 Sovereign Substrate",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/git-lfs:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/powershell:1": { "version": "7.4" }
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": "pwsh -NoProfile -File scripts/install_hooks.ps1",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-vscode.powershell",
+        "ms-python.python",
+        "DavidAnson.vscode-markdownlint"
+      ],
+      "settings": { "editor.tabSize": 4, "files.eol": "\n" }
+    }
+  }
+}
 ```
 
-**NEW fields:**
+**`.devcontainer/Dockerfile`** (full content):
 
-```json
-  "mission": "V12.15 Platinum Hardening",
-  "build_tag": "1111.002-v28.1",
-  "phase": "AWAITING_RELOAD",
-  "last_updated": "2026-04-12T00:00:00Z"
+```dockerfile
+FROM mcr.microsoft.com/devcontainers/dotnet:6.0-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3.11 python3-pip git-lfs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN git lfs install --system
 ```
 
----
+Non-goals: no NinjaTrader DLL layer (proprietary, host-only). CI builds that require NinjaTrader linkage must run on the Windows runner (`dotnet-build.yml`); the devcontainer is for scripts, documentation, and P3/P5 tooling.
 
-### Step 16 -- MANDATORY post-edit sequence
+### D.2 `.github/workflows/label-sync.yml` + `.github/labels.yml` (NEW) -- label-pruning protection
 
-1. `powershell -File ".\deploy-sync.ps1"` -- ASCII Gate PASS, hardlinks rehydrated, **no ResourceExists collision** (validates Step 14).
-2. Director presses F5 in NT8 -- expect zero CS0227/CS0103/CS0246/CS0019 errors.
-3. Banner must show `Build 1111.002-v28.1`.
-4. `V12_002.Constants.cs` `Version` tag visible in the UI matches the banner.
+**`.github/labels.yml`** (canonical manifest):
 
----
-
-## Audit Gates (all must PASS before handoff back to P3)
-
-1. **Zero `lock(ctx.Sync)` in `src/`** -- `Grep("lock\s*\(\s*\w+\.Sync\s*\)", path="src/")` returns 0 hits.
-2. **Zero `dailySummaryLock` in `src/`** -- after Step 12B deletion, `Grep("dailySummaryLock", path="src/")` returns 0 hits (was 1: the orphan declaration at V12_002.cs:227).
-3. **ASCII Gate** PASS on all modified `.cs` files via `deploy-sync.ps1`.
-4. **F5 compile** -- zero CS errors.
-5. **Banner verification** -- Director confirms `Build 1111.002-v28.1` in the NT8 banner and `Version` tag in the UI.
-6. **INTEGRITY FAILURE STOP_AUDIT roundtrip (R1)** -- scratch-branch injection (force `stopOrder.Quantity != pos.TotalContracts`) must produce: (a) `[INTEGRITY_FAILURE] STOP_AUDIT ... EMERGENCY ROLLBACK` log line, (b) `EMERGENCY FLATTEN` log line from `FlattenPositionByName`, (c) broker-side cancel events for the live stop and any live target orders, (d) market flatten order submitted, (e) `[INTEGRITY_FAILURE] purge ... local-state-only` log line, (f) `entryName` absent from every tracking dictionary after the dust settles.
-7. **INTEGRITY FAILURE BRACKET_SUM roundtrip (R1)** -- same six-step verification for target-sum mismatch injection.
-8. **deploy-sync.ps1 repeat-run test** -- run `deploy-sync.ps1`, touch `V12_002.cs`, run again; no `ResourceExists` error.
-9. **Symmetry regression** -- replay a known symmetry dispatch (master fills -> followers propagate) and confirm no crashes, no `NullReferenceException`, no stale anchor read.
-10. **10-min paper trading** -- `PrivateMemorySize64` delta < 5 MB, zero `[INTEGRITY_FAILURE]` logs under normal operation.
-11. **Multi-instance run** -- two NT8 instances each show their own `[PHOTON MMIO] mirror online: V12_FleetDispatch_<pid>_<salt>` banner.
-12. **Forensic grep panel (post-execution)** -- all patterns in the verification table return zero hits.
-13. **R3 visibility check** -- `Grep("internal sealed class SymmetryDispatchContext", path="src/")` returns 0 hits; `Grep("private sealed class SymmetryDispatchContext", path="src/")` returns 1 hit.
-14. **R4 torn-read check** -- `Grep("ctx\.MasterAnchorPrice", path="src/V12_002.Symmetry.cs")` returns hits ONLY on the `Volatile.Write` line and any `Volatile.Read(ref ctx.MasterAnchorPrice)` site; the `[SYMMETRY_GUARD] MASTER ANCHOR LOCKED` Print must reference a local (e.g. `publishedAnchor`), not `ctx.MasterAnchorPrice` directly.
-15. **R1 R2 STOP_AUDIT + BRACKET_SUM exception-path roundtrip** -- inject an exception inside `FlattenPositionByName` (e.g., temporarily disconnect the broker plugin in a scratch branch, or set a sentinel that throws when the entry name matches a known fixture) before triggering each mismatch. Verify the log sequence: (a) `[INTEGRITY_FAILURE] STOP_AUDIT ... EMERGENCY ROLLBACK` fires, (b) `EMERGENCY FLATTEN` fires from inside `FlattenPositionByName`, (c) `[INTEGRITY_FAILURE] purge ... local-state-only` fires from the `finally` block (proof the purge ran), (d) `ERROR SubmitBracketOrders: <broker exception message>` is logged by the outer catch (proof the exception propagated correctly), (e) `entryName` is absent from `activePositions`, `entryOrders`, `stopOrders`, `target1Orders`..`target5Orders`, and `pendingStopReplacements` after the dust settles. Repeat the entire sequence for the `BRACKET_SUM` mismatch path.
-16. **R14 R2 deploy-sync.ps1 PS 5.1 compatibility check** -- run `powershell.exe -Version 5.1 -File ".\deploy-sync.ps1"` on the Director's Windows PowerShell 5.1 host. Confirm: (a) no parser errors on the new `Test-IsLink` function, (b) no missing-property warnings (since `$item.LinkType` is no longer referenced), (c) `Test-IsLink -Path "$NtStrategyDir\V12_002.cs"` returns `$true` after a successful run (proves hardlink detection works), (d) `Test-IsLink -Path "$srcDir\..\.git\HEAD"` returns `$false` for a regular file, (e) the script exits 0 with no `ResourceExists` errors on a repeat run.
-
----
-
-## HARD RULES (v28.1)
-
-- **ASCII only** in every C# string literal. No emoji, curly quotes, em-dashes, Unicode arrows, box-drawing.
-- **No `lock(ctx.Sync)` anywhere** in executable code after Step 9 completes.
-- **No silent integrity-mismatch fallback.** Every detector logs `[INTEGRITY_FAILURE] ...` and calls `EmergencyPurgeEntry`.
-- **MMIO mirror failure is NON-fatal** (unchanged from v28.0).
-- **No agent impersonation.** If Codex or Jules is unreachable, report failure and wait for Director intervention.
-- **Every `src/` edit is followed by `deploy-sync.ps1` before F5.** Skipping is a protocol violation.
-- **All path arguments with spaces must be double-quoted**, e.g. `"C:\Users\Mohammed Khalid\..."`.
-- **All `*.ps1` scripts must be Windows PowerShell 5.1 compatible.** No `$item.LinkType`, no ternary `? :`, no null-coalescing `??`, no PS 7-only cmdlets or members. The Director's environment is Windows PowerShell 5.1 / .NET Framework 4.8. Detect hardlinks via `fsutil hardlink list` and reparse points via `[System.IO.FileAttributes]::ReparsePoint` bitwise check.
-- **No new files in `src/`.** This is a surgical hardening pass; every edit touches an existing file.
-
----
-
-## Director's Handoff Block
-
-```
-=== V12.15 PLATINUM HARDENING HANDOFF ===
-FROM:  Claude (P3 Architect, Opus 4.6)
-TO:    Codex (P4 primary) / Jules (P4 standby)
-TAG:   1111.002-v28.1 (bump from 1111.002-v28.0)
-PLAN:  .claude/plans/jaunty-churning-kazoo.md (authoritative spec)
-
-TARGET RUNTIME:
-  NinjaTrader 8 / .NET Framework 4.8 / C# 7.3
-
-FORBIDDEN:
-  unsafe, byte*, fixed blocks, Unsafe.*, nint, Span<T>, stackalloc,
-  NativeMemory, Environment.ProcessId, C# 8+ features, new src/ files
-
-REQUIRED:
-  System.Threading.Volatile.Read/Write, volatile bool keyword,
-  System.Collections.Concurrent.ConcurrentDictionary<string, byte>,
-  ASCII-only string literals, no lock(ctx.Sync), no dailySummaryLock,
-  [INTEGRITY_FAILURE] logging + EmergencyPurgeEntry on all detectors,
-  hardlink-aware deploy-sync.ps1,
-  PowerShell 5.1 compatible deploy-sync.ps1 (no $item.LinkType; Test-IsLink helper),
-  try { FlattenPositionByName } finally { EmergencyPurgeEntry } at every integrity detector
-
-EXECUTION ORDER (NO reordering, NO skipping):
-  Step 1  -- V12_002.cs:44 BUILD_TAG bump
-  Step 2  -- Symmetry.cs SymmetryDispatchContext class def (R3: preserve `private sealed class`; volatile bool + ConcurrentDictionary, drop ctx.Sync)
-  Step 3  -- Symmetry.cs:150-171 master anchor publish + R4 log-site Volatile.Read (capture into local before Print)
-  Step 4  -- Symmetry.cs:114-118 FollowerEntries.TryAdd
-  Step 5  -- Symmetry.Replace.cs:219-223 FollowerEntries.TryRemove
-  Step 6  -- Propagation.cs:124-128 snapshot via Keys.ToArray()
-  Step 6B -- Orders.Callbacks.AccountOrders.cs TryGetDispatchFollowerEntries -> Keys.ToArray()
-  Step 6C -- SIMA.Shadow.cs ShadowMoveFollowerStops -> iterate Keys.ToArray() + re-validate
-  Step 7  -- Symmetry.Follower.cs:36-42 Volatile.Read anchor
-  Step 8  -- Symmetry.Follower.cs:129-134 Volatile.Read anchor
-  Step 9  -- Symmetry.Replace.cs:125-140 iterate Keys.ToArray() + re-validate (TryResolveFollowersForDispatch)
-  Step 9B -- Symmetry.Replace.cs CascadeFollowerCleanup -> Keys.ToArray()
-  Step 9C -- Symmetry.Replace.cs PruneDispatches -> foreach ctx.FollowerEntries.Keys (drop Phase8 F-04 comment)
-  Step 10 -- Orders.Management.cs:183-193 R1 R2 INTEGRITY FAILURE + try { FlattenPositionByName } finally { EmergencyPurgeEntry } (stop audit)
-  Step 11 -- Orders.Management.cs:222-228 R1 R2 INTEGRITY FAILURE + try { FlattenPositionByName } finally { EmergencyPurgeEntry } (bracket sum)
-  Step 12 -- Orders.Management.cs append EmergencyPurgeEntry helper (R1: documented LOCAL-STATE-ONLY; callers must Flatten first)
-  Step 12B -- V12_002.cs:227 R2 DELETE `dailySummaryLock` declaration (audit gate 2 fix)
-  Step 13 -- Constants.cs:12 Version bump
-  Step 14 -- deploy-sync.ps1 add Test-IsLink helper (PS 5.1) + replace Sections 2 AND 3 with helper-based clearing
-  Step 15 -- docs/brain/nexus_a2a.json metadata bump
-  Step 16 -- MANDATORY powershell -File .\deploy-sync.ps1 then F5
-
-POST-EDIT (per CLAUDE.md -- NEVER SKIP):
-  1. powershell -File ".\deploy-sync.ps1"   -> ASCII Gate PASS, no ResourceExists
-  2. Director F5 in NinjaTrader             -> zero CS errors
-  3. Banner MUST show:                      Build 1111.002-v28.1
-  4. Version tag in UI:                     Build 1111.002-v28.1
-
-TOUCH LIST (exact):
-  src/V12_002.cs                                  MODIFY (Steps 1, 12B)
-  src/V12_002.Symmetry.cs                         MODIFY (Steps 2, 3, 4)
-  src/V12_002.Symmetry.Replace.cs                 MODIFY (Steps 5, 9, 9B, 9C)
-  src/V12_002.Symmetry.Follower.cs                MODIFY (Steps 7, 8)
-  src/V12_002.Orders.Callbacks.Propagation.cs     MODIFY (Step 6)
-  src/V12_002.Orders.Callbacks.AccountOrders.cs   MODIFY (Step 6B)
-  src/V12_002.SIMA.Shadow.cs                      MODIFY (Step 6C)
-  src/V12_002.Orders.Management.cs                MODIFY (Steps 10, 11, 12)
-  src/V12_002.Constants.cs                        MODIFY (Step 13)
-  deploy-sync.ps1                                 MODIFY (Step 14)
-  docs/brain/nexus_a2a.json                       MODIFY (Step 15)
-
-HARD RULES:
-  - ASCII only in every string literal
-  - No lock(ctx.Sync) anywhere after Step 9
-  - INTEGRITY FAILURE logging + EmergencyPurgeEntry on every integrity detector
-  - Every src/ edit is followed by deploy-sync.ps1 before F5
-  - No agent impersonation
-  - All paths with spaces must be double-quoted
-  - No new src/ files
-
-AUDIT GATES (all 16 MUST PASS before handoff back to P3):
-  1  Zero lock(ctx.Sync) in src/
-  2  Zero dailySummaryLock in src/
-  3  ASCII Gate PASS on all modified .cs files
-  4  F5 compile zero CS errors
-  5  Banner and Version tag both show Build 1111.002-v28.1
-  6  STOP_AUDIT INTEGRITY FAILURE roundtrip
-  7  BRACKET_SUM INTEGRITY FAILURE roundtrip
-  8  deploy-sync.ps1 repeat-run test (no ResourceExists)
-  9  Symmetry regression (master -> follower propagate) clean
-  10 10-min paper trading PrivateMemorySize64 delta < 5 MB, zero integrity failures
-  11 Multi-instance run: two NT8 instances, two distinct MMIO mirror banners
-  12 Forensic grep panel all zero (see Verification table)
-  13 R3 visibility check (private sealed class SymmetryDispatchContext)
-  14 R4 torn-read check (publishedAnchor local in Print, not ctx.MasterAnchorPrice)
-  15 R1 R2 STOP_AUDIT + BRACKET_SUM exception-path roundtrip (try-finally proof)
-  16 R14 R2 deploy-sync.ps1 PS 5.1 compatibility check (Test-IsLink helper)
-
-ON COMPLETION, report back to P3:
-  - All 16 audit gates PASS
-  - Touch list exact (git status matches)
-  - Banner and Version tag confirmed by Director
-  - nexus_a2a.json metadata bumped
-  - Symmetry regression log clean
+```yaml
+- name: "SIMA / Fleet"
+  color: "1d76db"
+  description: "SIMA dispatch, flatten, or fleet logic"
+- name: "Orders / Callbacks"
+  color: "0e8a16"
+  description: "Broker callbacks, FSM, follower replace"
+- name: "REAPER"
+  color: "b60205"
+  description: "REAPER audit, repair, or flatten queue"
+- name: "IPC"
+  color: "5319e7"
+  description: "UI.IPC server, client, or command pipeline"
+- name: "UI / Compliance"
+  color: "fbca04"
+  description: "UI panel, compliance queue, or marshalling"
+- name: "Core Strategy"
+  color: "333333"
+  description: "Lifecycle, OnBarUpdate, entry logic"
+- name: "Deploy / Scripts"
+  color: "c5def5"
+  description: "deploy-sync, install_hooks, or scripts/*"
+- name: "Workflows / CI"
+  color: "ededed"
+  description: "GitHub Actions or CI configuration"
+- name: "Agent / Manifesto"
+  color: "d4c5f9"
+  description: ".agent/, _agents/, or standards_manifesto"
+- name: "adr-019"
+  color: "000000"
+  description: "ADR-019 Sovereign Substrate Repair scope"
+- name: "orphan-guard"
+  color: "b60205"
+  description: "Orphan-order guard injection"
+- name: "substrate-repair"
+  color: "1d76db"
+  description: "Devcontainer, hooks, label-sync, portability"
 ```
 
----
+**`.github/workflows/label-sync.yml`** (workflow):
 
-## Verification
+```yaml
+name: Label Sync
+on:
+  push:
+    branches: [main]
+    paths: [".github/labels.yml"]
+  workflow_dispatch: {}
+permissions:
+  issues: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EndBug/label-sync@v2
+        with:
+          config-file: .github/labels.yml
+          delete-other-labels: false
+```
 
-### Forensic grep panel (post-execution)
+`delete-other-labels: false` preserves any label the Director added by hand (e.g., `priority:high`, `wontfix`). The sync is additive only; it will never prune. Pruning is an explicit Director action through a manual `workflow_dispatch` with a flag flip (future ADR if needed).
 
-| Pattern                                     | Path                               | Expected hits                              |
-| ------------------------------------------- | ---------------------------------- | ------------------------------------------ |
-| `lock\s*\(\s*\w+\.Sync\s*\)`                | `src/`                             | 0                                          |
-| `dailySummaryLock`                          | `src/`                             | 0                                          |
-| `\bunsafe\b`                                | `src/`                             | 0                                          |
-| `byte\s*\*`                                 | `src/`                             | 0                                          |
-| `fixed\s*\(`                                | `src/`                             | 0                                          |
-| `stackalloc`                                | `src/`                             | 0                                          |
-| `\[INTEGRITY_FAILURE\] STOP_AUDIT` literal  | `src/V12_002.Orders.Management.cs` | present                                    |
-| `\[INTEGRITY_FAILURE\] BRACKET_SUM` literal | `src/V12_002.Orders.Management.cs` | present                                    |
-| `EmergencyPurgeEntry\(`                     | `src/V12_002.Orders.Management.cs` | present (>= 3: helper decl + 2 call sites) |
-| Non-ASCII inside C# string literals         | `src/`                             | 0                                          |
+### D.3 `scripts/install_hooks.ps1` (AMEND) + `.gitattributes` (NEW) -- Hook gate
 
-### deploy-sync.ps1 repeat-run smoke
+The current hook enforces (a) `lock(stateLock)` ban, (b) ASCII on staged `.cs`. Amendment adds two new gates:
+
+**`.gitattributes`** (NEW, full content):
+
+```
+*.dll filter=lfs diff=lfs merge=lfs -text
+*.exe filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.onnx filter=lfs diff=lfs merge=lfs -text
+*.pt filter=lfs diff=lfs merge=lfs -text
+*.pdb filter=lfs diff=lfs merge=lfs -text
+```
+
+**`scripts/install_hooks.ps1`** amendment -- append the following two gates to the generated `.git/hooks/pre-commit` body, before the final `exit 0`:
 
 ```bash
-powershell -File ".\deploy-sync.ps1"     # run 1 -- PASS, links created
-# No edit to V12_002.cs between runs
-powershell -File ".\deploy-sync.ps1"     # run 2 -- must PASS, no ResourceExists
+# ADR-019: LFS pointer gate -- reject non-LFS binary file types
+for staged in $(git diff --cached --name-only --diff-filter=ACM); do
+    case "$staged" in
+        *.dll|*.exe|*.bin|*.onnx|*.pt|*.pdb)
+            head -c 50 "$staged" | grep -q "version https://git-lfs.github.com/spec/v1" || {
+                echo "[HOOK] ADR-019 REJECT: $staged is a tracked binary type but is not an LFS pointer."
+                echo "       Run: git lfs track '$staged' ; git add .gitattributes ; git add '$staged'"
+                exit 1
+            }
+            ;;
+    esac
+done
+
+# ADR-019: 5MB size gate -- reject any non-LFS staged file > 5 MiB
+FIVE_MB=5242880
+for staged in $(git diff --cached --name-only --diff-filter=ACM); do
+    if [ -f "$staged" ]; then
+        head -c 50 "$staged" | grep -q "version https://git-lfs.github.com/spec/v1" && continue
+        size=$(wc -c < "$staged")
+        if [ "$size" -gt "$FIVE_MB" ]; then
+            echo "[HOOK] ADR-019 REJECT: $staged is $size bytes (> 5 MiB) and not tracked via LFS."
+            exit 1
+        fi
+    fi
+done
 ```
 
-### Symmetry regression smoke (Director-initiated)
+Preserves existing lock-ban + ASCII gates. `head -c 50` matches the LFS pointer prefix `version https://git-lfs.github.com/spec/v1` without dereferencing the file. No change to hard-link behavior or the Post-Edit Deployment Protocol (CLAUDE.md).
 
-- Replay a known symmetry dispatch with 3 followers. Confirm all propagate without `[INTEGRITY_FAILURE]` logs under normal conditions.
-- Stress: scratch-branch synthetic mismatches must fire `[INTEGRITY_FAILURE]` + `EmergencyPurgeEntry` cleanly.
-- 10-min paper trading: `PrivateMemorySize64` delta < 5 MB.
-- Disable -> enable 3x: handle count returns to baseline (Process Explorer Section/FileMapping).
-- Two NT8 instances: each shows its own `[PHOTON MMIO] mirror online` banner (carries over from v28.0).
+### D.4 Portability bundle (supplementary)
 
----
+#### D.4.a `Linting.csproj:37`
 
-## Open Items / Director Decisions
-
-1. **Execution grant.** PLAN-ONLY until the Director confirms per-session execution.
-2. **Thread-origin invariant (Finding 1).** Design is safe even if a future producer leaks off-thread, but Codex should still record the observed callers during execution so we can re-tighten later if desired.
-3. **`EmergencyPurgeEntry` dictionary names.** Verified on 2026-04-12 against `V12_002.cs:185-196`. If a name drifts before execution, Codex adapts the body to match; the contract is "every `ConcurrentDictionary<string, ...>` keyed by `entryName` must be cleared."
-4. **`Constants.cs` starting state.** Memory pointer says `"Build 972"` (139 builds stale). Codex bumps directly to `"Build 1111.002-v28.1"` regardless of current string value.
-5. **`deploy-sync.ps1` Section 2 fix scope.** Both sections are patched (Section 3 is the root cause; Section 2 is prophylactic so the hardlink detection is consistent).
-6. **Memory refresh chore.** After execution, Architect updates `project_state_build1004.md` and retires `project_r28_kernel.md` (kernel recovery is complete). Not in this session.
-
----
-
-## Execution Prerequisites
-
-- [ ] Director grants per-session execution permission
-- [ ] Working tree on `build/1105-monolith` with `BUILD_TAG = "1111.002-v28.0"` in `V12_002.cs:44`
-- [ ] `deploy-sync.ps1` writable
-- [ ] Codex is warm and reachable (no impersonation fallback)
-- [ ] No unrelated uncommitted changes that would bleed into the Codex edit set
-
----
-
-**END OF PLAN -- V12.15 Platinum Hardening (Build 1111.002-v28.1)**
-
----
-
-# Phase 2: Substrate Hardening (Linting.csproj)
-
-**Mission:** Eliminate hardcoded absolute paths to achieve Level 5 Agent Readiness.
-**Architect (P3):** Antigravity (Recovered from Claude Terminal logs)
-**Engineer (P4):** Codex / Jules
-**Implementation Date:** 2026-04-17
-
-## Context
-
-The current `Linting.csproj` contains absolute paths to `C:\Program Files\NinjaTrader 8\bin` and `C:\Users\Mohammed Khalid\`. This creates a binary integrity hazard and blocks cross-environment Level 5 readiness.
-
-## Design Decisions
-
-### DD-P2-1: Property-Based Resolution
-
-All `<HintPath>` elements will reference MSBuild properties defined in a centralized `<PropertyGroup>`.
-
-- `$(NT8_INSTALL_PATH)`: Defaults to `C:\Program Files\NinjaTrader 8\bin`
-- `$(NT8_CUSTOM_PATH)`: Defaults to `$(USERPROFILE)\Documents\NinjaTrader 8\bin\Custom`
-
-### DD-P2-2: Conditional Defaults
-
-The properties will use `Condition="'$([Property])' == ''"` to allow environment variable overrides without modifying the project file.
-
-## Steps
-
-### Step 17 -- Centralized Path Properties
-
-**File:** `Linting.csproj`
-**Location:** Insert before the first `<ItemGroup>` (around line 15).
-
-**NEW:**
+**OLD**:
 
 ```xml
-  <PropertyGroup>
-    <NT8_INSTALL_PATH Condition="'$(NT8_INSTALL_PATH)' == ''">C:\Program Files\NinjaTrader 8\bin</NT8_INSTALL_PATH>
-    <NT8_CUSTOM_PATH Condition="'$(NT8_CUSTOM_PATH)' == ''">$(USERPROFILE)\Documents\NinjaTrader 8\bin\Custom</NT8_CUSTOM_PATH>
-  </PropertyGroup>
+      <HintPath>C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\NinjaTrader.Custom.dll</HintPath>
 ```
 
-### Step 18 -- Refactor HintPaths
+**NEW**:
 
-**File:** `Linting.csproj`
-**Lines:** 31-60
+```xml
+      <HintPath>$(UserProfile)\Documents\NinjaTrader 8\bin\Custom\NinjaTrader.Custom.dll</HintPath>
+```
 
-**OLD:** (Absolute paths)
-**NEW:**
+MSBuild resolves `$(UserProfile)` identically to `%USERPROFILE%` on Windows and to `$HOME` on Linux/macOS when .NET is cross-running. No other line in `Linting.csproj` is touched (the `C:\Program Files\NinjaTrader 8\bin\...` entries on lines 33, 41, 45, 49, 53, 57 stay as-is; they reference the system install and are portable for this mission).
 
-- `C:\Program Files\NinjaTrader 8\bin\` -> `$(NT8_INSTALL_PATH)\`
-- `C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\` -> `$(NT8_CUSTOM_PATH)\`
+#### D.4.b `deploy-sync.ps1` (four-path portability repair)
 
-### Step 19 -- Substrate-Independence Hard Rule
+**Sub-block 1 -- lines 8-9** (variable declarations):
 
-**File:** `docs/brain/implementation_plan.md`
-**Rule:** _"All binary dependencies MUST use MSBuild property variables. Absolute path literals for environment-specific directories are BANNED in `.csproj` files."_
+**OLD** (verbatim from the live file):
 
-## Phase 2 Audit Gates
+```powershell
+$RepoRoot = "C:\WSGTA\universal-or-strategy"
+$NtCustomDir = "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom"
+```
 
-| ID     | Severity | Description                                                                            |
-| ------ | -------- | -------------------------------------------------------------------------------------- |
-| **17** | CRITICAL | `grep` check: zero absolute `C:\` literals in `Linting.csproj`.                        |
-| **18** | CRITICAL | `dotnet build Linting.csproj` succeeds with zero environment variables set.            |
-| **19** | CRITICAL | `dotnet build` succeeds on a secondary machine (or via manual override of properties). |
-| **20** | WARNING  | `nexus_a2a.json` phase bumped to "Phase 3: Execution".                                 |
+**NEW**:
 
-**END OF PHASE 2 PLAN**
+```powershell
+$RepoRoot = $PSScriptRoot
+$NtCustomDir = Join-Path $env:USERPROFILE "Documents\NinjaTrader 8\bin\Custom"
+```
+
+`$PSScriptRoot` resolves to the directory containing `deploy-sync.ps1`, which is the repo root. This matches the model already used at `deploy-vm-safe.ps1:10` and lets any Director Mode machine run the script without editing. Note: the actual file uses `$RepoRoot` and `$NtCustomDir`, not `$Source`/`$Target` -- earlier drafts of this plan cited the wrong variable names; the OLD/NEW above is verified against the live source.
+
+**Sub-block 2 -- lines 89, 99** (dead-reference error messages pointing at non-existent `C:\tmp\byte_purge.py`):
+
+**OLD** (verbatim from the live file):
+
+```powershell
+# Fix: run C:\tmp\byte_purge.py, then re-run deploy-sync.ps1
+```
+
+```powershell
+        Write-Host "  Fix: python C:\tmp\byte_purge.py  then re-run deploy-sync.ps1" -ForegroundColor Red
+```
+
+**NEW**:
+
+```powershell
+# Fix: run `python (Join-Path $PSScriptRoot 'check_ascii.py') src/`, then re-run deploy-sync.ps1
+```
+
+```powershell
+        Write-Host "  Fix: python $(Join-Path $PSScriptRoot 'check_ascii.py') src/  then re-run deploy-sync.ps1" -ForegroundColor Red
+```
+
+`byte_purge.py` does not exist anywhere in the repository (verified via filesystem search). `check_ascii.py` is the repo-canonical ASCII-purity tool per CLAUDE.md section "CRITICAL: ASCII-Only in All C# String Literals". Anchoring the path at `$PSScriptRoot` (the same anchor used for `$RepoRoot` in sub-block 1) guarantees the error message resolves on any machine where the repo is cloned, regardless of drive letter, username, or install location. No other error-message strings in the file reference `C:\` paths.
+
+---
+
+## Section E -- Build Tag Bump
+
+**File**: `src/V12_002.Constants.cs:12`.
+
+**OLD**:
+
+```csharp
+        public const string BuildTag = "Build 1111.002-v28.0";
+```
+
+**NEW**:
+
+```csharp
+        public const string BuildTag = "Build 1111.003-v28.0-adr019";
+```
+
+Per CLAUDE.md "Naming Conventions", build-tag increment is MANDATORY for every production delivery. The `-adr019` suffix lets the Arena reliably identify the post-repair binary.
+
+---
+
+## Section F -- Verification Matrix (must pass before Arena APPROVED)
+
+| #   | Gate                                    | Check                                                                         | Expected                                   |
+| --- | --------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | ASCII purity (C#)                       | `python check_ascii.py src/`                                                  | zero findings                              |
+| 2   | Lock-ban                                | `grep -n 'lock(stateLock)' src/`                                              | zero hits                                  |
+| 3   | Guard coverage (Transform A)            | `grep -c 'if (_isTerminating) return;  // ADR-019 orphan guard' src/`         | 26 hits                                    |
+| 3b  | REAPER.Audit.cs per-file coverage       | `grep -c 'if (_isTerminating) return;' src/V12_002.REAPER.Audit.cs`           | 5 hits                                     |
+| 4   | Guard coverage (Transform B)            | `grep -cE 'o => \{ if \(_isTerminating\) return; [A-Za-z]+\(\); \}' src/`     | 6 hits                                     |
+| 5   | Devcontainer presence                   | `test -f .devcontainer/devcontainer.json && test -f .devcontainer/Dockerfile` | exit 0                                     |
+| 6   | Label-sync presence                     | `test -f .github/workflows/label-sync.yml && test -f .github/labels.yml`      | exit 0                                     |
+| 7   | LFS config presence                     | `test -f .gitattributes`                                                      | exit 0                                     |
+| 8   | Hook amendment                          | `grep -q "ADR-019: LFS pointer gate" .git/hooks/pre-commit`                   | exit 0                                     |
+| 9   | Hook live test (LFS)                    | stage a non-LFS `*.dll`                                                       | hook rejects with ADR-019 message          |
+| 10  | Hook live test (size)                   | stage a non-LFS file > 5 MiB                                                  | hook rejects with ADR-019 message          |
+| 11  | Portability (Linting)                   | `grep -c 'C:\\Users\\Mohammed' Linting.csproj`                                | zero hits                                  |
+| 12  | Portability (deploy) -- user profile    | `grep -nE 'C:\\\\Users\\\\' deploy-sync.ps1`                                  | zero hits                                  |
+| 12b | Portability (deploy) -- repo/tool paths | `grep -nE 'C:\\\\(WSGTA\|tmp)\\\\' deploy-sync.ps1`                           | zero hits                                  |
+| 12c | Portability (deploy) -- positive check  | `grep -cE '\$PSScriptRoot\|\$env:USERPROFILE\|GetFolderPath' deploy-sync.ps1` | >= 3 hits                                  |
+| 13  | Build tag                               | `grep -n '1111.003-v28.0-adr019' src/V12_002.Constants.cs`                    | one hit on line 12                         |
+| 14  | Deploy sync round-trip                  | `pwsh -File ./deploy-sync.ps1` then F5 in NT                                  | ASCII gate PASS, banner shows new BuildTag |
+
+---
+
+## Section G -- Handoff Block -> P5 ARENA (Red Team Audit)
+
+**P4 Codex is SUSPENDED. The block below is for the Director to paste into Antigravity/Arena to run the Red Team audit. No implementation begins until every agent returns APPROVED on every target.**
+
+```
+# =======================================================================
+# P5 ARENA RED TEAM AUDIT -- ADR-019 Sovereign Substrate Repair
+# =======================================================================
+# MISSION: Adversarial audit of the ADR-019 structural plan.
+# TARGET: docs/brain/implementation_plan.md @ branch mission-uni-5-full-sync
+# HANDOFF STATUS: P4 ENGINEER SUSPENDED -- 100% CONSENSUS GATE IN EFFECT
+# SIMULATION BAN: CLAUDE.md NO SIMULATION -- every verdict must cite an
+#        authentic local log, file write, or tool output.
+# GITHUB-LINK PROTOCOL: all citations MUST reference GitHub URLs to the
+#        branch file (not raw inline code) per CLAUDE.md.
+# =======================================================================
+
+RED TEAM TASKS (each agent runs ALL six):
+
+1. Kernel guard surface (32 sites)
+   - Challenge: Is any of the 32 sites mis-scoped? Any lambda body where
+     `if (_isTerminating) return;` on the first line skips critical
+     cleanup (e.g., releasing a reservation, clearing an in-flight flag)
+     that must still run after State.Terminated?
+   - Specifically audit sites #5 (AccountOrders.cs:369) and #11
+     (REAPER.Audit.cs:136) for reservation-leak after guard short-circuit.
+   - Challenge Transform B: does the rewritten expression body preserve
+     exception semantics exactly?
+
+2. _isTerminating race
+   - Challenge: volatile read on strategy thread vs volatile write on
+     lifecycle transition -- is there any call site where the marshal
+     lambda can read the flag BEFORE the Lifecycle.cs:400 write but
+     EXECUTE after the broker subscription is released? Name the site
+     and the window.
+
+3. Devcontainer spec
+   - Challenge: dotnet:6.0 matches NinjaTrader 8; confirm PowerShell 7.4
+     runs install_hooks.ps1 on the Linux image without Windows-only
+     cmdlets. Is any Python dependency in scripts/*.py missing from the
+     Dockerfile?
+
+4. Hook amendment
+   - Challenge: Can the 5 MiB gate false-positive on legitimate binaries
+     (e.g., a graphify-out/graph.json > 5 MiB)? The gate only skips
+     already-LFS-pointer files; is that the correct behavior given that
+     graphify-out/ is not LFS-tracked?
+   - Challenge: LFS pointer detection uses `head -c 50` and a grep
+     pattern. Is that the canonical byte prefix or can a legitimate LFS
+     pointer evade it?
+
+5. Label-sync manifest
+   - Challenge: Is any label currently in use on an open issue or PR
+     missing from .github/labels.yml? If `delete-other-labels: false` is
+     set, is there any drift risk we are missing?
+
+6. Portability substitutions
+   - Challenge: Does `$(UserProfile)` in MSBuild resolve identically to
+     `%USERPROFILE%` on Windows AND on the Linux devcontainer (where
+     NinjaTrader linkage is not attempted)? Does `$PSScriptRoot` behave
+     identically whether deploy-sync.ps1 is invoked from the repo root
+     or via an absolute path?
+
+7. Adversarial scenario (open-ended)
+   - Design ONE corner case per category (kernel / devcontainer / hook /
+     label-sync / portability) where the plan fails. If ANY model
+     produces a VALID failure mode, CONSENSUS = FAIL and the plan
+     returns to P3 for revision.
+
+RETURN FORMAT (per agent, separate message):
+
+  AGENT: <codex|gemini|jules>
+  TARGET-1 GUARD-SURFACE: APPROVED | REVISION REQUIRED
+    <citations: GitHub URLs with line anchors>
+  TARGET-2 ISTERMINATING-RACE: APPROVED | REVISION REQUIRED
+    <citations>
+  TARGET-3 DEVCONTAINER: APPROVED | REVISION REQUIRED
+    <citations>
+  TARGET-4 HOOK: APPROVED | REVISION REQUIRED
+    <citations>
+  TARGET-5 LABEL-SYNC: APPROVED | REVISION REQUIRED
+    <citations>
+  TARGET-6 PORTABILITY: APPROVED | REVISION REQUIRED
+    <citations>
+  TARGET-7 ADVERSARIAL SCENARIO:
+    <one failure mode per category>
+  OVERALL: APPROVED | REVISION REQUIRED
+
+CONSENSUS GATE:
+  - All 3 agents must return APPROVED on targets 1-6.
+  - Target 7 produces failure modes; if any are VALID, plan returns to P3.
+  - Task-splitting during audit is STRICTLY FORBIDDEN.
+  - If any agent is unreachable, the Director is notified; audit pauses.
+
+NEXT STEPS (post-APPROVED):
+  - P3 updates docs/brain/nexus_a2a.json status to P4_EXECUTION_AUTHORIZED.
+  - P4 Codex receives handoff with the exact 32-site list + infra designs.
+  - P5 UltraReview re-audits after Codex finishes implementation.
+  - Director signs off after Build 1111.003-v28.0-adr019 clears regression.
+# =======================================================================
+```
+
+---
+
+## Section H -- Architect's sign-off
+
+- **P3 (Claude)**: plan drafted per Director directive 2026-04-18. Handoff target is P5 Arena (NOT P4 Engineer). No `src/` edits performed this session.
+- **Next action**: Director pastes Section G block into Antigravity to trigger the 14-model adversarial fleet audit.
+- **Rollback**: if the Arena rejects, the plan returns to P3 for revision; no implementation has been performed, so rollback is trivial.
+
+End of plan.
