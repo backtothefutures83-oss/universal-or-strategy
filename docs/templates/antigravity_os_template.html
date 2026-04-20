@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity OS | Sovereign Intelligence Model</title>
+    <style>
+        :root {
+            --bg-color: #050508;
+            --cyan: #00f2ff;
+            --purple: #bc13fe;
+            --orange: #ff8c00;
+            --glass: rgba(20, 20, 30, 0.4);
+            --border: rgba(255, 255, 255, 0.15);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Subtle animated grid background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 200%; height: 200%;
+            background-image: 
+                linear-gradient(rgba(0, 242, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(-50%);
+            animation: grid-flow 20s linear infinite;
+            z-index: 0;
+        }
+
+        @keyframes grid-flow {
+            from { transform: perspective(500px) rotateX(60deg) translateY(-50%); }
+            to { transform: perspective(500px) rotateX(60deg) translateY(0%); }
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+        }
+
+        #os-canvas {
+            position: relative;
+            width: 90%;
+            height: 80%;
+            max-width: 1200px;
+        }
+
+        .node-container {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .glass-node {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .glass-node:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 242, 255, 0.2);
+        }
+
+        .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+        /* Positioning logic */
+        .pos-top-left { top: 10%; left: 10%; }
+        .pos-top-right { top: 10%; right: 10%; }
+        .pos-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .pos-bottom-left { bottom: 10%; left: 15%; }
+        .pos-bottom-right { bottom: 10%; right: 15%; }
+        .pos-bottom-center { bottom: 5%; left: 50%; transform: translateX(-50%); }
+
+        /* Flow Layer */
+        .flow-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .flow-line {
+            fill: none;
+            stroke-width: 2;
+            stroke-dasharray: 10, 10;
+            opacity: 0.6;
+        }
+
+        .flow-slow { animation: dash 10s linear infinite; }
+        .flow-medium { animation: dash 5s linear infinite; }
+        .flow-fast { animation: dash 2s linear infinite; }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -100; }
+        }
+
+        .distillation-kernel {
+            border-color: var(--purple);
+            box-shadow: 0 0 20px rgba(188, 19, 254, 0.3);
+            font-size: 1.2rem;
+            padding: 30px 50px;
+        }
+
+        .revenue-pool {
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+        }
+
+        /* Tooltip style */
+        .tooltip {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            width: 200px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            border: 1px solid var(--border);
+        }
+
+        .glass-node:hover .tooltip {
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="os-canvas">
+            <svg class="flow-layer" id="svg-connections"></svg>
+
+            <!-- Nodes -->
+            <div class="node-container pos-top-left" id="n1">
+                <div class="label">Raw Compute</div>
+                <div class="glass-node" style="color: var(--purple);">
+                    FRONTIER PROVIDERS
+                    <span class="tooltip">Distilling raw H100/A100 compute into high-order intelligence.</span>
+                </div>
+            </div>
+
+            <div class="node-container pos-top-right" id="n2">
+                <div class="label">Data Silos</div>
+                <div class="glass-node" style="color: var(--purple);">
+                    PROPRIETARY DATA
+                    <span class="tooltip">Refining siloed information into Sovereign Units.</span>
+                </div>
+            </div>
+
+            <div class="node-container pos-center" id="n3">
+                <div class="label">Primary Kernel</div>
+                <div class="glass-node distillation-kernel">
+                    <strong>SOVEREIGN<br>INTELLIGENCE</strong>
+                    <span class="tooltip">The core OS where data and compute become agency.</span>
+                </div>
+            </div>
+
+            <div class="node-container pos-bottom-left" id="n4">
+                <div class="label">Infrastructure Rev</div>
+                <div class="glass-node" style="color: var(--orange);">
+                    A2A BRIDGE & LICENSING
+                    <span class="tooltip">Fixed fees for protocol access and agent communication.</span>
+                </div>
+            </div>
+
+            <div class="node-container pos-bottom-right" id="n5">
+                <div class="label">Alpha Dividends</div>
+                <div class="glass-node" style="color: var(--orange);">
+                    DROID TRADING AGENTS
+                    <span class="tooltip">5% Performance Fee generated by autonomous profit-seeking droids.</span>
+                </div>
+            </div>
+
+            <div class="node-container pos-bottom-center" id="n6">
+                <div class="label">Network Revenue Pool</div>
+                <div class="glass-node revenue-pool">
+                    <strong>RE-INVEST<br>LOOP</strong>
+                    <span class="tooltip">Profits automatically buy wholesale compute to grow the OS.</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function drawLines() {
+            const svg = document.getElementById('svg-connections');
+            const canvas = document.getElementById('os-canvas');
+            const rect = canvas.getBoundingClientRect();
+
+            const connections = [
+                { from: 'n1', to: 'n3', color: 'var(--purple)', speed: 'flow-slow' },
+                { from: 'n2', to: 'n3', color: 'var(--purple)', speed: 'flow-slow' },
+                { from: 'n3', to: 'n4', color: 'var(--orange)', speed: 'flow-medium' },
+                { from: 'n3', to: 'n5', color: 'var(--orange)', speed: 'flow-medium' },
+                { from: 'n4', to: 'n6', color: 'var(--cyan)', speed: 'flow-fast' },
+                { from: 'n5', to: 'n6', color: 'var(--cyan)', speed: 'flow-fast' },
+                { from: 'n6', to: 'n3', color: 'var(--cyan)', speed: 'flow-medium', loop: true }
+            ];
+
+            svg.innerHTML = '';
+
+            connections.forEach(conn => {
+                const f = document.getElementById(conn.from).getBoundingClientRect();
+                const t = document.getElementById(conn.to).getBoundingClientRect();
+
+                const x1 = (f.left + f.width / 2) - rect.left;
+                const y1 = (f.top + f.height / 2) - rect.top;
+                const x2 = (t.left + t.width / 2) - rect.left;
+                const y2 = (t.top + t.height / 2) - rect.top;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.classList.add('flow-line', conn.speed);
+                path.setAttribute('stroke', conn.color);
+
+                let d = '';
+                if (conn.loop) {
+                    const midX = Math.max(x1, x2) + 100;
+                    d = `M ${x1},${y1} C ${midX},${y1} ${midX},${y2} ${x2},${y2}`;
+                } else {
+                    const midY = (y1 + y2) / 2;
+                    d = `M ${x1},${y1} Q ${(x1 + x2) / 2},${midY} ${x2},${y2}`;
+                }
+
+                path.setAttribute('d', d);
+                svg.appendChild(path);
+            });
+        }
+
+        window.addEventListener('resize', drawLines);
+        window.onload = drawLines;
+    </script>
+</body>
+</html>

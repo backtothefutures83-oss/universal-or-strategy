@@ -16,22 +16,26 @@
 
 ## 🛡️ Protocol Hardening (V12 Permanent DNA)
 
-### 1. THE "DIRECTOR'S GATE" HIERARCHY
+### 1. THE "DIRECTOR'S GATE" HIERARCHY (Protocol V14)
 
-- **ORCHESTRATOR (Antigravity / Gemini CLI)**: The Central Switchboard. BANNED from manual coding AND BANNED from simulating sub-agent outputs (e.g., audits). Must wait for authentic logs.
-- **P5 Redundancy Mandate**: Task-splitting during a P5 audit is **STRICTLY FORBIDDEN**. Every member of the Red Team (Codex, Gemini CLI, Jules) must independently audit the **entire** implementation plan. Consensus is only valid if every agent validates every target individually.
-- **ZERO-TRUST IDENTITY**: It is STRICTLY FORBIDDEN for any agent to pretend to be another model or 'hallucinate' results if a sub-agent is unreachable. Missions must HOLD until the authentic agent responds.
-- **GITHUB-FIRST PROMPTING**: All external AI prompts (Arena AI, Gemini Web) MUST use standard GitHub links for branch or file references. Raw code-in-prompts is BANNED for large architectural reviews.
-- **FORENSICS (Codex)**: Diagnosis (P2) and Logic Audits (P5). Provides "Logical Proof of Failure."
-- **ARCHITECT (Claude Code)**: Design, Strategic Planning (P3). **PLAN-ONLY by default** -- writes `docs/brain/implementation_plan.md`, never `src/`. Peer Review & Sign-off (P5). Exception: Director may grant execution permission explicitly for a session.
-- **ENGINEER (Codex / Jules)**: Implementation (P4). Execution of approved surgical edits.
+- **ORCHESTRATOR (Antigravity / Gemini CLI)**: P1 Central Switchboard. BANNED from manual coding.
+- **FORENSICS (Codex)**: P2 Diagnosis & Proof of Failure.
+- **ARCHITECT (Claude Code)**: P3 Design & Strategic Planning. PLAN-ONLY by default.
+- **ADJUDICATOR (Arena / Red Team)**: **P4 Vetting Gate**. Adversarial consensus required BEFORE surgery.
+- **ENGINEER (Codex / Jules)**: **P5 Surgical Execution**. Implementation of approved P3 plan.
+- **VALIDATOR (Rider / AMAL)**: **P6 Post-Surgery Performance**. ASCII Gate & Allocation checks.
+- **SENTINEL (GitHub / Sentry)**: **P7 Infrastructure & Security**. Supply chain & environmental health.
+
+- **P4 Redundancy Mandate**: Task-splitting during a P4 audit is **STRICTLY FORBIDDEN**. Every member of the Red Team must independently audit the entire plan.
+- **ZERO-TRUST IDENTITY**: It is STRICTLY FORBIDDEN for any agent to pretend to be another model. Missions must HOLD until the authentic agent responds.
+- **GITHUB-FIRST PROMPTING**: All external AI prompts MUST use standard GitHub links for branch references.
 
 ### 2. OPERATIONAL WORKFLOW
 
 - **Plan Approval**: Every code change requires `docs/brain/implementation_plan.md` authored by Claude (ARCHITECT). Claude is BANNED from writing to `src/` -- the `.claude/hooks/pre_tool_src_guard.py` hook auto-blocks any attempt.
 - **User Mandate**: Orchestrators (Antigravity / Gemini CLI) are BANNED from approving plans. Only the USER (The Director) can authorize implementation.
-- **Post-Edit Deployment**: After every `src/` edit, ENGINEER must run `powershell -File .\deploy-sync.ps1`, then tell Director to press F5. Verify BUILD_TAG banner.
-- **Engineer Self-Audit (P4)**: Before handing off for Architectural Audit, the ENGINEER must:
+- **Post-Edit Deployment (P5)**: After every `src/` edit, ENGINEER must run `powershell -File .\deploy-sync.ps1`, then tell Director to press F5. Verify BUILD_TAG banner.
+- **Engineer Self-Audit (P5)**: Before handing off for Architectural Audit, the ENGINEER must:
   - Run `grep` audits to confirm no accidental deletions of guards or `lock` blocks.
   - Verify that all new logic is wrapped in the FSM/Actor `Enqueue` model.
   - Check for non-ASCII characters in C# strings (compiler safety).

@@ -58,7 +58,7 @@ Recommendation: [APPROVE / REVISE / BLOCK]
 ## Phase 4: Consensus Sign-Off
 
 1. All findings documented in `docs/brain/audit_[mission_id].md`.
-2. ARCHITECT issues final P5 Sign-Off memo.
+2. ARCHITECT issues final P4 Audit Sign-Off memo.
 3. Director receives consolidated report before approving implementation.
 
 ---
