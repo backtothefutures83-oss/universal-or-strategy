@@ -194,6 +194,7 @@ using NinjaTrader.NinjaScript;
         // Interlocked / Volatile primitives; the Sync lock object is DELETED. Resolve is
         // one-shot via CAS on _anchorState (0=unresolved, 1=resolving, 2=published).
         // Visibility preserved as private sealed (R3).
+        // CANARY: PHOENIX-ADR-019-V12-981
         private sealed class SymmetryDispatchContext
         {
             public string DispatchId;
