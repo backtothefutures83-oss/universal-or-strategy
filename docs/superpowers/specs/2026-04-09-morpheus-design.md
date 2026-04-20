@@ -97,6 +97,45 @@ Process 4: THE FORGE (Performance Environment)
 
 ---
 
+## Superpower: Sovereign Transparency ("Clear Pipes")
+
+**Transparent Pipes** is the foundational trust pillar of Morpheus. When you run agents on Morpheus, nothing is a black box — not for you, and not for the agents.
+
+Other platforms (JetBrains + ACP, Cursor, Copilot) decide what their agents can see. The IDE or host chooses which file context, which terminal buffer, which project state to pass — and users cannot inspect exactly what was included. The agent operates inside a curated envelope without knowing what was left out.
+
+**In Morpheus, every agent gets everything:**
+
+- Every running terminal process is explicitly named with its PID, directory, and elapsed runtime
+- Any agent can call `read_terminal` and receive the live output of any named process
+- All agents read the same `nexus_a2a.json` blackboard: mission phase, BUILD_TAG, plan path, and full A2A handoff history
+- When agent A hands off to agent B, B inherits the complete mission state — not a summary, not a truncation
+
+**The result:** agents in Morpheus know what other agents are doing. Agent A knows Agent B is running in terminal 2. Agent A can read Agent B's output. When Agent B finishes, Agent A sees it. No polling, no guessing, no black box.
+
+> Other platforms decide what their agents can see. Morpheus agents see everything — and so do you.
+
+---
+
+## Superpower: Infinite Configurability ("Rubix Cube")
+
+**The Rubix Cube principle:** Morpheus is a substrate, not a product. Like a Rubix Cube, it can be twisted into an endless number of configurations — and every configuration resolves to a valid, governed state.
+
+The fixed pieces are the 6-agent fleet (Claude, Codex, Gemini, Jules, Antigravity, Droid) and the Director's Gate rules. Within those rules, any combination of agents, harnesses, missions, broker adapters, and market surfaces can be composed:
+
+```
+TRADING LAYER:  NinjaTrader ↔ Schwab TOS ↔ Binance ↔ XRPL ↔ any IBrokerAdapter
+INTELLIGENCE:   Claude ↔ Codex ↔ Gemini ↔ Jules ↔ any ACP-registered agent
+MISSION:        Any ADR -- swap in one nexus_a2a.json write
+MARKET:         Futures ↔ Equities ↔ Crypto ↔ Prediction markets ↔ DeFi
+STRATEGY:       OR ↔ FFMA ↔ RMA ↔ Trend ↔ any IStrategyProducer
+```
+
+None of these swaps require touching the kernel. The substrate absorbs them.
+
+> See full pillar spec: [morpheus-sovereign-pillars.md](./morpheus-sovereign-pillars.md)
+
+---
+
 ## Layer 1: Kernel -- Broker Abstraction & N-Producer Model
 
 ### IBrokerAdapter Interface

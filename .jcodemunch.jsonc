@@ -1,0 +1,46 @@
+// jCodeMunch project config — V12 Universal OR Strategy
+// Merges over global ~/.code-index/config.jsonc
+// Docs: https://github.com/jgravelle/jcodemunch-mcp
+{
+  // Focus on C# — the primary language of the NinjaTrader strategy
+  "languages": ["csharp", "python", "typescript", "javascript", "markdown"],
+
+  // Tool tier: "standard" exposes 51 tools (analytics + architecture + quality)
+  // Best balance for Sonnet/Gemini-class models. Use "full" for o1/Opus.
+  "tool_profile": "standard",
+
+  // Compact schemas reduce the tool-schema token footprint from ~11.5k -> ~4k tokens
+  // MANDATORY for context-budget-conscious V12 sessions
+  "compact_schemas": true,
+
+  // Adaptive tiering — auto-narrows tools based on model announced via plan_turn()
+  "adaptive_tiering": true,
+
+  // MUNCH wire format: auto-compresses tool responses by ~50% when savings >= 15%
+  // "auto" = emit compact if savings >= 15%, otherwise standard JSON
+  "output_format": "auto",
+
+  // Exclude build artifacts, NinjaTrader DLL output, and git internals from index
+  "exclude_patterns": [
+    "**/bin/**",
+    "**/obj/**",
+    "**/*.dll",
+    "**/*.pdb",
+    "**/*.bak",
+    "**/*.log",
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/__pycache__/**",
+  ],
+
+  // Index location for this project (isolated from global index)
+  "index_path": ".jcodemunch-index",
+
+  // Enable semantic search using the locally downloaded all-MiniLM-L6-v2 model
+  // No API keys, no internet required after first download
+  "semantic_search": true,
+
+  // Auto-reindex on file save via PostToolUse hook (installed by init --hooks)
+  "auto_reindex": true,
+}
