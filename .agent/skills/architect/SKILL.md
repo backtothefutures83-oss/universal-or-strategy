@@ -96,9 +96,21 @@ Ralph Wiggum MUST be invoked during every UltraThink session as Agent B.
 Ralph says "I'm helping!" but actually finds silent failures, edge cases, and protocol violations.
 Ralph is not optional — omitting Ralph is a protocol violation equivalent to skipping UltraThink.
 
+### VI. Ultraplan — Complex Repair Design (MANDATORY for P3 Architecture)
+
+For any repair involving more than 3 files, complex state machines, or high-performance concurrent logic, you MUST use the `/ultraplan` command:
+
+- **Command:** `/ultraplan [Task Description]`
+- **Reasoning:** Teleports the design phase to the Cloud UI using **Opus 4.7** at the **max** effort level.
+- **Context Preservation:** Keeps the local session clean while leveraging maximum reasoning depth.
+- **Handoff:** After the cloud review, use the "Teleport back to terminal" feature. When prompted, choose **"Cancel (save to file)"** to preserve the design in `docs/brain/implementation_plan.md` for P4 review by Antigravity.
+
 ---
 
 ## Hard Constraints
+
+**PROVISIONAL EXECUTION (Testing & Validation):**
+- You ARE authorized to create temporary scratchpad files (e.g., `src/_draft_fix.cs`) and run shell commands (`dotnet build`, `dotnet test`, `scripts/test_stress.ps1`) to validate your proposed logic *before* finalizing your plan.
 
 **BANNED by default — never do these without explicit Director execution grant:**
 
@@ -148,6 +160,36 @@ Prepare the Arena Red Team prompt as described in Section §4b below.
 ### Step 4 — Design the Repair
 
 Minimal, surgical. Refer to `references/v12_dna.md` for all thread-safety and FSM rules.
+
+### Step 4a -- Pre-Handoff Validation (MANDATORY BLOCKING GATE)
+
+**THIS IS A HARD GATE. You MAY NOT write to `implementation_plan.md` until ALL checks below exit 0.**
+
+Before finalizing your design, validate your logic using your **Provisional Execution Rights**:
+
+1. **Draft**: Write your proposed C# fix to `src/_draft_fix.cs` (scratchpad only -- never a real src file).
+2. **Build Gate**: Run `dotnet build Linting.csproj`. If it fails, fix the draft. Do NOT proceed.
+3. **Test Gate**: Run `dotnet test Testing.csproj`. If any test fails, fix the draft. Do NOT proceed.
+4. **Debug Gate** (if testing a runtime behavior): Use the Run and Debug tab. Set a breakpoint at the
+   exact line the Forensics report cited. Confirm the exception is reproducible, then confirm your
+   fix eliminates it.
+5. **AMAL Gate** (if testing hot-path performance): Run `python scripts/amal_harness.py`.
+   Confirm your draft does not add allocations to the hot path.
+
+**Testing Decision Tree -- Which tool do I use for this specific failure?**
+
+| Error Type | Tool |
+|------------|------|
+| Compile error | `dotnet build Linting.csproj` |
+| Logic / math error (pure C#, no NT API) | `dotnet test Testing.csproj` |
+| Runtime exception (NinjaTrader, IPC) | Run and Debug tab -- breakpoint at crash site |
+| Performance regression (alloc, latency) | `python scripts/amal_harness.py` |
+| Race condition / concurrency | `powershell -File scripts/test_stress.ps1` |
+
+**STOP** if you have not run at least one of these tools against your draft.
+Write in your response: "Pre-Handoff Validation: [tool used] -- [result]" before proceeding to Step 5.
+Delete `src/_draft_fix.cs` after the plan is finalized.
+
 
 ### Step 4b — Arena Prompt API-Verification Gate (when generating Arena AI prompts)
 
