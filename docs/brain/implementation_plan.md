@@ -1,4 +1,5 @@
 # Implementation Plan: ADR-019 Sovereign Substrate (Structural Hardening)
+BUILD_TAG: 1111.002-v28.0 -> 1111.003-v28.0-adr019
 
 ## MISSION
 
