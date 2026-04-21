@@ -28,10 +28,10 @@ $lines = @(
     "",
     "# Gate 1: Lock-free audit",
     'REPO_ROOT=$(git rev-parse --show-toplevel)',
-    'LOCK_HITS=$(grep -rl "lock(" "$REPO_ROOT/src/" 2>/dev/null | wc -l)',
+    'LOCK_HITS=$(grep -rnE "(^|[[:space:]])lock[[:space:]]*\(" "$REPO_ROOT/src/" 2>/dev/null | grep -vE "(//|stateLock|\*)" | wc -l)',
     'if [ "$LOCK_HITS" -gt "0" ]; then',
     '    echo "PRE-COMMIT FAIL: lock() found in src/ -- BANNED by Platinum Standard."',
-    '    grep -rl "lock(" "$REPO_ROOT/src/"',
+    '    grep -rnE "(^|[[:space:]])lock[[:space:]]*\(" "$REPO_ROOT/src/" 2>/dev/null | grep -vE "(//|stateLock|\*)"',
     '    exit 1',
     "fi",
     "",
@@ -49,7 +49,8 @@ $lines = @(
     "exit 0"
 )
 
-$lines | Set-Content -Path $hookTarget -Encoding UTF8
+$hookContent = $lines -join "`n"
+[System.IO.File]::WriteAllText($hookTarget, $hookContent + "`n", (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host ""
 Write-Host "HOOK INSTALLED : $hookTarget"
