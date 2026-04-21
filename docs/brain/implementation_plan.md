@@ -1,588 +1,332 @@
-# ADR-019 Lock Remediation: SymmetryDispatchContext Lock-Free Refactor
+# Implementation Plan: ADR-019 Sovereign Substrate (Structural Hardening)
 
-**Build Tag:** `1111.003-v28.0-adr019`
-**Branch:** `mission-uni-5-full-sync`
-**Protocol:** V14 Alpha (Morpheus Level 5)
-**P3 Architect:** Claude | **Session:** 2026-04-20
-**Execution Permission:** DENIED (Director approval required for P4 adjudication)
-**Destination after approval:** `docs/brain/implementation_plan.md`
+## MISSION
 
-> **NOTE on plan location:** Plan Mode restricts edits to this file only. Once the Director approves via ExitPlanMode, the Engineer must copy the body of this document into `docs/brain/implementation_plan.md` verbatim (preserving all OLD/NEW blocks).
+Eliminate the eleven residual `lock(ctx.Sync)` / `lock(stateLock)`-on-`ConcurrentDictionary` sites that survived the prior refactor, plus the auxiliary `dailySummaryLock` DNA violation. Replace the ad-hoc `Monitor`-based serialization on `SymmetryDispatchContext` with an atomic-publish snapshot substrate (`AnchorSnapshot` + `string[]` follower array, swapped via `Interlocked.CompareExchange`) so that follower iteration is point-in-time consistent, zero-allocation on the hot path, and free of every `lock()` keyword in the in-scope files.
 
----
+## FORENSIC EVIDENCE
 
-## Context
+1. **Residual Locks (11 confirmed):**
+   - `Symmetry.cs:115`, `Symmetry.cs:151` -- HashSet write + 4-field anchor RMW under `ctx.Sync`.
+   - `Symmetry.Follower.cs:38`, `Symmetry.Follower.cs:131` -- anchor snapshot reads under `ctx.Sync`.
+   - `Symmetry.Replace.cs:127`, `Symmetry.Replace.cs:189`, `Symmetry.Replace.cs:224`, `Symmetry.Replace.cs:247` -- follower iteration + HashSet remove under `ctx.Sync`.
+   - `Orders.Callbacks.Propagation.cs:126` -- HOT-path `FollowerEntries.ToArray()` under `ctx.Sync` on every master price move.
+   - `Orders.Callbacks.AccountOrders.cs:204` -- follower snapshot under `ctx.Sync` on master cancel.
+   - `SIMA.cs:78/100/111/134` ("SIMA.Shadow" cluster) -- four `lock(stateLock)` wrappers around `ConcurrentDictionary<string,int> expectedPositions` mutations.
 
-**Problem.** The P7 Sentinel confirmed 12 banned `lock()` violations in production `src/` that must be removed per V12 Actor-model DNA (`references/v12_dna.md`). An earlier P3 draft attempted the refactor but returned a BLOCK verdict (`docs/brain/audit_v28_1_platinum.md`) with four mandatory revisions:
+2. **Deadlock / Contention Risk:** `lock(stateLock)` over a `ConcurrentDictionary` is unsound; other writers bypass the monitor, producing the ghost-order tracking gap during shutdown races.
 
-- **R1** — Ghost-order vector: purge must cancel broker orders before local-state cleanup.
-- **R2** — `dailySummaryLock` field at `src/V12_002.cs:227` was unused but not deleted; audit gate 2 failed.
-- **R3** — `SymmetryDispatchContext` visibility drifted from `private sealed` to `internal sealed`.
-- **R4** — Torn-read of `MasterAnchorPrice` at `src/V12_002.Symmetry.cs:168` observed outside any lock.
+3. **DNA Violations:** `dailySummaryLock` declaration at `V12_002.cs:227` (working-tree line 146) plus the two `UI.Compliance.cs:122/144` acquisitions trigger automated audit failures.
 
-**Outcome.** This plan replaces all 11 `lock(*.Sync)` sites with a lock-free `SymmetryDispatchContext` (BitConverter+Interlocked for atomic `double`, Volatile+CAS state-machine for one-shot resolve, `ConcurrentDictionary<string, byte>` for the follower set), deletes the `dailySummaryLock` field, preserves `private sealed` visibility, and makes the `Print` at `Symmetry.cs:168` automatically tear-safe via atomic property getters. The 12 counted remediations are: 11 lock-removals + 1 field deletion.
+4. **Peer Review (GPT 5.4):** `.Keys.ToArray()` on the HashSet snapshot is allocation-prohibitive on hot paths and violates the zero-allocation mandate.
 
-**Why now.** P6 validation is blocked on Sentinel P7 finding — ADR-019 cannot close until the 12 lock violations clear and DNA grep returns zero hits.
+## CONSTRAINTS
 
----
+- **No internal locks.** `lock(stateLock)`, `lock(Sync)`, `lock(<ConcurrentDictionary>)` are BANNED.
+- All iteration must be thread-safe and **allocation-free** in hot paths (notably `PropagateMasterPriceMove`).
+- **ASCII-only** in every C# string literal (no emoji, curly quotes, em-dashes, Unicode arrows, box-drawing).
+- **`SymmetryDispatchContext` visibility remains `private sealed class`.** All new helper types nested inside `V12_002` are also `private`.
 
-## UltraThink Adversarial Audit (Agent B: Ralph Wiggum)
+## STRUCTURAL OVERVIEW
 
-| # | Probe | Finding | Mitigation |
-|---|-------|---------|------------|
-| 1 | Torn read on 8-byte `double` (32-bit x86) | Naked `double` reads are not CPU-atomic | `long _bits = BitConverter.DoubleToInt64Bits(0.0)`; getter via `Interlocked.Read`, setter via `Interlocked.Exchange`. Template proven at `src/V12_002.cs:156` (`lastKnownPrice`). |
-| 2 | Check-then-act race on `IsResolved` | Two concurrent master-fill callbacks both seeing `false` would corrupt `MasterWeightedFill` / `MasterFilledQuantity` via double-`+=` | One-shot CAS gate: `Interlocked.CompareExchange(ref _anchorState, 1, 0) == 0`. Only the winning thread writes the three fields. Preserves first-fill-wins semantics of the prior `lock(ctx.Sync)` path. |
-| 3 | Publication ordering for `MasterAnchorPrice` | Reader sees `IsResolved == true` but a stale / torn `MasterAnchorPrice` on weak-memory archs | Three-state machine: `0=unresolved, 1=resolving, 2=published`. Winner writes fields via Interlocked (full fence), then `Volatile.Write(ref _anchorState, 2)` (release). Readers: `Volatile.Read(ref _anchorState) == 2` (acquire) → all three field writes visible. |
-| 4 | `HashSet<string>` → `ConcurrentDictionary<string, byte>` semantics | `Add` / `Remove` / `ToArray` / `foreach` must be lock-free-safe | `TryAdd(key, 0)`, `TryRemove(key, out _)`, `Keys.ToArray()` are atomic. Iteration via `Keys` yields a point-in-time snapshot. `StringComparer.Ordinal` preserved. |
-| 5 | Print at `Symmetry.cs:168` (R4) | Naked read of `ctx.MasterAnchorPrice` outside lock | Auto-fixed: property getter now performs `BitConverter.Int64BitsToDouble(Interlocked.Read(ref _masterAnchorPriceBits))`. Tear-impossible. |
-| 6 | `dailySummaryLock` deletion (R2) | Field declared at `src/V12_002.cs:227`; orphaned lock usages would break compile | Pre-verified: zero matches for `dailySummaryLock` in mainline `src/*.cs` except the declaration itself. Deletion is inert. |
-| 7 | `SymmetryDispatchContext` visibility (R3) | Widening to `internal` exposes follower tracking to other assemblies | Design keeps `private sealed class`; no change to accessibility. Verified at `src/V12_002.Symmetry.cs:15`. |
-| 8 | R1 ghost-order (EmergencyPurgeEntry) | Prior plan's Steps 10-12 introduced `EmergencyPurgeEntry` | This plan does NOT introduce `EmergencyPurgeEntry`. Verified: zero occurrences of `EmergencyPurgeEntry` / `SymmetryGuardEmergencyPurge` anywhere in the repo. R1 therefore becomes a compliance note for future work — see §R1 Compliance below. |
-| 9 | Lost `+=` accumulation semantics at `Symmetry.cs:151` | Original `MasterWeightedFill += averageFillPrice * fillQty` inside a one-shot `if (!IsResolved)` block is equivalent to `= averageFillPrice * fillQty` (only one write ever occurs). Re-expressed as plain assignment under the CAS gate. | Unit behaviour identical. Documented inline. |
-| 10 | Missing `using System.Threading;` in Symmetry.cs | `Interlocked` / `Volatile` require `System.Threading` | Task T0 adds the `using` directive. |
-| 11 | `stateLock` sibling field at V12_002.cs:226 | Field retained; out of scope for this audit | Sentinel report explicitly targets `dailySummaryLock` only. `stateLock` follow-up tracked separately. |
-| 12 | `MasterFilledQuantity` as `int` | Int writes are CPU-atomic on x86, but memory-ordering across threads requires fencing | `Volatile.Read` / `Volatile.Write` on `_masterFilledQuantity`. Sub-ordered to the `_anchorState` release. |
-| 13 | `ConcurrentDictionary` iteration during concurrent mutation | Non-atomic iteration could miss a follower mid-`TryAdd` | Acceptable: followers are added eagerly at dispatch time, cascade/prune paths take `Keys.ToArray()` snapshots. Any follower added after the snapshot will still be picked up by the fallback `symmetryPendingFollowerFills` scan (already present in `SymmetryGuardTryResolveFollowersForDispatch`). |
-| 14 | Build tag / ASCII gate / deploy-sync | Mandatory post-edit protocol per `CLAUDE.md` | Tasks T14-T17 make this explicit in the engineer handoff. |
+```mermaid
+flowchart LR
+    subgraph "BEFORE: Monitor-protected mutable record"
+      A1["SymmetryDispatchContext<br/>HashSet&lt;string&gt; FollowerEntries<br/>bool IsResolved<br/>double MasterAnchorPrice<br/>double MasterWeightedFill<br/>int MasterFilledQuantity<br/>object Sync"]
+      A2["Reader: lock(ctx.Sync) {<br/>FollowerEntries.ToArray() }"] --> A1
+      A3["Writer: lock(ctx.Sync) {<br/>FollowerEntries.Add(...) }"] --> A1
+      A4["Resolver: lock(ctx.Sync) {<br/>IsResolved=true; AnchorPrice=avg }"] --> A1
+    end
 
-**Verdict:** Design is sound. No unmitigated silent-failure paths. Proceeding to task map.
+    subgraph "AFTER: atomic-publish snapshot substrate"
+      B1["SymmetryDispatchContext<br/>volatile string[] _followers<br/>volatile AnchorSnapshot _anchor"]
+      B2["Reader:<br/>var snap = ctx.Followers<br/>(single Volatile.Read,<br/> zero alloc, immutable)"] --> B1
+      B3["Writer:<br/>ctx.AddFollower(name)<br/>(CAS loop, cold path)"] --> B1
+      B4["Resolver:<br/>CAS loop builds new<br/>AnchorSnapshot,<br/>Interlocked.CompareExchange"] --> B1
+    end
 
----
-
-## Design: Lock-Free SymmetryDispatchContext (Target Shape)
-
-```csharp
-private sealed class SymmetryDispatchContext   // R3: visibility preserved
-{
-    public string DispatchId;
-    public string TradeType;
-    public MarketPosition Direction;
-    public int ExpectedQuantity;
-    public DateTime CreatedUtc;
-
-    // Atomic doubles via BitConverter+Interlocked (R4 torn-read fix).
-    private long _masterWeightedFillBits = BitConverter.DoubleToInt64Bits(0.0);
-    public double MasterWeightedFill
-    {
-        get { return BitConverter.Int64BitsToDouble(Interlocked.Read(ref _masterWeightedFillBits)); }
-        set { Interlocked.Exchange(ref _masterWeightedFillBits, BitConverter.DoubleToInt64Bits(value)); }
-    }
-
-    private long _masterAnchorPriceBits = BitConverter.DoubleToInt64Bits(0.0);
-    public double MasterAnchorPrice
-    {
-        get { return BitConverter.Int64BitsToDouble(Interlocked.Read(ref _masterAnchorPriceBits)); }
-        set { Interlocked.Exchange(ref _masterAnchorPriceBits, BitConverter.DoubleToInt64Bits(value)); }
-    }
-
-    private int _masterFilledQuantity;
-    public int MasterFilledQuantity
-    {
-        get { return Volatile.Read(ref _masterFilledQuantity); }
-        set { Volatile.Write(ref _masterFilledQuantity, value); }
-    }
-
-    // Resolve state machine: 0 = unresolved, 1 = resolving (CAS winner), 2 = published.
-    private int _anchorState;
-    public bool IsResolved
-    {
-        get { return Volatile.Read(ref _anchorState) == 2; }
-    }
-
-    public bool TryBeginResolve()   // CAS gate — exactly one winner
-    {
-        return Interlocked.CompareExchange(ref _anchorState, 1, 0) == 0;
-    }
-
-    public void PublishAnchor()     // Release fence: publishes the three data writes
-    {
-        Volatile.Write(ref _anchorState, 2);
-    }
-
-    // Lock-free follower set. `StringComparer.Ordinal` preserved.
-    public readonly ConcurrentDictionary<string, byte> FollowerEntries =
-        new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-}
+    A1 -. "structural repair" .-> B1
 ```
 
-**Note on `Sync` field:** DELETED. Any residual `lock(ctx.Sync)` remaining after T1-T12 will fail compile, providing a natural audit gate.
+## FILE 1: `src/V12_002.Symmetry.cs`
 
----
+### Step 1.1 -- Replace `SymmetryDispatchContext` (lines 15-30) and add `AnchorSnapshot`
 
-## Task Map (17 edits total — 12 remediations + 5 structural)
+Replace the existing `private sealed class SymmetryDispatchContext { ... }` block in its entirety with:
 
-| # | File | Lines | Purpose | Tag |
-|---|------|-------|---------|-----|
-| T0 | `src/V12_002.Symmetry.cs` | top | Add `using System.Threading;` | Structural |
-| T1 | `src/V12_002.Symmetry.cs` | 15-30 | Redesign `SymmetryDispatchContext` | Remediation 1 |
-| T2 | `src/V12_002.Symmetry.cs` | 145-163 | Replace master-fill resolve body | Remediation 2 (site :151) |
-| T3 | `src/V12_002.Symmetry.cs` | 111-116 | Replace `FollowerEntries.Add` | Remediation 3 (site :115) |
-| T4 | `src/V12_002.Symmetry.cs` | 167-168 | R4 Print tear-safe (auto-fixed by T1) | R4 compliance — no edit needed |
-| T5 | `src/V12_002.Symmetry.Follower.cs` | 34-44 | Replace pre-check anchor read | Remediation 4 (site :38) |
-| T6 | `src/V12_002.Symmetry.Follower.cs` | 126-135 | Replace resolve anchor read | Remediation 5 (site :131) |
-| T7 | `src/V12_002.Symmetry.Replace.cs` | 119-148 | Replace worklist iterator | Remediation 6 (site :127) |
-| T8 | `src/V12_002.Symmetry.Replace.cs` | 187-193 | Replace cascade ToArray | Remediation 7 (site :189) |
-| T9 | `src/V12_002.Symmetry.Replace.cs` | 217-227 | Replace `FollowerEntries.Remove` | Remediation 8 (site :221) |
-| T10 | `src/V12_002.Symmetry.Replace.cs` | 238-263 | Replace prune iterator | Remediation 9 (site :244) |
-| T11 | `src/V12_002.Orders.Callbacks.AccountOrders.cs` | 243-247 | Replace follower ToArray | Remediation 10 (site :244) |
-| T12 | `src/V12_002.Orders.Callbacks.Propagation.cs` | 124-128 | Replace follower ToArray | Remediation 11 (site :126) |
-| T13 | `src/V12_002.SIMA.Shadow.cs` | 87-105 | Replace follower iterator | Remediation 12 (site :89) |
-| T14 | `src/V12_002.cs` | 225-228 | Delete `dailySummaryLock` field | R2 (13th remediation — counts toward the 12 banned-locks inventory) |
-| T15 | `src/V12_002.Properties.cs` | BuildTag | Bump tag to `1111.003-v28.0-adr019` | Build |
-| T16 | Repo | — | Run `deploy-sync.ps1` + ASCII gate + DNA grep | Gate |
-| T17 | Repo | — | Run AMAL 6-test harness | Validation |
-
----
-
-## T0 — Add `using System.Threading;` to Symmetry.cs
-
-**File:** `src/V12_002.Symmetry.cs` (lines 1-7)
-
-**OLD:**
 ```csharp
-// V12.50 SYMMETRY GUARD - Master-Fill Anchored Fleet Risk Isolation
-using System;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Linq;
-using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript;
-```
+        // ADR-019: Atomic-publish snapshot of master-fill anchor state.
+        // Immutable; mutated only via Interlocked.CompareExchange on the parent context.
+        private sealed class AnchorSnapshot
+        {
+            public static readonly AnchorSnapshot Pending = new AnchorSnapshot(false, 0d, 0d, 0);
 
-**NEW:**
-```csharp
-// V12.50 SYMMETRY GUARD - Master-Fill Anchored Fleet Risk Isolation
-// V28.0-adr019: System.Threading added for Interlocked / Volatile primitives.
-using System;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Threading;
-using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript;
-```
+            public readonly bool   IsResolved;
+            public readonly double MasterAnchorPrice;
+            public readonly double MasterWeightedFill;
+            public readonly int    MasterFilledQuantity;
 
----
+            public AnchorSnapshot(bool isResolved, double anchorPrice, double weightedFill, int filledQty)
+            {
+                IsResolved           = isResolved;
+                MasterAnchorPrice    = anchorPrice;
+                MasterWeightedFill   = weightedFill;
+                MasterFilledQuantity = filledQty;
+            }
+        }
 
-## T1 — Redesign `SymmetryDispatchContext` (R3 preserves `private sealed`)
-
-**File:** `src/V12_002.Symmetry.cs` (lines 15-30)
-
-**OLD:**
-```csharp
         private sealed class SymmetryDispatchContext
         {
-            public string DispatchId;
-            public string TradeType;
+            public string         DispatchId;
+            public string         TradeType;
             public MarketPosition Direction;
-            public int ExpectedQuantity;
-            public DateTime CreatedUtc;
+            public int            ExpectedQuantity;
+            public DateTime       CreatedUtc;
 
-            public double MasterWeightedFill;
-            public int MasterFilledQuantity;
-            public double MasterAnchorPrice;
-            public bool IsResolved;
+            // Initial requested anchor seeded by SymmetryGuardBeginDispatch; immutable thereafter.
+            public double         RequestedAnchorPrice;
 
-            public readonly object Sync = new object();
-            public readonly HashSet<string> FollowerEntries = new HashSet<string>(StringComparer.Ordinal);
+            // ADR-019: anchor state replaces { IsResolved, MasterAnchorPrice, MasterWeightedFill, MasterFilledQuantity }
+            // and the prior object Sync monitor. Single reference field, swapped via Interlocked.CompareExchange.
+            private AnchorSnapshot _anchor = AnchorSnapshot.Pending;
+            public AnchorSnapshot Anchor { get { return Volatile.Read(ref _anchor); } }
+            public bool TryPublishAnchor(AnchorSnapshot expected, AnchorSnapshot updated)
+            {
+                return Interlocked.CompareExchange(ref _anchor, updated, expected) == expected;
+            }
+
+            // ADR-019: follower membership held as an immutable string[] snapshot.
+            // Hot-path readers do a single Volatile.Read; iteration is index-based and zero-alloc.
+            // Mutators allocate one fresh array per change (cold path: register/forget per dispatch).
+            private string[] _followers = Array.Empty<string>();
+            public string[] Followers { get { return Volatile.Read(ref _followers); } }
+
+            public void AddFollower(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return;
+                while (true)
+                {
+                    string[] cur = Volatile.Read(ref _followers);
+                    if (Array.IndexOf(cur, name) >= 0) return;
+                    string[] next = new string[cur.Length + 1];
+                    if (cur.Length > 0) Array.Copy(cur, 0, next, 0, cur.Length);
+                    next[cur.Length] = name;
+                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur) return;
+                }
+            }
+
+            public void RemoveFollower(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return;
+                while (true)
+                {
+                    string[] cur = Volatile.Read(ref _followers);
+                    int idx = Array.IndexOf(cur, name);
+                    if (idx < 0) return;
+                    string[] next = new string[cur.Length - 1];
+                    if (idx > 0)               Array.Copy(cur, 0,       next, 0,   idx);
+                    if (idx < cur.Length - 1)  Array.Copy(cur, idx + 1, next, idx, cur.Length - idx - 1);
+                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur) return;
+                }
+            }
         }
 ```
 
-**NEW:**
+The `using System.Threading;` directive is already present in `V12_002.Symmetry.cs` (it lives in `V12_002.cs` and applies to all partial declarations); no using changes required.
+
+### Step 1.2 -- `SymmetryGuardBeginDispatch` (lines 89-103)
+
+Two field renames only:
+
 ```csharp
-        // V28.0-adr019: Lock-free dispatch context. All mutable state is published via
-        // Interlocked / Volatile primitives; the Sync lock object is DELETED. Resolve is
-        // one-shot via CAS on _anchorState (0=unresolved, 1=resolving, 2=published).
-        // Visibility preserved as private sealed (R3).
-        // CANARY: PHOENIX-ADR-019-V12-981
-        private sealed class SymmetryDispatchContext
+            var ctx = new SymmetryDispatchContext
+            {
+                DispatchId       = dispatchId,
+                TradeType        = normalizedType,
+                Direction        = direction,
+                ExpectedQuantity = Math.Max(1, quantity),
+                CreatedUtc       = now,
+                RequestedAnchorPrice = Instrument != null
+                    ? Instrument.MasterInstrument.RoundToTickSize(requestedEntryPrice)
+                    : requestedEntryPrice
+            };
+            // IsResolved=false implicit via AnchorSnapshot.Pending; no mutable seed needed.
+
+            symmetryDispatchById[dispatchId] = ctx;
+            return dispatchId;
+```
+
+`MasterAnchorPrice` is no longer a `SymmetryDispatchContext` field; the **requested** anchor used as the initial-pre-resolution price is now `RequestedAnchorPrice` (immutable). All sites that previously read `ctx.MasterAnchorPrice` are migrated to `ctx.Anchor.MasterAnchorPrice` (post-resolution) or `ctx.RequestedAnchorPrice` (pre-resolution).
+
+### Step 1.3 -- `SymmetryGuardRegisterFollower` (lines 106-118)
+
+Replace the `lock (ctx.Sync) ctx.FollowerEntries.Add(...)` block with the lock-free `AddFollower`:
+
+```csharp
+        private void SymmetryGuardRegisterFollower(string dispatchId, string fleetEntryName)
         {
-            public string DispatchId;
-            public string TradeType;
-            public MarketPosition Direction;
-            public int ExpectedQuantity;
-            public DateTime CreatedUtc;
+            if (string.IsNullOrEmpty(dispatchId) || string.IsNullOrEmpty(fleetEntryName))
+                return;
 
-            // Atomic double: BitConverter+Interlocked prevents torn reads on 32-bit x86.
-            // Template: V12_002.cs:156 (lastKnownPrice).
-            private long _masterWeightedFillBits = BitConverter.DoubleToInt64Bits(0.0);
-            public double MasterWeightedFill
-            {
-                get { return BitConverter.Int64BitsToDouble(Interlocked.Read(ref _masterWeightedFillBits)); }
-                set { Interlocked.Exchange(ref _masterWeightedFillBits, BitConverter.DoubleToInt64Bits(value)); }
-            }
+            symmetryFleetEntryToDispatch[fleetEntryName] = dispatchId;
 
-            // Atomic double (R4 torn-read fix for Print at Symmetry.cs:168).
-            private long _masterAnchorPriceBits = BitConverter.DoubleToInt64Bits(0.0);
-            public double MasterAnchorPrice
-            {
-                get { return BitConverter.Int64BitsToDouble(Interlocked.Read(ref _masterAnchorPriceBits)); }
-                set { Interlocked.Exchange(ref _masterAnchorPriceBits, BitConverter.DoubleToInt64Bits(value)); }
-            }
-
-            // Int is CPU-atomic on x86, but Volatile provides memory-ordering.
-            private int _masterFilledQuantity;
-            public int MasterFilledQuantity
-            {
-                get { return Volatile.Read(ref _masterFilledQuantity); }
-                set { Volatile.Write(ref _masterFilledQuantity, value); }
-            }
-
-            // Resolve state machine: 0 = unresolved, 1 = resolving (CAS winner), 2 = published.
-            // Readers observing _anchorState == 2 (acquire) see all prior writes to
-            // MasterWeightedFill / MasterAnchorPrice / MasterFilledQuantity (release).
-            private int _anchorState;
-            public bool IsResolved
-            {
-                get { return Volatile.Read(ref _anchorState) == 2; }
-            }
-
-            // Exactly one thread wins the CAS. Winner must then write the three data
-            // fields and call PublishAnchor() to transition state 1 -> 2.
-            public bool TryBeginResolve()
-            {
-                return Interlocked.CompareExchange(ref _anchorState, 1, 0) == 0;
-            }
-
-            // Release-store. All prior writes in the winner thread become visible to any
-            // reader that subsequently observes IsResolved == true.
-            public void PublishAnchor()
-            {
-                Volatile.Write(ref _anchorState, 2);
-            }
-
-            // ConcurrentDictionary<string, byte> as Set<string>. StringComparer.Ordinal preserved.
-            public readonly ConcurrentDictionary<string, byte> FollowerEntries =
-                new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+                ctx.AddFollower(fleetEntryName); // ADR-019: lock-free CAS publish
         }
 ```
 
----
+### Step 1.4 -- `SymmetryGuardOnMasterFill` (lines 127-172)
 
-## T2 — Lock-free master-fill resolve
+Replace the `lock (ctx.Sync) { ... weighted RMW ... ctx.IsResolved = true; }` block with a CAS loop that builds a fresh `AnchorSnapshot`. First-writer-wins semantics (one `IsResolved=true` transition) preserved:
 
-**File:** `src/V12_002.Symmetry.cs` (lines 145-163, inside `SymmetryGuardOnMasterFill`)
-
-**OLD:**
 ```csharp
-            bool resolvedNow = false;
-            lock (ctx.Sync)
-            {
-                if (!ctx.IsResolved)
-                {
-                    ctx.MasterWeightedFill += averageFillPrice * fillQty;
-                    ctx.MasterFilledQuantity += fillQty;
+        private void SymmetryGuardOnMasterFill(string entryName, PositionInfo masterPos, double averageFillPrice, int fillQty, DateTime fillTimeUtc)
+        {
+            if (masterPos == null || masterPos.IsFollower || averageFillPrice <= 0 || fillQty <= 0)
+                return;
 
-                    double avg = ctx.MasterWeightedFill / Math.Max(1, ctx.MasterFilledQuantity);
-                    ctx.MasterAnchorPrice = Instrument.MasterInstrument.RoundToTickSize(avg);
-                    ctx.IsResolved = true;
-                    resolvedNow = true;
+            SymmetryDispatchContext ctx = null;
+
+            if (!string.IsNullOrEmpty(entryName) &&
+                symmetryMasterEntryToDispatch.TryGetValue(entryName, out var mappedDispatch) &&
+                symmetryDispatchById.TryGetValue(mappedDispatch, out var mappedCtx))
+            {
+                ctx = mappedCtx;
+            }
+
+            if (ctx == null)
+            {
+                string tradeType = SymmetryInferTradeType(entryName, masterPos);
+                ctx = SymmetryFindDispatchForMasterFill(tradeType, masterPos.Direction, fillTimeUtc);
+            }
+
+            if (ctx == null)
+                return;
+
+            // ADR-019: CAS loop over AnchorSnapshot. First writer to publish IsResolved=true wins.
+            // Losing CAS retries; on retry the IsResolved guard short-circuits (idempotent).
+            AnchorSnapshot resolvedSnap = null;
+            while (true)
+            {
+                AnchorSnapshot cur = ctx.Anchor;
+                if (cur.IsResolved) break;
+
+                double weighted = cur.MasterWeightedFill + averageFillPrice * fillQty;
+                int    qty      = cur.MasterFilledQuantity + fillQty;
+                double avg      = weighted / Math.Max(1, qty);
+                double anchor   = Instrument.MasterInstrument.RoundToTickSize(avg);
+
+                AnchorSnapshot next = new AnchorSnapshot(true, anchor, weighted, qty);
+                if (ctx.TryPublishAnchor(cur, next))
+                {
+                    resolvedSnap = next;
+                    break;
                 }
             }
-```
 
-**NEW:**
-```csharp
-            // V28.0-adr019: Lock-free one-shot resolve.
-            // TryBeginResolve does an atomic CAS 0 -> 1. Only one thread ever enters this block.
-            // Prior lock(ctx.Sync) path used `+=` inside a one-shot gate; with only one entrant
-            // ever, += from zero == plain =. Semantics preserved.
-            bool resolvedNow = false;
-            if (ctx.TryBeginResolve())
+            if (resolvedSnap != null)
             {
-                double weighted = averageFillPrice * fillQty;
-                ctx.MasterWeightedFill = weighted;
-                ctx.MasterFilledQuantity = fillQty;
+                Print(string.Format("[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
+                    ctx.TradeType, resolvedSnap.MasterAnchorPrice, resolvedSnap.MasterFilledQuantity));
 
-                double avg = weighted / Math.Max(1, fillQty);
-                ctx.MasterAnchorPrice = Instrument.MasterInstrument.RoundToTickSize(avg);
-
-                // Release-store: publishes all three prior writes. Readers subsequently
-                // observing IsResolved == true see them via acquire-load (R4 compliance).
-                ctx.PublishAnchor();
-                resolvedNow = true;
+                SymmetryGuardTryResolveFollowersForDispatch(ctx.DispatchId, DateTime.UtcNow);
             }
+        }
 ```
 
----
+## FILE 2: `src/V12_002.SIMA.cs` (the "SIMA.Shadow" cluster)
 
-## T3 — Lock-free `FollowerEntries.Add`
+All four `lock(stateLock)` wrappers around `expectedPositions` are replaced by native `ConcurrentDictionary.AddOrUpdate` (per-key atomic, lock-free at the API boundary). The `oldVal -> newVal` audit trace is preserved by capturing both inside the update factory; the post-mutation Interlocked stamps and grace-window calls move outside the atomic update (they were never serialised by `stateLock` in any meaningful sense -- other writers bypassed it).
 
-**File:** `src/V12_002.Symmetry.cs` (lines 111-116, inside `SymmetryGuardRegisterFollower`)
+### Step 2.1 -- `AddExpectedPositionDeltaLocked` (lines 73-93)
 
-**OLD:**
 ```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+        // V12.1101E [F-06] / ADR-019: lock-free RMW via ConcurrentDictionary.AddOrUpdate.
+        // The prior lock(stateLock) provided no real serialization (other writers bypassed it).
+        private void AddExpectedPositionDeltaLocked(string accountName, int delta)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
+
+            int capturedOld = 0;
+            int capturedNew = expectedPositions.AddOrUpdate(
+                accountName,
+                addValueFactory:    k => { capturedOld = 0; return delta; },
+                updateValueFactory: (k, v) => { capturedOld = v; return v + delta; });
+
+            Print(string.Format("[ACCOUNT_SYNC] {0} expected: {1} -> {2}", accountName, capturedOld, capturedNew));
+            if (delta != 0)
             {
-                lock (ctx.Sync)
-                    ctx.FollowerEntries.Add(fleetEntryName);
+                Interlocked.Exchange(ref _lastExpectedPositionSetTicks, DateTime.UtcNow.Ticks);
+                if (capturedNew != 0)
+                    StampAccountFillGrace(accountName);
             }
+        }
 ```
 
-**NEW:**
+### Step 2.2 -- `AddOrUpdateExpectedPositionLocked` (lines 96-104)
+
 ```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+        // V12.1101E [F-06] / ADR-019: pass-through to ConcurrentDictionary.AddOrUpdate.
+        private void AddOrUpdateExpectedPositionLocked(string accountName, int addValue, Func<int, int> updateExisting)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null || updateExisting == null) return;
+            expectedPositions.AddOrUpdate(accountName, addValue, (k, v) => updateExisting(v));
+        }
+```
+
+### Step 2.3 -- `SetExpectedPositionLocked` (lines 107-125)
+
+```csharp
+        // V12.1101E [F-06] / ADR-019: lock-free unconditional set via AddOrUpdate.
+        private void SetExpectedPositionLocked(string accountName, int value)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
+
+            expectedPositions.AddOrUpdate(accountName, value, (k, v) => value);
+            if (value == 0)
+                _dispatchSyncPendingExpKeys.TryRemove(accountName, out _); // [B967-FIX-02]
+
+            if (value != 0)
             {
-                // V28.0-adr019: ConcurrentDictionary<string, byte> used as Set<string>.
-                // TryAdd is atomic; idempotent re-registration is a no-op.
-                ctx.FollowerEntries.TryAdd(fleetEntryName, 0);
+                Interlocked.Exchange(ref _lastExpectedPositionSetTicks, DateTime.UtcNow.Ticks);
+                StampAccountFillGrace(accountName);
             }
+        }
 ```
 
----
-
-## T4 — Print at Symmetry.cs:168 (R4 auto-fix)
-
-**File:** `src/V12_002.Symmetry.cs` (lines 167-168)
-
-**No edit required.** The R4 torn-read concern is eliminated by T1: `ctx.MasterAnchorPrice` is now an atomic property whose getter performs `Interlocked.Read` via `BitConverter`. The existing Print:
+### Step 2.4 -- `DeltaExpectedPositionLocked` (lines 130-144)
 
 ```csharp
-if (resolvedNow)
-{
-    Print(string.Format("[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
-        ctx.TradeType, ctx.MasterAnchorPrice, ctx.MasterFilledQuantity));
-    ...
-}
+        // Build 930.1 [P1] / ADR-019: lock-free signed-delta rollback.
+        private void DeltaExpectedPositionLocked(string accountName, int delta)
+        {
+            if (string.IsNullOrEmpty(accountName) || expectedPositions == null) return;
+
+            int capturedCurrent = 0;
+            int capturedUpdated = expectedPositions.AddOrUpdate(
+                accountName,
+                addValueFactory:    k => { capturedCurrent = 0; return delta; },
+                updateValueFactory: (k, v) => { capturedCurrent = v; return v + delta; });
+
+            Print(string.Format("[ACCOUNT_SYNC] {0} expected delta: {1} + ({2}) = {3}",
+                accountName, capturedCurrent, delta, capturedUpdated));
+            if (delta != 0)
+                Interlocked.Exchange(ref _lastExpectedPositionSetTicks, DateTime.UtcNow.Ticks);
+        }
 ```
 
-— reads through the atomic getter, so no tear is possible on any architecture. R4 compliance is structural, not per-site.
+After Steps 2.1-2.4, `V12_002.SIMA.cs` contains **zero** `lock` keywords. All four "Locked"-suffixed method names are retained for caller compatibility (22 files reference them); the suffix is now a historical marker, documented in the new comments as "ADR-019: lock-free".
 
----
+## FILE 3: `src/V12_002.Orders.Callbacks.Propagation.cs`
 
-## T5 — Lock-free pre-check anchor read
+### Step 3.1 -- HOT-path follower snapshot (line 121-128)
 
-**File:** `src/V12_002.Symmetry.Follower.cs` (lines 34-44, inside `SymmetryGuardOnFollowerFill` pre-check block)
+This is the per-tick read inside `PropagateMasterPriceMove`. Under ADR-019 the `string[]` returned by `ctx.Followers` IS the immutable snapshot -- no `ToArray()` copy is needed, no lock is taken, the read is a single `Volatile.Read`.
 
-**OLD:**
+Replace the existing block:
+
 ```csharp
-                if (symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var preCheckId) &&
-                    symmetryDispatchById.TryGetValue(preCheckId, out var preCheckCtx))
-                {
-                    bool anchorReady;
-                    double preCheckAnchor;
-                    lock (preCheckCtx.Sync)
-                    {
-                        anchorReady   = preCheckCtx.IsResolved;
-                        preCheckAnchor = preCheckCtx.MasterAnchorPrice;
-                    }
-                    if (anchorReady && preCheckAnchor > 0)
-```
-
-**NEW:**
-```csharp
-                if (symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var preCheckId) &&
-                    symmetryDispatchById.TryGetValue(preCheckId, out var preCheckCtx))
-                {
-                    // V28.0-adr019: Lock-free acquire. IsResolved is a Volatile.Read on _anchorState;
-                    // when it observes true (state == 2), the subsequent MasterAnchorPrice atomic
-                    // read is guaranteed to see the published value (acquire-release pairing).
-                    bool anchorReady = preCheckCtx.IsResolved;
-                    double preCheckAnchor = anchorReady ? preCheckCtx.MasterAnchorPrice : 0.0;
-                    if (anchorReady && preCheckAnchor > 0)
-```
-
----
-
-## T6 — Lock-free resolve anchor read
-
-**File:** `src/V12_002.Symmetry.Follower.cs` (lines 126-135, inside `SymmetryGuardTryResolveFollower`)
-
-**OLD:**
-```csharp
-            bool isResolved;
-            double masterAnchor;
-            lock (ctx.Sync)
-            {
-                // V1101E HOT-PATCH: Snapshot dispatch state under ctx.Sync, then release before any stateLock path.
-                isResolved = ctx.IsResolved;
-                masterAnchor = ctx.MasterAnchorPrice;
-            }
-```
-
-**NEW:**
-```csharp
-            // V28.0-adr019: Lock-free acquire. IsResolved gates the atomic MasterAnchorPrice
-            // read via acquire-release memory ordering; no stateLock path exists anymore.
-            bool isResolved = ctx.IsResolved;
-            double masterAnchor = isResolved ? ctx.MasterAnchorPrice : 0.0;
-```
-
----
-
-## T7 — Lock-free worklist iterator (Replace:127)
-
-**File:** `src/V12_002.Symmetry.Replace.cs` (lines 119-148, inside `SymmetryGuardTryResolveFollowersForDispatch`)
-
-**OLD:**
-```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx) && ctx != null)
-            {
-                lock (ctx.Sync)
-                {
-                    // V1101E HOT-PATCH: Build follower worklist under ctx.Sync only; never call stateLock paths while holding ctx.Sync.
-                    foreach (string fleetEntryName in ctx.FollowerEntries)
-                    {
-                        if (string.IsNullOrEmpty(fleetEntryName))
-                            continue;
-
-                        if (!symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var linkedDispatch))
-                            continue;
-                        if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                            continue;
-                        if (!symmetryPendingFollowerFills.ContainsKey(fleetEntryName))
-                            continue;
-
-                        followersToResolve.Add(fleetEntryName);
-                    }
-                }
-            }
-```
-
-**NEW:**
-```csharp
-            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx) && ctx != null)
-            {
-                // V28.0-adr019: ConcurrentDictionary.Keys enumeration is lock-free. Followers
-                // added after this snapshot are picked up by the legacy dispatch-map scan
-                // immediately below, preserving prior completeness.
-                foreach (string fleetEntryName in ctx.FollowerEntries.Keys)
-                {
-                    if (string.IsNullOrEmpty(fleetEntryName))
-                        continue;
-
-                    if (!symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var linkedDispatch))
-                        continue;
-                    if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                        continue;
-                    if (!symmetryPendingFollowerFills.ContainsKey(fleetEntryName))
-                        continue;
-
-                    followersToResolve.Add(fleetEntryName);
-                }
-            }
-```
-
----
-
-## T8 — Lock-free cascade snapshot (Replace:189)
-
-**File:** `src/V12_002.Symmetry.Replace.cs` (lines 187-193, inside `SymmetryGuardCascadeFollowerCleanup`)
-
-**OLD:**
-```csharp
-            string[] followers;
-            lock (ctx.Sync) { followers = ctx.FollowerEntries.ToArray(); }
-```
-
-**NEW:**
-```csharp
-            // V28.0-adr019: Lock-free snapshot of follower keys. Point-in-time atomic.
-            string[] followers = ctx.FollowerEntries.Keys.ToArray();
-```
-
----
-
-## T9 — Lock-free `FollowerEntries.Remove` (Replace:221)
-
-**File:** `src/V12_002.Symmetry.Replace.cs` (lines 217-227, inside `SymmetryGuardForgetEntry`)
-
-**OLD:**
-```csharp
-            if (symmetryFleetEntryToDispatch.TryRemove(entryName, out var dispatchId) &&
-                symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                lock (ctx.Sync)
-                    ctx.FollowerEntries.Remove(entryName);
-            }
-```
-
-**NEW:**
-```csharp
-            if (symmetryFleetEntryToDispatch.TryRemove(entryName, out var dispatchId) &&
-                symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                // V28.0-adr019: TryRemove on ConcurrentDictionary is atomic.
-                byte _discard;
-                ctx.FollowerEntries.TryRemove(entryName, out _discard);
-            }
-```
-
----
-
-## T10 — Lock-free prune iterator (Replace:244)
-
-**File:** `src/V12_002.Symmetry.Replace.cs` (lines 238-263, inside `SymmetryGuardPruneDispatches`)
-
-**OLD:**
-```csharp
-                    bool hasActiveFollowers = false;
-                    lock (ctx.Sync)
-                    {
-                        foreach (string follower in ctx.FollowerEntries)
-                        {
-                            // V12.Phase8 [F-04]: activePositions is a ConcurrentDictionary but
-                            // ContainsKey here is used alongside ctx.FollowerEntries iteration under
-                            // ctx.Sync -- acquire stateLock for the read to prevent torn observations
-                            // when ExecuteSmartDispatchEntry commits or removes entries concurrently.
-                            bool exists;
-                            exists = activePositions.ContainsKey(follower);
-                            if (exists)
-                            {
-                                hasActiveFollowers = true;
-                                break;
-                            }
-                        }
-                    }
-```
-
-**NEW:**
-```csharp
-                    // V28.0-adr019: Lock-free scan. activePositions is already ConcurrentDictionary
-                    // so its ContainsKey is atomic; ctx.FollowerEntries.Keys is also atomic. Both
-                    // reads are tear-safe without any enclosing lock. Prune is best-effort pruning —
-                    // any follower added after this scan will survive until the next TTL sweep.
-                    bool hasActiveFollowers = false;
-                    foreach (string follower in ctx.FollowerEntries.Keys)
-                    {
-                        if (activePositions.ContainsKey(follower))
-                        {
-                            hasActiveFollowers = true;
-                            break;
-                        }
-                    }
-```
-
----
-
-## T11 — Lock-free AccountOrders ToArray (:244)
-
-**File:** `src/V12_002.Orders.Callbacks.AccountOrders.cs` (lines 243-247, inside `TryGetDispatchFollowerEntries`)
-
-**OLD:**
-```csharp
-            lock (ctx.Sync)
-                followerEntries = ctx.FollowerEntries.ToArray();
-
-            return followerEntries != null && followerEntries.Length > 0;
-```
-
-**NEW:**
-```csharp
-            // V28.0-adr019: Lock-free snapshot.
-            followerEntries = ctx.FollowerEntries.Keys.ToArray();
-
-            return followerEntries != null && followerEntries.Length > 0;
-```
-
----
-
-## T12 — Lock-free Propagation ToArray (:126)
-
-**File:** `src/V12_002.Orders.Callbacks.Propagation.cs` (lines 124-128)
-
-**OLD:**
-```csharp
+            IEnumerable<string> followerEntryNames;
             if (symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId) &&
                 symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
             {
@@ -590,72 +334,39 @@ if (resolvedNow)
                 lock (ctx.Sync) { snapshot = ctx.FollowerEntries.ToArray(); }
                 followerEntryNames = snapshot;
             }
+            else
+            {
+                // [BUILD 926 -- Codex P1 Fix]: Fallback type match now uses SignalName parsing.
+                // ... (existing fallback logic unchanged)
 ```
 
-**NEW:**
+with:
+
 ```csharp
+            IEnumerable<string> followerEntryNames;
             if (symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId) &&
                 symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
             {
-                // V28.0-adr019: Lock-free snapshot of follower keys.
-                followerEntryNames = ctx.FollowerEntries.Keys.ToArray();
+                // ADR-019: ctx.Followers is an immutable snapshot published via Interlocked.CompareExchange.
+                // Zero-alloc, lock-free, point-in-time consistent. Hot path on every master price move.
+                followerEntryNames = ctx.Followers;
             }
-```
-
----
-
-## T13 — Lock-free SIMA Shadow iterator (:89)
-
-**File:** `src/V12_002.SIMA.Shadow.cs` (lines 87-105, inside `ShadowMoveFollowerStops`)
-
-**OLD:**
-```csharp
-            var followerEntryNames = new System.Collections.Generic.List<string>();
-            lock (ctx.Sync)
+            else
             {
-                foreach (string followerEntryName in ctx.FollowerEntries)
-                {
-                    if (string.IsNullOrEmpty(followerEntryName))
-                        continue;
-                    if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
-                        continue;
-                    if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                        continue;
-                    followerEntryNames.Add(followerEntryName);
-                }
-            }
+                // [BUILD 926 -- Codex P1 Fix]: Fallback type match now uses SignalName parsing.
+                // ... (existing fallback logic unchanged)
 ```
 
-**NEW:**
-```csharp
-            // V28.0-adr019: Lock-free scan over ConcurrentDictionary keys.
-            var followerEntryNames = new System.Collections.Generic.List<string>();
-            foreach (string followerEntryName in ctx.FollowerEntries.Keys)
-            {
-                if (string.IsNullOrEmpty(followerEntryName))
-                    continue;
-                if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
-                    continue;
-                if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                    continue;
-                followerEntryNames.Add(followerEntryName);
-            }
-```
+The fallback branch (lines 130-199) is untouched -- it does not access `ctx.Sync` and operates on `activePositions` (already a `ConcurrentDictionary`). The downstream `foreach (string fleetEntryName in followerEntryNames)` loop at line 202 iterates the `string[]` directly via the `IEnumerable<string>` contract; no allocation cost added.
 
----
+After Step 3.1, `V12_002.Orders.Callbacks.Propagation.cs` contains **zero** `lock` keywords.
 
-## T14 — Delete `dailySummaryLock` field (R2)
+## FILE 4: `src/V12_002.cs`
 
-**File:** `src/V12_002.cs` (lines 225-228)
+### Step 4.1 -- Remove `dailySummaryLock` declaration (line 146)
 
-**Pre-flight verification (engineer must run before edit):**
-```bash
-grep -nE "lock\s*\(\s*dailySummaryLock\s*\)" src/*.cs   # Expect: 0 hits (verified at plan time).
-grep -nE "\bdailySummaryLock\b" src/*.cs                 # Expect: 1 hit (the declaration at :227).
-```
-If either expectation fails, STOP and escalate to P1 — scope has changed since plan was written.
+Delete the `dailySummaryLock` field; add the one-shot CAS guard used by the migrated `EnsureDailySummaryCsv` (Step 5.4 below). Existing block:
 
-**OLD:**
 ```csharp
         // V12 PERFORMANCE: Locks are BANNED in favor of the Actor model (Enqueue).
         // Restored as dummy objects to satisfy un-extracted partial files during remediation.
@@ -663,194 +374,206 @@ If either expectation fails, STOP and escalate to P1 — scope has changed since
         private readonly object dailySummaryLock = new object();
 ```
 
-**NEW:**
+becomes:
+
 ```csharp
-        // V12 PERFORMANCE: Locks are BANNED in favor of the Actor model (Enqueue).
-        // V28.0-adr019 (R2): dailySummaryLock deleted -- field had zero lock() usages in src/.
-        // Any future daily-summary CSV serialisation must use ConcurrentQueue-backed async
-        // writes or the Enqueue actor path. stateLock retained as a dummy object to satisfy
-        // un-extracted partial files; tracked for removal in a follow-up pass.
+        // V12 PERFORMANCE / ADR-019: Locks are BANNED. stateLock retained as a dummy field
+        // ONLY because 22 out-of-scope partial files still reference it; scheduled for removal
+        // in the next migration phase. dailySummaryLock removed (DNA audit violation cleared).
         private readonly object stateLock = new object();
+
+        // ADR-019: One-shot guard replacing dailySummaryLock around CSV header creation.
+        // 0 = not yet ensured, 1 = header ensured (or file pre-existed). Reset to 0 on I/O failure
+        // so the next caller can retry. Read/written exclusively via Interlocked.
+        private int _dailySummaryHeaderEnsured = 0;
 ```
 
-**Audit gate 2 (now passing):** `grep -cn "dailySummaryLock" src/*.cs` must return `0`.
+The `stateLock` declaration is intentionally retained as a single-line stub -- removing it would require a sweep across 22 partial files that fall outside this mission's scope. The `dailySummaryLock` declaration is removed outright; the DNA audit specifically targets that identifier.
 
----
+### Step 4.2 -- Add `using System.Threading;` (already present, no-op)
 
-## T15 — Build tag increment
+`V12_002.cs` already imports `System.Threading` (used by the inline actor's `Interlocked` / `Volatile` calls). No directive change needed.
 
-**File:** `src/V12_002.Properties.cs` (the `BUILD_TAG` constant — exact line provided by engineer during apply)
+After Step 4.1, `V12_002.cs` no longer declares `dailySummaryLock`. The `stateLock` stub is annotated for the next phase.
 
-**Action:** Bump the build tag string constant from its current value to `1111.003-v28.0-adr019`. Engineer must preserve surrounding formatting and ASCII-only rules (no curly quotes, no emoji, no en/em-dash).
+## FILE 5: Cascade Migrations Required by Section 1's Structural Change
 
----
+Section 1's redefinition of `SymmetryDispatchContext` removes the `Sync` field and the `FollowerEntries` HashSet. Five out-of-scope files reference these members and **must** be migrated in the same commit or the build breaks. Each migration is a mechanical pattern application of ADR-019 -- no logic change.
 
-## T16 — Post-edit deployment gate (MANDATORY)
+### Step 5.1 -- `src/V12_002.Symmetry.Follower.cs`
 
-After T0-T15 are applied:
+Two anchor-read sites (lines 36-42 and 129-136). In both, the `lock(ctx.Sync) { snapshot fields }` block becomes a single `var snap = ctx.Anchor;`:
 
-```powershell
-powershell -File .\deploy-sync.ps1
+```csharp
+                if (symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var preCheckId) &&
+                    symmetryDispatchById.TryGetValue(preCheckId, out var preCheckCtx))
+                {
+                    // ADR-019: single Volatile.Read returns coherent immutable snapshot.
+                    AnchorSnapshot preSnap = preCheckCtx.Anchor;
+                    bool   anchorReady    = preSnap.IsResolved;
+                    double preCheckAnchor = preSnap.MasterAnchorPrice;
+                    if (anchorReady && preCheckAnchor > 0) { /* ...unchanged... */ }
+                }
 ```
 
-**Expected:** ASCII Gate PASS. All hard links re-established.
-
-Then the Director presses F5 in NinjaTrader to compile. Verify banner shows `BUILD_TAG = 1111.003-v28.0-adr019`.
-
-**Validation greps (must all return 0):**
-```bash
-grep -nE "lock\s*\(\s*ctx\.Sync\s*\)" src/*.cs                 # 0 hits
-grep -nE "lock\s*\(\s*preCheckCtx\.Sync\s*\)" src/*.cs         # 0 hits
-grep -nE "\bdailySummaryLock\b" src/*.cs                       # 0 hits
-grep -nE "public\s+readonly\s+object\s+Sync" src/*.cs          # 0 hits
-grep -nE "new\s+HashSet<string>\s*\(\s*StringComparer\.Ordinal\s*\)\s*;\s*\}" src/V12_002.Symmetry.cs   # 0 hits (old FollowerEntries decl gone)
-grep -nE "[^\x00-\x7F]" src/*.cs                               # 0 hits (ASCII gate)
+```csharp
+            // ADR-019: snapshot dispatch state via single Volatile.Read; no ctx.Sync.
+            AnchorSnapshot snap = ctx.Anchor;
+            bool   isResolved   = snap.IsResolved;
+            double masterAnchor = snap.MasterAnchorPrice;
 ```
 
----
+### Step 5.2 -- `src/V12_002.Symmetry.Replace.cs`
 
-## T17 — AMAL 6-test validation (Engineer → P6)
+Four sites:
 
-Run the AMAL harness:
-```bash
-python scripts/amal_harness.py --gate adr019
+- **Line 127** (`SymmetryGuardTryResolveFollowersForDispatch`): `lock (ctx.Sync) { foreach (string fleetEntryName in ctx.FollowerEntries) ... }` becomes `string[] snap = ctx.Followers; foreach (string fleetEntryName in snap) { ... }` (zero-alloc enumeration over the immutable array).
+- **Line 189** (`SymmetryGuardCascadeFollowerCleanup`): `string[] followers; lock (ctx.Sync) { followers = ctx.FollowerEntries.ToArray(); }` becomes `string[] followers = ctx.Followers;`.
+- **Line 224** (`SymmetryGuardForgetEntry`): `lock (ctx.Sync) ctx.FollowerEntries.Remove(entryName);` becomes `ctx.RemoveFollower(entryName);`.
+- **Line 247** (`SymmetryGuardPruneDispatches`): `lock (ctx.Sync) { foreach (string follower in ctx.FollowerEntries) { exists = activePositions.ContainsKey(follower); ... } }` becomes `string[] snap = ctx.Followers; foreach (string follower in snap) { ... }` -- the inner `activePositions.ContainsKey` is already lock-free.
+
+### Step 5.3 -- `src/V12_002.Orders.Callbacks.AccountOrders.cs`
+
+Two sites:
+
+- **Line 204** (`TryGetDispatchFollowerEntries`): `lock (ctx.Sync) followerEntries = ctx.FollowerEntries.ToArray();` becomes `followerEntries = ctx.Followers;`. The downstream `followerEntries.Length > 0` check works unchanged on the `string[]`.
+- **Line 300** (`HandleMatchedFollowerOrder`): the `lock (stateLock) { masterFilled = ...; if (!masterFilled) { qty = fsm.PendingQty; price = fsm.PendingPrice; ...; fsm.State = FollowerReplaceState.Submitting; } }` block is **removed entirely**. The enclosing `ProcessQueuedAccountOrder` is invoked exclusively from `ProcessAccountOrderQueue`, which is invoked exclusively via `TriggerCustomEvent` (strategy thread). Single-threaded execution is guaranteed by the actor pipeline; the lock is dead weight inherited from the pre-actor era.
+
+```csharp
+            // ADR-019: single-threaded by the actor pipeline (ProcessAccountOrderQueue is the
+            // sole caller, dispatched via TriggerCustomEvent). The prior lock(stateLock) was
+            // dead weight; no torn-state risk remains.
+            masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
+                && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
+                && masterPos != null
+                && masterPos.EntryFilled
+                && masterPos.RemainingContracts > 0;
+
+            if (!masterFilled)
+            {
+                qty             = fsm.PendingQty;
+                price           = fsm.PendingPrice;
+                acctNameCapture = fsm.AccountName;
+                sigName         = fsm.SignalName;
+                fsmCapture      = fsm;
+                fsm.State       = FollowerReplaceState.Submitting;
+            }
 ```
 
-**Expected gates (all PASS required):**
-1. Allocation baseline parity vs. pre-edit snapshot (no regression > 2%).
-2. Logic Unit Tests (`tests/LogicTests.cs`) — zero failures.
-3. Symmetry anchor resolution — first-fill-wins invariant holds under 16-thread concurrent dispatch.
-4. Follower-set cardinality invariant — TryAdd / TryRemove produce expected transitions under concurrent stress.
-5. DNA grep — zero banned-pattern hits (see T16 grep suite).
-6. Stress test — 1000-dispatch soak with Interlocked metrics monotonic increase.
+### Step 5.4 -- `src/V12_002.UI.Compliance.cs`
 
----
+Both `lock (dailySummaryLock)` acquisitions collapse onto the new one-shot CAS guard from Step 4.1. The double-checked file-existence pattern is preserved; failure is recoverable (resets the flag so a subsequent caller can retry).
 
-## R1 Compliance (Ghost-Order Rollback)
+```csharp
+        private void EnsureDailySummaryCsv()
+        {
+            if (string.IsNullOrEmpty(dailySummaryCsvPath)) return;
 
-**Scope:** R1 required that any defensive purge of local dispatch state (`EmergencyPurgeEntry` proposed in a prior plan) must first cancel live broker orders via `CancelOrderSafe` and flatten positions via `FlattenPositionByName`.
+            // ADR-019: one-shot CAS guard replaces lock(dailySummaryLock).
+            // First caller wins; idempotent thereafter.
+            if (Interlocked.CompareExchange(ref _dailySummaryHeaderEnsured, 1, 0) != 0) return;
 
-**This plan:** Does NOT introduce `EmergencyPurgeEntry`. Verification:
-```bash
-grep -rE "EmergencyPurgeEntry|SymmetryGuardEmergencyPurge" src/ docs/brain/implementation_plan.md   # 0 hits
+            try
+            {
+                if (!System.IO.File.Exists(dailySummaryCsvPath))
+                {
+                    string header = "Date,Account,DailyPL,DailyTrades,TotalProfit,TotalTrades,MaxDrawdown,UniqueDays";
+                    System.IO.File.WriteAllText(dailySummaryCsvPath, header + Environment.NewLine);
+                }
+            }
+            catch
+            {
+                // Allow retry on transient I/O failure.
+                Interlocked.Exchange(ref _dailySummaryHeaderEnsured, 0);
+            }
+        }
+
+        private void AppendDailySummary(DateTime summaryDate, string accountName, double dailyPL, int dailyTrades,
+            double totalProfit, int totalTrades, double maxDrawdown, int uniqueDays)
+        {
+            if (string.IsNullOrEmpty(dailySummaryCsvPath)) return;
+
+            string safeName = (accountName ?? string.Empty).Replace("\"", "\"\"");
+            string line = string.Format(CultureInfo.InvariantCulture,
+                "{0},\"{1}\",{2:F2},{3},{4:F2},{5},{6:F2},{7}",
+                summaryDate.ToString("yyyy-MM-dd"), safeName, dailyPL, dailyTrades, totalProfit, totalTrades, maxDrawdown, uniqueDays);
+
+            // ADR-019: CSV header creation is now self-guarded; no surrounding lock needed.
+            EnsureDailySummaryCsv();
+
+            string pathCopy = dailySummaryCsvPath;
+            string lineCopy = line + Environment.NewLine;
+            Task.Run(() =>
+            {
+                try { System.IO.File.AppendAllText(pathCopy, lineCopy); }
+                catch { /* swallow -- daily summary is best-effort */ }
+            });
+        }
 ```
 
-**Future engineers:** If a subsequent plan adds defensive purging of `SymmetryDispatchContext`, `activePositions`, `entryOrders`, or equivalent local state, the R1 rule is MANDATORY — call `CancelOrderSafe(order, pos)` for every live broker order (Working / Submitted / Accepted states) and `FlattenPositionByName(entryName)` for any non-flat position BEFORE any local-state removal.
+`UI.Compliance.cs` already imports `System.Threading`; no using changes.
 
-The existing `SymmetryGuardCascadeFollowerCleanup` at `src/V12_002.Symmetry.Replace.cs:176-208` already follows this pattern and is the reference implementation.
+## FINAL STATE
 
----
-
-## Verification Matrix
-
-| Gate | How to run | Pass criterion |
-|------|------------|----------------|
-| ASCII gate | `powershell -File .\deploy-sync.ps1` | Script exits 0; reports "ASCII Gate PASS" |
-| Lock grep | See T16 | All four lock-related greps return 0 hits |
-| DNA grep | `python scripts/audit_scan.ps1 --strict` | No `lock(`, `stateLock` in business logic, no `unsafe`/`fixed`/`stackalloc` |
-| Compile | F5 in NinjaTrader | BUILD_TAG banner shows `1111.003-v28.0-adr019`; zero CS errors |
-| Unit tests | `dotnet test tests/LogicTests.cs` | Zero failures |
-| AMAL | `python scripts/amal_harness.py --gate adr019` | All 6 gates PASS |
-| Stress | 16-thread concurrent dispatch soak | First-fill-wins invariant holds; no exceptions |
-
----
-
-## Director's Handoff Block (for Codex P5 Engineer)
+After all five files are migrated, an automated grep over the in-scope files yields:
 
 ```
-You are the P5 Engineer. Read docs/brain/implementation_plan.md end-to-end before any edit.
-Target build tag: 1111.003-v28.0-adr019. Branch: mission-uni-5-full-sync.
-
-Apply tasks T0 through T15 in order. Each task has exact OLD / NEW blocks -- use
-replace_file_content with anchor context. After T15, run T16 (deploy-sync.ps1 + grep suite)
-and T17 (AMAL harness) and report verbatim output.
-
-DO NOT:
-- Skip the pre-flight grep for T14 (dailySummaryLock).
-- Widen SymmetryDispatchContext visibility beyond `private sealed`.
-- Introduce EmergencyPurgeEntry or any new defensive purge path.
-- Use --no-verify, --no-gpg-sign, or amend published commits.
-- Touch any file outside the T-list.
-
-REPORT back to P1 with:
-- Verbatim T16 grep output (all six greps must return 0 hits).
-- Verbatim T17 AMAL output (all six gates must PASS).
-- Build banner screenshot / text showing the new BUILD_TAG.
-- Git status + diff summary.
-
-Any deviation requires P1 re-adjudication -- do NOT attempt rework unilaterally.
+Symmetry.cs                          : 0 lock() sites
+Symmetry.Follower.cs                 : 0 lock() sites
+Symmetry.Replace.cs                  : 0 lock() sites
+SIMA.cs                              : 0 lock() sites
+Orders.Callbacks.Propagation.cs      : 0 lock() sites
+Orders.Callbacks.AccountOrders.cs    : 0 lock() sites (within in-scope methods)
+UI.Compliance.cs                     : 0 lock() sites
+V12_002.cs                           : 0 dailySummaryLock declarations (stateLock stub retained)
 ```
 
----
+Hot-path allocation profile: `PropagateMasterPriceMove` per-tick allocations drop from `O(N_followers)` (HashSet enumerator + `string[]` ToArray copy) to `0` (single `Volatile.Read` returns the cached immutable array).
 
-## P4 Red Team "Trojan Horse" Adjudication Prompt (Arena)
+## VERIFICATION PLAN
 
-**Delivery:** Paste the block below into the Arena session as the P4 prompt. Per GITHUB-LINK PROTOCOL, raw code is referenced via GitHub URLs, not inlined.
+### Build-time
 
-```
-ROLE: P4 Adjudicator (Red Team) for ADR-019 Sovereign Substrate Repair.
-TARGET: Branch `mission-uni-5-full-sync` of `universal-or-strategy`.
-PLAN UNDER AUDIT: docs/brain/implementation_plan.md (build 1111.003-v28.0-adr019)
+1. **Compile in NinjaTrader 8** (`F5` in NinjaScript Editor). Expect zero errors. The `using System.Threading;` directive is already present in every modified file.
+2. **`check_ascii.py src/V12_002.Symmetry.cs src/V12_002.SIMA.cs src/V12_002.Orders.Callbacks.Propagation.cs src/V12_002.cs src/V12_002.Symmetry.Follower.cs src/V12_002.Symmetry.Replace.cs src/V12_002.Orders.Callbacks.AccountOrders.cs src/V12_002.UI.Compliance.cs`** -- expect `OK` for every file (no curly quotes / em-dashes / Unicode arrows introduced by new comments or log strings).
 
-GitHub sources (read these BEFORE adjudicating):
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.Symmetry.cs
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.Symmetry.Follower.cs
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.Symmetry.Replace.cs
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.Orders.Callbacks.AccountOrders.cs
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.Orders.Callbacks.Propagation.cs
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.SIMA.Shadow.cs
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/src/V12_002.cs (line 227)
-- https://github.com/<owner>/universal-or-strategy/blob/mission-uni-5-full-sync/docs/brain/audit_v28_1_platinum.md
+### Forensic / DNA audits
 
-MANDATE (P5 Redundancy Protocol -- NO TASK SPLITTING):
-Every red-team agent (Codex, Gemini CLI, Jules) MUST independently audit ALL 17 tasks
-and ALL of R1-R4. Consensus is valid ONLY if every agent confirms every item individually.
+3. **`grep -nE "^[[:space:]]*lock[[:space:]]*\(" src/V12_002.Symmetry.cs src/V12_002.SIMA.cs src/V12_002.Orders.Callbacks.Propagation.cs src/V12_002.Symmetry.Follower.cs src/V12_002.Symmetry.Replace.cs src/V12_002.UI.Compliance.cs`** -- expect zero matches.
+4. **`grep -n "dailySummaryLock" src/`** -- expect zero matches (declaration and both acquisitions removed).
+5. **`grep -n "ctx\.Sync\|preCheckCtx\.Sync\|FollowerEntries" src/`** -- expect zero matches; followers must be accessed only via `ctx.Followers` or `ctx.AddFollower` / `ctx.RemoveFollower`.
+6. **Run the `forensics` subagent** (per CLAUDE.md Engineer Self-Audit P4 Step 2) to confirm zero `lock(stateLock)` usage in in-scope files and ASCII compliance globally.
+7. **Run the `architect` subagent (`/loop-critic`)** to critique the AnchorSnapshot CAS-loop semantics against the Build 1004 FSM patterns already in use elsewhere in the codebase.
 
-AUDIT MATRIX -- answer PASS / FAIL / EVIDENCE for each row:
+### Runtime smoke test
 
-| # | Claim to verify | Evidence required |
-|---|-----------------|-------------------|
-| 1 | T1 preserves `private sealed` (R3) | Cite line in NEW block that begins `private sealed class` |
-| 2 | T1 provides atomic MasterWeightedFill via BitConverter+Interlocked (Probe 1) | Cite getter/setter signatures |
-| 3 | T1 provides atomic MasterAnchorPrice (R4) | Cite getter/setter signatures |
-| 4 | T1 resolves via CAS state machine (Probe 2, Probe 3) | Cite TryBeginResolve + PublishAnchor bodies |
-| 5 | T1 replaces HashSet with ConcurrentDictionary<string, byte> preserving StringComparer.Ordinal (Probe 4) | Cite FollowerEntries declaration |
-| 6 | T2 preserves first-fill-wins semantics (Probe 9) | Explain why `= weighted` is equivalent to the original `+= averageFillPrice * fillQty` |
-| 7 | T3-T13 each replace exactly one `lock(*.Sync)` site | Count: 11 removals expected; cite line numbers per file |
-| 8 | T14 deletes dailySummaryLock field; pre-flight grep documented (R2) | Cite pre-flight grep expectations |
-| 9 | R1 compliance: plan introduces NO EmergencyPurgeEntry | Run `grep -rE "EmergencyPurgeEntry" src/ docs/` and report hits |
-| 10 | ASCII gate: zero non-ASCII in any NEW block | Scan each NEW block for codepoints > 0x7F |
-| 11 | DNA compliance: no `unsafe` / `fixed` / `stackalloc` / `volatile` field modifiers added | Review NEW blocks |
-| 12 | `using System.Threading;` added to Symmetry.cs (T0) | Verify line appears between `using System.Linq;` and `using NinjaTrader.Cbi;` |
-| 13 | Sync field DELETED from context class (not just unused) | Verify T1 NEW block does NOT declare `public readonly object Sync` |
-| 14 | Build tag bump planned (T15) | Verify T15 specifies `1111.003-v28.0-adr019` |
-| 15 | Deploy-sync mandated post-edit (T16) | Verify T16 names `deploy-sync.ps1` |
-| 16 | AMAL harness planned (T17) | Verify T17 names `scripts/amal_harness.py --gate adr019` |
-| 17 | No lock widening: plan MUST NOT introduce any new `lock(...)` anywhere | Scan NEW blocks for `lock(` -- expect 0 |
+8. **High-volatility Sim session** with `EnableSIMA=true` and 4-account fleet:
+   - Trigger an OR entry; confirm `[SYMMETRY_GUARD] MASTER ANCHOR LOCKED` log fires exactly once.
+   - Confirm follower brackets receive master-anchored prices (`[ANCHOR-01]` and `[ANCHOR-02]` paths exercised).
+   - Drag the master entry several times during the pre-fill window; confirm `[MOVE-SYNC] Entry move:` logs fire for every follower with no missed propagations and no `[V12 IPC REJECT]` errors.
+   - Trigger a master cancel during the dispatch window; confirm `[CASCADE]` log lists every dispatched follower and all are cancelled.
+9. **Concurrent flatten + entry stress** (per `implementation_plan.md` Phase 4 verification): slam IPC with simultaneous `FLATTEN` and `ENTRY` commands; confirm no ghost orders, no REAPER `Critical Desync`, no `expectedPositions` torn-state log entries.
+10. **REAPER audit cycle**: confirm the `_lastExpectedPositionSetTicks` grace window stamps fire after every `AddOrUpdate` mutation (verify timestamp progression in `[ACCOUNT_SYNC]` traces).
 
-TROJAN-HORSE CHECK (independent scan, not in the matrix above):
-The plan may contain a deliberately-subtle flaw. Candidate hiding spots include:
-- Incorrect memory-ordering argument (e.g. claiming release semantics where a full fence is needed).
-- Off-by-one line number on an OLD anchor that would cause replace_file_content to fail.
-- A `using` directive in the wrong file.
-- Missed strengthening of MasterFilledQuantity when it participates in `+=` semantics elsewhere.
+### Regression fences
 
-If you find a flaw, name it, cite the line, and mark plan as REVISE. If you find none,
-state explicitly "Trojan-Horse scan: no defects found" -- a blanket "looks good" is a FAIL
-and will be rejected as rubber-stamping.
+11. **`[ANCHOR_SNAPSHOT]` CAS retry counter** (optional dev-only diagnostic): instrument the CAS loop in `SymmetryGuardOnMasterFill` to print when `cur.IsResolved == true` on retry. Expect zero retries in normal operation; non-zero values indicate concurrent master-fill events for the same dispatch -- already idempotent under the new design but worth observing.
+12. **Property-test substitute** (manual): in Sim, fire 50 rapid OR entries with 4 followers each. Confirm `_followers` array length monotonically tracks `AddFollower` / `RemoveFollower` calls -- no stale entries, no missing entries -- by diffing a `[SNAPSHOT]` debug print against the dispatch context's recorded register/forget log.
 
-DELIVER verdict: APPROVED / REVISE / BLOCK. Majority (2/3) required for APPROVED.
-Attach per-row evidence. No summarisation of the plan -- only per-claim verification.
-```
+### Critical files to re-read before declaring done
 
----
+- `src/V12_002.Symmetry.cs` -- new `AnchorSnapshot` class + redefined `SymmetryDispatchContext`.
+- `src/V12_002.SIMA.cs` -- four `AddOrUpdate` migrations.
+- `src/V12_002.Orders.Callbacks.Propagation.cs` -- `ctx.Followers` substitution at the hot-path read.
+- `src/V12_002.cs` -- declaration cleanup + `_dailySummaryHeaderEnsured` field addition.
 
-## Post-Use Workflow Audit
+### Existing utilities reused (no new code paths added unnecessarily)
 
-Per CLAUDE.md "Mandatory Workflow Self-Improvement":
+- `Volatile.Read` / `Interlocked.CompareExchange` -- already used by the inline actor (`V12_002.cs:236-241`).
+- `ConcurrentDictionary.AddOrUpdate` -- already used in `V12_002.SIMA.cs:102` and elsewhere.
+- `_followerReplaceSpecs` actor-driven FSM pattern (`V12_002.cs:483-501`) -- mirrored by the AnchorSnapshot CAS pattern; no new infrastructure introduced.
+- `Array.Empty<string>()` -- already used in `V12_002.cs` runtime helpers.
 
-- **Did any step produce an unexpected result?** `mcp__jcodemunch__plan_turn` returned "Repository not found: ." — had to call `resolve_repo` with the absolute path first. Documented as guidance for the architect workflow: `plan_turn` requires the resolved repo id, not the literal `"."` string unless the repo was indexed under that name.
-- **Was any rule ambiguous?** R1 scope was ambiguous (applied to prior-plan `EmergencyPurgeEntry` which does not exist in current `src/`). Resolved by adding "R1 Compliance" section that converts R1 from an edit-site rule to a compliance gate for future plans.
-- **Was a step missing?** Yes — the pre-flight grep for T14 (dailySummaryLock) and the T0 `using` insertion were not present in the prior draft that was BLOCKed. Added both.
+### Done definition
 
-**Commit tag (workflow self-improvement):** `workflow(architect_intake): add R1-as-compliance-gate, pre-flight grep for field deletion, and explicit `using System.Threading;` insertion step`
+All eleven lock sites listed in **FORENSIC EVIDENCE Section 1** removed. Items 1-7 of the verification plan pass cleanly. Build succeeds in NinjaTrader 8. Sim smoke test (Item 8) shows no behavioural regressions on the symmetry guard happy path or the cascade-cancel path. Forensics subagent reports zero `lock(stateLock)` / zero `lock(ctx.Sync)` / zero `lock(dailySummaryLock)` in the in-scope files.
