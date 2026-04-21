@@ -33,13 +33,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var preCheckId) &&
                     symmetryDispatchById.TryGetValue(preCheckId, out var preCheckCtx))
                 {
-                    bool anchorReady;
-                    double preCheckAnchor;
-                    lock (preCheckCtx.Sync)
-                    {
-                        anchorReady   = preCheckCtx.IsResolved;
-                        preCheckAnchor = preCheckCtx.MasterAnchorPrice;
-                    }
+                    // ADR-019: AnchorSnapshot is published atomically via Interlocked.CompareExchange.
+                    // IsResolved and MasterAnchorPrice are read from a single immutable snapshot -- lock-free.
+                    AnchorSnapshot preCheckSnapshot = preCheckCtx.Anchor;
+                    bool anchorReady = preCheckSnapshot.IsResolved;
+                    double preCheckAnchor = preCheckSnapshot.MasterAnchorPrice;
                     if (anchorReady && preCheckAnchor > 0)
                     {
                         Print(string.Format("[ANCHOR-01] Pre-applying master anchor {0:F2} for {1} -- bracket will use master fill price",
@@ -126,14 +124,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            bool isResolved;
-            double masterAnchor;
-            lock (ctx.Sync)
-            {
-                // V1101E HOT-PATCH: Snapshot dispatch state under ctx.Sync, then release before any stateLock path.
-                isResolved = ctx.IsResolved;
-                masterAnchor = ctx.MasterAnchorPrice;
-            }
+            // ADR-019: AnchorSnapshot is published atomically via Interlocked.CompareExchange.
+            // IsResolved and MasterAnchorPrice are read from a single immutable snapshot -- lock-free.
+            AnchorSnapshot snapshot = ctx.Anchor;
+            bool isResolved = snapshot.IsResolved;
+            double masterAnchor = snapshot.MasterAnchorPrice;
 
             if (!isResolved)
             {

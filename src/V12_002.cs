@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.002-v28.0";  // R28 v28.0 -- blittable slot + XorShadow + optional MMIO mirror
+        public const string BUILD_TAG = "1111.003-v28.0-adr019";  // R28 v28.0 -- blittable slot + XorShadow + optional MMIO mirror
 
         public class UILiveTargetSnapshot
         {
@@ -221,10 +221,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool pendingTRENDEntry;  // V8.2 FIX: Flag to execute TREND in OnBarUpdate when BarsInProgress=0
         private ConcurrentDictionary<string, string> linkedTRENDEntries;  // V8.30: Thread-safe - Links E1 and E2 by group ID
 
-        // V12 PERFORMANCE: Locks are BANNED in favor of the Actor model (Enqueue).
-        // Restored as dummy objects to satisfy un-extracted partial files during remediation.
+        // V12 PERFORMANCE / ADR-019: Locks are BANNED. stateLock retained as a dummy field
+        // ONLY because 22 out-of-scope partial files still reference it; scheduled for removal
+        // in the next migration phase. Legacy CSV-header lock removed (DNA audit violation cleared).
         private readonly object stateLock = new object();
-        private readonly object dailySummaryLock = new object();
+
+        // ADR-019: One-shot guard replacing the legacy CSV-header lock around file creation.
+        // 0 = not yet ensured, 1 = header ensured (or file pre-existed). Reset to 0 on I/O failure
+        // so the next caller can retry. Read/written exclusively via Interlocked.
+        private int _dailySummaryHeaderEnsured = 0;
 
         // V8.4: RETEST Mode tracking
         private volatile bool isRetestModeActive;

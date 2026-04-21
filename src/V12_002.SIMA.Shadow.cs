@@ -85,19 +85,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            var followerEntryNames = new System.Collections.Generic.List<string>();
-            lock (ctx.Sync)
+            // ADR-019: snapshot via Volatile.Read on immutable string[] -- zero-alloc, lock-free.
+            string[] followerSnapshot = ctx.Followers;
+            var followerEntryNames = new System.Collections.Generic.List<string>(followerSnapshot.Length);
+            foreach (string followerEntryName in followerSnapshot)
             {
-                foreach (string followerEntryName in ctx.FollowerEntries)
-                {
-                    if (string.IsNullOrEmpty(followerEntryName))
-                        continue;
-                    if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
-                        continue;
-                    if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                        continue;
-                    followerEntryNames.Add(followerEntryName);
-                }
+                if (string.IsNullOrEmpty(followerEntryName))
+                    continue;
+                if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
+                    continue;
+                if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
+                    continue;
+                followerEntryNames.Add(followerEntryName);
             }
 
             foreach (var kvp in symmetryFleetEntryToDispatch.ToArray())

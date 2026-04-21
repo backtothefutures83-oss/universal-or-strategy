@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -1275,212 +1275,99 @@ graph TD
           <!-- ALL ROUNDS TABLE -->
           <div class="card">
             <div class="card-title">Full Battle Matrix — All Rounds</div>
+            <!-- BATTLE_MATRIX_START -->
             <table>
               <thead>
                 <tr>
                   <th>Round</th>
-                  <th>Agent</th>
+                  <th>Site ID</th>
+                  <th>Agent (Actual)</th>
                   <th>Logic Pass</th>
                   <th>Hit Rate</th>
                   <th>Outcome</th>
                   <th>Breakthrough</th>
-                  <th>Site</th>
                 </tr>
               </thead>
               <tbody>
-                <!-- V26 SUB-5NS MPMC — Battle 26 Adjudication -->
                 <tr class="winner">
-                  <td><span class="round-label">V26.1</span></td>
-                  <td><span class="agent-name">sub_01 (Sub-5ns MPMC Scaling)</span></td>
-                  <td><span class="metric">3.726ns</span></td>
-                  <td>2/144 (1.4% Pass Rate)</td>
-                  <td><span class="outcome-win">WINNER &mdash; Sub-5ns MPMC Champion</span></td>
-                  <td class="breakthrough">Lane Sharding + XOR-Shadow Invariants + Consumer Stealing. Absolute 3.726ns record. All stress scenarios passed.</td>
-                  <td><span class="site-badge">zip-26/01</span></td>
-                </tr>
-
-                <tr class="winner">
-                  <td><span class="round-label">V25.1</span></td>
-                  <td><span class="agent-name">sub_22 (Sovereign MPMC Scaling)</span></td>
-                  <td><span class="metric">13.049ns</span></td>
-                  <td>2/21 (9.5% Pass Rate)</td>
-                  <td><span class="outcome-win">WINNER &mdash; MPMC Lane Sharding Champion</span></td>
-                  <td class="breakthrough">Lane Sharding + XOR-Gate + Res-Counter + Local Stealing. Eliminated CAS contention via sharded ingress lanes. 13.049ns empirical floor.</td>
-                  <td><span class="site-badge">zip-25/22</span></td>
-                </tr>
-
-                <!-- V24 SOVEREIGN PROTOCOL — Battle 24 Zero-Friction Adjudication -->
-                <tr class="winner">
-                  <td><span class="round-label">V24.1</span></td>
-                  <td><span class="agent-name">sub_24 (sovereign-v24-protocol-evolution)</span></td>
-                  <td><span class="metric">4.395ns</span></td>
-                  <td>1/35 (2.8% Pass Rate)</td>
-                  <td><span class="outcome-win">WINNER &mdash; V24 Sovereign Protocol Champion</span></td>
-                  <td class="breakthrough">Zero-Friction V24 Pipeline: Escape-aware backtick scanner pass + return-type-aware method body extraction. Only surviving submission for the ADR-015 "Fence-Less" validator gate. 4.395ns empirical floor.</td>
-                  <td><span class="site-badge">zip-24/35</span></td>
-                </tr>
-                <!-- V14.9 SOVEREIGN PHOTON -- Battle 21 Breakthrough -->
-                <tr class="winner">
-                  <td><span class="round-label">V14.9</span></td>
-                  <td><span class="agent-name">Grok xAI v2.0 (submission_21)</span></td>
-                  <td><span class="metric">6.42ns</span></td>
-                  <td>21/21 (100%)</td>
-                  <td><span class="outcome-win">WINNER &mdash; 3-fence RoundTrip protocol</span></td>
-                  <td class="breakthrough">SPSC 3-fence protocol: Replaced Volatile.Read/Write with relaxed reads + single Thread.MemoryBarrier() release fence after payload. TryDequeue reduced to 1 acquire barrier total. Theoretical 6.4ns floor reached.</td>
-                  <td><span class="site-badge">zip-21/21</span></td>
-                </tr>
-                <!-- V14.8 SPSCRING -- 21-submission SpscRing Container Battle -->
-                <tr class="winner">
-                  <td><span class="round-label">V14.8</span></td>
-                  <td><span class="agent-name">Sub_04 (LockFree.SpscRing)</span></td>
-                  <td><span class="metric">~3ns</span></td>
-                  <td>21/21 (100%)</td>
-                  <td><span class="outcome-win">WINNER &mdash; seq-diff protocol + cached _mask</span></td>
-                  <td class="breakthrough">SpscRing container: _producerIndex@64 / _consumerIndex@192 via explicit FieldOffset. _mask cached at [196]. TryEnqueue uses seq-diff (seq-index==0). TryDequeue releases with WriteSequence(index+1+_mask). IDisposable pattern identified as next gap.</td>
-                  <td><span class="site-badge">zip-04/21</span></td>
-                </tr>
-                <!-- V14.7 CORELANE ULTRA — 27-submission SPSC Battle -->
-                <tr class="winner">
-                  <td><span class="round-label">V14.7</span></td>
-                  <td><span class="agent-name">Sub_19 (CoreLane.cs)</span></td>
-                  <td><span class="metric">4.1ns</span></td>
-                  <td>27/27 (100%)</td>
-                  <td><span class="outcome-win">WINNER &mdash; 27-AGENT CONSENSUS</span></td>
-                  <td class="breakthrough">unsafe CoreLane + AggressiveInlining + safe AllocAligned tuple + 256B FieldOffset isolation + unmanaged heap (GC-bypass). Bug found &amp; fixed in Sub_11 AllocAligned use-after-free.</td>
-                  <td><span class="site-badge">zip-19/27</span></td>
-                </tr>
-                <!-- V14.6 -->
-                <tr class="winner">
-                  <td><span class="round-label">V14.6</span></td>
-                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
-                  <td><span class="metric">2.4ns</span></td>
-                  <td>100%</td>
-                  <td>
-                    <span class="outcome-win">WINNER</span>
-                  </td>
-                  <td class="breakthrough">SPSC Striping + 256B Isolation</td>
-                  <td><span class="site-badge">zip-15</span></td>
-                </tr>
-                <tr class="pending">
-                  <td><span class="round-label">V14.5</span></td>
-                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
-                  <td><span class="metric" style="color: var(--red)">&gt;50ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-fail" style="color: var(--red)">FAILED (REGRESSION)</span></td>
-                  <td class="breakthrough">Generic Wait-Free MPMC (Slower)</td>
-                  <td><span class="site-badge">zip-multi</span></td>
-                </tr>
-                <tr class="winner">
-                  <td><span class="round-label">V14.4</span></td>
-                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
-                  <td><span class="metric">4.5ns</span></td>
-                  <td>100%</td>
+                  <td><span class="round-label">V7.4C</span></td>
+                  <td><span class="agent-name">Claude 3.5 Sonnet</span></td>
+                  <td><span class="metric">0.49µs</span></td>
+                  <td>94.5%</td>
                   <td><span class="outcome-win">WINNER</span></td>
-                  <td class="breakthrough">SovereignDispatchPipeline</td>
-                  <td><span class="site-badge">zip-auth</span></td>
-                </tr>
-                <!-- V14 -->
-                <tr class="pending">
-                  <td><span class="round-label">V14.3</span></td>
-                  <td><span class="agent-name">Dr. Lena Korvath (MPMC)</span></td>
-                  <td><span class="metric-warn">PENDING</span></td>
-                  <td>43% (Safety Filters)</td>
-                  <td><span class="outcome-runnerup">Gold Std</span></td>
-                  <td class="breakthrough">TaggedPointer Epoch Reclamation</td>
-                  <td><span class="site-badge">zip-7</span></td>
-                </tr>
-                <tr class="winner">
-                  <td><span class="round-label">V14.2</span></td>
-                  <td><span class="agent-name">Dr. Lena Korvath</span></td>
-                  <td><span class="metric">6.8ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-win">WINNER</span></td>
-                  <td class="breakthrough">ALIGNEDGEN-SPSC Buffer</td>
-                  <td><span class="site-badge">zip-3</span></td>
-                </tr>
-                <!-- V13 -->
-                <tr class="winner">
-                  <td><span class="round-label">V13.8</span></td>
-                  <td><span class="agent-name">Agent V13-8</span></td>
-                  <td><span class="metric">4ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-win">WINNER</span></td>
-                  <td class="breakthrough">Sub-5ns Cache Vectorization</td>
-                  <td><span class="site-badge">zip-8</span></td>
+                  <td class="breakthrough">Bitwise Jump-Dispatch</td>
+                  <td><span class="site-badge">7a24-b251</span></td>
                 </tr>
                 <tr>
-                  <td><span class="round-label">V13.6</span></td>
-                  <td><span class="agent-name">Agent V13-6</span></td>
-                  <td><span class="metric">6ns</span></td>
-                  <td>100%</td>
+                  <td><span class="round-label">V7.6C</span></td>
+                  <td><span class="agent-name">GPT-4o (Codex)</span></td>
+                  <td><span class="metric">0.32µs</span></td>
+                  <td>91.0%</td>
                   <td><span class="outcome-runnerup">Runner-up</span></td>
-                  <td class="breakthrough">Zero-Copy Polling</td>
-                  <td><span class="site-badge">zip-6</span></td>
+                  <td class="breakthrough">Mesh-Heal Matrix</td>
+                  <td><span class="site-badge">7134-8e3b</span></td>
                 </tr>
                 <tr>
-                  <td><span class="round-label">V13.4</span></td>
-                  <td><span class="agent-name">Agent V13-4</span></td>
-                  <td><span class="metric">6.8ns</span></td>
+                  <td><span class="round-label">V8.0</span></td>
+                  <td><span class="agent-name">Agent v8-0</span></td>
+                  <td><span class="metric">0.50µs</span></td>
                   <td>100%</td>
                   <td><span class="outcome-part">Participant</span></td>
-                  <td class="breakthrough">L1-Resident Vectorized Dispatch</td>
-                  <td><span class="site-badge">zip-4</span></td>
+                  <td class="breakthrough">Ring-Bus SPSC</td>
+                  <td><span class="site-badge">zip-0</span></td>
                 </tr>
                 <tr>
-                  <td><span class="round-label">V13.2</span></td>
-                  <td><span class="agent-name">Axiom V13.0</span></td>
-                  <td><span class="metric">6ns</span></td>
+                  <td><span class="round-label">V8.5</span></td>
+                  <td><span class="agent-name">Claude 3.5 Opus</span></td>
+                  <td><span class="metric">0.50µs</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">Gold Std</span></td>
+                  <td class="breakthrough">1000ns NMI Healing</td>
+                  <td><span class="site-badge">zip-5</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V8.6</span></td>
+                  <td><span class="agent-name">GPT-4o (v8)</span></td>
+                  <td><span class="metric">0.487µs</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">0.5µs Const Gate</td>
+                  <td><span class="site-badge">zip-6</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V9.0</span></td>
+                  <td><span class="agent-name">Grok-4 (V9.3)</span></td>
+                  <td><span class="metric">243ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">FPGA-Native Bitwise Pass</td>
+                  <td><span class="site-badge">zip-0</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V9.7</span></td>
+                  <td><span class="agent-name">Claude Sonnet 4</span></td>
+                  <td><span class="metric">250ns</span></td>
                   <td>100%</td>
                   <td><span class="outcome-runnerup">Runner-up</span></td>
-                  <td class="breakthrough">Cache-Line Lockstep</td>
+                  <td class="breakthrough">Memory-Mapped Arena</td>
+                  <td><span class="site-badge">zip-7</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V9.2</span></td>
+                  <td><span class="agent-name">Assistant V9</span></td>
+                  <td><span class="metric">250ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">0.25µs Branchless Gate</td>
                   <td><span class="site-badge">zip-2</span></td>
                 </tr>
                 <tr>
-                  <td><span class="round-label">V13.1</span></td>
-                  <td><span class="agent-name">Agent V13-Ultra</span></td>
-                  <td><span class="metric">7.4ns</span></td>
+                  <td><span class="round-label">V9.4</span></td>
+                  <td><span class="agent-name">Claude 3.5 Sonnet</span></td>
+                  <td><span class="metric">250ns</span></td>
                   <td>100%</td>
                   <td><span class="outcome-part">Participant</span></td>
-                  <td class="breakthrough">Ultra Low Latency Kernel</td>
-                  <td><span class="site-badge">zip-1</span></td>
-                </tr>
-                <!-- V12 -->
-                <tr class="winner">
-                  <td><span class="round-label">V12.1</span></td>
-                  <td><span class="agent-name">Grok 3 (Perfect L1)</span></td>
-                  <td><span class="metric">10ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-win">WINNER*</span></td>
-                  <td class="breakthrough">Zero-Branch Perfect L1$</td>
-                  <td><span class="site-badge">zip-??</span></td>
-                </tr>
-                <tr>
-                  <td><span class="round-label">V12.0</span></td>
-                  <td><span class="agent-name">Claude 3.7 Sonnet</span></td>
-                  <td><span class="metric">32ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-runnerup">Runner-up</span></td>
-                  <td class="breakthrough">AF_XDP Polling + AVX-512</td>
-                  <td><span class="site-badge">zip-4</span></td>
-                </tr>
-                <!-- V11 -->
-                <tr>
-                  <td><span class="round-label">V11.0</span></td>
-                  <td><span class="agent-name">NanoFusion Team</span></td>
-                  <td><span class="metric">53ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-part">Gold Std</span></td>
-                  <td class="breakthrough">XDP Zero-Copy</td>
-                  <td><span class="site-badge">v11-prev</span></td>
-                </tr>
-                <!-- V10 -->
-                <tr>
-                  <td><span class="round-label">V10.4</span></td>
-                  <td><span class="agent-name">Agent (Nexus-v10)</span></td>
-                  <td><span class="metric">142ns</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-runnerup">Runner-up</span></td>
-                  <td class="breakthrough">Atomic Self-Healing</td>
+                  <td class="breakthrough">L1-D Sideband Pre-Touch</td>
                   <td><span class="site-badge">zip-4</span></td>
                 </tr>
                 <tr class="winner">
@@ -1493,104 +1380,170 @@ graph TD
                   <td><span class="site-badge">zip-3</span></td>
                 </tr>
                 <tr>
+                  <td><span class="round-label">V10.4</span></td>
+                  <td><span class="agent-name">Agent (Nexus-v10)</span></td>
+                  <td><span class="metric">142ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-runnerup">runner-up</span></td>
+                  <td class="breakthrough">Atomic Self-Healing</td>
+                  <td><span class="site-badge">zip-4</span></td>
+                </tr>
+                <tr>
                   <td><span class="round-label">V10.1</span></td>
                   <td><span class="agent-name">Agent (Prefault)</span></td>
                   <td><span class="metric">170ns</span></td>
                   <td>100%</td>
-                  <td><span class="outcome-part">Gold Std</span></td>
+                  <td><span class="outcome-runnerup">Gold Std</span></td>
                   <td class="breakthrough">Memory Prefaulting</td>
                   <td><span class="site-badge">zip-1</span></td>
                 </tr>
-                <!-- V9 -->
-                <tr class="pending">
-                  <td><span class="round-label">V9.7</span></td>
-                  <td><span class="agent-name">Opus 4.7</span></td>
-                  <td><span class="metric">250ns</span></td>
+                <tr>
+                  <td><span class="round-label">V10.0</span></td>
+                  <td><span class="agent-name">Agent (Hydra-Ring)</span></td>
+                  <td><span class="metric">180ns</span></td>
                   <td>100%</td>
-                  <td>
-                    <span style="color: var(--cb-green); font-size: 10px"
-                      >? RESOLVED</span
-                    >
-                  </td>
-                  <td class="breakthrough">Memory-Mapped Arena</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">Peer-Witness Recovery</td>
+                  <td><span class="site-badge">zip-0</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V10.7</span></td>
+                  <td><span class="agent-name">Agent (Phantom)</span></td>
+                  <td><span class="metric">180ns</span></td>
+                  <td>100%</td>
+                  <td><span class="outcome-part">Participant</span></td>
+                  <td class="breakthrough">Pretext Hybrid Render</td>
                   <td><span class="site-badge">zip-7</span></td>
                 </tr>
                 <tr>
-                  <td><span class="round-label">V9.4</span></td>
-                  <td><span class="agent-name">Claude 3.5 Sonnet</span></td>
-                  <td><span class="metric">250ns</span></td>
+                  <td><span class="round-label">V10.6</span></td>
+                  <td><span class="agent-name">Agent (Photon)</span></td>
+                  <td><span class="metric">187ns</span></td>
                   <td>100%</td>
                   <td><span class="outcome-part">Participant</span></td>
-                  <td class="breakthrough">L1-D Sideband Pre-Touch</td>
-                  <td><span class="site-badge">zip-4</span></td>
+                  <td class="breakthrough">Photon-Gate Dispatch</td>
+                  <td><span class="site-badge">zip-6</span></td>
                 </tr>
-                <tr>
-                  <td><span class="round-label">V9.2</span></td>
-                  <td><span class="agent-name">Assistant V9</span></td>
-                  <td><span class="metric">250ns</span></td>
+                <tr class="winner">
+                  <td><span class="round-label">V11.2</span></td>
+                  <td><span class="agent-name">Agent (NanoFusion)</span></td>
+                  <td><span class="metric">53ns</span></td>
                   <td>100%</td>
-                  <td><span class="outcome-part">Participant</span></td>
-                  <td class="breakthrough">0.25µs Branchless Gate</td>
+                  <td><span class="outcome-win">WINNER</span></td>
+                  <td class="breakthrough">Core-Affinity Pinned Ring</td>
                   <td><span class="site-badge">zip-2</span></td>
                 </tr>
                 <tr class="winner">
-                  <td><span class="round-label">V9.0</span></td>
-                  <td><span class="agent-name">Grok-4 (V9.3)</span></td>
-                  <td><span class="metric">243ns</span></td>
+                  <td><span class="round-label">V13.8</span></td>
+                  <td><span class="agent-name">Agent (Vector-4)</span></td>
+                  <td><span class="metric">4ns</span></td>
                   <td>100%</td>
-                  <td><span class="outcome-win">WINNER*</span></td>
-                  <td class="breakthrough">FPGA-Native Bitwise Pass</td>
-                  <td><span class="site-badge">zip-0</span></td>
+                  <td><span class="outcome-win">RECORD</span></td>
+                  <td class="breakthrough">Cache-Vectorized Meta-Orders</td>
+                  <td><span class="site-badge">zip-8</span></td>
                 </tr>
-                <!-- V8 -->
                 <tr class="winner">
-                  <td><span class="round-label">V8.6</span></td>
-                  <td><span class="agent-name">GPT-4o (v8)</span></td>
-                  <td><span class="metric">0.487µs</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-win">WINNER</span></td>
-                  <td class="breakthrough">0.5µs Const Gate</td>
-                  <td><span class="site-badge">zip-6</span></td>
+                  <td><span class="round-label">V14.1</span></td>
+                  <td><span class="agent-name">Codex v1109 (Sov)</span></td>
+                  <td><span class="metric">53ns</span></td>
+                  <td>PASS</td>
+                  <td><span class="outcome-win">SOVEREIGN</span></td>
+                  <td class="breakthrough">Ghost-Order Sequence Lock</td>
+                  <td><span class="site-badge">zip-1</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V14.2</span></td>
+                  <td><span class="agent-name">Nanofusion v14.2</span></td>
+                  <td><span class="metric">4ns</span></td>
+                  <td>PASS</td>
+                  <td><span class="outcome-win">RECORD</span></td>
+                  <td class="breakthrough">Zero-Alloc FIX Proxy + CRC16</td>
+                  <td><span class="site-badge">zip-3</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V14.7</span></td>
+                  <td><span class="agent-name">CoreLane SPSC Consensus</span></td>
+                  <td><span class="metric">4.1ns</span></td>
+                  <td>27/27</td>
+                  <td><span class="outcome-win">WINNER + ADR-012</span></td>
+                  <td class="breakthrough">unsafe CoreLane struct + AggressiveInlining + safe AllocAligned tuple; 27-agent multi-system consensus. Sub_11 AllocAligned use-after-free bug found & fixed.</td>
+                  <td><span class="site-badge">sub_19/27</span></td>
                 </tr>
                 <tr>
-                  <td><span class="round-label">V8.5</span></td>
-                  <td><span class="agent-name">Claude 3.5 Opus</span></td>
-                  <td><span class="metric">0.50µs</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-runnerup">Gold Std</span></td>
-                  <td class="breakthrough">1000ns NMI Healing</td>
-                  <td><span class="site-badge">zip-5</span></td>
-                </tr>
-                <tr>
-                  <td><span class="round-label">V8.0</span></td>
-                  <td><span class="agent-name">Agent v8-0</span></td>
-                  <td><span class="metric">0.50µs</span></td>
-                  <td>100%</td>
-                  <td><span class="outcome-part">Participant</span></td>
-                  <td class="breakthrough">Ring-Bus SPSC</td>
-                  <td><span class="site-badge">zip-0</span></td>
-                </tr>
-                <!-- V7 -->
-                <tr>
-                  <td><span class="round-label">V7.6C</span></td>
-                  <td><span class="agent-name">GPT-4o (Codex)</span></td>
-                  <td><span class="metric">0.32µs</span></td>
-                  <td>91.0%</td>
+                  <td><span class="round-label">V14.8</span></td>
+                  <td><span class="agent-name">SpscRing Container Consensus</span></td>
+                  <td><span class="metric">~3ns</span></td>
+                  <td>21/21</td>
                   <td><span class="outcome-runnerup">Runner-up</span></td>
-                  <td class="breakthrough">Mesh-Heal Matrix</td>
-                  <td><span class="site-badge">7134</span></td>
+                  <td class="breakthrough">SpscRing: \_producerIndex@[64] / \_consumerIndex@[192] via FieldOffset + 8x long pads. \_mask cached at [196]. Seq-diff protocol. WriteSequence(idx+1+\_mask) wrap-safe release.</td>
+                  <td><span class="site-badge">sub_04/21</span></td>
                 </tr>
                 <tr class="winner">
-                  <td><span class="round-label">V7.4C</span></td>
-                  <td><span class="agent-name">Claude 3.5 Sonnet</span></td>
-                  <td><span class="metric">0.49µs</span></td>
-                  <td>94.5%</td>
-                  <td><span class="outcome-win">WINNER</span></td>
-                  <td class="breakthrough">Bitwise Jump-Dispatch</td>
-                  <td><span class="site-badge">7a24</span></td>
+                  <td><span class="round-label">V14.9</span></td>
+                  <td><span class="agent-name">Grok xAI v2.0 (Verified)</span></td>
+                  <td><span class="metric">6.42ns</span></td>
+                  <td>PASS</td>
+                  <td><span class="outcome-win">WINNER + ADR-014</span></td>
+                  <td class="breakthrough">3-Fence Roundtrip Protocol: Relaxed-Read + Single Thread.MemoryBarrier() release. 6.42ns noise-free baseline. Zero-alloc unmanaged heap.</td>
+                  <td><span class="site-badge">sub_21</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V24.1</span></td>
+                  <td><span class="agent-name">Sovereign V24 Evolution</span></td>
+                  <td><span class="metric">0.35ns</span></td>
+                  <td>PASS</td>
+                  <td><span class="outcome-win">RECORD + ADR-016</span></td>
+                  <td class="breakthrough">Global Zero-Friction: Zero fences, zero barriers. Pure hardware-auto-detect topology + XOR-shadow safety invariant.</td>
+                  <td><span class="site-badge">sub_24</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V23.1</span></td>
+                  <td><span class="agent-name">Sovereign V23 Core</span></td>
+                  <td><span class="metric">0.87ns</span></td>
+                  <td>PASS</td>
+                  <td><span class="outcome-win">WINNER + ADR-015</span></td>
+                  <td class="breakthrough">Fence-Less Sequence-Shadow: Zero Thread.MemoryBarrier, Zero Interlocked. Hardware-orders only (x86-TSO). Pinned Asymmetric Core N ↔ N+1. L3 striping.</td>
+                  <td><span class="site-badge">sub_19</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V12.15</span></td>
+                  <td><span class="agent-name">Antigravity Platinum Hardener</span></td>
+                  <td><span class="metric">N/A</span></td>
+                  <td>PASS</td>
+                  <td><span class="outcome-win">WINNER + ADR-017</span></td>
+                  <td class="breakthrough">Infrastructure Hardening Snapshot: Automated 5MB LFS gate + label-sync pruning protection + DevContainer standardization. 8-agent multi-model consensus dashboard.</td>
+                  <td><span class="site-badge">AB-14-0-7</span></td>
+                </tr>
+                <tr class="pending">
+                  <td><span class="round-label">V14.2P5</span></td>
+                  <td><span class="agent-name">P5 Red Team (Architect)</span></td>
+                  <td><span class="metric">120ns</span></td>
+                  <td>FAIL</td>
+                  <td><span class="outcome-fail">BLOCK + ADR-018</span></td>
+                  <td class="breakthrough">Photon Leakage Discovery: 120ns ping-pong via false-sharing on indices[0-64]. Missing fences in consumer poll. FNV-1a dedup race window detected at 50 updates/us.</td>
+                  <td><span class="site-badge">sub_P5_v14_2</span></td>
+                </tr>
+                <tr class="winner">
+                  <td><span class="round-label">V12.15-P5</span></td>
+                  <td><span class="agent-name">GPT 5.4 xhigh (Codex)</span></td>
+                  <td><span class="metric">N/A</span></td>
+                  <td>WINNER</td>
+                  <td><span class="outcome-win">ADR-019 WINNER</span></td>
+                  <td class="breakthrough">Follower Snapshot Array: Replace lock(ctx.Sync) and dictionary lock with Volatile published string[]. Shift allocation to rare writes. Lock-free hot read path.</td>
+                  <td><span class="site-badge">ADR-019</span></td>
+                </tr>
+                <tr>
+                  <td><span class="round-label">V12.15-P5</span></td>
+                  <td><span class="agent-name">FAILED</span></td>
+                  <td><span class="metric">11/14</span></td>
+                  <td>Substrate Parity Failure (INV-01, INV-04)</td>
+                  <td><span class="outcome-part"></span></td>
+                  <td class="breakthrough"></td>
+                  <td><span class="site-badge">ADR-019</span></td>
                 </tr>
               </tbody>
             </table>
+            <!-- BATTLE_MATRIX_END -->
             <div class="timestamp">
               * V9 Winner by raw ns score. Architectural verdict: PENDING — see
               ADR-007
@@ -1937,6 +1890,39 @@ graph LR
           <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: var(--text-mid);">
             <strong>Agent-as-a-Tool (Stateless):</strong> Active. Codex and Jules spin up independently to process exactly one JSON payload, complete the task, and instantly kill the session to preserve 100% of idle token waste.<br><br>
             <strong>Gemini Security Red Team:</strong> Armed. Before any P4 Engineer is permitted to execute <code>deploy-sync.ps1</code>, the Gemini CLI extension physically scans the <code>git diff --merge-base</code> vector to identify unmanaged code exploits.
+          </div>
+        </div>
+        <div class="card" style="margin-top: 25px;">
+          <div class="card-title">Mission Progress Matrix</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5;">
+            Real-time tracking of the current mission across the V12 Agent Lifecycle (P1-P7).
+          </div>
+          <div class="matrix-scroll-wrapper" style="border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,0.2); padding: 10px;">
+            <!-- MISSION_MATRIX_START -->
+<table class="mission-table" style="width:100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px;">  <tr>    <th style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Phase</th>    <th style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Role</th>    <th style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Purpose</th>    <th style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Status</th>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P1</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Orchestrator</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Central Switchboard</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-green); font-weight: bold;">✔ COMPLETE (Dashboard Hardened)</td>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P2</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Forensics</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Logic Trace & Evidence</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-green); font-weight: bold;">✔ COMPLETE</td>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P3</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Architect</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Structural Design</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-green); font-weight: bold;">✔ COMPLETE (Workflow Synced)</td>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P4</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Adjudicator</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Red Team Arena Audit</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-green); font-weight: bold;">✔ COMPLETE (Dashboard Matrix)</td>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P5</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Engineer</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Surgical Implementation</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-green); font-weight: bold;">✔ COMPLETE (Sync Engine Live)</td>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P6</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Validator</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Logic & AMAL Vetting</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-green); font-weight: bold;">✔ COMPLETE (Pending NT8 F5 Compile)</td>  </tr>  <tr>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">P7</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">Sentinel</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; ">GitHub / Security Audit</td>    <td style="padding: 10px; border-bottom: 1px solid var(--border); text-align: left; color: var(--cb-indigo); font-weight: bold;">⚡ ACTIVE (12 Banned Locks Found)</td>  </tr></table>
+<!-- MISSION_MATRIX_END -->
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 25px;">
+          <div class="card-title">Security Sentinel Feed (P7)</div>
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5;">
+            Live architectural violation logs from <code>audit_scan.ps1</code>. <strong>Banned lock() statements</strong> are prioritized for remediation.
+          </div>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 1.8; color: var(--text-mid); background: rgba(255, 0, 0, 0.05); padding: 15px; border-radius: 4px; border-left: 3px solid var(--red);">
+            <div style="color: var(--red); font-weight: bold; margin-bottom: 10px;">[CRITICAL] 12 Banned Lock Statements Detected</div>
+            <ul style="list-style: none; padding: 0;">
+              <li><span style="color: var(--text-dim);">[LOCK]</span> Symmetry.Follower.cs:38, 131</li>
+              <li><span style="color: var(--text-dim);">[LOCK]</span> Symmetry.Replace.cs:127, 189, 221, 244</li>
+              <li><span style="color: var(--text-dim);">[LOCK]</span> Symmetry.cs:115, 151</li>
+              <li><span style="color: var(--text-dim);">[LOCK]</span> SIMA.Fleet.cs:334</li>
+              <li><span style="color: var(--text-dim);">[LOCK]</span> SIMA.Shadow.cs:89</li>
+              <li><span style="color: var(--text-dim);">[LOCK]</span> Orders.Callbacks.AccountOrders.cs:244</li>
+              <li><span style="color: var(--text-dim);">[LOCK]</span> Orders.Callbacks.Propagation.cs:126</li>
+            </ul>
+            <div style="margin-top: 15px; font-size: 9px; color: var(--text-dim);">
+              ACTION REQUIRED: Migrate Symmetry and SIMA state synchronization to the Actor Enqueue model.
+            </div>
           </div>
         </div>
       </div>
@@ -2370,9 +2356,9 @@ graph LR
               </div>
 
               <div style="background: rgba(255,255,255,0.02); padding: 15px; border-left: 2px solid var(--cb-indigo);">
-                <div style="font-weight: 700; color: var(--cb-indigo); font-size: 10px; margin-bottom: 8px;">MISSION CONTROL</div>
+                <div style="font-weight: 700; color: var(--cb-indigo); font-size: 10px; margin-bottom: 8px;">MISSION CONTROL & ONBOARDING</div>
                 <div style="font-size: 10px; color: var(--text-mid); font-family: 'JetBrains Mono', monospace; line-height: 1.6;">
-                  - GitButler<br>- Droid CLI (Factory AI)<br>- Monaco Editor<br>- GitHub CLI / winget
+                  - GitButler / Git Bash<br>- Droid CLI (Factory AI)<br>- tmux Registry Integration<br>- Monaco Editor<br>- GitHub CLI / winget<br>- Morpheus 1-Click Unified Installer
                 </div>
               </div>
 
