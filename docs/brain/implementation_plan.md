@@ -424,7 +424,7 @@ The `stateLock` declaration is intentionally retained as a single-line stub -- r
 
 After Step 4.1, `V12_002.cs` no longer declares `dailySummaryLock`. The `stateLock` stub is annotated for the next phase.
 
-## FILE 5: Cascade Migrations Required by Section 1's Structural Change
+## D.4 PATH SUBSTITUTIONS (Cascade Migrations)
 
 Section 1's redefinition of `SymmetryDispatchContext` removes the `Sync` field and the `FollowerEntries` HashSet. Five out-of-scope files reference these members and **must** be migrated in the same commit or the build breaks. Each migration is a mechanical pattern application of ADR-019 -- no logic change.
 
@@ -558,7 +558,7 @@ V12_002.cs                           : 0 dailySummaryLock declarations (stateLoc
 
 Hot-path allocation profile: `PropagateMasterPriceMove` per-tick allocations drop from `O(N_followers)` (HashSet enumerator + `string[]` ToArray copy) to `0` (single `Volatile.Read` returns the cached immutable array).
 
-## VERIFICATION PLAN
+## F. VERIFICATION GATES
 
 ### Build-time
 
