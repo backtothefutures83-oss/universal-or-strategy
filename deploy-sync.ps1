@@ -63,9 +63,13 @@ $Mappings = @(
     @{ src = "V12_002.Trailing.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.cs" },
     @{ src = "V12_002.Trailing.StopUpdate.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.StopUpdate.cs" },
     @{ src = "V12_002.Trailing.Breakeven.cs"; dst = Join-Path $NtStrategyDir "V12_002.Trailing.Breakeven.cs" },
+    @{ src = "V12_002.UI.Snapshot.cs"; dst = Join-Path $NtStrategyDir "V12_002.UI.Snapshot.cs" },
+    @{ src = "V12_002.Safety.Watchdog.cs"; dst = Join-Path $NtStrategyDir "V12_002.Safety.Watchdog.cs" },
     @{ src = "V12_002.MetadataGuard.cs"; dst = Join-Path $NtStrategyDir "V12_002.MetadataGuard.cs" },
+    @{ src = "V12_002.Photon.Ring.cs"; dst = Join-Path $NtStrategyDir "V12_002.Photon.Ring.cs" },
+    @{ src = "V12_002.Photon.Pool.cs"; dst = Join-Path $NtStrategyDir "V12_002.Photon.Pool.cs" },
     @{ src = "V12_002.Properties.cs"; dst = Join-Path $NtStrategyDir "V12_002.Properties.cs" },
-    
+
     # Strategy Components
     @{ src = "V12_002.Constants.cs"; dst = Join-Path $NtStrategyDir "V12_002.Constants.cs" },
     @{ src = "V12_002.Atm.cs"; dst = Join-Path $NtStrategyDir "V12_002.Atm.cs" },
@@ -102,23 +106,44 @@ if (-not $gatePass) {
 }
 Write-Host "ASCII GATE PASS - all source files are clean`n" -ForegroundColor Green
 
+# =============================================================================
+# SOVEREIGN DROID AUDIT (P5 Red Team)
+# Automated verification of V12 architectural mandates.
+# =============================================================================
+if (Get-Command "droid" -ErrorAction SilentlyContinue) {
+    Write-Host "--- SOVEREIGN AUDIT: Launching Droid P5 Review ---" -ForegroundColor Yellow
+    $AuditPrompt = "Review all uncommitted changes in src/. STRICTLY FLAG [P0] for any 'lock(' blocks or non-ASCII characters in C# strings. Verify that state mutations follow the Enqueue/Actor pattern."
+    try {
+        droid exec --auto high $AuditPrompt
+        Write-Host "SOVEREIGN AUDIT PASS: Architectural integrity verified.`n" -ForegroundColor Green
+    } catch {
+        Write-Host "SOVEREIGN AUDIT FAIL: Droid flagged critical violations." -ForegroundColor Red
+        Write-Host "Check the output above and fix the P0 findings before deployment.`n" -ForegroundColor Red
+    }
+} else {
+    Write-Host "SOVEREIGN AUDIT SKIP: Droid CLI not found. (Level 2 Readiness incomplete)`n" -ForegroundColor Gray
+}
+
+# =============================================================================
+# DEPLOYMENT ENGINE: Hardening Environment
+# =============================================================================
 Write-Host "--- WSGTA DEPLOY SYNC: Hardening Environment ---" -ForegroundColor Cyan
 
-foreach ($map in $Mappings) {
-    if ($map.src -match "Indicator") {
-        $srcPath = Join-Path (Join-Path $RepoRoot "src") $map.src
-    }
-    else {
-        $srcPath = Join-Path (Join-Path $RepoRoot "src") $map.src
-    }
-    
-    $dstPath = $map.dst
-    
-    if (!(Test-Path $srcPath)) {
-        Write-Host "SKIP: Source missing -> src/$($map.src)" -ForegroundColor Gray
-        continue
-    }
+# 1. Base Strategy & Main Components
+$FixedMappings = @(
+    @{ src = "V12_001.cs"; dst = Join-Path $NtIndicatorDir "V12_001.cs" },
+    @{ src = "V12_002.cs"; dst = Join-Path $NtStrategyDir "V12_002.cs" },
+    @{ src = "SignalBroadcaster.cs"; dst = Join-Path $NtStrategyDir "SignalBroadcaster.cs" }
+)
 
+# 2. Dynamic Discovery: All V12_002 Sub-modules
+$DynamicFiles = Get-ChildItem -Path $srcDir -Filter "V12_002.*.cs"
+foreach ($file in $DynamicFiles) {
+    if ($file.Name -eq "V12_002.cs") { continue } # Already in FixedMappings
+    
+    $srcPath = $file.FullName
+    $dstPath = Join-Path $NtStrategyDir $file.Name
+    
     # Ensure Target Directory Exists
     $targetDir = Split-Path $dstPath
     if (!(Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir }
@@ -126,24 +151,41 @@ foreach ($map in $Mappings) {
     # Sync Logic
     if (Test-Path $dstPath) {
         $item = Get-Item $dstPath
-        # If it's a file but NOT a link, backup it
-        # Check if it's already a link to the current source
-        $isLink = $item.Attributes -match "ReparsePoint"
-        
-        if ($isLink) {
-            # Verify it points to the right place or just recreate it
-            Remove-Item $dstPath -Force
-        }
-        else {
-            # Backup if it's a real file (to avoid losing work)
-            $backup = $dstPath + ".bak_" + (Get-Date -Format "yyyyMMdd_HHmm")
+        if ($item.LinkType -eq "HardLink") {
+            Remove-Item $dstPath -Force 
+        } else {
+            $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+            $backup = $dstPath + ".bak_" + $timestamp
             Write-Host "BACKUP: Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
-            Move-Item $dstPath $backup
+            Move-Item $dstPath $backup -Force
         }
     }
 
     # Create the Link
-    Write-Host "LINKING: $($map.src) -> NT8" -ForegroundColor Green
+    Write-Host "LINKING: $($file.Name) -> NT8" -ForegroundColor Green
+    New-Item -ItemType HardLink -Path $dstPath -Value $srcPath | Out-Null
+}
+
+# 3. Fixed Mappings Execution
+foreach ($map in $FixedMappings) {
+    $srcPath = Join-Path $srcDir $map.src
+    $dstPath = $map.dst
+    if (!(Test-Path $srcPath)) { continue }
+    
+    if (Test-Path $dstPath) {
+        $item = Get-Item $dstPath
+        if ($item.LinkType -eq "HardLink") {
+            Write-Host "CLEANUP: Removing existing link -> $(Split-Path $dstPath -Leaf)" -ForegroundColor Gray
+            Remove-Item $dstPath -Force 
+        } else {
+            $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+            $backup = $dstPath + ".bak_" + $timestamp
+            Write-Host "BACKUP (Fixed): Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
+            Move-Item $dstPath $backup -Force
+        }
+    }
+    
+    Write-Host "LINKING (Fixed): $($map.src) -> NT8" -ForegroundColor Green
     New-Item -ItemType HardLink -Path $dstPath -Value $srcPath | Out-Null
 }
 

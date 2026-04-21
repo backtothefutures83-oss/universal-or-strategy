@@ -122,9 +122,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId) &&
                 symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
             {
-                string[] snapshot;
-                lock (ctx.Sync) { snapshot = ctx.FollowerEntries.ToArray(); }
-                followerEntryNames = snapshot;
+                // ADR-019: ctx.Followers is an immutable snapshot published via Interlocked.CompareExchange.
+                // Zero-alloc, lock-free, point-in-time consistent. Hot path on every master price move.
+                followerEntryNames = ctx.Followers;
             }
             else
             {

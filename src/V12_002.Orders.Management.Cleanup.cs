@@ -43,12 +43,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int cancelledTargets = 0;
                 int cancelledEntries = 0;
 
-                // Build 1102U [BUG-2a]: Fleet followers must use Account.Cancel() -- not CancelOrder() which only
-                // works for orders submitted through this strategy instance's NinjaScript order management.
-                // Follower orders are submitted via acct.Submit(), so they require the broker-level cancel API.
+                // Build 1104: route all cleanup cancels through the gateway so follower orders use
+                // Account.Cancel() while master orders keep the managed cancel path.
                 PositionInfo cleanupPosRef;
-                bool isFollowerForCleanup = activePositions.TryGetValue(entryName, out cleanupPosRef)
-                    && cleanupPosRef.IsFollower && cleanupPosRef.ExecutingAccount != null;
+                activePositions.TryGetValue(entryName, out cleanupPosRef);
 
                 // Stop: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
                 if (stopOrders.TryGetValue(entryName, out var stopOrder))
@@ -59,10 +57,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             stopOrders.TryRemove(entryName, out _);
                         else
                         {
-                            if (isFollowerForCleanup)
-                                cleanupPosRef.ExecutingAccount.Cancel(new[] { stopOrder });
-                            else
-                                CancelOrder(stopOrder);
+                            CancelOrderSafe(stopOrder, cleanupPosRef);
                             cancelledStops++;
                         }
                     }
@@ -84,10 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 tDict.TryRemove(entryName, out _);
                             else
                             {
-                                if (isFollowerForCleanup)
-                                    cleanupPosRef.ExecutingAccount.Cancel(new[] { tOrder });
-                                else
-                                    CancelOrder(tOrder);
+                                CancelOrderSafe(tOrder, cleanupPosRef);
                                 cancelledTargets++;
                             }
                         }
@@ -110,10 +102,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         else
                         {
-                            if (isFollowerForCleanup)
-                                cleanupPosRef.ExecutingAccount.Cancel(new[] { eOrder });
-                            else
-                                CancelOrder(eOrder);
+                            CancelOrderSafe(eOrder, cleanupPosRef);
                             cancelledEntries++;
                         }
                     }
@@ -360,7 +349,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (string.IsNullOrEmpty(entryName) || !activePositions.ContainsKey(entryName))
                         {
                             Print(string.Format("ORPHANED ORDER DETECTED ({0}): {1} | Cancelling...", reason, name));
-                            CancelOrder(order);
+                            CancelOrderOnAccount(order, order.Account);
                             foundOrphans = true;
                         }
                     }

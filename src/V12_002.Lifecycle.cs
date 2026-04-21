@@ -48,6 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _configureComplete = false;
                 _dataLoadedComplete = false;
                 Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
+                ResetTelemetry();
                 Description = "Universal OR Strategy V12.12 - Build " + BUILD_TAG;
                 Name = "V12_002";
                 Calculate = Calculate.OnPriceChange;  // CRITICAL FIX: Updates on every price tick for real-time trailing
@@ -70,7 +71,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Risk defaults
                 RiskPerTrade = 200;
-                ReducedRiskPerTrade = 200; // deprecated -- hidden in UI (RISK-01)
                 StopThresholdPoints = 5.0;
                 SlippageCushionPoints = 1.0; // SLIP-01: 1pt default cushion for follower slippage
                 MESMinimum = 1;
@@ -142,11 +142,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnableSIMA = false; // SAFETY: Default to OFF
                 ReaperAuditEnabled = true;
                 ReaperIntervalMs = 1000;          // 1 second audit cycle
-                NakedPositionGraceSec = 3;        // GHOST-FIX-2 [922Z]: 3s grace before emergency stop on naked position
+                NakedPositionGraceSec = 5;        // Build 1104: extend naked-position grace to 5s for stop replace round-trips
                 EnablePathB = false;
                 AutoFlattenDesync = false;
                 RepairTickFence = 8;
-                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES?MES fleet parity
+                FleetParityMultiplier = 1; // V12.Phase8.7 [PARITY-01]: Set to 10 for ES/MES fleet parity
+                ShadowModeEnabled = false; // Build 1105: Shadow Mode opt-in, default OFF for safe rollout
                 PathBStopPoints = 10.0;
                 PathBTargetPoints = 15.0;
                 ChaseIfTouchPoints = "0";
@@ -163,6 +164,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RmaIntelligenceEnabled = false; // Default to isolated/OFF
                 RmaProximityTicks = 2;
                 RmaCancellationTicks = 4;
+                RmaMaxProbeCount = 3;         // Phase 9.2: 3 probes before exhaustion
+                RmaExhaustionEnabled = false; // Phase 9.2: Off by default, opt-in
             }
             else if (state == State.Configure)
             {
@@ -195,6 +198,43 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // V12 SIMA: Initialize expected positions tracking
                 expectedPositions = new ConcurrentDictionary<string, int>(2, 20); // Up to 20 accounts
+
+                // v28.0 Sovereign Photon [ADR-012 + ADR-016]: pool + ring + sideband + salt + MMIO mirror
+                // Capacity 64: 5 concurrent signals x 12 accounts = 60 < 64
+                _photonPool = new PhotonOrderPool(PhotonPoolCapacity);
+                _photonDispatchRing = new SPSCRing<FleetDispatchSlot>(PhotonPoolCapacity);
+                _photonSideband = new FleetDispatchSideband[PhotonPoolCapacity];
+                _photonShadowSalt = unchecked((ulong)Guid.NewGuid().GetHashCode() * 0x9E3779B97F4A7C15UL);
+
+                // Static assert: Shadow must be the last 8 bytes of FleetDispatchSlot (ADR-016)
+                {
+                    int _slotSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(FleetDispatchSlot));
+                    int _shadowOffset = System.Runtime.InteropServices.Marshal.OffsetOf(typeof(FleetDispatchSlot), "Shadow").ToInt32();
+                    if (_slotSize != 64 || _shadowOffset != 56)
+                    {
+                        throw new InvalidOperationException(string.Format(
+                            "FleetDispatchSlot layout invariant violated: size={0}, shadowOffset={1}; expected size=64, offset=56",
+                            _slotSize, _shadowOffset));
+                    }
+                }
+
+                // Optional MMIO mirror. Named per-process so multiple NT instances do not collide.
+                // Failure is non-fatal: hot path runs against the heap ring even if the mirror fails.
+                try
+                {
+                    string _mmfName = "V12_FleetDispatch_" + System.Diagnostics.Process.GetCurrentProcess().Id.ToString() + "_" + _photonShadowSalt.ToString("X16");
+                    _photonMmioMirror = new MmioDispatchMirror(_mmfName, PhotonPoolCapacity, 64, _photonShadowSalt);
+                    Print(string.Format("[PHOTON MMIO] mirror online: {0}", _mmfName));
+                }
+                catch (Exception _mmioEx)
+                {
+                    _photonMmioMirror = null;
+                    Print("[PHOTON MMIO] mirror unavailable (hot path unaffected): " + _mmioEx.Message);
+                }
+
+                // V14.2 Sovereign Photon [ADR-011]: Pre-allocate execution ID dedup rings
+                _executionIdRing = new ExecutionIdRing(512, 1024);
+                _executionIdFallbackRing = new ExecutionIdRing(512, 1024);
 
                 // V12.1: Initialize Compliance Hub -- create log directory early (idempotent).
                 // Build 935 [Fix-2/3]: Symbol-specific log paths and LogicAudit moved to DataLoaded.
@@ -270,14 +310,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 ResetOR();
 
-                Print(string.Format("UniversalORStrategy V12.14 | {0} | Tick: {1} | PV: ${2}", symbol, tickSize, pointValue));
+                Print(string.Format("UniversalORStrategy {0} | {1} | Tick: {2} | PV: ${3}", BUILD_TAG, symbol, tickSize, pointValue));
                 Print(string.Format("Session: {0} - {1} {2} | OR: {3} min",
                     SessionStart.ToString("HH:mm"), SessionEnd.ToString("HH:mm"), SelectedTimeZone, (int)ORTimeframe));
                 Print(string.Format("Targets: T1={0}({1}) T2={2}({3}) T3={4}({5}) T4={6}({7}) T5={8}({9}) | Stop={10}xOR",
                     Target1Value, T1Type, Target2Value, T2Type, Target3Value, T3Type, Target4Value, T4Type, Target5Value, T5Type, StopMultiplier));
                 Print(string.Format("RMA: Enabled={0} ATR({1}) Stop={2}xATR",
                     RMAEnabled, RMAATRPeriod, RMAStopATRMultiplier));
-                Print("V12.9 REPAIRED: Definitive Chart-Click Fix + Logic Refresh");
+                Print(string.Format("{0} REPAIRED: Definitive Chart-Click Fix + Logic Refresh", BUILD_TAG));
                 Print(string.Format("TREND: Enabled={0} E1Stop={1}xATR E2Trail={2}xATR", TRENDEnabled, TRENDEntry1ATRMultiplier, TRENDEntry2ATRMultiplier));
                 Print(string.Format("FFMA: Enabled={0} Distance={1}pt RSI={2}/{3}", FFMAEnabled, FFMAEMADistance, FFMARSIOversold, FFMARSIOverbought));
                 Print(string.Format("V12 SIMA: {0} | AccountPrefix: \"{1}\"", EnableSIMA ? "ENABLED - Fleet mode" : "DISABLED - Single account", AccountPrefix));
@@ -295,9 +335,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 _dataLoadedComplete = true;
 
+                // Build 1103: Initialize sticky state path + hydrate persisted config.
+                // MUST run BEFORE StartIpcServer() so GET_LAYOUT serves last-synced state.
+                _stickyStatePath = System.IO.Path.Combine(logsDir,
+                    string.Format("StickyState_{0}.v12state", symbol));
+                bool stickyLoaded = LoadStickyState();
+                if (stickyLoaded)
+                    Print("[STICKY] Persisted state hydrated -- GET_LAYOUT will serve last-synced config");
+
                 // V12.2 HEADLESS SAFETY: Start core services even if ChartControl is null (for background execution)
                 // [Build 932]: Start IPC in DataLoaded so Control Surface connects even if market is closed/offline.
                 StartIpcServer();
+                TouchStrategyHeartbeat();
+                PublishUiSnapshot();
             }
             else if (state == State.Realtime)
             {
@@ -305,6 +355,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("|          [OK] BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE       |");
                 Print(string.Format("|          Build: {0,-10} |  Sync: ONE SOURCE OF TRUTH    |", BUILD_TAG));
                 Print("+--------------------------------------------------------------+");
+                TouchStrategyHeartbeat();
+                PublishUiSnapshot();
+                StartWatchdog();
 
                 if (EnableSIMA)
                 {
@@ -323,21 +376,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (ChartControl != null)
                 {
+                    // Hotkeys attach at Normal priority (fast, no visual tree dependency)
                     ChartControl.Dispatcher.InvokeAsync(() =>
                     {
+                        if (_isTerminating) return;
                         AttachHotkeys();
                         AttachChartClickHandler();
+                    }, System.Windows.Threading.DispatcherPriority.Normal);
+
+                    // Panel creation deferred to Loaded priority (runs AFTER Render pass)
+                    // This ensures the Chart Trader control is in the visual tree before discovery
+                    ChartControl.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (_isTerminating) return;
+                        CreatePanel();
+                        StartPanelRefresh();
                         Print("REALTIME - Hotkeys: L=Long, S=Short, Shift+Click=RMA, F=Flatten");
-                    });
+                    }, System.Windows.Threading.DispatcherPriority.Loaded);
                 }
             }
             else if (state == State.Terminated)
             {
                 _isTerminating = true;
+                StopWatchdog();
 
                 _configureComplete = false;
                 _dataLoadedComplete = false;
                 Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
+
+                StopPanelRefresh();
 
                 if (ChartControl != null)
                 {
@@ -345,6 +412,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         DetachHotkeys();
                         DetachChartClickHandler();
+                        DestroyPanel();
                     });
                 }
 
@@ -354,6 +422,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 CancelAllV12GtcOrders(false);
 
                 DrainQueuesForShutdown();
+                EmitMetricsSummary();
 
                 // Stop IPC Server
                 StopIpcServer();
@@ -365,7 +434,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() -- unconditional (no EnableSIMA guard)
                 // to handle cases where flag was toggled OFF mid-session while handlers were still subscribed.
                 UnsubscribeFromFleetAccounts();
-                
+
+                // v28.0 MMIO mirror teardown
+                if (_photonMmioMirror != null)
+                {
+                    try { _photonMmioMirror.Dispose(); } catch { }
+                    _photonMmioMirror = null;
+                }
 
                 // V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
                 // Static events survive instance disposal -- without this, dead instance handlers accumulate
@@ -468,9 +543,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (marketDataUpdate.MarketDataType == MarketDataType.Last)
             {
                 if (!EnsureStartupReady(nameof(OnMarketData))) return;
+                TouchStrategyHeartbeat();
 
                 // Update last known price for real-time tracking
                 lastKnownPrice = marketDataUpdate.Price;
+                PublishUiSnapshot();
                 
                 // Process IPC commands immediately on every tick
                 // This ensures Remote App buttons work even outside session time

@@ -1,0 +1,10 @@
+version: "1.0.0"
+title: Schema Test
+description: Testing Goose schema validation
+prompt: Hello
+instructions: Say hello
+parameters:
+  test_param:
+    type: string
+    description: A test parameter
+    required: true

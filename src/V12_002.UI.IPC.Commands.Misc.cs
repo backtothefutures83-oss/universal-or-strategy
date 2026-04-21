@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12: GET_LAYOUT handler (primary response is in ListenForRemote, this is fallback logging)
             if (action == "GET_LAYOUT")
             {
-                string mode = isRMAModeActive ? "RMA" : "OR";
+                string mode = GetCurrentConfigMode();
                 Print(string.Format("V12 GET_LAYOUT: Mode={0} Count={1} T1={2}({3}) T2={4}({5}) T3={6}({7}) T4={8}({9}) T5={10}({11})",
                     mode, activeTargetCount,
                     Target1Value, T1Type,
@@ -118,7 +118,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (parts.Length > 1)
                 {
                     string newLeader = parts[1].Trim();
+                    _stickyLeaderAccount = newLeader; // Build 1103: Store for persistence
                     Print($"V12.25 IPC: Leader Account synced to [{newLeader}]");
+                    MarkStickyDirty(); // Build 1103: Persist leader
                 }
             }
             else if (action == "REQUEST_FLEET_STATE")
@@ -144,10 +146,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 fsb.Append(string.Join(";", acctStates));
                 SendResponseToRemote(fsb.ToString());
+                if (!string.IsNullOrEmpty(_stickyLeaderAccount))
+                    SendResponseToRemote("SET_LEADER_ACCOUNT|" + _stickyLeaderAccount);
             }
         }
 
-        // ?????????????????????????????????????????????????????????????????????????????
+        // =========================================================================
 
         private void SendResponseToRemote(string response)
         {
@@ -241,20 +245,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                             targetOrder.OrderState == OrderState.Accepted ||
                             targetOrder.OrderState == OrderState.Submitted))
                         {
-                            CancelOrder(targetOrder);
+                            CancelOrderSafe(targetOrder, pos);
                             Print(string.Format("V10.3: Cancelled {0} limit order for {1}", targetName, entryName));
                         }
                     }
 
-                    // Submit market order to close the target contracts
-                    if (pos.Direction == MarketPosition.Long)
-                        SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qtyToClose, 0, 0, "",
-                            string.Format("Close{0}_{1}", targetName, entryName));
-                    else
-                        SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qtyToClose, 0, 0, "",
-                            string.Format("Close{0}_{1}", targetName, entryName));
+                    // Build 1108.003 [D1]: Pre-cancel stop when closing the entire remaining position.
+                    // Without this, follower accounts can have a working stop + market exit simultaneously.
+                    if (qtyToClose >= pos.RemainingContracts)
+                    {
+                        RequestStopCancelLifecycleSafe(entryName);
+                        Print(string.Format("V10.3: Full close -- requested stop cancel for {0}", entryName));
+                    }
 
-                    Print(string.Format("V10.3: Closing {0} ({1} contracts) at market for {2}", targetName, qtyToClose, entryName));
+                    // Submit market order to close the target contracts
+                    Order closeOrder = SubmitExitOrderForPosition(
+                        pos, qtyToClose, OrderType.Market, 0, string.Format("Close{0}_{1}", targetName, entryName));
+                    if (closeOrder != null)
+                        Print(string.Format("V10.3: Closing {0} ({1} contracts) at market for {2}", targetName, qtyToClose, entryName));
+                    else
+                        Print(string.Format("V10.3: FAILED to close {0} ({1} contracts) at market for {2}", targetName, qtyToClose, entryName));
                 }
             }
             catch (Exception ex)
@@ -266,8 +276,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ToggleStrategyMode(string action)
         {
              // V12.20: Atomic flag mutations
-             if (action == "MODE_RMA") isRMAModeActive = !isRMAModeActive;
-             else if (action == "MODE_MOMO") isMOMOModeActive = !isMOMOModeActive;
+             if (action == "MODE_RMA")
+             {
+                 isRMAModeActive = !isRMAModeActive;
+                 ClearClickTraderBorderIfInactive();
+             }
+             else if (action == "MODE_MOMO")
+             {
+                 isMOMOModeActive = !isMOMOModeActive;
+                 ClearClickTraderBorderIfInactive();
+             }
              else if (action == "MODE_FFMA")
              {
                  isFFMAModeArmed = true;
@@ -336,6 +354,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                  int ffmaContracts = CalculatePositionSize(ffmaStopDist);
                  Enqueue(ctx => ctx.ExecuteFFMAEntry(direction, ffmaContracts));
              }
+
+             if (action == "MODE_RMA"
+                 || action == "MODE_MOMO"
+                 || action == "MODE_FFMA"
+                 || action == "FFMA_DISARM")
+             {
+                 BumpUiConfigRevision();
+             }
+
+             PublishUiSnapshot();
 
              Print(string.Format("IPC Mode Toggle: {0} | RMA={1} MOMO={2} TrendRMA={3} RetestRMA={4} FFMA={5}",
                 action, isRMAModeActive, isMOMOModeActive, isTrendRmaMode, isRetestRmaMode, isFFMAModeArmed));

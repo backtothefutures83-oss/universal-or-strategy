@@ -23,9 +23,9 @@ This document provides the immutable technical standards for all AI agents (Anth
 
 - **ORCHESTRATOR (Antigravity):** The **"Central Switchboard."** Handles intake (P1), context management, and non-coding tools. BANNED from manual coding.
 - **FORENSICS (Codex):** The **"Logic Auditor."** Provides diagnosis (P2) and "Logical Proof of Failure" (P5).
-- **ARCHITECT (Claude Code):** The **"Strategic Planner."** Authority for Design (P3), Peer Review, and Sign-off (P5).
+- **ARCHITECT (Claude Code):** The **"Strategic Planner & Implementation Lead."** Authority for Design (P3), Peer Review, and **Approved Execution (P4)**. Has full permission to edit source once plan is approved.
 - **ENGINEER (Any Agent):** The **"Implementation Specialist."** Primary terminal/agent for execution (P4). Must use its native subagent ecosystem or internal audit tools.
-- **The Workflow:** Forensic Trace (Codex) -> Architectural Brief (Claude) -> Implementation Plan -> User Approval -> Engineer Execution (Any Agent) -> **Internal Subagent Audit (/loop-critic)** -> Architectural Audit (Claude) -> Final Handoff.
+- **The Workflow:** Forensic Trace (Codex) -> Architectural Brief (Claude) -> Implementation Plan -> **USER APPROVAL (Director's Gate)** -> Architect/Engineer Execution -> **Internal Subagent Audit (/loop-critic)** -> Architectural Sign-off (Claude) -> Final Handoff.
 - **The Bridge:** Handoffs are managed via `implementation_plan.md` and **Mission Brief** artifacts.
 
 ## 5. Multi-Agent Parity and Sync Protocol
@@ -72,6 +72,19 @@ This document provides the immutable technical standards for all AI agents (Anth
 2. Search all `.cs` files for the pattern `?"` in non-comment lines -- each match is a broken string
 3. Replace `?"` with `--` or `(!)` as appropriate
 4. Run `deploy-sync.ps1` -- the ASCII gate will confirm clean before touching NT8
+
+## 7B. Post-Edit Deployment Protocol (MANDATORY -- ALL AGENTS)
+
+**Root Cause (confirmed Build 1108 incident):** File-edit tools (`replace_file_content`, `Edit`, `Write`) create new inodes. This silently breaks the hard links `deploy-sync.ps1` established between `src/` and the NinjaTrader Strategies folder. The old stale DLL is compiled even after F5, and the banner shows the old BUILD_TAG.
+
+**Required sequence after ANY `src/` file edit -- no exceptions:**
+1. Run `powershell -File .\deploy-sync.ps1` -- re-establishes all hard links. ASCII Gate must PASS.
+2. Instruct the Director: "Please press F5 in NinjaTrader to compile."
+3. Verify the startup banner shows the new BUILD_TAG.
+
+**Applies to:** Antigravity, Claude, Codex, Gemini, Jules -- all agents, all platforms.
+**Skipping this step is a protocol violation** equivalent to not running the ASCII gate.
+
 
 ---
 

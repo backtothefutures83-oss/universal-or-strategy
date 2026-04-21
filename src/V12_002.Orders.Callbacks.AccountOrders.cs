@@ -94,6 +94,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
+            // Build 1104.1: Fleet account expectedPositions tracking (symmetric with Master at line 65)
+            // Without this, expectedPositions stays stale after fleet stop/target fills,
+            // causing REAPER to see Expected != Actual and trigger false flattens.
+            else if (IsFleetAccount(acct))
+            {
+                if (order.OrderState == OrderState.Filled || order.OrderState == OrderState.PartFilled)
+                {
+                    if (order.Name.StartsWith("Stop_"))
+                    {
+                        // Fleet stop filled: position closing. Zero expectedPositions.
+                        _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+                        var fExpKey = ExpKey(acct.Name);
+                        Enqueue(ctx => ctx.SetExpectedPositionLocked(fExpKey, 0));
+                    }
+                    else if (order.Name.StartsWith("T") && order.Name.Contains("_"))
+                    {
+                        // Fleet target filled: delta-decrement expectedPositions.
+                        int fFilledQty = order.Filled;
+                        var fExpKey = ExpKey(acct.Name);
+                        Enqueue(ctx =>
+                        {
+                            if (ctx.expectedPositions != null && ctx.expectedPositions.TryGetValue(fExpKey, out int fCurrentExp))
+                            {
+                                int fNewExp;
+                                if (fCurrentExp > 0)
+                                    fNewExp = Math.Max(0, fCurrentExp - fFilledQty);
+                                else if (fCurrentExp < 0)
+                                    fNewExp = Math.Min(0, fCurrentExp + fFilledQty);
+                                else
+                                    fNewExp = 0;
+                                ctx.SetExpectedPositionLocked(fExpKey, fNewExp);
+                            }
+                        });
+                    }
+                }
+            }
 
             if (order.OrderState != OrderState.Cancelled && order.OrderState != OrderState.Rejected &&
                 order.OrderState != OrderState.Unknown)
@@ -116,6 +152,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ProcessAccountOrderQueue()
         {
+            // Build 1109 [FREEZE-PROOF]: Queue depth warning
+            int _oqDepth = _accountOrderQueue.Count;
+            if (_oqDepth > 50)
+                Print("[ORDER_WARN] Account order queue depth=" + _oqDepth);
             // V12.Phase7 [THREAD-01a]: Buffer-and-wait during flatten (symmetric with ProcessAccountExecutionQueue).
             if (isFlattenRunning)
             {
@@ -201,8 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            lock (ctx.Sync)
-                followerEntries = ctx.FollowerEntries.ToArray();
+            followerEntries = ctx.Followers;
 
             return followerEntries != null && followerEntries.Length > 0;
         }
@@ -288,33 +327,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PositionInfo masterPos = null;
                     bool masterFilled = false;
 
-                    // A1-3: Snapshot qty/price and transition state atomically under stateLock to close TOCTOU window.
-                    // PropagateFollowerEntryReplace can update PendingQty/PendingPrice inside
-                    // while OnAccountOrderUpdate (background thread) reads them here. Without the lock,
-                    // the snapshot and state transition can observe torn state. (Build 960 audit fix)
+                    // Phase 10 [B960-AUDIT]: synchronization wrapper removed. Both this path
+                    // via ProcessQueuedAccountOrder via TriggerCustomEvent and PropagateFollowerEntryReplace
+                    // are serialized on the NinjaTrader strategy thread. No concurrent field access is possible.
                     int qty = 0;
                     double price = 0;
                     string acctNameCapture = acctName;
                     string sigName = fsm.SignalName;
                     FollowerReplaceSpec fsmCapture = fsm;
-                    lock (stateLock)
-                    {
-                        masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
-                            && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
-                            && masterPos != null
-                            && masterPos.EntryFilled
-                            && masterPos.RemainingContracts > 0;
 
-                        if (!masterFilled)
-                        {
-                            // V12.962 ACTOR: Direct field reads remain serialized by stateLock in this branch.
-                            qty             = fsm.PendingQty;
-                            price           = fsm.PendingPrice;
-                            acctNameCapture = fsm.AccountName;
-                            sigName         = fsm.SignalName;
-                            fsmCapture      = fsm;
-                            fsm.State       = FollowerReplaceState.Submitting;
-                        }
+                    masterFilled = !string.IsNullOrEmpty(fsm.MasterSignalName)
+                        && activePositions.TryGetValue(fsm.MasterSignalName, out masterPos)
+                        && masterPos != null
+                        && masterPos.EntryFilled
+                        && masterPos.RemainingContracts > 0;
+
+                    if (!masterFilled)
+                    {
+                        qty             = fsm.PendingQty;
+                        price           = fsm.PendingPrice;
+                        acctNameCapture = fsm.AccountName;
+                        sigName         = fsm.SignalName;
+                        fsmCapture      = fsm;
+                        fsm.State       = FollowerReplaceState.Submitting;
                     }
 
                     if (masterFilled)
@@ -408,7 +443,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     foreach (var _psr in pendingStopReplacements.ToArray())
                     {
-                        if (_psr.Value.OldOrder == order)
+                        if (_psr.Value.OldOrder == order
+                            || (_psr.Value.OldOrder != null && _psr.Value.OldOrder.OrderId == order.OrderId))
                         {
                             PositionInfo _rPos;
                             // Build 955: Move guard inside lock -- check and use same atomic snapshot.

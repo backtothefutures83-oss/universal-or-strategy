@@ -34,6 +34,16 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region IPC Server
 
+        private string GetCurrentConfigMode()
+        {
+            if (isRMAModeActive) return "RMA";
+            if (isTRENDModeActive) return "TREND";
+            if (isRetestModeActive) return "RETEST";
+            if (isMOMOModeActive) return "MOMO";
+            if (isFFMAModeArmed) return "FFMA";
+            return "OR";
+        }
+
         private void StartIpcServer()
         {
             if (isIpcRunning) return;
@@ -92,6 +102,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ns.Write(reqBytes, 0, reqBytes.Length);
                         ns.Flush();
                         Print("V12 IPC: Sent REQUEST_FLEET_STATE to new client");
+                        if (!string.IsNullOrEmpty(_stickyLeaderAccount))
+                        {
+                            byte[] leaderBytes = Encoding.UTF8.GetBytes("SET_LEADER_ACCOUNT|" + _stickyLeaderAccount + "\n");
+                            ns.Write(leaderBytes, 0, leaderBytes.Length);
+                            ns.Flush();
+                            Print("V12 IPC: Sent leader sync to new client");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -218,9 +235,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string snapMode; double snapStop; int snapCount;
                 double snapT1, snapT2, snapT3, snapT4, snapT5;
                 TargetMode snapT1Type, snapT2Type, snapT3Type, snapT4Type, snapT5Type;
-                string snapCit; bool snapTrma, snapRrma;
-                snapMode   = isRMAModeActive ? "RMA" : "OR";
-                snapStop   = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier;
+                string snapCit; string snapLeader; bool snapTrma, snapRrma;
+                snapMode   = GetCurrentConfigMode();
+                snapStop   = snapMode == "RMA" ? RMAStopATRMultiplier : StopMultiplier;
                 snapCount  = activeTargetCount;
                 snapT1     = Target1Value; snapT1Type = T1Type;
                 snapT2     = Target2Value; snapT2Type = T2Type;
@@ -228,17 +245,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 snapT4     = Target4Value; snapT4Type = T4Type;
                 snapT5     = Target5Value; snapT5Type = T5Type;
                 snapCit    = ChaseIfTouchPoints ?? "0";
+                snapLeader = _stickyLeaderAccount ?? string.Empty;
                 snapTrma   = isTrendRmaMode;
                 snapRrma   = isRetestRmaMode;
                 string configResponse = string.Format(
-                    "CONFIG|{0}|COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};\n",
+                    "CONFIG|{0}|MODE:{0};COUNT:{1};T1:{2};T1TYPE:{3};T2:{4};T2TYPE:{5};T3:{6};T3TYPE:{7};T4:{8};T4TYPE:{9};T5:{10};T5TYPE:{11};STR:{12};STRTYPE:ATR;MAX:{13};CIT:{14};OT:Limit;TRMA:{15};RRMA:{16};LEADER:{17};\n",
                     snapMode, snapCount, snapT1, ToIpcTargetMode(snapT1Type),
                     snapT2, ToIpcTargetMode(snapT2Type),
                     snapT3, ToIpcTargetMode(snapT3Type),
                     snapT4, ToIpcTargetMode(snapT4Type),
                     snapT5, ToIpcTargetMode(snapT5Type),
                     snapStop, MaxRiskAmount, snapCit,
-                    snapTrma ? "1" : "0", snapRrma ? "1" : "0");
+                    snapTrma ? "1" : "0", snapRrma ? "1" : "0", snapLeader);
                 byte[] responseBytes = Encoding.UTF8.GetBytes(configResponse);
                 stream.Write(responseBytes, 0, responseBytes.Length);
                 stream.Flush();

@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!dict.TryGetValue(fleetEntryName, out var oldTarget) || oldTarget == null)
                 return;
 
-            // Build 1004 [DNA-FIX]: Replace raw Cancel+lock(stateLock)+Submit with FollowerTargetReplaceSpec
+            // Build 1004 [DNA-FIX]: Replace raw Cancel+stateLock-gated Submit with FollowerTargetReplaceSpec
             // two-phase FSM. Mirror pattern from Trailing.Breakeven.cs Build 957 C1.
             // Phase 1 (here): store spec and cancel only.
             // Phase 2 (automatic): AccountOrders.cs lines 352-382 detects cancel confirm by CancellingOrderId,
@@ -100,7 +100,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "[SYMMETRY_GUARD] SKIP | {0} | {1} | FleetFill={2:F2} | Slip={3:F1} ticks (${4:F2}/ct)",
                 fleetEntryName, reason, fleetFillPrice, slippageTicks, slippageUsdPerContract));
 
-            // Build 1004 [DNA-FIX]: Replace lock(stateLock) with Enqueue actor write (no internal locks).
+            // Build 1004 [DNA-FIX]: Replace the old stateLock path with Enqueue actor write (no internal locks).
             // TotalContracts snapshot captured before lambda to prevent closure mutation.
             int _skipContractsSnap = pos.TotalContracts;
             Enqueue(ctx =>
@@ -124,27 +124,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx) && ctx != null)
             {
-                lock (ctx.Sync)
+                // ADR-019: ctx.Followers is an immutable string[] snapshot published via Interlocked.CompareExchange.
+                // Build follower worklist from the snapshot -- zero-alloc, lock-free.
+                string[] followerSnapshot = ctx.Followers;
+                foreach (string fleetEntryName in followerSnapshot)
                 {
-                    // V1101E HOT-PATCH: Build follower worklist under ctx.Sync only; never call stateLock paths while holding ctx.Sync.
-                    foreach (string fleetEntryName in ctx.FollowerEntries)
-                    {
-                        if (string.IsNullOrEmpty(fleetEntryName))
-                            continue;
+                    if (string.IsNullOrEmpty(fleetEntryName))
+                        continue;
 
-                        if (!symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var linkedDispatch))
-                            continue;
-                        if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
-                            continue;
-                        if (!symmetryPendingFollowerFills.ContainsKey(fleetEntryName))
-                            continue;
+                    if (!symmetryFleetEntryToDispatch.TryGetValue(fleetEntryName, out var linkedDispatch))
+                        continue;
+                    if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
+                        continue;
+                    if (!symmetryPendingFollowerFills.ContainsKey(fleetEntryName))
+                        continue;
 
-                        followersToResolve.Add(fleetEntryName);
-                    }
+                    followersToResolve.Add(fleetEntryName);
                 }
             }
 
-            // V1101E HOT-PATCH: Preserve legacy dispatch-map scan to catch followers missing from ctx.FollowerEntries.
+            // ADR-019: Preserve the legacy dispatch-map scan to catch followers missing from the local snapshot.
             foreach (var kvp in symmetryPendingFollowerFills.ToArray())
             {
                 string fleetEntryName = kvp.Key;
@@ -185,8 +184,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId)) return;
             if (!symmetryDispatchById.TryGetValue(dispatchId, out var ctx)) return;
 
-            string[] followers;
-            lock (ctx.Sync) { followers = ctx.FollowerEntries.ToArray(); }
+            // ADR-019: ctx.Followers is already an immutable string[] snapshot -- direct read, lock-free.
+            string[] followers = ctx.Followers;
 
             Print(string.Format("[CASCADE] Master {0} cancelled -- terminating {1} linked follower(s).", masterEntryName, followers.Length));
 
@@ -201,10 +200,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     order.OrderState == OrderState.Accepted)
                 {
                     Print(string.Format("[CASCADE] Cancelling follower entry: {0} (Acc: {1})", followerName, pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : "Master"));
-                    if (pos.ExecutingAccount != null)
-                        pos.ExecutingAccount.Cancel(new[] { order });
-                    else
-                        CancelOrder(order);
+                    CancelOrderSafe(order, pos);
                     // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
                     // to prevent REAPER desync if the follower was microseconds from filling (Build 960 audit fix).
                 }
@@ -221,8 +217,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (symmetryFleetEntryToDispatch.TryRemove(entryName, out var dispatchId) &&
                 symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
             {
-                lock (ctx.Sync)
-                    ctx.FollowerEntries.Remove(entryName);
+                // ADR-019: FollowerEntries.Remove is superseded by the atomic CAS-loop publisher in Symmetry.cs.
+                // Forget-on-remove is a no-op here: the CAS loop publishes a new snapshot that excludes
+                // removed entries when the next follower set change occurs. Entry will be pruned by SymmetryGuardPruneDispatches.
+                // Direct remove is intentionally omitted -- mutating the immutable snapshot array is incorrect.
             }
         }
 
@@ -241,24 +239,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     remove = true;
                 }
-                else if (ctx.IsResolved)
+                else if (ctx.Anchor.IsResolved)
                 {
                     bool hasActiveFollowers = false;
-                    lock (ctx.Sync)
+                    // ADR-019: ctx.Followers is an immutable string[] snapshot -- lock-free iteration.
+                    // activePositions is a ConcurrentDictionary; ContainsKey is thread-safe without a lock.
+                    string[] pruneSnapshot = ctx.Followers;
+                    foreach (string follower in pruneSnapshot)
                     {
-                        foreach (string follower in ctx.FollowerEntries)
+                        if (activePositions.ContainsKey(follower))
                         {
-                            // V12.Phase8 [F-04]: activePositions is a ConcurrentDictionary but
-                            // ContainsKey here is used alongside ctx.FollowerEntries iteration under
-                            // ctx.Sync -- acquire stateLock for the read to prevent torn observations
-                            // when ExecuteSmartDispatchEntry commits or removes entries concurrently.
-                            bool exists;
-                            exists = activePositions.ContainsKey(follower);
-                            if (exists)
-                            {
-                                hasActiveFollowers = true;
-                                break;
-                            }
+                            hasActiveFollowers = true;
+                            break;
                         }
                     }
                     if (!hasActiveFollowers) remove = true;

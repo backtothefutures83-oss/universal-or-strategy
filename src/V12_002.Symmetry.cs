@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript;
 
@@ -12,6 +13,26 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region V12.50 Symmetry Guard
 
+        // ADR-019: Atomic-publish snapshot of master-fill anchor state.
+        // Immutable; mutated only via Interlocked.CompareExchange on the parent context.
+        private sealed class AnchorSnapshot
+        {
+            public static readonly AnchorSnapshot Pending = new AnchorSnapshot(false, 0d, 0d, 0);
+
+            public readonly bool   IsResolved;
+            public readonly double MasterAnchorPrice;
+            public readonly double MasterWeightedFill;
+            public readonly int    MasterFilledQuantity;
+
+            public AnchorSnapshot(bool isResolved, double anchorPrice, double weightedFill, int filledQty)
+            {
+                IsResolved           = isResolved;
+                MasterAnchorPrice    = anchorPrice;
+                MasterWeightedFill   = weightedFill;
+                MasterFilledQuantity = filledQty;
+            }
+        }
+
         private sealed class SymmetryDispatchContext
         {
             public string DispatchId;
@@ -20,13 +41,52 @@ namespace NinjaTrader.NinjaScript.Strategies
             public int ExpectedQuantity;
             public DateTime CreatedUtc;
 
-            public double MasterWeightedFill;
-            public int MasterFilledQuantity;
-            public double MasterAnchorPrice;
-            public bool IsResolved;
+            // Initial requested anchor seeded by SymmetryGuardBeginDispatch; immutable thereafter.
+            public double RequestedAnchorPrice;
 
-            public readonly object Sync = new object();
-            public readonly HashSet<string> FollowerEntries = new HashSet<string>(StringComparer.Ordinal);
+            // ADR-019: anchor state replaces { IsResolved, MasterAnchorPrice, MasterWeightedFill, MasterFilledQuantity }
+            // and the prior monitor-backed mutation path. Single reference field, swapped via Interlocked.CompareExchange.
+            private AnchorSnapshot _anchor = AnchorSnapshot.Pending;
+            public AnchorSnapshot Anchor { get { return Volatile.Read(ref _anchor); } }
+            public bool TryPublishAnchor(AnchorSnapshot expected, AnchorSnapshot updated)
+            {
+                return Interlocked.CompareExchange(ref _anchor, updated, expected) == expected;
+            }
+
+            // ADR-019: follower membership held as an immutable string[] snapshot.
+            // Hot-path readers do a single Volatile.Read; iteration is index-based and zero-alloc.
+            // Mutators allocate one fresh array per change (cold path: register/forget per dispatch).
+            private string[] _followers = Array.Empty<string>();
+            public string[] Followers { get { return Volatile.Read(ref _followers); } }
+
+            public void AddFollower(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return;
+                while (true)
+                {
+                    string[] cur = Volatile.Read(ref _followers);
+                    if (Array.IndexOf(cur, name) >= 0) return;
+                    string[] next = new string[cur.Length + 1];
+                    if (cur.Length > 0) Array.Copy(cur, 0, next, 0, cur.Length);
+                    next[cur.Length] = name;
+                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur) return;
+                }
+            }
+
+            public void RemoveFollower(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return;
+                while (true)
+                {
+                    string[] cur = Volatile.Read(ref _followers);
+                    int idx = Array.IndexOf(cur, name);
+                    if (idx < 0) return;
+                    string[] next = new string[cur.Length - 1];
+                    if (idx > 0) Array.Copy(cur, 0, next, 0, idx);
+                    if (idx < cur.Length - 1) Array.Copy(cur, idx + 1, next, idx, cur.Length - idx - 1);
+                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur) return;
+                }
+            }
         }
 
         private sealed class PendingFollowerFill
@@ -59,10 +119,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             MarketPosition direction = (action == OrderAction.Buy || action == OrderAction.BuyToCover)
                 ? MarketPosition.Long : MarketPosition.Short;
 
-            // V12.Audit [Q4-001]: Atomic read-check-write to eliminate TOCTOU in duplicate dispatch guard.
-            // Phase 7 [H-11] left the loop and insertion unguarded -- two concurrent callers could both
-            // pass the "no existing dispatch" check and insert competing contexts. The entire compound
-            // check-then-insert is now serialised under stateLock so the operation is atomic.
+            // ADR-019: Duplicate dispatch guard is lock-free. Iteration over symmetryDispatchById
+            // (ConcurrentDictionary) is snapshot-safe. The CAS-loop publisher in PublishFollowers/
+            // PublishAnchor ensures atomic visibility without stateLock.
             DateTime now = DateTime.UtcNow;
 
             // V12.Phase7 [H-11]: Prevent duplicate dispatches for the same signal+direction.
@@ -73,7 +132,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 var existing = kvp.Value;
                 if (existing.TradeType == normalizedType &&
                     existing.Direction == direction &&
-                    !existing.IsResolved &&
+                    !existing.Anchor.IsResolved &&
                     (now - existing.CreatedUtc) < SymmetryDispatchTtl)
                 {
                     Print(string.Format("[SYMMETRY] Duplicate dispatch suppressed: {0} {1} -- reusing {2}", normalizedType, direction, existing.DispatchId));
@@ -93,10 +152,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Direction = direction,
                 ExpectedQuantity = Math.Max(1, quantity),
                 CreatedUtc = now,
-                MasterAnchorPrice = Instrument != null
+                RequestedAnchorPrice = Instrument != null
                     ? Instrument.MasterInstrument.RoundToTickSize(requestedEntryPrice)
-                    : requestedEntryPrice,
-                IsResolved = false
+                    : requestedEntryPrice
             };
 
             symmetryDispatchById[dispatchId] = ctx;
@@ -111,10 +169,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             symmetryFleetEntryToDispatch[fleetEntryName] = dispatchId;
 
             if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
-            {
-                lock (ctx.Sync)
-                    ctx.FollowerEntries.Add(fleetEntryName);
-            }
+                ctx.AddFollower(fleetEntryName);
         }
 
         private void SymmetryGuardRegisterMasterEntry(string dispatchId, string masterEntryName)
@@ -147,25 +202,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ctx == null)
                 return;
 
-            bool resolvedNow = false;
-            lock (ctx.Sync)
+            // ADR-019: CAS loop over AnchorSnapshot. First writer to publish IsResolved=true wins.
+            // Losing CAS retries; on retry the IsResolved guard short-circuits (idempotent).
+            AnchorSnapshot resolvedSnap = null;
+            while (true)
             {
-                if (!ctx.IsResolved)
-                {
-                    ctx.MasterWeightedFill += averageFillPrice * fillQty;
-                    ctx.MasterFilledQuantity += fillQty;
+                AnchorSnapshot cur = ctx.Anchor;
+                if (cur.IsResolved)
+                    break;
 
-                    double avg = ctx.MasterWeightedFill / Math.Max(1, ctx.MasterFilledQuantity);
-                    ctx.MasterAnchorPrice = Instrument.MasterInstrument.RoundToTickSize(avg);
-                    ctx.IsResolved = true;
-                    resolvedNow = true;
+                double weighted = cur.MasterWeightedFill + averageFillPrice * fillQty;
+                int qty = cur.MasterFilledQuantity + fillQty;
+                double avg = weighted / Math.Max(1, qty);
+                double anchor = Instrument.MasterInstrument.RoundToTickSize(avg);
+
+                AnchorSnapshot next = new AnchorSnapshot(true, anchor, weighted, qty);
+                if (ctx.TryPublishAnchor(cur, next))
+                {
+                    resolvedSnap = next;
+                    break;
                 }
             }
 
-            if (resolvedNow)
+            if (resolvedSnap != null)
             {
                 Print(string.Format("[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
-                    ctx.TradeType, ctx.MasterAnchorPrice, ctx.MasterFilledQuantity));
+                    ctx.TradeType, resolvedSnap.MasterAnchorPrice, resolvedSnap.MasterFilledQuantity));
 
                 SymmetryGuardTryResolveFollowersForDispatch(ctx.DispatchId, DateTime.UtcNow);
             }
@@ -179,7 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in symmetryDispatchById.ToArray())
             {
                 SymmetryDispatchContext ctx = kvp.Value;
-                if (ctx == null || ctx.IsResolved)
+                if (ctx == null || ctx.Anchor.IsResolved)
                     continue;
                 if (ctx.Direction != direction)
                     continue;

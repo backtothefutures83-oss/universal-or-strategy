@@ -49,7 +49,7 @@ jobs:
 
           async function run() {
             try {
-              const diffContent = fs.readFileSync('pr.diff', 'utf8');
+              let diffContent = fs.readFileSync('pr.diff', 'utf8');
               let geminiMdContent = '';
               try {
                 geminiMdContent = fs.readFileSync('GEMINI.md', 'utf8');
@@ -57,27 +57,30 @@ jobs:
                 console.log('GEMINI.md not found, proceeding without it.');
               }
 
-              const prompt = `You are the Gemini Standards Auditor (Antigravity Auto-Auditor) performing an automated compliance check.
-              Your task is to analyze the following PR diff strictly against our project's institutional standards.
+              // SECURITY (Build 1105): Truncate oversized diffs to prevent prompt stuffing
+              const MAX_DIFF_CHARS = 100000;
+              if (diffContent.length > MAX_DIFF_CHARS) {
+                diffContent = diffContent.substring(0, MAX_DIFF_CHARS) + '\n... [TRUNCATED at 100KB]';
+              }
 
-              GEMINI.md Standards:
-              ${geminiMdContent}
-
-              PR DIFF:
-              ${diffContent}
-
-              Systematic Audit Protocol:
-              1. Verify Zero-Trust IPC compliance.
-              2. Check for FSM Follower Replace pattern violations.
-              3. Enforce ASCII-ONLY string literals in all C# source code.
-              4. Verify StateLock usage for activePositions and expectedPositions.
-              5. Check for Metabolic Elegance and naming conventions.
-
-              Provide:
-              - A list of specific violations (file and line if possible).
-              - Final Audit Verdict: PASS or FAIL.
-
-              Be uncompromising. Safety first.`;
+              // SECURITY (Build 1105): Use string concatenation with JSON.stringify to prevent
+              // template literal injection from malicious PR diff content.
+              const prompt = 'You are the Gemini Standards Auditor (Antigravity Auto-Auditor) performing an automated compliance check.\n'
+                + 'Your task is to analyze the following PR diff strictly against our project\'s institutional standards.\n\n'
+                + 'GEMINI.md Standards:\n'
+                + JSON.stringify(geminiMdContent) + '\n\n'
+                + 'PR DIFF:\n'
+                + JSON.stringify(diffContent) + '\n\n'
+                + 'Systematic Audit Protocol:\n'
+                + '1. Verify Zero-Trust IPC compliance.\n'
+                + '2. Check for FSM Follower Replace pattern violations.\n'
+                + '3. Enforce ASCII-ONLY string literals in all C# source code.\n'
+                + '4. Verify StateLock usage for activePositions and expectedPositions.\n'
+                + '5. Check for Metabolic Elegance and naming conventions.\n\n'
+                + 'Provide:\n'
+                + '- A list of specific violations (file and line if possible).\n'
+                + '- Final Audit Verdict: PASS or FAIL.\n\n'
+                + 'Be uncompromising. Safety first.';
 
               const project = process.env.GCP_PROJECT_ID;
               const regions = ['global', 'us-central1', 'us-east4', 'us-west1', 'europe-west1', 'us-east1'];

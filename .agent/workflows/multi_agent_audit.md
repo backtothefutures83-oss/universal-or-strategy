@@ -2,39 +2,78 @@
 description: Multi-Agent "Red Team" Auditing Workflow
 ---
 
-# Multi-Agent Auditing Workflow (The "Reaper Scan")
+Use this workflow for high-stakes implementations where a single agent's blind spots must be caught.
+Minimum 2 agents audit the same implementation independently. Results are cross-compared.
+Mandatory for any change touching: order submission, position sizing, FSM state transitions, or fleet-wide broadcast logic.
 
-This workflow coordinates multiple AI agents (Claude, Cursor, Gemini, Grok) to cross-audit strategy logic, identify bugs, and reach a consensus on hardening fixes.
+---
 
-## 1. Preparation
-1. Ensure `UniversalORStrategyV12_002_Dev` is in a clean baseline state.
-2. Create/Initialize `C:\WSGTA\universal-or-strategy\docs\audits\CONSOLIDATED_AUDIT.md`.
+## Phase 1: Define Audit Scope
 
-## 2. Round 1: Redundant Discovery (Independent Deep Scan)
-*All agents perform the same comprehensive 'Full Spectrum' scan to ensure maximum coverage.*
+1. Identify the implementation to audit (file path, diff, or code block).
+2. Define audit criteria:
+   - **Safety**: ghost orders, naked positions, shutdown races
+   - **Correctness**: FSM state coverage, edge cases
+   - **DNA compliance**: no locks, correct pattern (Enqueue vs direct-write), ASCII gate
+   - **Performance**: no hot-path allocations, no blocking calls
 
-1. **Prompt for ALL agents**: "Independent Audit Task: Perform a 360-degree deep-scan of the UniversalORStrategyV12 codebase. Look for: (1) Division-by-zero risk in sizing math, (2) MOMO Stop-Limit slippage risks, (3) Thread-safety in SIMA broadcasting, (4) State-persistence bugs, and (5) Logic clashing between modes. Propose specific hardening fixes. **DIRECTIVE: Write your findings directly into C:\WSGTA\universal-or-strategy\docs\audits\CONSOLIDATED_AUDIT.md under your designated section.** Do NOT read other AI findings yet."
-2. **Execution**:
-    - **Gemini (Lead)**: Analyze and write to `## ROUND_1: GEMINI`.
-    - **Claude Code CLI**: Analyze and write to `## ROUND_1: CLAUDE`.
-    - **Codex 5.3**: Analyze and write to `## ROUND_1: CODEX_5.3`.
-    - **Cursor**: Analyze and write to `## ROUND_1: CURSOR`.
+---
 
-## 3. Round 2: The Consensus Debate (Rebuttal & Synthesis)
-1. Feed the completed Round 1 logs back to ALL agents.
-2. **Prompt**: "Review findings from the other 3 agents. Identify any 'hallucinations', 'false positives', or 'overlooked risks'. Debate the differences. Refine your final risk assessment."
-3. Update `## ROUND_2: THE DEBATE` with the cross-agent synthesis.
+## Phase 2: Independent Parallel Audits
 
-## 4. Round 3: Final Hardening Plan (Agreement)
-1. **Gemini** synthesizes the debate into a single, unified `## FINAL_HARDENING_CONSENSUS`.
-2. **USER Approval**: User grants permission for surgical edits.
-3. **Execution**: Cursor (Codex) implements the final, multi-agent verified hardening.
+Invoke each auditor with IDENTICAL input. They must NOT see each other's output.
 
-## 4. Round 3: Consensus & Implementation Plan
-1. **Gemini** (or a designated Project Director) synthesizes all verified risks into a single `## FINAL_HARDENING_PLAN`.
-2. **USER Approval**: User reviews the plan and gives the "GO" signal.
-3. **Execution**: Use Cursor (Codex) to apply the approved surgery across all files.
+| Auditor   | Tool            | Focus                                |
+| --------- | --------------- | ------------------------------------ |
+| FORENSICS | Codex forensics | Logic trace, state sequence proof    |
+| ARCHITECT | Claude          | Structural soundness, DNA compliance |
+| ENGINEER  | Codex/Jules     | Hot-path correctness, edge cases     |
 
-## 5. Verification
-1. Run `ExecuteRiskLogicAudit` (Case 5/6) to ensure symmetry guard and slippage caps remain intact.
-2. Sunday Open Readiness Check.
+Each auditor produces:
+
+```
+RED TEAM AUDIT — [Auditor Name] — [Date]
+
+VERDICT: [PASS / FAIL / CONDITIONAL]
+
+Findings:
+1. [Finding + severity: CRITICAL / WARNING / INFO]
+2. ...
+
+Recommendation: [APPROVE / REVISE / BLOCK]
+```
+
+---
+
+## Phase 3: Cross-Comparison
+
+1. Collect all audit reports.
+2. Cross-compare findings:
+   - **Agreement on FAIL**: block implementation, escalate to Director.
+   - **Divergence**: Antigravity adjudicates — present both views to Director.
+   - **All PASS**: route to Phase 4.
+
+---
+
+## Phase 4: Consensus Sign-Off
+
+1. All findings documented in `docs/brain/audit_[mission_id].md`.
+2. ARCHITECT issues final P4 Audit Sign-Off memo.
+3. Director receives consolidated report before approving implementation.
+
+---
+
+## Phase 5: Mandatory Self-Improvement Audit (NON-NEGOTIABLE)
+
+After EVERY use of this workflow, the executing agent MUST perform a post-use audit:
+
+1. **Did auditors receive identical inputs?** Verify isolation protocol.
+2. **Was a CRITICAL finding missed by one auditor but caught by another?** Add to Phase 1 criteria.
+3. **Was adjudication unclear?** Improve the Phase 3 conflict resolution rule.
+4. **Was the audit scope too broad?** Narrow Phase 1 criteria for next use.
+
+**If no gap found, state:** `workflow(multi_agent_audit): no gaps identified -- workflow correct as written.`
+
+Skipping the audit is a protocol violation. No Director approval needed for self-improvement edits.
+
+**Commit format:** `workflow(multi_agent_audit): [what was fixed and why]`

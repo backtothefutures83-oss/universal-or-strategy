@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="GPT-5 Codex (version unspecified) technical demonstration of a C# multi-producer multi-consumer data pipeline with work stealing." />
+  <title>GPT-5 Codex (version unspecified) | C# MPMC Pipeline Demonstration</title>
+  <style>
+    :root {
+      --bg: #08141c;
+      --panel: rgba(9, 23, 31, 0.86);
+      --line: rgba(163, 196, 189, 0.16);
+      --ink: #f2f4ee;
+      --muted: #b4c4c8;
+      --accent: #62dec7;
+      --accent2: #f0b35d;
+      --accent3: #78aef9;
+      --shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+      --mono: "Consolas", "Lucida Console", "Courier New", monospace;
+      --body: "Trebuchet MS", "Lucida Sans Unicode", sans-serif;
+      --display: "Palatino Linotype", Cambria, serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--body);
+      background:
+        radial-gradient(circle at top left, rgba(98, 222, 199, 0.18), transparent 28%),
+        radial-gradient(circle at 85% 18%, rgba(120, 174, 249, 0.13), transparent 24%),
+        linear-gradient(180deg, #07121a 0%, #08141c 45%, #0b1115 100%);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.18;
+    }
+
+    code, pre { font-family: var(--mono); }
+    .shell { width: min(1220px, calc(100% - 28px)); margin: 0 auto; padding: 24px 0 56px; position: relative; z-index: 1; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      padding: 24px;
+      margin-top: 22px;
+    }
+
+    .hero { margin-top: 0; }
+    .eyebrow {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.88rem;
+      margin-bottom: 8px;
+    }
+
+    h1, h2 {
+      font-family: var(--display);
+      letter-spacing: -0.03em;
+      margin: 0 0 12px;
+    }
+
+    h1 { font-size: clamp(2.3rem, 4.8vw, 4rem); line-height: 1.02; max-width: 860px; }
+    h2 { font-size: clamp(1.6rem, 2.5vw, 2.2rem); }
+    p { color: var(--muted); line-height: 1.7; }
+
+    .hero-grid,
+    .cards,
+    .metrics,
+    .lane-list,
+    .lane-meta,
+    .slot-grid,
+    .dashboard {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero-grid { grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr); align-items: start; }
+    .cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .dashboard { grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.85fr); }
+    .metrics { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+    .lane-list { grid-template-columns: 1fr; }
+    .lane-meta { grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); }
+    .slot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .chip-row, .controls, .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .chip, .status, .slot-state {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .card, .metric, .lane, .feed, .source-box {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+      padding: 16px;
+    }
+
+    .card h3, .lane h3, .feed h3 { margin: 0 0 8px; }
+    .card .note { color: var(--accent2); font-weight: 700; }
+    .metric .label { color: var(--muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.12em; }
+    .metric .value { font-size: 1.8rem; font-weight: 700; margin-top: 8px; }
+
+    .button, button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 15px;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #85f0ce);
+      color: #071116;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button.alt, button.alt {
+      background: rgba(255,255,255,0.06);
+      color: var(--ink);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    input[type="range"] { accent-color: var(--accent); }
+    .lane-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .bar { width: min(280px, 100%); height: 10px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 180ms ease; }
+    .slot { border-radius: 14px; padding: 10px; border: 1px solid rgba(255,255,255,0.08); min-height: 102px; background: rgba(255,255,255,0.03); }
+    .slot.ready { background: rgba(98, 222, 199, 0.1); border-color: rgba(98, 222, 199, 0.34); }
+    .slot.free { background: rgba(120, 174, 249, 0.07); border-color: rgba(120, 174, 249, 0.24); }
+    .slot.stolen { background: rgba(240, 179, 93, 0.12); border-color: rgba(240, 179, 93, 0.34); }
+    .slot.hot { animation: pulse 420ms ease; }
+    .slot-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .slot-seq { font-size: 1.12rem; font-weight: 700; margin-bottom: 6px; }
+    .slot-item { color: #dce7de; line-height: 1.45; min-height: 2.8em; }
+
+    .feed ol {
+      margin: 0;
+      padding-left: 18px;
+      max-height: 760px;
+      overflow: auto;
+      color: var(--muted);
+      line-height: 1.55;
+      display: grid;
+      gap: 8px;
+    }
+
+    .source-toolbar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    pre {
+      margin: 0;
+      overflow: auto;
+      max-height: 920px;
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(1, 8, 13, 0.96);
+      color: #d4f0e4;
+      line-height: 1.58;
+      font-size: 0.92rem;
+    }
+
+    .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .footer-note { margin-top: 14px; font-size: 0.94rem; }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      45% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid, .dashboard { grid-template-columns: 1fr; }
+      .slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 18px, 1220px); }
+      .panel { padding: 18px; }
+      .slot-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="panel hero">
+      <div class="eyebrow">Technical Demonstration</div>
+      <div class="hero-grid">
+        <div>
+          <h1>GPT-5 Codex (version unspecified): C# MPMC Data Pipeline</h1>
+          <p>
+            This standalone page demonstrates a lane-oriented multi-producer multi-consumer
+            pipeline with explicit cache-line separation, a dedicated reservation counter, and
+            sequence-based flow control. The JavaScript simulator below mirrors the same slot
+            publish and receive rules used by the embedded C# reference.
+          </p>
+          <div class="chip-row">
+            <a class="button" href="#simulation">Open Simulation</a>
+            <a class="button alt" href="#source">Open C# Source</a>
+          </div>
+        </div>
+        <div class="chip-row">
+          <div class="chip">4 lanes</div>
+          <div class="chip">8 slots per lane</div>
+          <div class="chip">free-slot reservation credits</div>
+          <div class="chip">work stealing enabled</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Required Invariants</h2>
+      <p>
+        The reference class below keeps the requested comments and maps each invariant to a visible
+        part of the simulator so the concurrency model stays inspectable.
+      </p>
+      <div class="cards">
+        <article class="card">
+          <h3>Metadata isolation</h3>
+          <p><code>LaneMetadata</code> uses explicit layout with fields placed at offsets 0, 64, and 128.</p>
+          <p class="note">// hardware isolation for cache lines.</p>
+        </article>
+        <article class="card">
+          <h3>Counter isolation</h3>
+          <p><code>CounterBlock</code> keeps <code>ReadPointer</code> and the <code>Interlocked.Add</code> reservation counter on separate cache lines.</p>
+          <p class="note">// counter isolation.</p>
+        </article>
+        <article class="card">
+          <h3>Flow control</h3>
+          <p>Both send and receive gate on sequence equality by XOR, and successful writes publish <code>writeSequence + 1</code>.</p>
+          <p class="note">// flow control invariant.</p>
+        </article>
+        <article class="card">
+          <h3>Steal path</h3>
+          <p><code>StealFrom</code> invokes the same receive core against a victim lane and increments thief-side steal telemetry.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="simulation" class="panel">
+      <h2>Lane Activity Simulator</h2>
+      <p>
+        The simulator uses the same reservation-credit model as the C# sample. Green slots are
+        published, blue slots are free, and amber shows the latest slot taken through work
+        stealing.
+      </p>
+      <div class="dashboard">
+        <div>
+          <div class="controls">
+            <button id="startButton" type="button">Start</button>
+            <button id="pauseButton" class="alt" type="button">Pause</button>
+            <button id="stepButton" class="alt" type="button">Step</button>
+            <button id="resetButton" class="alt" type="button">Reset</button>
+            <label for="speedRange">Tick delay</label>
+            <input id="speedRange" type="range" min="120" max="900" step="20" value="260" />
+            <strong id="speedValue">260 ms</strong>
+          </div>
+          <div id="metrics" class="metrics"></div>
+          <div id="lanes" class="lane-list"></div>
+        </div>
+        <aside class="feed">
+          <h3>Telemetry Feed</h3>
+          <div class="legend">
+            <span><i class="swatch" style="background: rgba(98, 222, 199, 0.92);"></i> published</span>
+            <span><i class="swatch" style="background: rgba(120, 174, 249, 0.92);"></i> free</span>
+            <span><i class="swatch" style="background: rgba(240, 179, 93, 0.92);"></i> stolen</span>
+          </div>
+          <ol id="eventLog"></ol>
+        </aside>
+      </div>
+    </section>
+
+    <section id="source" class="panel">
+      <h2>Complete C# Reference</h2>
+      <p>
+        The code block below contains the requested standalone implementation, including
+        <code>TrySend</code>, <code>TryReceive</code>, and <code>StealFrom</code>.
+      </p>
+      <div class="source-box">
+        <div class="source-toolbar">
+          <div>Reference class: <code>MpmcPipeline&lt;T&gt;</code></div>
+          <button id="copySource" class="alt" type="button">Copy C# Source</button>
+        </div>
+        <pre><code id="csharpCode"></code></pre>
+      </div>
+      <p class="footer-note">
+        Model identity note: the session exposes <code>GPT-5 Codex</code> but does not provide a
+        more specific version string, so the title and heading use <code>version unspecified</code>
+        instead of inventing one.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const csharpSource = String.raw`using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace PipelineDemo
+{
+    public sealed class MpmcPipeline<T>
+    {
+        private readonly Lane[] _lanes;
+
+        public MpmcPipeline(int laneCount, int laneCapacity)
+        {
+            if (laneCount <= 0)
+                throw new ArgumentOutOfRangeException("laneCount");
+
+            if (laneCapacity < 2 || (laneCapacity & (laneCapacity - 1)) != 0)
+                throw new ArgumentException("laneCapacity must be a power of two.", "laneCapacity");
+
+            _lanes = new Lane[laneCount];
+            for (int i = 0; i < laneCount; i++)
+                _lanes[i] = new Lane(i, laneCapacity);
+        }
+
+        public bool TrySend(int laneId, T item)
+        {
+            Lane lane = _lanes[NormalizeLane(laneId)];
+
+            long remaining = Interlocked.Add(ref lane.Counters.ReservationCounter, -1);
+            if (remaining < 0)
+            {
+                Interlocked.Add(ref lane.Counters.ReservationCounter, 1);
+                return false;
+            }
+
+            long writeSequence = Interlocked.Add(ref lane.WritePointer.Value, 1) - 1;
+            Slot slot = lane.Slots[(int)(writeSequence & lane.Metadata.Mask)];
+            SpinWait spinner = new SpinWait();
+
+            while (true)
+            {
+                long sequence = Volatile.Read(ref slot.Sequence);
+
+                // flow control invariant.
+                if ((sequence ^ writeSequence) == 0)
+                {
+                    slot.Item = item;
+                    Volatile.Write(ref slot.Sequence, writeSequence + 1);
+                    Interlocked.Increment(ref lane.Stats.SendCount);
+                    return true;
+                }
+
+                spinner.SpinOnce();
+            }
+        }
+
+        public bool TryReceive(int laneId, out T item)
+        {
+            Lane lane = _lanes[NormalizeLane(laneId)];
+            return TryReceiveCore(lane, out item, false, null);
+        }
+
+        public bool StealFrom(int thiefLaneId, int victimLaneId, out T item)
+        {
+            Lane thief = _lanes[NormalizeLane(thiefLaneId)];
+            Lane victim = _lanes[NormalizeLane(victimLaneId)];
+
+            if (thief.Metadata.LaneId == victim.Metadata.LaneId)
+                return TryReceiveCore(victim, out item, false, null);
+
+            if (TryReceiveCore(victim, out item, true, thief))
+            {
+                Interlocked.Increment(ref thief.Stats.StealCount);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryReceiveCore(Lane lane, out T item, bool stolen, Lane thief)
+        {
+            while (true)
+            {
+                long readSequence = Volatile.Read(ref lane.Counters.ReadPointer);
+                Slot slot = lane.Slots[(int)(readSequence & lane.Metadata.Mask)];
+                long expectedValue = readSequence + 1;
+                long sequence = Volatile.Read(ref slot.Sequence);
+
+                // flow control invariant.
+                if ((sequence ^ expectedValue) != 0)
+                {
+                    item = default(T);
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref lane.Counters.ReadPointer, readSequence + 1, readSequence) != readSequence)
+                    continue;
+
+                item = slot.Item;
+                slot.Item = default(T);
+                Volatile.Write(ref slot.Sequence, readSequence + lane.Metadata.Capacity);
+                Interlocked.Add(ref lane.Counters.ReservationCounter, 1);
+                Interlocked.Increment(ref lane.Stats.ReceiveCount);
+
+                if (stolen && thief != null)
+                    Volatile.Write(ref thief.LastVictimLaneId.Value, lane.Metadata.LaneId);
+
+                return true;
+            }
+        }
+
+        private int NormalizeLane(int laneId)
+        {
+            if ((uint)laneId >= (uint)_lanes.Length)
+                throw new ArgumentOutOfRangeException("laneId");
+
+            return laneId;
+        }
+
+        [StructLayout(LayoutKind.Explicit, Size = 192)]
+        private sealed class LaneMetadata
+        {
+            // hardware isolation for cache lines.
+            [FieldOffset(0)] public int LaneId;
+            [FieldOffset(64)] public int Capacity;
+            [FieldOffset(128)] public int Mask;
+
+            public LaneMetadata(int laneId, int capacity)
+            {
+                LaneId = laneId;
+                Capacity = capacity;
+                Mask = capacity - 1;
+            }
+        }
+
+        [StructLayout(LayoutKind.Explicit, Size = 128)]
+        private sealed class CounterBlock
+        {
+            [FieldOffset(0)] public long ReadPointer;
+
+            // counter isolation.
+            [FieldOffset(64)] public long ReservationCounter;
+        }
+
+        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        private sealed class CacheIsolatedLong
+        {
+            [FieldOffset(0)] public long Value;
+        }
+
+        [StructLayout(LayoutKind.Explicit, Size = 192)]
+        private sealed class LaneStats
+        {
+            [FieldOffset(0)] public long SendCount;
+            [FieldOffset(64)] public long ReceiveCount;
+            [FieldOffset(128)] public long StealCount;
+        }
+
+        private sealed class Slot
+        {
+            public long Sequence;
+            public T Item;
+        }
+
+        private sealed class Lane
+        {
+            public readonly LaneMetadata Metadata;
+            public readonly CounterBlock Counters;
+            public readonly CacheIsolatedLong WritePointer;
+            public readonly CacheIsolatedLong LastVictimLaneId;
+            public readonly LaneStats Stats;
+            public readonly Slot[] Slots;
+
+            public Lane(int laneId, int capacity)
+            {
+                Metadata = new LaneMetadata(laneId, capacity);
+                Counters = new CounterBlock();
+                WritePointer = new CacheIsolatedLong();
+                LastVictimLaneId = new CacheIsolatedLong();
+                Stats = new LaneStats();
+                Slots = new Slot[capacity];
+
+                for (int i = 0; i < capacity; i++)
+                {
+                    Slots[i] = new Slot();
+                    Slots[i].Sequence = i;
+                }
+
+                Counters.ReadPointer = 0;
+                Counters.ReservationCounter = capacity;
+                WritePointer.Value = 0;
+                LastVictimLaneId.Value = -1;
+            }
+        }
+    }
+}`;
+
+    const laneCount = 4;
+    const laneCapacity = 8;
+    const maxLogs = 22;
+    const lanes = [];
+    const logs = [];
+    const telemetry = { tick: 0, sends: 0, receives: 0, steals: 0, failedSends: 0, emptyReads: 0 };
+    const metricsEl = document.getElementById("metrics");
+    const lanesEl = document.getElementById("lanes");
+    const logEl = document.getElementById("eventLog");
+    const codeEl = document.getElementById("csharpCode");
+    const speedRange = document.getElementById("speedRange");
+    const speedValue = document.getElementById("speedValue");
+    let timer = null;
+
+    function pushLog(text) {
+      logs.unshift(text);
+      if (logs.length > maxLogs)
+        logs.length = maxLogs;
+    }
+
+    function resetState() {
+      lanes.length = 0;
+      logs.length = 0;
+      telemetry.tick = 0;
+      telemetry.sends = 0;
+      telemetry.receives = 0;
+      telemetry.steals = 0;
+      telemetry.failedSends = 0;
+      telemetry.emptyReads = 0;
+
+      for (let laneId = 0; laneId < laneCount; laneId += 1) {
+        const lane = {
+          metadata: { laneId, capacity: laneCapacity, mask: laneCapacity - 1 },
+          counters: { readPointer: 0, reservationCounter: laneCapacity },
+          writePointer: 0,
+          stats: { sends: 0, receives: 0, steals: 0 },
+          lastVictim: -1,
+          lastAction: "idle",
+          slots: []
+        };
+
+        for (let i = 0; i < laneCapacity; i += 1)
+          lane.slots.push({ sequence: i, item: null, state: "free", hot: false });
+
+        lanes.push(lane);
+      }
+
+      pushLog("Tick 0: simulator reset; each slot sequence equals its slot index.");
+      render();
+    }
+
+    function clearHotFlags() {
+      for (const lane of lanes)
+        for (const slot of lane.slots)
+          slot.hot = false;
+    }
+
+    function payload(laneId) {
+      return "lane-" + laneId + "/msg-" + telemetry.tick.toString().padStart(4, "0");
+    }
+
+    function trySend(laneId, item) {
+      const lane = lanes[laneId];
+      lane.counters.reservationCounter -= 1;
+      if (lane.counters.reservationCounter < 0) {
+        lane.counters.reservationCounter += 1;
+        lane.lastAction = "blocked";
+        telemetry.failedSends += 1;
+        pushLog("Tick " + telemetry.tick + ": TrySend on lane " + laneId + " failed because no free-slot credits remained.");
+        return false;
+      }
+
+      const writeSequence = lane.writePointer;
+      lane.writePointer += 1;
+      const slotIndex = writeSequence & lane.metadata.mask;
+      const slot = lane.slots[slotIndex];
+
+      // flow control invariant.
+      if ((slot.sequence ^ writeSequence) !== 0) {
+        lane.writePointer -= 1;
+        lane.counters.reservationCounter += 1;
+        telemetry.failedSends += 1;
+        lane.lastAction = "sequence wait";
+        pushLog("Tick " + telemetry.tick + ": TrySend on lane " + laneId + " observed a sequence mismatch at slot " + slotIndex + ".");
+        return false;
+      }
+
+      slot.item = item;
+      slot.sequence = writeSequence + 1;
+      slot.state = "ready";
+      slot.hot = true;
+      lane.stats.sends += 1;
+      lane.lastAction = "published";
+      telemetry.sends += 1;
+      pushLog("Tick " + telemetry.tick + ": TrySend published " + item + " to lane " + laneId + ", slot " + slotIndex + ".");
+      return true;
+    }
+
+    function tryReceiveCore(lane, thiefLane, stolen) {
+      const readSequence = lane.counters.readPointer;
+      const slotIndex = readSequence & lane.metadata.mask;
+      const slot = lane.slots[slotIndex];
+      const expectedValue = readSequence + 1;
+
+      // flow control invariant.
+      if ((slot.sequence ^ expectedValue) !== 0) {
+        telemetry.emptyReads += 1;
+        return null;
+      }
+
+      lane.counters.readPointer += 1;
+      const item = slot.item;
+      slot.item = null;
+      slot.sequence = readSequence + lane.metadata.capacity;
+      slot.state = stolen ? "stolen" : "free";
+      slot.hot = true;
+      lane.counters.reservationCounter += 1;
+      lane.stats.receives += 1;
+      lane.lastAction = stolen ? "lost to steal" : "received";
+      telemetry.receives += 1;
+
+      if (stolen) {
+        thiefLane.stats.steals += 1;
+        thiefLane.lastVictim = lane.metadata.laneId;
+        thiefLane.lastAction = "stole";
+        telemetry.steals += 1;
+      }
+
+      return { item, slotIndex };
+    }
+
+    function tryReceive(laneId) {
+      const lane = lanes[laneId];
+      const result = tryReceiveCore(lane, null, false);
+      if (!result) {
+        lane.lastAction = "empty";
+        return false;
+      }
+
+      pushLog("Tick " + telemetry.tick + ": TryReceive drained " + result.item + " from lane " + laneId + ", slot " + result.slotIndex + ".");
+      return true;
+    }
+
+    function stealFrom(thiefLaneId, victimLaneId) {
+      if (thiefLaneId === victimLaneId)
+        return false;
+
+      const thief = lanes[thiefLaneId];
+      const victim = lanes[victimLaneId];
+      const result = tryReceiveCore(victim, thief, true);
+      if (!result)
+        return false;
+
+      pushLog("Tick " + telemetry.tick + ": lane " + thiefLaneId + " used StealFrom on lane " + victimLaneId + " and captured " + result.item + ".");
+      return true;
+    }
+
+    function richestVictim(excludingLaneId) {
+      let bestLaneId = -1;
+      let bestOccupancy = 0;
+
+      for (const lane of lanes) {
+        if (lane.metadata.laneId === excludingLaneId)
+          continue;
+
+        const occupancy = lane.metadata.capacity - lane.counters.reservationCounter;
+        if (occupancy > bestOccupancy) {
+          bestOccupancy = occupancy;
+          bestLaneId = lane.metadata.laneId;
+        }
+      }
+
+      return bestLaneId;
+    }
+
+    function simulationStep() {
+      telemetry.tick += 1;
+      clearHotFlags();
+
+      for (let laneId = 0; laneId < laneCount; laneId += 1)
+        if (Math.random() < 0.74)
+          trySend(laneId, payload(laneId));
+
+      for (let laneId = 0; laneId < laneCount; laneId += 1) {
+        const consumed = Math.random() < 0.56 ? tryReceive(laneId) : false;
+        if (consumed)
+          continue;
+
+        const victimLaneId = richestVictim(laneId);
+        if (victimLaneId >= 0 && Math.random() < 0.72)
+          stealFrom(laneId, victimLaneId);
+      }
+
+      render();
+    }
+
+    function metric(label, value) {
+      return '<div class="metric"><div class="label">' + label + '</div><div class="value">' + value + "</div></div>";
+    }
+
+    function laneStatus(occupancy, capacity) {
+      const ratio = occupancy / capacity;
+      if (ratio === 0) return "idle";
+      if (ratio >= 0.75) return "pressure";
+      if (ratio >= 0.4) return "active";
+      return "balanced";
+    }
+
+    function renderMetrics() {
+      const liveOccupancy = lanes.reduce((sum, lane) => sum + (lane.metadata.capacity - lane.counters.reservationCounter), 0);
+      metricsEl.innerHTML =
+        metric("Tick", telemetry.tick) +
+        metric("Published", telemetry.sends) +
+        metric("Received", telemetry.receives) +
+        metric("Steals", telemetry.steals) +
+        metric("Failed sends", telemetry.failedSends) +
+        metric("Live occupancy", liveOccupancy);
+    }
+
+    function renderLanes() {
+      lanesEl.innerHTML = lanes.map((lane) => {
+        const occupancy = lane.metadata.capacity - lane.counters.reservationCounter;
+        const fill = (occupancy / lane.metadata.capacity) * 100;
+        const victimText = lane.lastVictim >= 0 ? "victim " + lane.lastVictim : "none";
+        const meta = [
+          ["occupancy", occupancy + " / " + lane.metadata.capacity],
+          ["write pointer", lane.writePointer],
+          ["read pointer", lane.counters.readPointer],
+          ["free credits", lane.counters.reservationCounter],
+          ["send | receive", lane.stats.sends + " | " + lane.stats.receives],
+          ["steals | last victim", lane.stats.steals + " | " + victimText]
+        ].map((pair) => '<div><div class="label">' + pair[0] + '</div><strong>' + pair[1] + "</strong></div>").join("");
+
+        const slots = lane.slots.map((slot, index) => {
+          const classes = ["slot", slot.state];
+          if (slot.hot) classes.push("hot");
+          return (
+            '<div class="' + classes.join(" ") + '">' +
+              '<div class="slot-head"><span>slot ' + index + '</span><span>' + slot.state + '</span></div>' +
+              '<div class="slot-seq">seq ' + slot.sequence + '</div>' +
+              '<div class="slot-item">' + (slot.item || "idle") + '</div>' +
+              '<div class="slot-state">' + (slot.hot ? "touched this tick" : "stable") + "</div>" +
+            "</div>"
+          );
+        }).join("");
+
+        return (
+          '<article class="lane">' +
+            '<div class="lane-head">' +
+              '<div><h3>Lane ' + lane.metadata.laneId + '</h3><div class="status">' + laneStatus(occupancy, lane.metadata.capacity) + " | " + lane.lastAction + "</div></div>" +
+              '<div class="bar"><span style="width:' + fill.toFixed(1) + '%;"></span></div>' +
+            "</div>" +
+            '<div class="lane-meta">' + meta + "</div>" +
+            '<div class="slot-grid">' + slots + "</div>" +
+          "</article>"
+        );
+      }).join("");
+    }
+
+    function renderLogs() {
+      logEl.innerHTML = logs.map((entry) => "<li>" + entry + "</li>").join("");
+    }
+
+    function render() {
+      renderMetrics();
+      renderLanes();
+      renderLogs();
+    }
+
+    function start() {
+      if (timer !== null) return;
+      timer = window.setInterval(simulationStep, Number(speedRange.value));
+    }
+
+    function pause() {
+      if (timer === null) return;
+      window.clearInterval(timer);
+      timer = null;
+    }
+
+    document.getElementById("startButton").addEventListener("click", start);
+    document.getElementById("pauseButton").addEventListener("click", pause);
+    document.getElementById("stepButton").addEventListener("click", () => { pause(); simulationStep(); });
+    document.getElementById("resetButton").addEventListener("click", () => { pause(); resetState(); });
+    speedRange.addEventListener("input", () => {
+      speedValue.textContent = speedRange.value + " ms";
+      if (timer !== null) {
+        pause();
+        start();
+      }
+    });
+
+    document.getElementById("copySource").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(csharpSource);
+        pushLog("Tick " + telemetry.tick + ": copied C# source to the clipboard.");
+      } catch (error) {
+        pushLog("Tick " + telemetry.tick + ": clipboard copy failed in this browser context.");
+      }
+      renderLogs();
+    });
+
+    codeEl.textContent = csharpSource;
+    speedValue.textContent = speedRange.value + " ms";
+    resetState();
+  </script>
+</body>
+</html>

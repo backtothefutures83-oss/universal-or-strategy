@@ -46,32 +46,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void GetTargetDistribution(int contracts, out int t1, out int t2, out int t3, out int t4, out int t5,
             int targetCountOverride = -1)
         {
-            t1 = 0; t2 = 0; t3 = 0; t4 = 0; t5 = 0;
-            if (contracts <= 0) return;
-
-            // IS-01: Clamp active target count (Source of Truth -- mirrors dashboard selection).
-            // Use caller snapshot when provided; fall through to live activeTargetCount for all other call sites.
             int count = (targetCountOverride >= 1 && targetCountOverride <= 5)
                 ? targetCountOverride
                 : Math.Max(1, Math.Min(5, activeTargetCount));
 
-            // IS-02: Integer-Division Distribution (remainder to T1 first -- scalp anchor)
-            int[] buckets = new int[5];
-            int baseQty   = contracts / count;
-            int remainder = contracts % count;
-            for (int i = 0; i < count; i++)
-                buckets[i] = baseQty + (i < remainder ? 1 : 0);
-
-            // IS-03: Teleporting Backstop (Final Reserve Anchor)
-            int captureIndex = count - 1;
-
-            // V12.Audit [D-008]: Final Sum Gate
-            int distSum = buckets[0] + buckets[1] + buckets[2] + buckets[3] + buckets[4];
-            if (distSum != contracts)
-            {
-                Print(string.Format("[SIZING_FATAL] Sum={0} Expected={1}. Forcing to T{2}.", distSum, contracts, count));
-                buckets[captureIndex] += contracts - distSum;
-            }
+            int[] buckets = V12_PureLogic.GetTargetDistribution(contracts, count);
 
             t1 = buckets[0]; t2 = buckets[1]; t3 = buckets[2]; t4 = buckets[3]; t5 = buckets[4];
         }
@@ -84,50 +63,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private int CalculatePositionSize(double stopDistanceRaw)
         {
-            if (double.IsNaN(stopDistanceRaw)      || double.IsInfinity(stopDistanceRaw)      ||
-                double.IsNaN(MaxRiskAmount)         || double.IsInfinity(MaxRiskAmount)         ||
-                double.IsNaN(SlippageCushionPoints) || double.IsInfinity(SlippageCushionPoints) ||
-                pointValue <= 0)
-            {
-                Print("[SIZING] (!) Invalid sizing inputs -- returning min contracts");
-                return Math.Max(1, minContracts);
-            }
-            if (stopDistanceRaw <= 0) return Math.Max(1, minContracts);
-
             // STEP 1: CEILING to whole POINT (e.g. 2.3 -> 3.0, 4.0 -> 4.0)
             double stopPoints = Math.Ceiling(stopDistanceRaw);
 
-            double riskToUse = MaxRiskAmount;
-            double stopDollars = stopPoints * pointValue;
-            if (stopDollars <= 0) return Math.Max(1, minContracts);
+            int contracts = V12_PureLogic.CalculatePositionSize(
+                stopPoints,
+                MaxRiskAmount,
+                SlippageCushionPoints,
+                pointValue,
+                minContracts,
+                maxContracts);
 
-            // SLIP-01: Subtract slippage cushion from risk budget before sizing.
-            // Followers may fill at worse prices than master (entry slippage); their stop
-            // is at the same absolute level -> actual dollar risk = (fillPrice - stop) x qty x pv.
-            // Cushion ensures worst-case follower risk stays <= MaxRiskAmount.
-            double slippageCushionDollars = SlippageCushionPoints * pointValue;
-            double effectiveRisk = riskToUse - slippageCushionDollars;
-
-            // STEP 2: FLOOR the quantity (never exceed $MaxRisk after slippage reserve)
-            // [923A-P2b-OVF]: checked{} guards against astronomically low stopDollars (near-zero ATR)
-            // producing a double->int overflow. Clamps to maxContracts on overflow rather than silent wrap.
-            int contracts;
-            try   { contracts = checked((int)Math.Floor(effectiveRisk / stopDollars)); }
-            catch (OverflowException)
-            {
-                Print($"[923A-OVF] Sizing overflow -- stop={stopDollars:F4} effectiveRisk={effectiveRisk:F0} -- clamping to maxContracts ({maxContracts})");
-                contracts = maxContracts;
-            }
-
-            // V12.Phase8.3: Diagnostic warning when ATR/Risk math produces 0 -- makes risk-floor fallbacks visible
+            // V12.Phase8.3: Diagnostic warning when ATR/Risk math produces 0
             if (contracts == 0)
-                Print($"[SIZING] Risk/Stop math resulted in 0 -- falling back to minContracts floor ({minContracts}). Risk=${riskToUse:F0}, StopDollars=${stopDollars:F0}");
+                Print($"[SIZING] Risk/Stop math resulted in 0 -- falling back to minContracts floor ({minContracts}). Risk=${MaxRiskAmount:F0}, StopPoints={stopPoints:F1}");
 
-            // V12.1101E [B-9]: Clamp to [minContracts, maxContracts] -- prevents runaway sizing on
-            // tiny ATR values (e.g., flat market) from hitting broker limits or compliance thresholds.
-            contracts = Math.Max(minContracts, Math.Min(contracts, maxContracts));
-
-            Print($"[V12.30 SIZING] RawStop={stopDistanceRaw:F2} -> Ceiling={stopPoints:F0}pt | Risk=${riskToUse:F0} | Cushion=${slippageCushionDollars:F0} | EffRisk=${effectiveRisk:F0} | StopDollars=${stopDollars:F0} | Qty={contracts} | Clamp=[{minContracts},{maxContracts}]");
+            Print($"[V12.30 SIZING] RawStop={stopDistanceRaw:F2} -> Ceiling={stopPoints:F0}pt | Risk=${MaxRiskAmount:F0} | Qty={contracts} | Clamp=[{minContracts},{maxContracts}]");
             return contracts;
         }
 
@@ -138,11 +89,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private double CalculateATRStopDistance(double atrMultiplier)
         {
-            if (currentATR <= 0) return MinimumStop;
-
-            double rawStop = currentATR * atrMultiplier;
-            double ceilingStop = Math.Ceiling(rawStop);  // Round UP to whole point
-            return Math.Max(MinimumStop, Math.Min(ceilingStop, MaximumStop));
+            return V12_PureLogic.CalculateATRStopDistance(currentATR, atrMultiplier, MinimumStop, MaximumStop);
         }
 
         /// <summary>

@@ -66,6 +66,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Round to tick size
                     newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
 
+                    // [Build 1108.002-HF1] Master-drives-followers: followers skip priceCleared gate.
+                    // BE is an explicit manual action -- threshold logic protects the master only.
+                    // UpdateStopOrder handles IsFollower routing (account-level cancel+resubmit).
+                    if (pos.IsFollower)
+                    {
+                        bool isBetterF = (pos.Direction == MarketPosition.Long && newStopPrice > pos.CurrentStopPrice)
+                                      || (pos.Direction == MarketPosition.Short && newStopPrice < pos.CurrentStopPrice);
+                        if (isBetterF)
+                        {
+                            UpdateStopOrder(entryName, pos, newStopPrice, 1);
+                            pos.ManualBreakevenTriggered = true;
+                            MarkStickyDirty();
+                            Print(string.Format("BE+{0} MOVED (follower): {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
+                        }
+                        continue;
+                    }
+
                     // [V12.12] ARM GUARD: If price hasn't cleared the BE threshold yet, arm instead of executing.
                     // ManageTrailingStops() will call UpdateStopOrder when price crosses the threshold.
                     if (lastKnownPrice <= 0)
@@ -101,6 +118,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // (ChangeOrder only works for Master -- followers were silently skipped)
                     UpdateStopOrder(entryName, pos, newStopPrice, 1);
                     pos.ManualBreakevenTriggered = true;
+                    MarkStickyDirty(); // Build 1103: Persist breakeven state
                     Print(string.Format("BE+{0} MOVED: {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
                 }
             }
@@ -267,6 +285,98 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
             {
                 Print($"[V14] MoveSpecificTarget T{targetNum}: No targets were moved (no active working orders found)");
+            }
+        }
+
+        // Build 1107: Moves a specific target to an absolute price (from live control center).
+        // Mirrors MoveSpecificTarget structure: finds working order on correct account,
+        // validates direction safety, uses ChangeOrder for master and FSM for follower.
+        private void MoveSpecificTargetAbsolute(int targetNum, double absolutePrice)
+        {
+            if (targetNum < 1 || targetNum > 5 || absolutePrice <= 0) return;
+            if (activePositions == null || activePositions.Count == 0) return;
+
+            foreach (var kvp in activePositions.ToArray())
+            {
+                if (!activePositions.ContainsKey(kvp.Key)) continue;
+                PositionInfo pos = kvp.Value;
+                string entryName = kvp.Key;
+                if (!pos.EntryFilled || pos.PendingCleanup) continue;
+
+                // Find working target order on the correct account
+                string targetOrderName = string.Format("T{0}_{1}", targetNum, entryName);
+                Order targetOrder = null;
+                var searchAcct = (pos.IsFollower && pos.ExecutingAccount != null)
+                    ? pos.ExecutingAccount : Account;
+
+                foreach (Order order in searchAcct.Orders)
+                {
+                    if (order != null && order.Name == targetOrderName
+                        && order.Instrument.FullName == Instrument.FullName
+                        && (order.OrderState == OrderState.Working || order.OrderState == OrderState.Accepted))
+                    {
+                        targetOrder = order;
+                        break;
+                    }
+                }
+
+                if (targetOrder == null)
+                {
+                    Print(string.Format("[V12] SET_TARGET_PRICE T{0}: No working order for {1}", targetNum, entryName));
+                    continue;
+                }
+
+                double newPrice = Instrument.MasterInstrument.RoundToTickSize(absolutePrice);
+
+                // Direction safety validation
+                if (pos.Direction == MarketPosition.Long && newPrice <= pos.EntryPrice)
+                {
+                    Print(string.Format("[V12] SET_TARGET_PRICE T{0}: REJECTED -- Long target {1:F2} at/below entry {2:F2}",
+                        targetNum, newPrice, pos.EntryPrice));
+                    continue;
+                }
+                if (pos.Direction == MarketPosition.Short && newPrice >= pos.EntryPrice)
+                {
+                    Print(string.Format("[V12] SET_TARGET_PRICE T{0}: REJECTED -- Short target {1:F2} at/above entry {2:F2}",
+                        targetNum, newPrice, pos.EntryPrice));
+                    continue;
+                }
+
+                try
+                {
+                    if (pos.IsFollower && pos.ExecutingAccount != null)
+                    {
+                        // Follower: Two-phase FSM (DNA-compliant, no raw Cancel+Submit)
+                        OrderAction exitAct = pos.Direction == MarketPosition.Long
+                            ? OrderAction.Sell : OrderAction.BuyToCover;
+                        var tSpec = new FollowerTargetReplaceSpec
+                        {
+                            EntryName = entryName,
+                            TargetNum = targetNum,
+                            NewTargetPrice = newPrice,
+                            Quantity = targetOrder.Quantity,
+                            ExitAction = exitAct,
+                            TargetAccount = pos.ExecutingAccount,
+                            CancellingOrderId = targetOrder.OrderId
+                        };
+                        _followerTargetReplaceSpecs[targetOrderName] = tSpec;
+                        StampReaperMoveGrace();
+                        pos.ExecutingAccount.Cancel(new[] { targetOrder });
+                        Print(string.Format("[V12] SET_TARGET_PRICE T{0}: Follower FSM queued on {1} -> {2:F2}",
+                            targetNum, pos.ExecutingAccount.Name, newPrice));
+                    }
+                    else
+                    {
+                        // Master: ChangeOrder for atomic in-place modification
+                        ChangeOrder(targetOrder, targetOrder.Quantity, newPrice, 0);
+                        Print(string.Format("[V12] SET_TARGET_PRICE T{0}: Master ChangeOrder -> {1:F2}",
+                            targetNum, newPrice));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print(string.Format("[V12] SET_TARGET_PRICE T{0} error: {1}", targetNum, ex.Message));
+                }
             }
         }
 

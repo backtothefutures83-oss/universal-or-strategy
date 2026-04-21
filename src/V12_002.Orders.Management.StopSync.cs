@@ -96,8 +96,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             try
                             {
-                                CancelOrder(existingOrder);
-                                // B957: Do NOT TryRemove from targetDict here -- CancelOrder is async.
+                                CancelOrderSafe(existingOrder, pos);
+                                // B957: Do NOT TryRemove from targetDict here -- the cancel is async.
                                 // The broker-confirmed terminal callback will perform the removal under stateLock
                                 // once confirmed, preventing premature cleanup before the cancel is acknowledged.
                                 Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancel requested -> now Runner (awaiting broker confirm)", targetNum, entryName));
@@ -215,15 +215,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (currentStop != null && (currentStop.OrderState == OrderState.Working || currentStop.OrderState == OrderState.Accepted))
                 {
                     // V8.31: Check if there's already a pending replacement to prevent duplicates
-                    if (pendingStopReplacements.ContainsKey(entryName))
+                    if (pendingStopReplacements.TryGetValue(entryName, out var existingPendingQty))
                     {
-                        // Just update the quantity, don't create a new pending
-                        if (pendingStopReplacements.TryGetValue(entryName, out var existingPending))
+                        // Build 1104.2: Staleness fast-path -- purge stale pending and re-initiate
+                        double pendingAgeSeconds = (DateTime.Now - existingPendingQty.CreatedTime).TotalSeconds;
+                        if (pendingAgeSeconds > STALE_PENDING_FAST_PATH_SEC)
                         {
-                            existingPending.Quantity = pos.RemainingContracts;
-                            Print(string.Format("V8.31: Updated existing pending replacement for {0} to {1} contracts", entryName, pos.RemainingContracts));
+                            if (pendingStopReplacements.TryRemove(entryName, out _))
+                                Interlocked.Decrement(ref pendingReplacementCount);
+                            Print(string.Format("[1104.2] Stale pending purged for {0} ({1:F1}s). Re-initiating stop resize.",
+                                entryName, pendingAgeSeconds));
                         }
-                        return;
+                        else
+                        {
+                            existingPendingQty.Quantity = pos.RemainingContracts;
+                            Print(string.Format("V8.31: Updated existing pending replacement for {0} to {1} contracts", entryName, pos.RemainingContracts));
+                            return;
+                        }
                     }
 
                     // Store the replacement info
@@ -244,7 +252,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                     // Cancel old stop - replacement will be created in OnOrderUpdate when confirmed
-                    CancelOrder(currentStop);
+                    CancelOrderForReplace(currentStop, pos);
                     Print(string.Format("STOP CANCEL PENDING: {0} | Will replace with {1} contracts @ {2:F2}",
                         entryName, pos.RemainingContracts, pos.CurrentStopPrice));
                 }
@@ -264,7 +272,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V8.11: Helper method to create a new stop order
         // V8.31: Added guard to prevent duplicate stop creation
-        private void CreateNewStopOrder(string entryName, int quantity, double stopPrice, MarketPosition direction)
+        private void CreateNewStopOrder(string entryName, int quantity, double stopPrice, MarketPosition direction, bool isRecovery = false)
         {
             try
             {
@@ -299,8 +307,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                         existingStop.OrderState == OrderState.ChangePending ||
                         existingStop.OrderState == OrderState.ChangeSubmitted))
                     {
-                        Print(string.Format("V12.Phase7: SKIPPING duplicate stop for {0} -- existing stop state={1}", entryName, existingStop.OrderState));
-                        return;
+                        if (isRecovery)
+                        {
+                            // Build 1104.2: Recovery mode -- stale tracked stop may be phantom at broker.
+                            // Force-cancel and clear reference to allow fresh stop submission.
+                            Print(string.Format("[1104.2] Recovery: force-cancelling phantom stop for {0} (state={1})",
+                                entryName, existingStop.OrderState));
+                            PositionInfo recoveryPos;
+                            activePositions.TryGetValue(entryName, out recoveryPos);
+                            CancelOrderSafe(existingStop, recoveryPos);
+                            stopOrders.TryRemove(entryName, out _);
+                        }
+                        else
+                        {
+                            Print(string.Format("V12.Phase7: SKIPPING duplicate stop for {0} -- existing stop state={1}", entryName, existingStop.OrderState));
+                            return;
+                        }
                     }
                 }
 
@@ -352,12 +374,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (newStop == null)
                 {
-                    Print(string.Format("?? ?? CRITICAL ERROR: Stop order submission returned NULL for {0}!", entryName));
-                    Print(string.Format("?? ?? POSITION UNPROTECTED: {0} {1} contracts @ {2:F2}",
+                    Print(string.Format("(!) CRITICAL ERROR: Stop order submission returned NULL for {0}!", entryName));
+                    Print(string.Format("(!) POSITION UNPROTECTED: {0} {1} contracts @ {2:F2}",
                         direction == MarketPosition.Long ? "LONG" : "SHORT", quantity, stopPrice));
 
                     // Attempt to flatten position immediately
-                    Print(string.Format("?? ?? Attempting emergency flatten for {0}...", entryName));
+                    Print(string.Format("(!) Attempting emergency flatten for {0}...", entryName));
                     FlattenPositionByName(entryName);
                     return;
                 }
@@ -380,7 +402,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print(string.Format("?? ?? ERROR CreateNewStopOrder for {0}: {1}", entryName, ex.Message));
+                Print(string.Format("(!) ERROR CreateNewStopOrder for {0}: {1}", entryName, ex.Message));
             }
         }
 

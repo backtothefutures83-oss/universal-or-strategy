@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arena AI | Multi-Agent Workflow Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "dark",
+        securityLevel: "loose",
+      });
+    </script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap");
+
+      :root {
+        --bg: #04040a;
+        --surface: #09090f;
+        --border: #16162a;
+        --cyan: #00e5ff;
+        --purple: #bc13fe;
+        --green: #39ff14;
+        --gold: #ffd700;
+        --orange: #ff6b00;
+        --red: #ff2244;
+        --text-dim: #5a6070;
+        --text-mid: #9aa0b4;
+        --text-bright: #e5e7eb;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text-bright);
+        font-family: "Inter", sans-serif;
+        padding: 24px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 28px;
+      }
+
+      .logo {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--cyan);
+        letter-spacing: -0.5px;
+      }
+
+      .logo span {
+        color: var(--text-dim);
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-mid);
+        margin-bottom: 16px;
+      }
+
+      @keyframes syncPulse {
+        to {
+          stroke-dashoffset: -24;
+        }
+      }
+
+      path[style*="stroke: #00e5ff"],
+      path[style*="stroke:#00e5ff"] {
+        stroke-dasharray: 6 6 !important;
+        animation: syncPulse 0.4s linear infinite !important;
+        filter: drop-shadow(0 0 5px var(--cyan)) !important;
+      }
+
+      path[style*="stroke: #bc13fe"],
+      path[style*="stroke:#bc13fe"] {
+        stroke-dasharray: 6 6 !important;
+        animation: syncPulse 0.4s linear infinite reverse !important;
+        filter: drop-shadow(0 0 5px var(--purple)) !important;
+      }
+
+      path[style*="stroke: #ff2244"],
+      path[style*="stroke:#ff2244"] {
+        stroke-dasharray: 6 6 !important;
+        animation: syncPulse 0.3s linear infinite !important;
+        filter: drop-shadow(0 0 8px var(--red)) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">Arena AI // <span>Multi-Agent Workflow OS</span></div>
+      <div
+        style="
+          font-family: &quot;JetBrains Mono&quot;, monospace;
+          font-size: 10px;
+          color: var(--gold);
+        "
+      >
+        STATUS: A2A MESH ACTIVE
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">
+        The Director's Gate: V12 Sub-100ns Multi-Agent Pipeline
+      </div>
+      <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px">
+        Visualizing the continuous, token-efficient `Agent-as-a-Tool` stateless
+        routing matrix. The P1 Orchestrator centralizes file-watching and API
+        firing, eliminating idle agent polling entirely.
+      </div>
+
+      <div class="mermaid">
+        graph TD Director(("The Director<br />(User)")) subgraph
+        Orchestration_Layer ["L1: The Central Switchboard"]
+        Antigravity["Antigravity<br />(P1 Orchestrator)"] Bridge[("Nexus A2A
+        Blackboard<br />(nexus_a2a.json)")] end subgraph Planning_Layer ["L2:
+        Structural Design"] Claude["Claude Code<br />(P3 ARCHITECT)"] end
+        subgraph Execution_Layer ["L3: Implementation & Validation"]
+        Codex["Codex<br />(P4 ENGINEER)"] Jules["Jules<br />(P4 STANDBY /
+        Critic)"] GeminiCLI["Gemini CLI<br />(/security:analyze)"] end %% Flow
+        Sequence Director ==>|1. Mission Prompt| Antigravity Antigravity <==>|2.
+        Manages State| Bridge Antigravity ==>|3. Wakes Architect| Claude Claude
+        -.->|4. Writes Plan & Sleeps| Bridge Antigravity ==>|5. Invokes
+        Stateless Tool| Codex Codex -.->|6. Edits src/ Source Code| Bridge Codex
+        -.->|7. Triggers Red Team| GeminiCLI GeminiCLI -.->|8. Writes Security
+        JSON| Bridge Antigravity ==>|9. Wakes Critic| Jules Jules -.->|10.
+        Validates Code + JSON| Bridge Jules -.->|11. PASS/FAIL Concensus|
+        Antigravity Antigravity ==>|12. Execute Deploy-Sync| Director %% Styling
+        style Director fill:#0a0a14,stroke:#ffd700,stroke-width:2px; style
+        Antigravity fill:#0a0a14,stroke:#00e5ff,stroke-width:3px; style Bridge
+        fill:#16162a,stroke:#5a6070,stroke-width:1px; style Claude
+        fill:#0a0a14,stroke:#bc13fe,stroke-width:2px; style Codex
+        fill:#0a0a14,stroke:#39ff14,stroke-width:2px; style Jules
+        fill:#0a0a14,stroke:#ff6b00,stroke-width:2px; style GeminiCLI
+        fill:#0a0a14,stroke:#ff2244,stroke-width:3px; %% Path Coloring and
+        Animations via our CSS logic linkStyle 0,2,4,8,11
+        stroke:#00e5ff,stroke-width:3px; linkStyle 3,5,9,10
+        stroke:#bc13fe,stroke-width:2px; linkStyle 6,7
+        stroke:#ff2244,stroke-width:2px;
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Protocol State Mechanisms</div>
+      <div
+        style="
+          font-family: &quot;JetBrains Mono&quot;, monospace;
+          font-size: 11px;
+          line-height: 1.6;
+          color: var(--text-mid);
+        "
+      >
+        <strong>Agent-as-a-Tool (Stateless):</strong> Active. Codex and Jules
+        spin up independently to process exactly one JSON payload, complete the
+        task, and instantly kill the session to preserve 100% of idle token
+        waste.<br /><br />
+        <strong>Gemini Security Red Team:</strong> Armed. Before any P4 Engineer
+        is permitted to execute <code>deploy-sync.ps1</code>, the Gemini CLI
+        extension physically scans the <code>git diff --merge-base</code> vector
+        to identify unmanaged code exploits.
+      </div>
+    </div>
+  </body>
+</html>

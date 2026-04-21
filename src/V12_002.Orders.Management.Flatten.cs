@@ -78,6 +78,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             double citOffset = 0;
             if (!double.TryParse(ChaseIfTouchPoints, out citOffset)) return;
 
+            int _citBrokerBudget = MaxBrokerCallsPerCycle; // 5 calls max per cycle (constant at V12_002.cs:303)
             // Iterate ALL entry orders in the unified dictionary (local + every fleet account)
             foreach (var kvp in entryOrders.ToArray())
             {
@@ -120,6 +121,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // Fleet follower: cancel limit, resubmit as nudged limit via account API
                         Account followerAcct = pos.ExecutingAccount;
                         Print($"[CIT] FLEET nudge: {key} on {followerAcct.Name} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)");
+
+                        // Build 1109 [FREEZE-PROOF]: Budget broker calls to prevent strategy thread stall
+                        if (_citBrokerBudget <= 0)
+                        {
+                            Print("[CIT] Broker budget exhausted -- deferring remaining nudges");
+                            Enqueue(ctx => ctx.ManageCIT());
+                            return;
+                        }
+                        _citBrokerBudget -= 2; // Cancel + Submit = 2 broker calls
 
                         followerAcct.Cancel(new[] { order });
 
@@ -196,11 +206,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.13b: Removed ExitLong/ExitShort block (managed-mode methods incompatible with IsUnmanaged=true)
                 // Unmanaged flatten via SubmitOrderUnmanaged is handled below at the per-position level
 
-                // 2. Clear all pending entry orders on Master
+                // 2. Clear all tracked pending entry orders using account-aware routing
                 foreach (var entryOrder in entryOrders.Values)
                 {
-                    if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
-                        CancelOrder(entryOrder);
+                    if (entryOrder != null
+                        && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted)
+                        && (entryOrder.Account == null || entryOrder.Account == Account))
+                        CancelOrderOnAccount(entryOrder, entryOrder.Account);
                 }
 
                 // 3. Flatten SIMA Fleet
@@ -259,7 +271,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
                             {
                                 if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
-                                    CancelOrder(tOrder);
+                                    CancelOrderSafe(tOrder, pos);
                             }
                         }
 
@@ -313,7 +325,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Order entryOrder = entryOrders[entryName];
                             if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
                             {
-                                CancelOrder(entryOrder);
+                                CancelOrderSafe(entryOrder, pos);
                                 Print(string.Format("FLATTEN: Cancelled pending {0} entry order @ {1:F2}",
                                     pos.Direction == MarketPosition.Long ? "LONG" : "SHORT", pos.EntryPrice));
                             }
@@ -338,7 +350,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (pos.EntryFilled && pos.RemainingContracts > 0)
             {
-                Print(string.Format("?? ?? EMERGENCY FLATTEN: Closing {0} position due to stop order failure", entryName));
+                Print(string.Format("(!) EMERGENCY FLATTEN: Closing {0} position due to stop order failure", entryName));
 
                 // V12.3: Determine if this is a fleet follower or local position
                 bool isFleetFollower = pos.IsFollower && pos.ExecutingAccount != null;
@@ -349,8 +361,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted)
                     {
-                        if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { stopOrder });
-                        else CancelOrder(stopOrder);
+                        CancelOrderSafe(stopOrder, pos);
                     }
                 }
                 // Cancel all target orders (T1-T5)
@@ -361,8 +372,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted)
                         {
-                            if (isFleetFollower) pos.ExecutingAccount.Cancel(new[] { tOrder });
-                            else CancelOrder(tOrder);
+                            CancelOrderSafe(tOrder, pos);
                         }
                     }
                 }
@@ -408,8 +418,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    Print(string.Format("?? ???? ???? ?? CRITICAL: Emergency flatten order FAILED for {0}!", entryName));
-                    Print("?? ???? ???? ?? MANUAL INTERVENTION REQUIRED - Close position manually in NinjaTrader!");
+                    Print(string.Format("(!) CRITICAL: Emergency flatten order FAILED for {0}!", entryName));
+                    Print("(!) MANUAL INTERVENTION REQUIRED - Close position manually in NinjaTrader!");
                 }
             }
         }

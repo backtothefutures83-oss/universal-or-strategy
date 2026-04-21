@@ -55,34 +55,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (pos != null && pos.MarketPosition != MarketPosition.Flat)
                 actualQty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
 
-            // Phase 4: Promote BracketFSM to primary authority for expected state
+            // Build 1105: FSM is the SOLE authority for follower expected position.
             var accountFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
-            int fsmExpectedQty = 0;
+            int fsmExpectedQty = GetFsmExpectedPosition(acct.Name);
+
+            // Handle hydrated Active FSMs with no order reference (restart edge case)
             foreach (var f in accountFsms)
             {
-                // Active, Accepted, or Submitted states imply we expect the entry to fill/be-filled
-                if (f.State == FollowerBracketState.Active || f.State == FollowerBracketState.Accepted || f.State == FollowerBracketState.Submitted)
+                if (f.State == FollowerBracketState.Active && f.EntryOrder == null)
                 {
-                    if (f.EntryOrder != null)
+                    if (actualQty != 0)
                     {
-                         int entrySign = (f.EntryOrder.OrderAction == OrderAction.Buy || f.EntryOrder.OrderAction == OrderAction.BuyToCover) ? 1 : -1;
-                         fsmExpectedQty += (f.EntryOrder.Quantity * entrySign);
+                        fsmExpectedQty += actualQty;
                     }
-                    else if (f.State == FollowerBracketState.Active)
+                    else
                     {
-                        // Hydrated Active FSM: entry was terminal (Filled) at restart, no order reference.
-                        if (actualQty != 0)
+                        FollowerBracketFSM staleFsm;
+                        if (TryTerminateFollowerBracket(f.EntryName, out staleFsm))
                         {
-                            fsmExpectedQty += actualQty;
-                        }
-                        else
-                        {
-                            FollowerBracketFSM staleFsm;
-                            if (TryTerminateFollowerBracket(f.EntryName, out staleFsm))
-                            {
-                                Print(string.Format("[REAPER-C7] Stale Active FSM for {0} on {1} (broker flat) -- auto-terminating",
-                                    f.EntryName, acct.Name));
-                            }
+                            Print(string.Format("[REAPER-C7] Stale Active FSM for {0} on {1} (broker flat) -- auto-terminating",
+                                f.EntryName, acct.Name));
                         }
                     }
                 }
@@ -188,17 +180,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (shouldLog) Print($"[REAPER] * QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
                         _reaperFlattenQueue.Enqueue(acct.Name);
-                        try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
+                        try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }
+                        catch (Exception _flatTriggerEx)
+                        {
+                            string _discarded;
+                            _reaperFlattenQueue.TryDequeue(out _discarded);
+                            Print("[REAPER] TriggerCustomEvent failed for flatten of "
+                                + acct.Name + ": " + _flatTriggerEx.Message
+                                + " -- dequeued, will re-detect next cycle");
+                        }
                     }
                 }
                 else if (shouldLog)
                     Print($"[REAPER] Minor Desync on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
             }
 
-            // ?? NAKED POSITION AUDIT (Build 1102R) ??????????????????????????????????
+            // --- NAKED POSITION AUDIT (Build 1102R) ---------------------------------
             if (actualQty != 0)
             {
-                bool hasWorkingStop = acct.Orders.Any(o =>
+                // Build 1108.003 [D3]: Snapshot broker orders before iteration. orderSnapshot
+                var orders = acct.Orders.ToArray();
+                bool hasWorkingStop = orders.Any(o =>
                     o.Instrument?.FullName == Instrument?.FullName &&
                     (o.OrderState == OrderState.Working || o.OrderState == OrderState.Accepted) &&
                     (o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit) &&
@@ -206,29 +208,51 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (!hasWorkingStop)
                 {
-                    DateTime firstSeen;
-                    int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
-                    if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
+                    bool hasPendingStopReplace = false;
+                    foreach (var psr in pendingStopReplacements.Values)
                     {
-                        _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
-                        Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked -- starting {2}s grace window.",
-                            acct.Name, actualQty, graceSeconds));
-                    }
-                    else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
-                    {
-                        bool alreadyNakedInFlight;
-                        alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(ExpKey(acct.Name)); // [Build 968]
-                        if (!alreadyNakedInFlight)
+                        PositionInfo psrPos;
+                        if (activePositions.TryGetValue(psr.EntryName, out psrPos)
+                            && psrPos != null && psrPos.ExecutingAccount != null
+                            && psrPos.ExecutingAccount.Name == acct.Name)
                         {
-                            _reaperNakedStopInFlight.TryAdd(ExpKey(acct.Name), 0); // [Build 968]
-                            Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
-                                acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
-                            _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
-                            try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
-                            catch (Exception tcEx)
+                            hasPendingStopReplace = true;
+                            break;
+                        }
+                    }
+
+                    if (hasPendingStopReplace)
+                    {
+                        _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+                        if (shouldLog)
+                            Print(string.Format("[REAPER] {0}: Stop replace in flight -- suppressing naked audit.", acct.Name));
+                    }
+                    else
+                    {
+                        DateTime firstSeen;
+                        int graceSeconds = (NakedPositionGraceSec >= 5) ? NakedPositionGraceSec : 5;
+                        if (!_nakedPositionFirstSeen.TryGetValue(acct.Name, out firstSeen))
+                        {
+                            _nakedPositionFirstSeen[acct.Name] = DateTime.UtcNow;
+                            Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct naked -- starting {2}s grace window.",
+                                acct.Name, actualQty, graceSeconds));
+                        }
+                        else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
+                        {
+                            bool alreadyNakedInFlight;
+                            alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(ExpKey(acct.Name)); // [Build 968]
+                            if (!alreadyNakedInFlight)
                             {
-                                _reaperNakedStopInFlight.TryRemove(ExpKey(acct.Name), out _); // [Build 969]
-                                Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
+                                _reaperNakedStopInFlight.TryAdd(ExpKey(acct.Name), 0); // [Build 968]
+                                Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                                    acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
+                                _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
+                                try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                                catch (Exception tcEx)
+                                {
+                                    _reaperNakedStopInFlight.TryRemove(ExpKey(acct.Name), out _); // [Build 969]
+                                    Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
+                                }
                             }
                         }
                     }
@@ -300,7 +324,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             if (shouldLog) Print($"[REAPER] QUEUING FLATTEN for {Account.Name} (Master) - Emergency Re-sync!");
                             _reaperFlattenQueue.Enqueue(Account.Name);
-                            try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); } catch { }
+                            try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }
+                            catch (Exception _mFlatTriggerEx)
+                            {
+                                string _mDiscarded;
+                                _reaperFlattenQueue.TryDequeue(out _mDiscarded);
+                                Print("[REAPER] TriggerCustomEvent failed for master flatten: "
+                                    + _mFlatTriggerEx.Message + " -- dequeued, will re-detect next cycle");
+                            }
                         }
                     }
                     else if (shouldLog)
@@ -321,7 +352,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!masterHasWorkingStop)
                 {
                     DateTime masterFirstSeen;
-                    int graceSeconds = (NakedPositionGraceSec > 0) ? NakedPositionGraceSec : 3;
+                    int graceSeconds = (NakedPositionGraceSec >= 5) ? NakedPositionGraceSec : 5;
                     if (!_nakedPositionFirstSeen.TryGetValue(Account.Name, out masterFirstSeen))
                     {
                         _nakedPositionFirstSeen[Account.Name] = DateTime.UtcNow;
@@ -398,7 +429,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                         if (ordersToCancel.Count > 0)
                         {
-                            targetAcct.Cancel(ordersToCancel);
+                            foreach (Order orderToCancel in ordersToCancel)
+                                CancelOrderOnAccount(orderToCancel, targetAcct);
                             Print($"[REAPER] Emergency Cancel: {ordersToCancel.Count} orders on {accountName}");
                         }
 

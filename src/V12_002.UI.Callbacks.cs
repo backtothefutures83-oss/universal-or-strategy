@@ -34,7 +34,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region UI
 
-        // V12.1101E [D-01]: Removed legacy no-op UI stub remnants.
+        // [Build 1108.002-HF1] Overlay rectangle for click-trader border warning (no layout reflow)
+        private System.Windows.Shapes.Rectangle _chartHoverOverlay;
+        private Grid _chartOverlayParentGrid;
 
         private void AttachHotkeys()
         {
@@ -57,6 +59,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ChartControl != null)
             {
                 ChartControl.PreviewMouseLeftButtonDown += OnChartClick;
+                ChartControl.MouseMove += OnChartMouseMove;
+                ChartControl.MouseLeave += OnChartMouseLeave;
+
+                // [Build 1108.002-HF1] Create transparent overlay for border warning.
+                // Overlay avoids layout reflow from border-width mutation and caches
+                // the parent reference to avoid repeated visual-tree walks.
+                try
+                {
+                    DependencyObject parent = VisualTreeHelper.GetParent(ChartControl);
+                    while (parent != null && !(parent is Grid))
+                        parent = VisualTreeHelper.GetParent(parent);
+
+                    if (parent is Grid parentGrid)
+                    {
+                        _chartHoverOverlay = new System.Windows.Shapes.Rectangle
+                        {
+                            Fill = Brushes.Transparent,
+                            Stroke = Brushes.Red,
+                            StrokeThickness = 4,
+                            IsHitTestVisible = false,
+                            Visibility = Visibility.Collapsed
+                        };
+
+                        int colSpan = Math.Max(1, parentGrid.ColumnDefinitions.Count);
+                        int rowSpan = Math.Max(1, parentGrid.RowDefinitions.Count);
+                        Grid.SetColumnSpan(_chartHoverOverlay, colSpan);
+                        Grid.SetRowSpan(_chartHoverOverlay, rowSpan);
+                        System.Windows.Controls.Panel.SetZIndex(_chartHoverOverlay, 9999);
+
+                        parentGrid.Children.Add(_chartHoverOverlay);
+                        _chartOverlayParentGrid = parentGrid;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print("[V12] Overlay creation failed: " + ex.Message);
+                }
             }
         }
 
@@ -65,7 +104,101 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ChartControl != null)
             {
                 ChartControl.PreviewMouseLeftButtonDown -= OnChartClick;
+                ChartControl.MouseMove -= OnChartMouseMove;
+                ChartControl.MouseLeave -= OnChartMouseLeave;
+                ClearClickTraderBorderIfActive();
             }
+
+            // [Build 1108.002-HF1] Remove overlay from visual tree on teardown
+            if (_chartHoverOverlay != null && _chartOverlayParentGrid != null)
+            {
+                try
+                {
+                    _chartOverlayParentGrid.Children.Remove(_chartHoverOverlay);
+                }
+                catch { }
+            }
+            _chartHoverOverlay = null;
+            _chartOverlayParentGrid = null;
+        }
+
+        private bool IsClickTraderArmed()
+        {
+            return (RMAEnabled && isRMAModeActive) || (MOMOEnabled && isMOMOModeActive);
+        }
+
+        private bool IsPointerInPriceArea(MouseEventArgs e)
+        {
+            if (ChartPanel == null || e == null) return false;
+
+            Point mouseInPanel = e.GetPosition(ChartPanel as System.Windows.IInputElement);
+            if (mouseInPanel.X < 0 || mouseInPanel.X > ChartPanel.W || mouseInPanel.Y < 0 || mouseInPanel.Y > ChartPanel.H)
+                return false;
+
+            double effectivePriceHeight = ChartPanel.H * 0.667;
+            return mouseInPanel.Y <= effectivePriceHeight;
+        }
+
+        private void OnChartMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isTerminating) return;
+
+            bool shouldWarn = IsClickTraderArmed() && IsPointerInPriceArea(e);
+            if (shouldWarn == _chartHoverRedActive) return;
+
+            if (shouldWarn)
+            {
+                SetChartBorderWarning(true);
+                _chartHoverRedActive = true;
+            }
+            else
+            {
+                SetChartBorderWarning(false);
+                _chartHoverRedActive = false;
+            }
+        }
+
+        private void OnChartMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (!_chartHoverRedActive) return;
+
+            SetChartBorderWarning(false);
+            _chartHoverRedActive = false;
+        }
+
+        private void SetChartBorderWarning(bool active)
+        {
+            if (_chartHoverOverlay == null) return;
+            _chartHoverOverlay.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ClearClickTraderBorderIfActive()
+        {
+            if (!_chartHoverRedActive) return;
+
+            if (ChartControl == null)
+            {
+                _chartHoverRedActive = false;
+                return;
+            }
+
+            Action clearWarning = () =>
+            {
+                if (!_chartHoverRedActive) return;
+                SetChartBorderWarning(false);
+                _chartHoverRedActive = false;
+            };
+
+            if (ChartControl.Dispatcher.CheckAccess())
+                clearWarning();
+            else
+                ChartControl.Dispatcher.InvokeAsync(clearWarning);
+        }
+
+        private void ClearClickTraderBorderIfInactive()
+        {
+            if (IsClickTraderArmed()) return;
+            ClearClickTraderBorderIfActive();
         }
 
         /// <summary>
@@ -154,6 +287,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         isRMAButtonClicked = false;
                         isRMAModeActive = false;
+                        ClearClickTraderBorderIfInactive();
 
                         // V12.43: Lightweight deactivation -- only signal mode change, don't clobber config
                         SendResponseToRemote("SET_RMA_MODE|OFF");
@@ -275,16 +409,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                         case "market":
                             // Fill target at market NOW
                             // V8.30: Thread-safe removal
-                            if (targetOrders.TryRemove(entryName, out var existingOrder))
+                            if (targetOrders.TryGetValue(entryName, out var existingOrder))
                             {
-                                CancelOrder(existingOrder);
+                                if (existingOrder != null && !IsOrderTerminal(existingOrder.OrderState))
+                                    CancelOrderSafe(existingOrder, pos);
+                                else
+                                    targetOrders.TryRemove(entryName, out _);
                             }
 
-                            Order marketOrder = pos.Direction == MarketPosition.Long
-                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, targetContracts, 0, 0, "", targetType + "_Market_" + entryName)
-                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, targetContracts, 0, 0, "", targetType + "_Market_" + entryName);
+                            Order marketOrder = SubmitExitOrderForPosition(
+                                pos, targetContracts, OrderType.Market, 0, targetType + "_Market_" + entryName);
 
-                            Print(string.Format("? {0} MARKET FILL: {1} - Closing {2} contracts at market", targetType, entryName, targetContracts));
+                            if (marketOrder != null)
+                                Print(string.Format("? {0} MARKET FILL: {1} - Closing {2} contracts at market", targetType, entryName, targetContracts));
+                            else
+                                Print(string.Format("ERROR {0} MARKET FILL FAILED: {1} - Could not close {2} contracts", targetType, entryName, targetContracts));
                             break;
 
                         case "1point":
@@ -297,7 +436,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("? {0} -> 1 POINT PROFIT: {1} - New target @ {2:F2} (Entry was {3:F2})",
                                 targetType, entryName, newPrice1pt, pos.EntryPrice));
 
-                            MoveTargetOrder(entryName, targetType, newPrice1pt, targetContracts, pos.Direction);
+                            MoveTargetOrder(entryName, pos, targetType, newPrice1pt, targetContracts);
                             break;
 
                         case "2point":
@@ -310,29 +449,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(string.Format("? {0} -> 2 POINTS PROFIT: {1} - New target @ {2:F2} (Entry was {3:F2})",
                                 targetType, entryName, newPrice2pt, pos.EntryPrice));
 
-                            MoveTargetOrder(entryName, targetType, newPrice2pt, targetContracts, pos.Direction);
+                            MoveTargetOrder(entryName, pos, targetType, newPrice2pt, targetContracts);
                             break;
 
                         case "marketprice":
                             // Move target to current market price (instant fill)
                             double marketPrice = Instrument.MasterInstrument.RoundToTickSize(currentPrice);
-                            MoveTargetOrder(entryName, targetType, marketPrice, targetContracts, pos.Direction);
+                            MoveTargetOrder(entryName, pos, targetType, marketPrice, targetContracts);
                             Print(string.Format("? {0} -> MARKET PRICE: {1} - New target @ {2:F2}", targetType, entryName, marketPrice));
                             break;
 
                         case "breakeven":
                             // Move target to breakeven (entry price)
-                            MoveTargetOrder(entryName, targetType, pos.EntryPrice, targetContracts, pos.Direction);
+                            MoveTargetOrder(entryName, pos, targetType, pos.EntryPrice, targetContracts);
                             Print(string.Format("? {0} -> BREAKEVEN: {1} - New target @ {2:F2}", targetType, entryName, pos.EntryPrice));
                             break;
 
                         case "cancel":
                             // Cancel target order - let contracts run
                             // V8.30: Thread-safe removal
-                            if (targetOrders.TryRemove(entryName, out var cancelOrder))
+                            if (targetOrders.TryGetValue(entryName, out var cancelOrder))
                             {
-                                CancelOrder(cancelOrder);
-                                Print(string.Format("? {0} CANCELLED: {1} - {2} contracts will run with stop", targetType, entryName, targetContracts));
+                                if (cancelOrder != null && !IsOrderTerminal(cancelOrder.OrderState))
+                                {
+                                    CancelOrderSafe(cancelOrder, pos);
+                                    Print(string.Format("? {0} CANCELLED: {1} - {2} contracts will run with stop", targetType, entryName, targetContracts));
+                                }
+                                else
+                                    targetOrders.TryRemove(entryName, out _);
                             }
                             break;
                     }
@@ -344,7 +488,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void MoveTargetOrder(string entryName, string targetType, double newPrice, int quantity, MarketPosition direction)
+        private void MoveTargetOrder(string entryName, PositionInfo pos, string targetType, double newPrice, int quantity)
         {
             if (!TryParseTargetNumber(targetType, out int targetNumber))
                 return;
@@ -361,21 +505,71 @@ namespace NinjaTrader.NinjaScript.Strategies
             ConcurrentDictionary<string, Order> targetOrders = GetTargetOrdersDictionary(targetNumber);
             if (targetOrders == null) return;
 
-            // V8.30: Thread-safe cancel existing target order
-            if (targetOrders.TryRemove(entryName, out var existingTarget))
+            Order existingTarget;
+            if (targetOrders.TryGetValue(entryName, out existingTarget) && existingTarget != null)
             {
-                CancelOrder(existingTarget);
+                if (IsOrderTerminal(existingTarget.OrderState))
+                {
+                    targetOrders.TryRemove(entryName, out _);
+                }
+                else if (pos != null && pos.IsFollower && pos.ExecutingAccount != null)
+                {
+                    OrderAction exitAct = pos.Direction == MarketPosition.Long
+                        ? OrderAction.Sell : OrderAction.BuyToCover;
+                    string targetOrderName = "T" + targetNumber + "_" + entryName;
+                    var tSpec = new FollowerTargetReplaceSpec
+                    {
+                        EntryName = entryName,
+                        TargetNum = targetNumber,
+                        NewTargetPrice = newPrice,
+                        Quantity = quantity,
+                        ExitAction = exitAct,
+                        TargetAccount = pos.ExecutingAccount,
+                        CancellingOrderId = existingTarget.OrderId
+                    };
+                    _followerTargetReplaceSpecs[targetOrderName] = tSpec;
+                    StampReaperMoveGrace();
+                    pos.ExecutingAccount.Cancel(new[] { existingTarget });
+                    Print(string.Format("[UI_TGT] Follower target replace queued: T{0} {1} on {2} -> {3:F2}",
+                        targetNumber, entryName, pos.ExecutingAccount.Name, newPrice));
+                    return;
+                }
+                else if (targetOrders.TryRemove(entryName, out existingTarget))
+                {
+                    CancelOrderSafe(existingTarget, pos);
+                }
             }
 
             // Submit new target order at new price
-            Order newTargetOrder = direction == MarketPosition.Long
-                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Limit, quantity, newPrice, 0, "", targetType + "_" + entryName)
-                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Limit, quantity, newPrice, 0, "", targetType + "_" + entryName);
+            Order newTargetOrder = SubmitExitOrderForPosition(pos, quantity, OrderType.Limit, newPrice, targetType + "_" + entryName);
 
             if (newTargetOrder != null)
             {
                 targetOrders[entryName] = newTargetOrder;
             }
+        }
+
+        private Order SubmitExitOrderForPosition(PositionInfo pos, int quantity, OrderType orderType, double limitPrice, string signalName)
+        {
+            if (pos == null || quantity <= 0) return null;
+
+            OrderAction exitAction = pos.Direction == MarketPosition.Long
+                ? OrderAction.Sell : OrderAction.BuyToCover;
+            double limit = orderType == OrderType.Limit ? limitPrice : 0;
+
+            if (pos.IsFollower && pos.ExecutingAccount != null)
+            {
+                Order exitOrder = pos.ExecutingAccount.CreateOrder(
+                    Instrument, exitAction, orderType, TimeInForce.Gtc,
+                    quantity, limit, 0, "", signalName, null);
+                if (exitOrder == null)
+                    return null;
+
+                pos.ExecutingAccount.Submit(new[] { exitOrder });
+                return exitOrder;
+            }
+
+            return SubmitOrderUnmanaged(0, exitAction, orderType, quantity, limit, 0, "", signalName);
         }
 
         private bool TryResolveTargetContext(
@@ -463,11 +657,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         case "market":
                             // Close runner at market
-                            Order runnerMarketOrder = pos.Direction == MarketPosition.Long
-                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, runnerContracts, 0, 0, "", "Runner_Market_" + entryName)
-                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, runnerContracts, 0, 0, "", "Runner_Market_" + entryName);
+                            Order runnerMarketOrder = SubmitExitOrderForPosition(
+                                pos, runnerContracts, OrderType.Market, 0, "Runner_Market_" + entryName);
 
-                            Print(string.Format("? RUNNER MARKET CLOSE: {0} - Closing {1} contracts at market", entryName, runnerContracts));
+                            if (runnerMarketOrder != null)
+                                Print(string.Format("? RUNNER MARKET CLOSE: {0} - Closing {1} contracts at market", entryName, runnerContracts));
+                            else
+                                Print(string.Format("ERROR RUNNER MARKET CLOSE FAILED: {0} - Could not close {1} contracts", entryName, runnerContracts));
                             break;
 
                         case "stop1pt":

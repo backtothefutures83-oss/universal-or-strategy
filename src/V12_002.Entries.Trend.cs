@@ -251,7 +251,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string removedPartner;
                     linkedTRENDEntries.TryRemove(entry1Name, out removedPartner);
                     linkedTRENDEntries.TryRemove(entry2Name, out removedPartner);
-                    if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState)) CancelOrder(entryOrder1);
+                    if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState)) CancelOrderSafe(entryOrder1, null);
                     Print("[ENTRY_ABORT] TREND E2 NULL -- E1 cancel issued for " + entry1Name + "; teardown deferred to cancel callback.");
                     return;
                 }
