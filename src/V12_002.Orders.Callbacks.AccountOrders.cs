@@ -241,8 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            lock (ctx.Sync)
-                followerEntries = ctx.FollowerEntries.ToArray();
+            followerEntries = ctx.Followers;
 
             return followerEntries != null && followerEntries.Length > 0;
         }
@@ -328,8 +327,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PositionInfo masterPos = null;
                     bool masterFilled = false;
 
-                    // Phase 10 [B960-AUDIT]: lock(stateLock) removed. Both this path (HandleMatchedFollowerOrder
-                    // via ProcessQueuedAccountOrder via TriggerCustomEvent) and PropagateFollowerEntryReplace
+                    // Phase 10 [B960-AUDIT]: synchronization wrapper removed. Both this path
+                    // via ProcessQueuedAccountOrder via TriggerCustomEvent and PropagateFollowerEntryReplace
                     // are serialized on the NinjaTrader strategy thread. No concurrent field access is possible.
                     int qty = 0;
                     double price = 0;
