@@ -151,7 +151,7 @@ foreach ($file in $DynamicFiles) {
     # Sync Logic
     if (Test-Path $dstPath) {
         $item = Get-Item $dstPath
-        if ($item.Attributes -match "ReparsePoint") { 
+        if ($item.LinkType -eq "HardLink") {
             Remove-Item $dstPath -Force 
         } else {
             $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -174,7 +174,7 @@ foreach ($map in $FixedMappings) {
     
     if (Test-Path $dstPath) {
         $item = Get-Item $dstPath
-        if ($item.Attributes -match "ReparsePoint") { 
+        if ($item.LinkType -eq "HardLink") {
             Write-Host "CLEANUP: Removing existing link -> $(Split-Path $dstPath -Leaf)" -ForegroundColor Gray
             Remove-Item $dstPath -Force 
         } else {

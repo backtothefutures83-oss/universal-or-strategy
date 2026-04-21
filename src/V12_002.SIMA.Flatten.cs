@@ -79,7 +79,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // Kick the pump -- one account per strategy-thread cycle
             if (!_pendingFlattenOps.IsEmpty)
-                try { TriggerCustomEvent(o => PumpFlattenOps(), null); } catch { }
+            {
+                try { TriggerCustomEvent(o => PumpFlattenOps(), null); }
+                catch (Exception ex)
+                {
+                    isFlattenRunning = false;
+                    LogException("SIMA.Flatten", "FlattenAllApexAccounts.TriggerCustomEvent", ex);
+                }
+            }
             else
             {
                 isFlattenRunning = false;
@@ -198,7 +205,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 // Chain to next account or release guard
                 if (!_pendingFlattenOps.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFlattenOps(), null); } catch { }
+                {
+                    try { TriggerCustomEvent(o => PumpFlattenOps(), null); }
+                    catch (Exception ex)
+                    {
+                        isFlattenRunning = false;
+                        LogException("SIMA.Flatten", "PumpFlattenOps.TriggerCustomEvent", ex);
+                    }
+                }
                 else
                 {
                     isFlattenRunning = false;
@@ -316,7 +330,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print(string.Format("[SIMA] Enqueued {0} account(s) for chunked close", enqueued));
 
             if (!_pendingFlattenOps.IsEmpty)
-                try { TriggerCustomEvent(o => PumpFlattenOps(), null); } catch { }
+            {
+                try { TriggerCustomEvent(o => PumpFlattenOps(), null); }
+                catch (Exception ex)
+                {
+                    isFlattenRunning = false;
+                    LogException("SIMA.Flatten", "ClosePositionsOnlyApexAccounts.TriggerCustomEvent", ex);
+                }
+            }
             else
             {
                 isFlattenRunning = false;

@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.003-v28.0-adr019";  // R28 v28.0 -- blittable slot + XorShadow + optional MMIO mirror
+        public const string BUILD_TAG = "1111.004-v28.0-pr56";  // PR56 pre-merge repair -- fleet slice + watchdog + flatten safety
 
         public class UILiveTargetSnapshot
         {

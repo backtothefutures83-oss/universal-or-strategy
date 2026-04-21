@@ -52,7 +52,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            if (!HasWatchdogLeadAccountExposure())
+            if (!HasWatchdogLeadAccountWorkingOrder())
             {
                 Interlocked.Exchange(ref _watchdogStage, 0);
                 return;
@@ -88,7 +88,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool HasWatchdogLeadAccountExposure()
+        private bool HasWatchdogLeadAccountPosition()
         {
             Account masterAccount = Account;
             if (masterAccount == null || Instrument == null)
@@ -106,6 +106,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return true;
             }
 
+            return false;
+        }
+
+        private bool HasWatchdogLeadAccountWorkingOrder()
+        {
+            Account masterAccount = Account;
+            if (masterAccount == null || Instrument == null)
+                return false;
+
+            string instrumentName = Instrument.FullName;
+
             foreach (Order order in masterAccount.Orders.ToArray())
             {
                 if (order == null || order.Instrument == null)
@@ -119,11 +130,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             return false;
         }
 
+        private bool HasWatchdogLeadAccountExposure()
+        {
+            return HasWatchdogLeadAccountPosition() || HasWatchdogLeadAccountWorkingOrder();
+        }
+
         private void ExecuteWatchdogLeadAccountFlatten()
         {
             Account masterAccount = Account;
             if (masterAccount == null || Instrument == null || _isTerminating || State != State.Realtime)
                 return;
+            if (!HasWatchdogLeadAccountWorkingOrder())
+            {
+                Interlocked.Exchange(ref _watchdogStage, 0);
+                return;
+            }
+
             if (!HasWatchdogLeadAccountExposure())
                 return;
 
@@ -193,6 +215,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             Account masterAccount = Account;
             if (masterAccount == null || Instrument == null)
                 return;
+            if (!HasWatchdogLeadAccountWorkingOrder())
+            {
+                Interlocked.Exchange(ref _watchdogStage, 0);
+                return;
+            }
 
             try
             {

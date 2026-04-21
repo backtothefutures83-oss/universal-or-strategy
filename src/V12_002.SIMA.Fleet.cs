@@ -114,7 +114,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     _followerBrackets.TryAdd(fleetEntryName, newFsm);
                 }
 
-                acct.Submit(orders);
+                Order[] submitOrders = orders;
+                if (orders != null && orderCount > 0 && orderCount < orders.Length)
+                {
+                    submitOrders = new Order[orderCount];
+                    Array.Copy(orders, submitOrders, orderCount);
+                }
+
+                acct.Submit(submitOrders);
                 ClearDispatchSyncPending(expectedKey);
                 syncCleared = true;
 
