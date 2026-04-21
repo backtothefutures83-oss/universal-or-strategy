@@ -20,6 +20,33 @@ Eliminate the eleven residual `lock(ctx.Sync)` / `lock(stateLock)`-on-`Concurren
 
 4. **Peer Review (GPT 5.4):** `.Keys.ToArray()` on the HashSet snapshot is allocation-prohibitive on hot paths and violates the zero-allocation mandate.
 
+## C.1 SITE INVENTORY
+
+| Site | File | Line | Method / Scope | Transform | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | Symmetry.cs | 115 | SymmetryGuardRegisterFollower | A | HashSet.Add under ctx.Sync |
+| 2 | Symmetry.cs | 151 | SymmetryGuardOnMasterFill | B | Anchor RMW + IsResolved under ctx.Sync |
+| 3 | Symmetry.Follower.cs | 38 | SymmetryGuardTryPropagateMove | A | Anchor read under ctx.Sync |
+| 4 | Symmetry.Follower.cs | 131 | SymmetryGuardTryResolveFollower | A | Anchor read under ctx.Sync |
+| 5 | Symmetry.Replace.cs | 127 | SymmetryGuardTryResolveFollowersForDispatch | A | Follower iteration under ctx.Sync |
+| 6 | Symmetry.Replace.cs | 189 | SymmetryGuardCascadeFollowerCleanup | A | Follower snapshot under ctx.Sync |
+| 7 | Symmetry.Replace.cs | 224 | SymmetryGuardForgetEntry | A | Follower removal under ctx.Sync |
+| 8 | Symmetry.Replace.cs | 247 | SymmetryGuardPruneDispatches | A | Follower iteration under ctx.Sync |
+| 9 | Orders.Callbacks.Propagation.cs | 126 | PropagateMasterPriceMove | A | HOT: .ToArray() under ctx.Sync |
+| 10 | Orders.Callbacks.AccountOrders.cs | 204 | TryGetDispatchFollowerEntries | A | .ToArray() under ctx.Sync |
+| 11 | Orders.Callbacks.AccountOrders.cs | 300 | HandleMatchedFollowerOrder | A | fsm.State write under stateLock |
+| 12 | SIMA.cs | 78 | AddExpectedPositionDeltaLocked | B | expectedPositions mutation under stateLock |
+| 13 | SIMA.cs | 100 | AddOrUpdateExpectedPositionLocked | B | expectedPositions mutation under stateLock |
+| 14 | SIMA.cs | 111 | SetExpectedPositionLocked | B | expectedPositions mutation under stateLock |
+| 15 | SIMA.cs | 134 | DeltaExpectedPositionLocked | B | expectedPositions mutation under stateLock |
+| 16 | V12_002.cs | 146 | Field Declaration | A | dailySummaryLock declaration |
+| 17 | UI.Compliance.cs | 122 | EnsureDailySummaryCsv | A | lock(dailySummaryLock) |
+| 18 | UI.Compliance.cs | 144 | AppendDailySummary | A | lock(dailySummaryLock) |
+
+## HALLUCINATION CANARY
+
+**CANARY_FACT**: The method `HandleMatchedFollowerOrder` at `Orders.Callbacks.AccountOrders.cs:300` is the ONLY site where the lock is being removed entirely without a replacement CAS loop, because the actor pipeline already guarantees single-threaded execution for that specific call graph.
+
 ## CONSTRAINTS
 
 - **No internal locks.** `lock(stateLock)`, `lock(Sync)`, `lock(<ConcurrentDictionary>)` are BANNED.
