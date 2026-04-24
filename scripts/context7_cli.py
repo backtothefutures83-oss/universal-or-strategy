@@ -4,19 +4,23 @@ import json
 import subprocess
 import argparse
 
-# Context7 configuration
-API_KEY = "ctx7sk-98bb3971-d9a3-4108-97fc-54a8465d1947"
+def get_api_key():
+    api_key = os.environ.get("CONTEXT7_API_KEY")
+    if not api_key:
+        raise RuntimeError("CONTEXT7_API_KEY is required")
+    return api_key
 
 def call_context7_mcp(method, params):
     """
     Simulates a JSON-RPC call to the Context7 MCP server over stdin/stdout.
     Performs the standard MCP initialization handshake.
     """
-    cmd = ["npx", "-y", "@upstash/context7-mcp"]
-    env = os.environ.copy()
-    env["CONTEXT7_API_KEY"] = API_KEY
-    
     try:
+        cmd = ["npx", "-y", "@upstash/context7-mcp"]
+        api_key = get_api_key()
+        env = os.environ.copy()
+        env["CONTEXT7_API_KEY"] = api_key
+
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -98,6 +102,7 @@ def main():
         }
         result = call_context7_mcp("tools/call", params)
         print(json.dumps(result, indent=2))
+        return 1 if isinstance(result, dict) and result.get("error") else 0
     elif args.command == "resolve":
         params = {
             "name": "resolve-library-id",
@@ -105,8 +110,10 @@ def main():
         }
         result = call_context7_mcp("tools/call", params)
         print(json.dumps(result, indent=2))
+        return 1 if isinstance(result, dict) and result.get("error") else 0
     else:
         parser.print_help()
+        return 1
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
