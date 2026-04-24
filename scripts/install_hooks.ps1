@@ -5,15 +5,15 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot   = Split-Path -Parent $PSScriptRoot
-$hooksDir   = Join-Path $repoRoot ".git\hooks"
+$hooksDir   = (& git -C "$repoRoot" rev-parse --git-path hooks).Trim()
 $hookTarget = Join-Path $hooksDir "pre-commit"
 
 Write-Host "--- V12 Hook Installer ---"
 Write-Host "Repo root : $repoRoot"
 Write-Host "Hooks dir : $hooksDir"
 
-if (-not (Test-Path $hooksDir)) {
-    Write-Error "ERROR: .git/hooks not found. Is this a git repository?"
+if (-not $hooksDir -or -not (Test-Path -LiteralPath $hooksDir)) {
+    Write-Error "ERROR: Git hooks path not found. Is this a git repository?"
     exit 1
 }
 
@@ -45,6 +45,17 @@ $lines = @(
     '    fi',
     "fi",
     "",
+    "# Gate 3: Gitleaks (staged-files scan; best-effort if binary missing)",
+    'if command -v gitleaks >/dev/null 2>&1; then',
+    '    gitleaks protect --staged --config "$REPO_ROOT/.gitleaks.toml" --redact',
+    '    if [ $? -ne 0 ]; then',
+    '        echo "PRE-COMMIT FAIL: Gitleaks detected a potential secret in staged files."',
+    '        exit 1',
+    '    fi',
+    'else',
+    '    echo "[WARN] gitleaks not on PATH -- skipping secret scan. CI will catch it."',
+    'fi',
+    "",
     'echo "--- V12 Pre-Commit Gate: PASS ---"',
     "exit 0"
 )
@@ -54,5 +65,5 @@ $hookContent = $lines -join "`n"
 
 Write-Host ""
 Write-Host "HOOK INSTALLED : $hookTarget"
-Write-Host "Active gates   : [1] lock() ban  [2] ASCII purity"
+Write-Host "Active gates   : [1] lock() ban  [2] ASCII purity  [3] gitleaks (if installed)"
 Write-Host "To bypass (rare): git commit --no-verify"

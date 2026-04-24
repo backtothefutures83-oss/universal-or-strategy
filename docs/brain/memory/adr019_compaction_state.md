@@ -16,7 +16,7 @@
 
 ## 📡 Telemetry Metadata
 
-- **Sentry DSN**: `https://8d93fd56b4edc9ffbae558678137c197@o4511168522944512.ingest.us.sentry.io/4511248880415744`
+- **Sentry DSN**: `REDACTED_SENTRY_DSN -- see V12_SENTRY_DSN env var`
 - **LangSmith Project**: `Sovereign-Multi-Agent`
 - **Evidence Folder**: `docs/telemetry/droid_mission_01/`
 

@@ -1,0 +1,17 @@
+title = "Universal OR Strategy gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Allow documented Sentry project URL in telemetry readme"
+paths = ['''(^|[\\/])docs[\\/]telemetry[\\/]droid_mission_01[\\/]README\.md$''']
+
+[[allowlists]]
+description = "Allow canary strings in check_ascii.py"
+paths = ['''(^|[\\/])check_ascii\.py$''']
+
+[[allowlists]]
+description = "Allow the redacted Sentry DSN placeholder"
+regexTarget = "line"
+regexes = ['''REDACTED_SENTRY_DSN -- see V12_SENTRY_DSN env var''']

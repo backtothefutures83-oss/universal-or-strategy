@@ -1,183 +1,0 @@
-
-
---- BLOCK 0 ---
-<div class="mermaid">
-graph LR
-UI[NT GUI] --> Dispatch["Windows Dispatcher<br />(Jitter Slot)"]
-Dispatch --> Strategy["Strategy Logic"]
-Strategy --> Bridge["Rithmic Bridge"]
-style UI fill:#1e2b45,stroke:#34435b;
-style Dispatch fill:#2d0a0a,stroke:#d97757;
-style Strategy fill:#1e2b45,stroke:#34435b;
-style Bridge fill:#1e2b45,stroke:#34435b;
-</div>
-
---- BLOCK 1 ---
-<div class="mermaid">
-graph LR
-UI[Nexus UI] ==> AFX["AF_XDP Ring<br />(Phase 1)"]
-AFX ==> Core["Sovereign Core<br />(Phase 2)"]
-Core ==> NIC["Direct Hardware<br />(Phase 3)"]
-style UI fill:#001a4d,stroke:#6a9bcc;
-style AFX fill:#001a4d,stroke:#6a9bcc;
-style Core fill:#1a0a2e,stroke:#d97757;
-style NIC fill:#0a1a0a,stroke:#788c5d;
-</div>
-
---- BLOCK 2 ---
-<div class="mermaid">
-graph LR
-%% 4-COLUMN SPREADSHEET ALIGNMENT %% Force 6 rows per column for perfect symmetry
-subgraph Box1 ["1. INPUT PLANE"]
-direction TB
-B1_1["Antigravity Web Dashboard"]
-B1_2["NinjaTrader Desktop UI"]
-B1_3["TradingView (Browser)"]
-B1_4["Tradovate (Mobile App)"]
-B1_5(("API Bridge"))
-B1_6["[Ingress Gate]"]
-end
-subgraph Box2 ["2. DECISION PLANE"]
-direction TB
-B2_1["Signal Hub"]
-B2_2["Fast Lane: Order Dispatch"]
-B2_3["Screen Lane: Charts"]
-B2_4["Voice Lane: Alerts"]
-B2_5["Self-Healing"]
-B2_6["[Brain Core]"]
-end
-subgraph Box3 ["3. SUBSTRATE"]
-direction TB
-B3_1["15ns NIC (NUMA)"]
-B3_2["OCR Engine"]
-B3_3["Voice Engine"]
-B3_4["Memory-Map (MMIO)"]
-B3_5["L1 Tick Hub"]
-B3_6["[Hardware Layer]"]
-end
-subgraph Box4 ["4. EXECUTION PLANE"]
-direction TB
-B4_1["NinjaTrader / Rithmic"]
-B4_2["Native Market Driver<br />[L1 Tick Feed => NIC]"]
-B4_3["ExecutionId Ring"]
-B4_4["Order Pool (Pre-Alloc)"]
-B4_5["Direct Bridge"]
-B4_6["[Execution Gate]"]
-end
-%% MATRIX RANK ANCHORS (Forces exact columns)
-B1_1 ~~~
-B2_1 ~~~
-B3_1 ~~~ B4_1
-B1_2 ~~~
-B2_2 ~~~
-B3_2 ~~~ B4_2
-B1_3 ~~~
-B2_3 ~~~
-B3_3 ~~~ B4_3
-B1_4 ~~~
-B2_4 ~~~
-B3_4 ~~~ B4_4
-B1_5 ~~~
-B2_5 ~~~
-B3_5 ~~~ B4_5
-B1_6 ~~~
-B2_6 ~~~
-B3_6 ~~~ B4_6 %% FUNCTIONAL FLOWS (The actual "business" logic)
-B1_3 ==> B2_1 B2_2 ==> B3_1 B3_1 ==> B4_1 B2_3 ==> B3_2 B2_4 ==> B3_3 %% TACTICAL STYLING
-style Box1 fill:#0a1a1a,stroke:#6a9bcc,stroke-width:2px;
-style Box2 fill:#150525,stroke:#d97757,stroke-width:2px;
-style Box3 fill:#1a1a00,stroke:#b0aea5,stroke-width:2px;
-style Box4 fill:#051505,stroke:#788c5d,stroke-width:2px;
-classDef cyanNode fill:#101010,stroke:#6a9bcc,stroke-width:2px;
-classDef purpleNode fill:#101010,stroke:#d97757,stroke-width:2px;
-classDef purpleNodeThick fill:#101010,stroke:#d97757,stroke-width:3px;
-classDef goldNode fill:#101010,stroke:#b0aea5,stroke-width:2px;
-classDef greenNode fill:#101010,stroke:#788c5d,stroke-width:2px;
-class B1_1,B1_2,B1_3,B1_4,B1_5,B1_6 cyanNode;
-class B2_1 purpleNodeThick;
-class B2_2 cyanNode;
-class B2_3,B2_4,B2_5,B2_6 purpleNode;
-class B3_1,B3_2,B3_3,B3_4,B3_5,B3_6 goldNode;
-class B4_1 cyanNode;
-class B4_2,B4_3,B4_4,B4_5,B4_6 greenNode;
-</div>
-
---- BLOCK 3 ---
-<div class="mermaid">
-graph TD
-%% SIMPLIFIED PHASE-BASED LAYOUT FOR BROADER COMPATIBILITY
-subgraph INGRESS ["PHASE 1: PHYSICAL INGRESS"]
-UI["Antigravity Dash"]
-AFX["AF_XDP Busy-poll Ring"]
-UI --> AFX
-end
-subgraph KERNEL ["PHASE 2: SOVEREIGN CORE"]
-Shadow["XOR-Shadow SPSC"]
-AVX["AVX-512 Vector Engine"]
-Shadow --> AVX Loop["Audit Loop"]
-Guard["Logic Guard"]
-Loop -.-> Guard
-end
-subgraph EGRESS ["Phase 3: Hardware Substrate"]
-MMIO["NUMA MMIO Driver"]
-NIC_TX["NIC TX (Rithmic)"]
-TOS_BRIDGE["Schwab TOS API"]
-MMIO --> NIC_TX MMIO --> TOS_BRIDGE
-end
-%% ORDER FLOW PULSE PATHS AFX --> Shadow AVX --> MMIO %% CROSS-PLANE FEEDBACK Guard -.-> Shadow NIC_TX -.-> Loop TOS_BRIDGE -.-> Loop %% STYLING (Coinbase Palette)
-style INGRESS fill:#001a4d,stroke:#6a9bcc,stroke-width:2px;
-style KERNEL fill:#1a103d,stroke:#d97757,stroke-width:2px;
-style EGRESS fill:#0a1a0f,stroke:#788c5d,stroke-width:2px;
-class UI,AFX pulse-cyan;
-class Shadow,AVX pulse-hazard;
-class MMIO,NIC_TX,TOS_BRIDGE pulse-green;
-class Loop,Guard pulse-orange;
-</div>
-
---- BLOCK 4 ---
-<div class="mermaid">
-graph TD
-subgraph Multi_Producer ["PRODUCER PLANE -- Dedicated HW Lanes"]
-P1["Core 1: Producer A"] --> L1["Lane 0 (Isolated)"]
-P2["Core 2: Producer B"] --> L2["Lane 1 (Isolated)"]
-P3["Core 3: Producer C"] --> L3["Lane 2 (Isolated)"]
-end
-L1 ==> Agg["Stealing Aggregator (XOR-Gate)"]
-L2 ==> Agg L3 ==> Agg subgraph Consumer_Logic ["CONSUMER PLANE -- Sovereign Pump"]
-Agg ==> Pump["Logic Pump (13.0ns)"]
-Pump ==> Exchange["Order Execution"]
-end
-linkStyle 3,4,5 stroke:#788c5d,stroke-width:2px;
-style Multi_Producer fill:#0a0a14,stroke:#6a9bcc,stroke-width:2px;
-style Consumer_Logic fill:#0a0a14,stroke:#788c5d,stroke-width:2px;
-style Agg fill:#150525,stroke:#d97757,stroke-width:3px;
-</div>
-
---- BLOCK 5 ---
-<div class="mermaid">
-graph TD
-P1["Semaphores"]
-P2["Snapshots"]
-P3["Flatten"]
-P4["Safety"]
-P5["Retry"]
-P6["Coalesce"]
-P7["I/O Locks"]
-P8["Monitor"]
-P9["Budget"]
-P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P7 --> P8 --> P9
-</div>
-
---- BLOCK 6 ---
-<div class="mermaid">
-graph LR
-MC["Sovereign Brain - Phase 0"]
-HE["Sovereign Core - Phase 2"]
-R_TX["Rithmic - NIC TX"]
-S_API["Schwab - TOS API"]
-MC --> HE HE --> R_TX HE --> S_API
-style MC fill:#001a4d,stroke:#6a9bcc,stroke-width:2px;
-style HE fill:#1a103d,stroke:#d97757,stroke-width:2px;
-style R_TX fill:#0a1a0f,stroke:#788c5d,stroke-width:1px;
-style S_API fill:#0a1a0f,stroke:#788c5d,stroke-width:1px;
-</div>
