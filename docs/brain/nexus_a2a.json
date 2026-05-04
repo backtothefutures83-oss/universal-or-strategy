@@ -1,10 +1,12 @@
 {
-  "mission": "ADR-020 Phase 4 Event Lifecycle Refactoring",
+  "mission": "ADR-020 Phase 4 Event Lifecycle Refactoring -- PR #73 Hardening Pass",
   "mission_status": "ACTIVE",
-  "milestone": "M8/M9",
-  "build_tag": "Build-982-Phase2-RAII",
+  "milestone": "M3",
+  "build_tag": "Build-983-Phase4-Dispatcher",
+  "branch": "build-983-phase4-dispatcher-final",
+  "pr": "#73",
   "plan_path": "docs/brain/implementation_plan.md",
-  "last_updated": "2026-05-03T22:52:00Z",
+  "last_updated": "2026-05-04T20:01:00Z",
   "morpheus_mode": true,
   "agent_readiness_target": "LEVEL_5",
   "phase": "P3",
@@ -54,23 +56,58 @@
       "timestamp": "2026-05-03T22:52:00Z",
       "authored_by": "Claude Sonnet 4.6 (as P3 Architect)",
       "note": "Full BROKEN/FIXED proofs for 4 forensic sites. 3 phantom blocks scoped for removal. 2 real RAII fixes. 2 confirmed-clean sites documented."
+    },
+    {
+      "phase": "P5_ENGINEER_BUILD982",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-04T10:00:00Z",
+      "note": "Codex executed Build-982-Phase2-RAII surgical edits. Compiled and pushed as PR #73."
+    },
+    {
+      "phase": "P6_VALIDATION_BUILD982",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-04T10:37:00Z",
+      "verdict": "PASS -- Gemini CLI independent validation"
+    },
+    {
+      "phase": "PR73_BOT_AUDIT",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-04T19:00:00Z",
+      "note": "CodeRabbit/DeepSource/KiloCode bots identified 9 defects (D1-D9). P1 catalogued. P3 verified independently."
+    },
+    {
+      "phase": "P3_PR73_HARDENING",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-04T20:01:00Z",
+      "authored_by": "Claude Sonnet 4.6 (as P3 Architect)",
+      "note": "9 defects verified. Implementation plan written. Backward-compat stub pattern applied to Photon properties. Shutdown guard designed as dequeue-always/execute-conditionally."
     }
   ],
   "active_agent": {
-    "name": "Antigravity (P1 Orchestrator)",
-    "phase": "P1_AWAITING_DIRECTOR_APPROVAL",
-    "started_at": "2026-05-03T22:52:00Z",
+    "name": "Director (User)",
+    "phase": "DIRECTOR_GATE",
+    "started_at": "2026-05-04T20:01:00Z",
     "status": "PLAN_READY_FOR_DIRECTOR_GATE"
   },
   "p3_handoff": {
     "plan_validated": true,
     "plan_author": "Claude Sonnet 4.6",
-    "plan_version": "v2_phase2_raii",
-    "sites_addressed": 4,
-    "phantom_blocks_to_remove": 3,
-    "real_raii_fixes": 2,
-    "confirmed_clean_sites": 2,
+    "plan_version": "v3_pr73_hardening",
+    "defects_addressed": 9,
+    "files_modified": 4,
+    "docs_modified": 1,
+    "phantom_blocks_to_fix": 3,
+    "shutdown_guards_to_add": 1,
+    "backward_compat_stubs": 2,
+    "dead_fields_to_remove": 3,
+    "python_lint_fixes": 1,
+    "roadmap_lines_to_update": 8,
     "ready_for_p5": false,
-    "director_gate_required": true
+    "director_gate_required": true,
+    "last_relay": {
+      "agent": "Claude (P3 Architect)",
+      "time": "2026-05-04T20:01:00Z",
+      "status": "AWAITING_SIGNOFF"
+    }
   }
 }

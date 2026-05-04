@@ -1,8 +1,8 @@
 # V12 Universal OR Strategy -- Master Roadmap
-## Build-982-Phase2-RAII Closed | ADR-020 Phase 4 Next
-**Last Synced**: 2026-05-04T17:32:00Z
+## Build-983-Phase4-Dispatcher | PR #73 Hardening Pass
+**Last Synced**: 2026-05-04T20:01:00Z
 **Protocol**: V14 Alpha | **Current Build**: 1111.004-v28.0-pr56
-**Active Branch**: `feature/phase-4-event-lifecycle`
+**Active Branch**: `build-983-phase4-dispatcher-final` | **PR**: #73
 
 ---
 
@@ -40,7 +40,7 @@
 | **Phase 1** | Foundation (Monolith Partition -- 20+ partial files) | ✅ DONE |
 | **Phase 2** | Command Routing (IPC TCP + FSM + OCO Fix) | ✅ DONE |
 | **Phase 3** | Strategy Patterns (RAII + Resource Leak Remediation) | ✅ DONE |
-| **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | 🟡 NEXT |
+| **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | 🟠 PR #73 -- Hardening Pass |
 
 ---
 
@@ -50,7 +50,7 @@
 | :---: | :--- | :--- | :---: |
 | **M1** | Monolith Partition | ✅ COMPLETE | REQUIRED |
 | **M2** | Arena Frozen (Execution Arena) | ✅ COMPLETE | REQUIRED |
-| **M3** | Phase 4 Event Lifecycle Dispatcher | 🟡 IN PROGRESS | REQUIRED |
+| **M3** | Phase 4 Event Lifecycle Dispatcher | 🟠 PR #73 Open -- Hardening Pass | REQUIRED |
 
 > [!IMPORTANT]
 > ## PRODUCTION GATE
@@ -70,10 +70,10 @@
 
 ## CURRENT MISSION: CLOSE M3
 
-### Step 1 -- Git Push (IMMEDIATE -- do this first)
+### Step 1 -- Git Push (COMPLETE)
 
-- [ ] Push `feature/phase-4-event-lifecycle` to GitHub
-- [ ] Confirm commit SHA visible on GitHub (needed for Arena AI prompt)
+- [x] PR #73 open on `build-983-phase4-dispatcher-final`
+- [x] Commit SHA visible on GitHub -- bots audited and reported
 
 ### Step 2 -- P6 Validation ✅ PASSED (2026-05-04)
 
@@ -85,13 +85,13 @@ Verify the Build-982-Phase2-RAII surgical edits are clean before Phase 4 begins.
 - [x] `_repairInFlight.TryRemove` inside `finally` block in `REAPER.Repair.cs` line 223
 - [x] **Sign-off**: **P6 PASS** (Gemini CLI, 2026-05-04T10:37)
 
-### Step 3 -- P3 Architecture Review (Antigravity)
+### Step 3 -- P3 Architecture Review (COMPLETE -- 2026-05-04)
 
-Review the existing ADR-020 Phase 4 implementation plan for staleness after RAII changes, then produce the final Codex engineering brief.
+PR #73 bot audit produced 9 defects (D1-D9). P3 Architect (Claude) independently verified all 9 and authored the hardening plan.
 
-- [ ] Read `docs/brain/implementation_plan.md` (Phase 4 scaffold spec)
-- [ ] Verify no Phase 4 target files were altered by Build-982-Phase2-RAII
-- [ ] Produce updated Phase 4 Codex brief
+- [x] `docs/brain/implementation_plan.md` updated to v3_pr73_hardening
+- [x] 9 defects catalogued: 3 phantom blocks, 1 shutdown guard, 1 culture parse, 2 Photon stubs, 3 dead fields, 1 Python lint, 8 roadmap lines
+- [x] Backward-compat stub pattern confirmed for Photon properties (matches ReducedRiskPerTrade precedent)
 
 ### Step 4 -- P4 Arena Red Team
 
@@ -147,7 +147,7 @@ User pastes the Codex engineering brief (produced in Step 3) into Codex manually
 | **Compilation** | [OK] `1111.004-v28.0-pr56` -- CLEAN |
 | **ASCII Gate** | [PASS] Zero non-ASCII violations |
 | **Lock Audit** | [PASS] Zero `lock()` in `src/*.cs` |
-| **Phantom Blocks** | [PASS] Zero empty `try { }` in `src/*.cs` |
+| **Phantom Blocks** | [PENDING] 3 phantom blocks in Lifecycle.cs -- see D1/D2/D3 in implementation_plan.md |
 | **RAII Leak Fix** | [DONE] `ClearDispatchSyncPending` injected (2 occurrences) |
 | **Hard Links** | [SYNCED] `deploy-sync.ps1` EXIT 0 |
 | **Risk Audit** | [PASS] Cases 1-7 pass, 8-9 idle (no live positions) |
@@ -155,7 +155,7 @@ User pastes the Codex engineering brief (produced in Step 3) into Codex manually
 | **Watchdog** | [OK] Started (2000ms interval, 5s timeout) |
 | **OR Logic** | [OK] 4 sessions replayed correctly |
 | **SIMA** | [DISABLED] Single-account mode -- expected for this config |
-| **GitHub** | [PENDING] Push needed before Arena AI step |
+| **GitHub** | [OPEN] PR #73 on build-983-phase4-dispatcher-final -- hardening pass pending P5 |
 
 ---
 
