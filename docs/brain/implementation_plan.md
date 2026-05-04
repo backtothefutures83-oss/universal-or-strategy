@@ -1,74 +1,139 @@
-# Implementation Plan: PR #73 Hardening -- Post-Review Compliance Pass
-**BUILD_TAG**: Build-983-Phase4-Dispatcher
-**BRANCH**: build-983-phase4-dispatcher-final
-**PR**: #73
-**AUTHORED_BY**: Claude Sonnet 4.6 (P3 Architect)
-**DATE**: 2026-05-04T19:58:00Z
-**STATUS**: AWAITING DIRECTOR APPROVAL
+# Implementation Plan — PR #75 Post-Audit Repairs
+# BUILD_TAG: 1111.004-v28.0-pr75-repairs
+# Branch: build-983-phase4-dispatcher-final-v2
+# Status: AWAITING DIRECTOR APPROVAL
 
 ---
 
-## MISSION
+## ULTRAPLAN VERDICT — 1111.004-v28.0-pr75-repairs
+```
+Step 1  ✅ — C-01 (DrainQueuesForShutdown dead-letter) — PARTIALLY CONFIRMED: _isTerminating
+              flag is NOT checked inside DrainQueuesForShutdown itself. However, the Arena AI
+              finding that "the flag is set TRUE before drain runs" needs verification — see §2.1.
+              The actual bug confirmed: bare catch{} silently swallows cmd.Execute(this) failures.
+              The 50-item hard cap has no overflow telemetry. Both are confirmed regressions.
 
-Address all critical and warning-level findings from the automated code review bots
-(CodeRabbit, DeepSource, Kilo-Code-Bot) on PR #73. This is a pure compliance/hardening
-pass -- no logic mutations, no new features. The goal is a clean merge to `main` with
-zero open audit issues.
+Step 2  ✅ — C-02 (ExpKey domain mismatch) — CONFIRMED. HandleMatchedFollowerOrder correctly
+              uses cancelledFollowerPos.ExecutingAccount.Name as cancelAcctKey, then calls
+              ExpKey(cancelAcctKey). This IS the follower account key — correct. However, Arena
+              AI's concern is partially valid: if ExecutingAccount is null, fallback is
+              Account.Name (the MASTER account). This null-path uses the wrong domain.
+              Confirmed: null-guard path emits master key, clearing a barrier the master owns,
+              which unblocks master dispatches incorrectly.
 
-This plan consolidates with `docs/brain/master_roadmap.md`. When this plan is
-executed and PR #73 merges, **M3 is closed** and Phase 4 is production-complete.
+Step 3  ✅ — C-03 (SemaphoreSlim unguarded disposal) — CONFIRMED. In V12_002.Lifecycle.cs:
+              _simaToggleSem?.Dispose() sits AFTER SignalBroadcaster.ClearAllSubscribers()
+              in the Terminated handler, with no try/catch. If ClearAllSubscribers() throws,
+              the Dispose() never runs and the OS handle leaks. Requires try/finally.
+
+Step 4  ✅ — C-04 (isFlattenRunning spin) — DISPROVED AS INFINITE LOOP. isFlattenRunning
+              IS guarded in FlattenAll's finally block (line 343: isFlattenRunning = false).
+              Arena AI finding overstated the risk. No infinite spin possible. However, the
+              flag is set redundantly BEFORE and AFTER FlattenAllApexAccounts(), which could
+              leave it asserted on an exception in FlattenAllApexAccounts(). The finally guard
+              on the outer try saves this. FINDING: Low-priority code smell, not a P0 bug.
+
+Step 5  ✅ — C-05 (50-item drain cap silent overflow) — CONFIRMED. DrainQueuesForShutdown
+              drains max 50 actor commands with no log on overflow. If >50 commands are
+              queued at shutdown, extras are silently discarded.
+
+Step 6  ✅ — W-01 (Culture parse) — DISPROVED AS NEW BUG. StickyState.cs already uses
+              CultureInfo.InvariantCulture on all double.TryParse calls (lines 343, 347, etc.).
+              PR #75 already applied this fix. FINDING: Already fixed in this PR — no action needed.
+
+Step 7  ✅ — W-02 (Disposal order) — CONFIRMED. _simaToggleSem.Dispose() runs after
+              ClearAllSubscribers() in Terminated. If ClearAllSubscribers() throws, semaphore
+              leaks. This is the same root cause as C-03 — one fix resolves both.
+
+Step 8  ✅ — W-04 (Silent catch on reconnect) — CONFIRMED. ProcessOnConnectionStatusUpdate
+              has: try { Enqueue(ctx => ctx.HydrateWorkingOrdersFromBroker()); } catch { }
+              Bare catch with no log. If Enqueue fails during reconnect, the re-adoption
+              silently aborts. This is a mission-critical silent failure.
+
+DEFECT AUDIT:
+  D1 (Dead-letter drain) — Partially confirmed. Bare catch + silent overflow cap: ✅ CONFIRMED
+  D2 (ExpKey null-path master bleed) — ✅ CONFIRMED
+  D3 (Semaphore OS handle leak) — ✅ CONFIRMED
+  D4 (isFlattenRunning infinite spin) — ❌ DISPROVED (overblown by Arena AI)
+  D5 (Culture parse) — ❌ DISPROVED (already fixed in PR #75)
+  D6 (Reconnect silent catch) — ✅ CONFIRMED
+
+SIGN-OFF: CONDITIONAL PASS
+  P0 fixes required: D1, D2, D3
+  P1 fixes required: D6
+  P2 backlog: Documentation Theatre (graphify CI gate), Telemetry fields, ProcessOnStateChange default case
+```
 
 ---
 
-## DEFECT REGISTRY
+## 1. Mission Scope
 
-| ID | Severity | File | Location | Description |
-|:---|:---|:---|:---|:---|
-| D1 | CRITICAL | `V12_002.Lifecycle.cs` | L70 | Phantom Block -- empty `catch { }` in actor drain loop |
-| D2 | CRITICAL | `V12_002.Lifecycle.cs` | L75 | Phantom Block -- empty `catch { }` outer drain wrapper |
-| D3 | WARNING  | `V12_002.Lifecycle.cs` | L481 | Phantom Block -- empty `catch { }` in MMIO Dispose |
-| D4 | CRITICAL | `V12_002.Lifecycle.cs` | L68-72 | `cmd.Execute` runs without `_isTerminating` guard |
-| D5 | WARNING  | `V12_002.Lifecycle.cs` | L101-102 | `DateTime.Parse` without `CultureInfo.InvariantCulture` |
-| D6 | WARNING  | `V12_002.Properties.cs` | L406-412 | `EnablePhotonAffinityBind`/`CpuAffinityMask` never implemented |
-| D7 | WARNING  | `V12_002.cs` | L579-581 | Unused dispatch performance counter fields |
-| D8 | ADVISORY | `scripts/csharp_hotspots.py` | L47 | Ruff E713 -- non-idiomatic `not in` check |
-| D9 | ADVISORY | `docs/brain/master_roadmap.md` | Multiple | Stale Build-982 / old branch references |
-| D10 | DEFERRED | `V12_002.Lifecycle.cs` | L542 | Pre-existing phantom block in `ProcessOnConnectionStatusUpdate` -- out of scope (Karpathy rule) |
+Repair **5 confirmed defects** in PR #75 source, validated against live `src/` index. No logic mutations beyond the stated repairs.
 
-> [!NOTE]
-> **SCOPE BOUNDARY**: D1-D9 are the only defects introduced or explicitly flagged by PR #73 bot review.
-> D10 was discovered during P3 validation audit but is **pre-existing code not touched by this PR**.
-> Per Karpathy protocol: do NOT fix D10 in this pass. Engineer must leave L542 untouched.
-> D10 is logged for the next standalone cleanup pass.
+**Files affected:**
+| File | Defects | Priority |
+|------|---------|----------|
+| `src/V12_002.Lifecycle.cs` | D1, D3 | P0 |
+| `src/V12_002.Orders.Callbacks.AccountOrders.cs` | D2 | P0 |
+| `src/V12_002.Lifecycle.cs` (reconnect) | D6 | P1 |
 
 ---
 
-## ARCHITECTURAL DECISIONS
+## 2. Evidence Verification (Independent — not echoed from Forensics)
 
-### D4 -- Shutdown Guard Design
-The guard must be placed **inside** the per-command try block, not as a pre-loop check.
-Rationale: We still want to dequeue all items (preventing queue leak), but we must skip
-`Execute()` once the strategy is terminating. Pattern: dequeue-always, execute-conditionally.
+### 2.1 D1 — DrainQueuesForShutdown: Bare catch + silent overflow (Lifecycle.cs:504-527)
 
-### D6 -- Photon Property Disposition
-`EnablePhotonAffinityBind` and `CpuAffinityMask` are `[NinjaScriptProperty]` decorated,
-meaning they are persisted in workspace XML. Hard-removal would generate deserialization
-warnings in existing workspaces. The established V12 pattern (see `ReducedRiskPerTrade`
-at `Properties.cs:L73-76`) is to retain the stub with `[Browsable(false)]` +
-`[XmlIgnore]` + a comment citing the build that deactivated it. **We do NOT remove --
-we stub with backward-compat annotation.** The `[NinjaScriptProperty]` attribute
-is removed so it stops appearing in the NinjaTrader UI while still deserializing cleanly.
-
----
-
-## SURGICAL EDITS
-
-### EDIT 1: `src/V12_002.Lifecycle.cs` -- Fix D1, D2, D4, D5
-
-**Target Region**: Lines 53-76 (DrainQueuesForShutdown) and Lines 100-102 (SetDefaults session defaults)
-
-#### BROKEN (current):
+**Confirmed code (live):**
 ```csharp
+// Line 519-521: Bare catch silently eats all cmd.Execute failures
+try { cmd.Execute(this); } catch { }
+// Line 518: Hard cap 50 — no telemetry on overflow
+while (actorDrained < 50 && _cmdQueue.TryDequeue(out StrategyCommand cmd))
+```
+
+**Root Cause**: The bare `catch {}` means if any command throws during shutdown drain (e.g., order already cancelled), the failure is lost. The 50-item cap has no overflow counter, so if the queue had 200 items at shutdown, 150 are silently discarded with no trace.
+
+**Note on C-01 Arena finding**: The `_isTerminating` flag check claim was **not verified** in the live code. `DrainQueuesForShutdown` does NOT check `_isTerminating` internally, but the flag is only checked by the actor loop — not this method. The drain runs unconditionally. The Arena AI conflated the actor loop guard with the drain method. **C-01 as stated is partially incorrect**, but D1 (bare catch + overflow cap) is the real confirmed defect.
+
+### 2.2 D2 — HandleMatchedFollowerOrder: ExpKey null-path master bleed (AccountOrders.cs:~420)
+
+**Confirmed code (live):**
+```csharp
+string cancelAcctKey = cancelledFollowerPos.ExecutingAccount != null
+    ? cancelledFollowerPos.ExecutingAccount.Name : Account.Name;  // <- null fallback = MASTER account
+int cancelDelta = ...
+DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+_dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
+```
+
+**Root Cause**: `Account.Name` is the **master** strategy account. If `ExecutingAccount` is null (possible during order teardown), the dispatch-sync barrier for the **master** account is cleared. This unblocks the master account dispatcher incorrectly, potentially allowing duplicate dispatches while follower state is still dirty.
+
+### 2.3 D3 — SemaphoreSlim unguarded disposal (Lifecycle.cs:~479)
+
+**Confirmed code (live):**
+```csharp
+// V12.Phase7 [GAP-4]: Dispose SIMA toggle semaphore to release OS handle.
+_simaToggleSem?.Dispose();  // No try/finally wrapping this
+```
+Located AFTER `SignalBroadcaster.ClearAllSubscribers()`. If `ClearAllSubscribers()` throws, the semaphore handle leaks.
+
+### 2.4 D6 — Silent Reconnect Failure (Lifecycle.cs:ProcessOnConnectionStatusUpdate)
+
+**Confirmed code (live):**
+```csharp
+try { Enqueue(ctx => ctx.HydrateWorkingOrdersFromBroker()); } catch { }
+```
+No log on catch. Silent re-adoption failure means orders are never re-adopted after reconnect, causing desync. Confirmed bare catch with no telemetry.
+
+---
+
+## 3. Repairs — Complete Code Blocks
+
+### REPAIR-01 — DrainQueuesForShutdown: Log bare catch + add overflow telemetry
+**File**: `src/V12_002.Lifecycle.cs` — Line 504
+
+```csharp
+// BEFORE (lines 504-527):
 private void DrainQueuesForShutdown()
 {
     try
@@ -93,10 +158,8 @@ private void DrainQueuesForShutdown()
     }
     catch { }
 }
-```
 
-#### FIXED:
-```csharp
+// AFTER:
 private void DrainQueuesForShutdown()
 {
     try
@@ -112,241 +175,205 @@ private void DrainQueuesForShutdown()
         }
 
         int actorDrained = 0;
+        int actorOverflow = 0;
         while (actorDrained < 50 && _cmdQueue.TryDequeue(out StrategyCommand cmd))
         {
-            // D4: Guard -- discard queued commands during teardown; still dequeue to clear the queue.
-            if (!_isTerminating)
+            try { cmd.Execute(this); }
+            catch (Exception exCmd)
             {
-                try { cmd.Execute(this); }
-                catch (Exception ex) { Print("[SHUTDOWN_ERROR] Actor cmd failed: " + ex.Message); } // D1
+                Print("[SHUTDOWN] Actor cmd failed during drain: " + exCmd.Message);
             }
             actorDrained++;
         }
-        Print(string.Format("[SHUTDOWN] Drained {0} IPC cmds and {1} Actor cmds.", ipcDrained, actorDrained));
+        // Count overflow items without executing -- telemetry only.
+        StrategyCommand overflowCmd;
+        while (_cmdQueue.TryDequeue(out overflowCmd))
+            actorOverflow++;
+
+        Print(string.Format("[SHUTDOWN] Drained {0} IPC cmds, {1} Actor cmds. Overflow discarded: {2}.",
+            ipcDrained, actorDrained, actorOverflow));
     }
-    catch (Exception ex) { Print("[SHUTDOWN_ERROR] DrainQueuesForShutdown: " + ex.Message); } // D2
+    catch (Exception exOuter)
+    {
+        Print("[SHUTDOWN] DrainQueuesForShutdown outer exception: " + exOuter.Message);
+    }
 }
 ```
 
-**Note on D4**: `_isTerminating` is set to `true` at `OnStateChangeTerminated:L440`, which
-runs before `DrainQueuesForShutdown` is called at L464. The guard will always be `true`
-at drain time, which means actor commands are discarded (correct behavior). The dequeue
-still runs so the queue is emptied cleanly.
-
 ---
 
-**Target Region**: Lines 100-102 (SessionStart/SessionEnd defaults)
+### REPAIR-02 — HandleMatchedFollowerOrder: Guard null ExecutingAccount before ExpKey
+**File**: `src/V12_002.Orders.Callbacks.AccountOrders.cs` — Entry cancel path (~line 420)
 
-#### BROKEN (current):
 ```csharp
-SessionStart = DateTime.Parse("09:30");
-SessionEnd = DateTime.Parse("16:00");
-```
-
-#### FIXED (D5):
-```csharp
-// D5: InvariantCulture prevents locale-dependent parse failures (e.g. European time separators).
-SessionStart = DateTime.Parse("09:30", System.Globalization.CultureInfo.InvariantCulture);
-SessionEnd   = DateTime.Parse("16:00", System.Globalization.CultureInfo.InvariantCulture);
-```
-
----
-
-### EDIT 2: `src/V12_002.Lifecycle.cs` -- Fix D3
-
-**Target Region**: Lines 479-483 (MMIO Dispose in OnStateChangeTerminated)
-
-#### BROKEN (current):
-```csharp
-if (_photonMmioMirror != null)
+// BEFORE:
+PositionInfo cancelledFollowerPos;
+if (activePositions.TryGetValue(matchedEntry, out cancelledFollowerPos) && cancelledFollowerPos != null)
 {
-    try { _photonMmioMirror.Dispose(); } catch { }
-    _photonMmioMirror = null;
+    string cancelAcctKey = cancelledFollowerPos.ExecutingAccount != null
+        ? cancelledFollowerPos.ExecutingAccount.Name : Account.Name;
+    int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
+        ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
+    DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+    // B957/D2: Release the SIMA dispatch-sync barrier for this account.
+    _dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
 }
-```
 
-#### FIXED (D3):
-```csharp
-if (_photonMmioMirror != null)
+// AFTER:
+PositionInfo cancelledFollowerPos;
+if (activePositions.TryGetValue(matchedEntry, out cancelledFollowerPos) && cancelledFollowerPos != null)
 {
-    try { _photonMmioMirror.Dispose(); }
-    catch (Exception ex) { Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.Message); } // D3
-    _photonMmioMirror = null;
+    // [B983-FIX-D2]: Guard null ExecutingAccount. Fallback to Account.Name (master) is
+    // a domain mismatch -- would clear the master dispatch barrier instead of the follower's.
+    // Skip ExpKey operations entirely if the follower account cannot be determined.
+    if (cancelledFollowerPos.ExecutingAccount == null)
+    {
+        Print("[B983-D2] HandleMatchedFollowerOrder: ExecutingAccount null for " + matchedEntry
+            + " -- skipping ExpKey delta and sync barrier ops to avoid master domain bleed.");
+    }
+    else
+    {
+        string cancelAcctKey = cancelledFollowerPos.ExecutingAccount.Name;
+        int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
+            ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
+        DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+        // B957/D2: Release the SIMA dispatch-sync barrier for this follower account only.
+        _dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
+    }
 }
 ```
 
 ---
 
-### EDIT 3: `src/V12_002.Properties.cs` -- Fix D6
+### REPAIR-03 — Lifecycle Terminated: Wrap SemaphoreSlim disposal in try/finally
+**File**: `src/V12_002.Lifecycle.cs` — Terminated handler (~line 475)
 
-**Target Region**: Lines 406-412 (Photon Kernel properties block)
-
-#### BROKEN (current):
 ```csharp
-[NinjaScriptProperty]
-[Display(Name = "Enable Photon Affinity Bind", GroupName = "Photon Kernel", Order = 1)]
-public bool EnablePhotonAffinityBind { get; set; }
+// BEFORE:
+// V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
+SignalBroadcaster.ClearAllSubscribers();
 
-[NinjaScriptProperty]
-[Display(Name = "CPU Affinity Mask", GroupName = "Photon Kernel", Order = 2)]
-public int CpuAffinityMask { get; set; }
+// V12.Phase7 [GAP-4]: Dispose SIMA toggle semaphore to release OS handle.
+_simaToggleSem?.Dispose();
+
+// Clear references
+activePositions?.Clear();
+
+// AFTER:
+// V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
+// Static events survive instance disposal. Wrapped in try/finally to guarantee semaphore
+// disposal even if ClearAllSubscribers throws. [B983-FIX-D3]
+try
+{
+    SignalBroadcaster.ClearAllSubscribers();
+}
+finally
+{
+    // V12.Phase7 [GAP-4]: Dispose SIMA toggle semaphore to release OS handle.
+    // In finally block: guaranteed to run even if ClearAllSubscribers throws.
+    try { _simaToggleSem?.Dispose(); }
+    catch (Exception exSem) { Print("[SHUTDOWN] SemaphoreSlim dispose failed: " + exSem.Message); }
+}
+
+// Clear references
+activePositions?.Clear();
 ```
 
-#### FIXED (D6 -- backward-compat stub, V12 pattern matching ReducedRiskPerTrade):
+---
+
+### REPAIR-04 — ProcessOnConnectionStatusUpdate: Log reconnect Enqueue failure
+**File**: `src/V12_002.Lifecycle.cs` — ProcessOnConnectionStatusUpdate (~line 556)
+
 ```csharp
-/// <summary>REMOVED (Build-983). Photon CPU affinity deferred to M4.
-/// Stub retained for workspace XML backward compatibility.</summary>
-[Browsable(false)]
-[System.Xml.Serialization.XmlIgnore]
-public bool EnablePhotonAffinityBind { get; set; }
+// BEFORE:
+else if (status == ConnectionStatus.Connected)
+{
+    Print("[BUILD 948] Reconnected -- scheduling working order re-adoption.");
+    try { Enqueue(ctx => ctx.HydrateWorkingOrdersFromBroker()); } catch { }
+}
 
-/// <summary>REMOVED (Build-983). Photon CPU affinity deferred to M4.
-/// Stub retained for workspace XML backward compatibility.</summary>
-[Browsable(false)]
-[System.Xml.Serialization.XmlIgnore]
-public int CpuAffinityMask { get; set; }
-```
-
-**Note**: Removing `[NinjaScriptProperty]` and `[Display]`, adding `[Browsable(false)]`
-and `[XmlIgnore]` hides these from the NT8 UI while preserving XML deserialization
-for existing saved workspaces. This is the identical pattern used by `ReducedRiskPerTrade`
-at `Properties.cs:L73-76`.
-
----
-
-### EDIT 4: `src/V12_002.cs` -- Fix D7
-
-**Target Region**: Lines 579-581 (unused dispatch counter declarations)
-
-#### BROKEN (current):
-```csharp
-private long _dispatchInvocationCount = 0;
-private long _dispatchPeakElapsedTicks = 0;
-private long _dispatchTotalElapsedTicks = 0;
-```
-
-#### FIXED (D7 -- remove 3 dead fields):
-```csharp
-// D7: _dispatchInvocationCount / _dispatchPeakElapsedTicks / _dispatchTotalElapsedTicks
-// removed (Build-983). Fields were declared but never wired into EmitMetricsSummary.
-// Re-introduce if/when FleetDispatch performance telemetry is instrumented (M5).
+// AFTER:
+else if (status == ConnectionStatus.Connected)
+{
+    Print("[BUILD 948] Reconnected -- scheduling working order re-adoption.");
+    try { Enqueue(ctx => ctx.HydrateWorkingOrdersFromBroker()); }
+    catch (Exception exReconnect)
+    {
+        // [B983-FIX-D6]: Silent bare catch promoted to logged failure.
+        // Re-adoption failure means orders will not be re-adopted after reconnect.
+        // Director must be alerted -- this is a mission-critical path.
+        Print("[B983-D6] CRITICAL: Reconnect re-adoption Enqueue failed: " + exReconnect.Message
+            + " -- orders may not be re-adopted. Manual intervention required.");
+    }
+}
 ```
 
 ---
 
-### EDIT 5: `scripts/csharp_hotspots.py` -- Fix D8
+## 4. P2 Backlog (No code changes this PR — track in docs only)
 
-**Target Region**: Line 47
-
-#### BROKEN (current):
-```python
-if match and not ';' in line_stripped and not '=' in line_stripped:
-```
-
-#### FIXED (D8 -- Ruff E713 idiomatic form):
-```python
-if match and ';' not in line_stripped and '=' not in line_stripped:
-```
+| ID | Item | Action |
+|----|------|--------|
+| Q-01 | Doc coverage 9% vs 80% required | Track as M3 backlog item |
+| Q-04 | ProcessOnStateChange missing default state handler | Add `else { Print("[STATE-WARN] Unhandled state: " + state); }` in M3 cleanup PR |
+| Q-06 | graphify CI enforcement | Add CI step to check `graphify-out/` staleness in M3 infra sprint |
 
 ---
 
-### EDIT 6: `docs/brain/master_roadmap.md` -- Fix D9
+## 5. DNA Compliance Checklist
 
-**Lines to update**:
-
-| Line | BROKEN | FIXED |
-|:---|:---|:---|
-| 2 | `## Build-982-Phase2-RAII Closed \| ADR-020 Phase 4 Next` | `## Build-983-Phase4-Dispatcher \| PR #73 Hardening Pass` |
-| 5 | `` `feature/phase-4-event-lifecycle` `` | `` `build-983-phase4-dispatcher-final` `` |
-| 43 | `Phase 4 \| Event Lifecycle Dispatcher (ADR-020) \| NEXT` | `Phase 4 \| Event Lifecycle Dispatcher (ADR-020) \| IN PROGRESS -- PR #73` |
-| 53 | `Phase 4 Event Lifecycle Dispatcher \| IN PROGRESS` | `Phase 4 Event Lifecycle Dispatcher \| PR #73 -- Hardening Pass` |
-| 75 | `- [ ] Push feature/phase-4-event-lifecycle to GitHub` | `- [x] PR #73 open on build-983-phase4-dispatcher-final` |
-| 78 | Step 2 header | Add note: P6 validation re-confirmed post-Build-983 |
-| 150 | `[PASS] Zero empty try { } in src/*.cs` | `[PENDING] 3 phantom blocks identified -- see PR #73 D1/D2/D3` |
-| 158 | `[PENDING] Push needed before Arena AI step` | `[OPEN] PR #73 -- hardening pass in progress` |
+- [x] No `lock(stateLock)` introduced
+- [x] No Unicode/emoji in C# string literals (Print statements use ASCII only)
+- [x] No new allocations on hot path (drain telemetry runs at shutdown only)
+- [x] Semaphore lifecycle: Dispose in `finally` — compliant with V12 semaphore protocol
+- [x] All new catch blocks log — no silent swallows
+- [x] No Enqueue used for stopOrders path — direct write rule maintained (Build 981 protocol)
 
 ---
 
-## EXECUTION ORDER FOR ENGINEER (P5)
+## 6. Audit Gates (ENGINEER must run before handoff)
 
-The following order minimizes context switches:
+```powershell
+# 1. Lock audit -- must return zero hits
+grep -rn "lock\s*(\s*stateLock\s*)" src/
 
-```
-Step 1: Edit src/V12_002.Lifecycle.cs
-  1a. DrainQueuesForShutdown -- apply D1, D2, D4 (lines 53-76)
-  1b. OnStateChangeSetDefaults -- apply D5 (lines 101-102)
-  1c. OnStateChangeTerminated -- apply D3 (lines 479-483)
+# 2. ASCII gate
+python scripts/check_ascii.py
 
-Step 2: Edit src/V12_002.Properties.cs
-  2a. Photon Kernel block -- apply D6 (lines 406-412)
-
-Step 3: Edit src/V12_002.cs
-  3a. Remove dispatch counter fields -- apply D7 (lines 579-581)
-
-Step 4: Edit scripts/csharp_hotspots.py
-  4a. Fix E713 lint -- apply D8 (line 47)
-
-Step 5: Edit docs/brain/master_roadmap.md
-  5a. Apply D9 metadata corrections (multiple lines)
-
-Step 6: SELF-AUDIT (mandatory before handoff)
-  6a. grep -rn "catch { }" src/     --> must return ZERO hits
-  6b. grep -rn "lock(" src/         --> must return ZERO hits (existing clean state)
-  6c. python scripts/check_ascii.py --> must return all PASS
-
-Step 7: deploy-sync.ps1
-  7a. powershell -File .\deploy-sync.ps1
-  7b. ASCII Gate must PASS
-  7c. Instruct Director to press F5 in NinjaTrader
-  7d. Verify BUILD_TAG banner shows 1111.004-v28.0-pr56 (or next increment)
-
-Step 8: Commit and push to build-983-phase4-dispatcher-final
-  8a. Commit message: "fix(pr73): resolve CodeRabbit/DeepSource findings -- phantom blocks, shutdown guard, culture parse, unused fields"
-  8b. Push -- PR #73 will auto-update
+# 3. Deploy sync (after edits)
+powershell -File .\deploy-sync.ps1
 ```
 
 ---
 
-## VERIFICATION CRITERIA
+## 7. Director's Handoff Block
 
-| Check | Tool | Pass Condition |
-|:---|:---|:---|
-| Zero phantom blocks | `grep -rn "catch { }" src/` | 0 matches |
-| Zero lock usage | `grep -rn "lock(" src/` | 0 matches |
-| ASCII compliance | `python scripts/check_ascii.py` | All PASS |
-| Compilation | F5 in NinjaTrader | BUILD_TAG banner visible |
-| Python lint | `ruff check scripts/csharp_hotspots.py` | 0 E713 violations |
-| PR audit bots | Push to branch | CodeRabbit / DeepSource show 0 new issues |
+```
+P3 ARCHITECT SIGN-OFF — BUILD_TAG: 1111.004-v28.0-pr75-repairs
+================================================================
+Status: PLAN COMPLETE — AWAITING DIRECTOR APPROVAL
 
----
+Confirmed defects: 4 (D1, D2, D3, D6)
+Disproved defects: 2 (D4 isFlattenRunning spin, D5 culture parse — already fixed)
 
-## ROADMAP CONSOLIDATION
+Files to edit:
+  - src/V12_002.Lifecycle.cs        (REPAIR-01, REPAIR-03, REPAIR-04)
+  - src/V12_002.Orders.Callbacks.AccountOrders.cs  (REPAIR-02)
 
-This plan directly serves `master_roadmap.md` Step 6 (P7 Sentinel / Close M3):
+ENGINEER (Codex) Instructions:
+  1. Apply REPAIR-01 to DrainQueuesForShutdown (Lifecycle.cs:504-527)
+  2. Apply REPAIR-02 to HandleMatchedFollowerOrder cancel path (AccountOrders.cs ~line 420)
+  3. Apply REPAIR-03 — wrap ClearAllSubscribers in try/finally for semaphore (Lifecycle.cs ~line 475)
+  4. Apply REPAIR-04 — log reconnect Enqueue failure (Lifecycle.cs ~line 556)
+  5. Run audit gates (Section 6)
+  6. Run: powershell -File .\deploy-sync.ps1
+  7. Press F5 in NinjaTrader. Verify BUILD_TAG banner shows 1111.004-v28.0-pr75-repairs.
 
-- When PR #73 merges after this hardening pass, **Phase 4 is production-complete**.
-- **M3 closes** when: this plan is executed (P5) + validated (P6) + PR #73 merges to main (P7).
-- No additional architectural work is required for M3 closure.
+BANNED:
+  - Do NOT modify any other logic outside the 4 targeted blocks
+  - Do NOT use lock(stateLock)
+  - Do NOT use Unicode in string literals
+  - Do NOT reorder the Terminated handler cleanup sequence beyond the try/finally wrapper
+```
 
-Post-merge, the next session should:
-1. Update `nexus_a2a.json` to reflect `P7 COMPLETE`.
-2. Update `master_roadmap.md` Phase 4 status to `DONE`.
-3. Update M3 status to `COMPLETE`.
-
----
-
-## DNA COMPLIANCE CHECKLIST
-
-- [x] Zero `lock(stateLock)` introduced
-- [x] All new `catch` blocks log via `Print()` (ASCII-safe messages only)
-- [x] No Unicode, emoji, or curly quotes in any C# string literal
-- [x] No `Thread.Sleep` or blocking calls introduced
-- [x] `_isTerminating` guard uses existing field (no new state introduced)
-- [x] `CultureInfo.InvariantCulture` from existing `using System.Globalization;` import
-- [x] Photon property stub follows established `[Browsable(false)][XmlIgnore]` pattern
-- [x] Dispatch counter comment documents deferral reason and milestone (M5)
-- [x] Python fix is purely idiomatic -- no logic change
-
----
-
-Plan saved to docs/brain/implementation_plan.md. Awaiting Director approval.
+Plan saved to `docs/brain/implementation_plan.md`. Awaiting Director approval.
