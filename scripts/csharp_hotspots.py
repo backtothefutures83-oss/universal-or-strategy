@@ -44,7 +44,7 @@ def analyze_complexity():
                 # Check for method signature if not already in one
                 if not in_method:
                     match = METHOD_PATTERN.match(line)
-                    if match and not ';' in line_stripped and not '=' in line_stripped: # Avoid fields/properties
+                    if match and ';' not in line_stripped and '=' not in line_stripped: # Avoid fields/properties
                         current_method_name = match.group('name')
                         current_method_complexity = 1  # Base complexity is 1
                         current_method_lines = 0

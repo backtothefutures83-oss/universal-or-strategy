@@ -403,12 +403,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Exhaustion Cancel Enabled", Description = "Cancel orders after RmaMaxProbeCount probes without fill.", GroupName = "14. RMA Intelligence", Order = 5)]
         public bool RmaExhaustionEnabled { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "Enable Photon Affinity Bind", GroupName = "Photon Kernel", Order = 1)]
+        /// <summary>REMOVED (Build-983). Photon CPU affinity deferred to M4.
+        /// Stub retained for workspace XML backward compatibility.</summary>
+        [Browsable(false)]
+        [System.Xml.Serialization.XmlIgnore]
         public bool EnablePhotonAffinityBind { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "CPU Affinity Mask", GroupName = "Photon Kernel", Order = 2)]
+        /// <summary>REMOVED (Build-983). Photon CPU affinity deferred to M4.
+        /// Stub retained for workspace XML backward compatibility.</summary>
+        [Browsable(false)]
+        [System.Xml.Serialization.XmlIgnore]
         public int CpuAffinityMask { get; set; }
 
         #endregion

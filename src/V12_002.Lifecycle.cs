@@ -67,12 +67,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int actorDrained = 0;
                 while (actorDrained < 50 && _cmdQueue.TryDequeue(out StrategyCommand cmd))
                 {
-                    try { cmd.Execute(this); } catch { }
+                    // D4: Guard -- discard queued commands during teardown; still dequeue to clear the queue.
+                    if (!_isTerminating)
+                    {
+                        try { cmd.Execute(this); }
+                        catch (Exception ex) { Print("[SHUTDOWN_ERROR] Actor cmd failed: " + ex.Message); }
+                    }
                     actorDrained++;
                 }
                 Print(string.Format("[SHUTDOWN] Drained {0} IPC cmds and {1} Actor cmds.", ipcDrained, actorDrained));
             }
-            catch { }
+            catch (Exception ex) { Print("[SHUTDOWN_ERROR] DrainQueuesForShutdown: " + ex.Message); }
         }
 
         #endregion
@@ -98,8 +103,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             IsUnmanaged = true;
 
             // Session defaults (NY Open)
-            SessionStart = DateTime.Parse("09:30");
-            SessionEnd = DateTime.Parse("16:00");
+            SessionStart = DateTime.Parse("09:30", System.Globalization.CultureInfo.InvariantCulture);
+            SessionEnd = DateTime.Parse("16:00", System.Globalization.CultureInfo.InvariantCulture);
             ORTimeframe = ORTimeframeType.Minutes_5;
             SelectedTimeZone = "Eastern";
 
@@ -478,7 +483,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             // v28.0 MMIO mirror teardown
             if (_photonMmioMirror != null)
             {
-                try { _photonMmioMirror.Dispose(); } catch { }
+                try { _photonMmioMirror.Dispose(); }
+                catch (Exception ex) { Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.Message); }
                 _photonMmioMirror = null;
             }
 
