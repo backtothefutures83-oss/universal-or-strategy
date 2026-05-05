@@ -1,8 +1,8 @@
 # V12 Universal OR Strategy -- Master Roadmap
-## Build-983-Phase4-Dispatcher | PR #73 Hardening Pass
-**Last Synced**: 2026-05-04T20:01:00Z
-**Protocol**: V14 Alpha | **Current Build**: 1111.004-v28.0-pr56
-**Active Branch**: `build-983-phase4-dispatcher-final` | **PR**: #73
+## Build-984-SourceHardening | Phase 4 Extraction CONFIRMED COMPLETE
+**Last Synced**: 2026-05-05T18:12:00Z
+**Protocol**: V14 Alpha | **Current Build**: 1111.004-v28.0-pr75-repairs
+**Active Branch**: `build-984-source-hardening` | **Last Stable PR**: #76
 
 ---
 
@@ -40,7 +40,7 @@
 | **Phase 1** | Foundation (Monolith Partition -- 20+ partial files) | ✅ DONE |
 | **Phase 2** | Command Routing (IPC TCP + FSM + OCO Fix) | ✅ DONE |
 | **Phase 3** | Strategy Patterns (RAII + Resource Leak Remediation) | ✅ DONE |
-| **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | 🟠 PR #73 -- Hardening Pass |
+| **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | ✅ DONE -- Extraction confirmed live (2026-05-05) |
 
 ---
 
@@ -50,12 +50,12 @@
 | :---: | :--- | :--- | :---: |
 | **M1** | Monolith Partition | ✅ COMPLETE | REQUIRED |
 | **M2** | Arena Frozen (Execution Arena) | ✅ COMPLETE | REQUIRED |
-| **M3** | Phase 4 Event Lifecycle Dispatcher | 🟠 PR #73 Open -- Hardening Pass | REQUIRED |
+| **M3** | Phase 4 Event Lifecycle Dispatcher | ✅ COMPLETE -- Extraction live. Build-984 Source Hardening is next before P7 merge. | REQUIRED |
 
 > [!IMPORTANT]
 > ## PRODUCTION GATE
-> **M3 = finish line (no Rithmic).** When Phase 4 P7 merges to main, the project is production-complete.
-> M3 closes when: Phase 4 implemented (P5) + validated (P6) + merged to main (P7).
+> **M3 = finish line (no Rithmic).** When Build-984 Source Hardening P7 merges to main, the project is production-complete.
+> M3 fully closes when: Build-984 implemented (P5) + validated (P6) + merged to main (P7).
 
 | Milestone | Title | Status | Required? |
 | :---: | :--- | :--- | :---: |
@@ -68,56 +68,48 @@
 
 ---
 
-## CURRENT MISSION: CLOSE M3
+## CURRENT MISSION: BUILD-984 SOURCE HARDENING
 
-### Step 1 -- Git Push (COMPLETE)
+### Context: Phase 4 Declared Complete (2026-05-05)
 
-- [x] PR #73 open on `build-983-phase4-dispatcher-final`
-- [x] Commit SHA visible on GitHub -- bots audited and reported
+- [x] `ProcessOnStateChange` (432-line God Function) extracted into 5 dedicated handlers
+- [x] Verified live in `src/V12_002.Lifecycle.cs` (handlers at lines 93/220/302/404/451)
+- [x] 12 Arena findings (F-01 to F-12) triaged as pre-existing source defects -- deferred to this mission
 
-### Step 2 -- P6 Validation ✅ PASSED (2026-05-04)
+### Step 1 -- P3 Architecture Review ⬅ CURRENT GATE
 
-Verify the Build-982-Phase2-RAII surgical edits are clean before Phase 4 begins.
+Claude (ARCHITECT) to verify the 12 pre-existing defects in `V12_002.Lifecycle.cs` and author
+a surgical hardening plan for `docs/brain/implementation_plan.md`.
 
-- [x] `ClearDispatchSyncPending` present at 2 call sites in `AccountOrders.cs` (lines 361, 581) -- 4 total text matches; 2 are definition/comment, 2 are call sites. CORRECT.
-- [x] Zero `try { }` empty blocks across `src/*.cs`
-- [x] Zero `lock(` in `src/*.cs` -- 3 false positives (`Block(`, `Lock (` string literals) confirmed not real locks.
-- [x] `_repairInFlight.TryRemove` inside `finally` block in `REAPER.Repair.cs` line 223
-- [x] **Sign-off**: **P6 PASS** (Gemini CLI, 2026-05-04T10:37)
+- [ ] Claude receives forensic brief (Antigravity packages evidence per `/architect_intake`)
+- [ ] Claude independently verifies all defect sites in current source
+- [ ] `docs/brain/implementation_plan.md` overwritten with Build-984 plan
+- [ ] Plan ends with Director Handoff Block for Engineer
 
-### Step 3 -- P3 Architecture Review (COMPLETE -- 2026-05-04)
+### Step 2 -- P4 Arena Red Team
 
-PR #73 bot audit produced 9 defects (D1-D9). P3 Architect (Claude) independently verified all 9 and authored the hardening plan.
-
-- [x] `docs/brain/implementation_plan.md` updated to v3_pr73_hardening
-- [x] 9 defects catalogued: 3 phantom blocks, 1 shutdown guard, 1 culture parse, 2 Photon stubs, 3 dead fields, 1 Python lint, 8 roadmap lines
-- [x] Backward-compat stub pattern confirmed for Photon properties (matches ReducedRiskPerTrade precedent)
-
-### Step 4 -- P4 Arena Red Team
-
-Send Phase 4 plan to Arena AI (text tab) with GitHub link + branch for adversarial audit.
-
-- [ ] Arena prompt includes: GitHub raw link, branch `feature/phase-4-event-lifecycle`, full plan
+- [ ] Arena prompt includes: GitHub raw link, branch `build-984-source-hardening`, full plan
 - [ ] Unanimous sign-off (target 2/3 models minimum)
 - [ ] Log verdict in `docs/brain/nexus_a2a.json`
 
-### Step 5 -- P5 Codex Implementation
+### Step 3 -- P5 Engineer (Codex)
 
-User pastes the Codex engineering brief (produced in Step 3) into Codex manually.
+- [ ] Codex applies approved plan to `src/V12_002.Lifecycle.cs`
+- [ ] Self-audit: ASCII gate, zero `lock(`, zero phantom blocks
+- [ ] Run `deploy-sync.ps1`; Director presses F5 -- verify BUILD_TAG banner
 
-- [ ] Codex implements Phase 4 scaffold (`Lifecycle.State.cs`, `Lifecycle.BarUpdate.cs`)
-- [ ] Codex runs self-audit: ASCII gate, zero `lock(`, zero phantom blocks
-- [ ] Codex runs `deploy-sync.ps1`
-- [ ] Director presses F5 -- strategy compiles with new BUILD_TAG
+### Step 4 -- P6 Validation
 
-### Step 6 -- P7 Sentinel (Close M3)
+- [ ] Gemini CLI (fresh session) runs post-surgery verification
+- [ ] All 12 defect sites confirmed repaired or documented waiver
 
-- [ ] Push Phase 4 implementation to GitHub
-- [ ] PR: `feature/phase-4-event-lifecycle` -> `main`
-- [ ] Merge after review
-- [ ] Sentry: no new error events
+### Step 5 -- P7 Sentinel (Close M3)
 
-**M3 CLOSED when Step 6 is complete.**
+- [ ] Push Build-984 to GitHub
+- [ ] PR: `build-984-source-hardening` -> `main`
+- [ ] Merge after review; Sentry: no new error events
+
+**M3 FULLY CLOSED when Step 5 is complete.**
 
 ---
 
@@ -133,21 +125,26 @@ User pastes the Codex engineering brief (produced in Step 3) into Codex manually
 | **P4-RETRO** | Arena Retro Audit | Null Fix confirmed 2/2 FAIL | ✅ COMPLETE |
 | **P5** | Engineer (Codex) | Build-982-Phase2-RAII Surgical Execution | ✅ COMPLETE |
 | **P6** | Validator | Post-Surgery Verification | ✅ **PASS** (2026-05-04) |
-| **P3-V3** | Architect (Phase 4) | Event Lifecycle Dispatcher Plan | 🟡 IN PROGRESS -- Step 3 |
-| **P4-PHASE4** | Arena Red Team | Phase 4 Plan Audit | ⚪ Step 4 above |
-| **P5-PHASE4** | Engineer (Codex) | Phase 4 Implementation | ⚪ Step 5 above |
-| **P7** | Sentinel | GitHub Merge to main | ⚪ Step 6 above |
+| **P3-V3** | Architect (Phase 4) | Event Lifecycle Dispatcher Plan | ✅ COMPLETE (2026-05-04) |
+| **P5-PR76** | Engineer (Codex) | PR #76 Repairs (D1/D2/D3/D6) | ✅ COMPLETE -- verified 2026-05-05 |
+| **P4-PHASE4** | Arena Red Team | Phase 4 Plan Audit | ✅ PASS -- 12 findings triaged as pre-existing, deferred to B984 |
+| **P5-PHASE4** | Engineer (Codex) | Phase 4 Extraction | ✅ CONFIRMED LIVE in src/ (2026-05-05) |
+| **B984-P3** | Architect (Build-984) | Source Hardening Plan (12 deferred findings) | 🟡 ACTIVE -- Step 1 above |
+| **B984-P4** | Arena Red Team | Build-984 Plan Audit | ⚪ Step 2 above |
+| **B984-P5** | Engineer (Codex) | Build-984 Implementation | ⚪ Step 3 above |
+| **P7** | Sentinel | GitHub Merge to main | ⚪ Step 5 above |
 
 ---
 
-## HEALTH SNAPSHOT (Live as of 2026-05-04)
+## HEALTH SNAPSHOT (Live as of 2026-05-05)
 
 | Signal | Status |
 | :--- | :--- |
-| **Compilation** | [OK] `1111.004-v28.0-pr56` -- CLEAN |
+| **Compilation** | [OK] `1111.004-v28.0-pr75-repairs` -- CLEAN |
 | **ASCII Gate** | [PASS] Zero non-ASCII violations |
 | **Lock Audit** | [PASS] Zero `lock()` in `src/*.cs` |
-| **Phantom Blocks** | [PENDING] 3 phantom blocks in Lifecycle.cs -- see D1/D2/D3 in implementation_plan.md |
+| **Phantom Blocks** | [DONE] D1/D2/D3/D6 repairs confirmed live in src/ (2026-05-05) |
+| **Phase 4 Extraction** | [DONE] 5 handlers live in `V12_002.Lifecycle.cs` (confirmed 2026-05-05) |
 | **RAII Leak Fix** | [DONE] `ClearDispatchSyncPending` injected (2 occurrences) |
 | **Hard Links** | [SYNCED] `deploy-sync.ps1` EXIT 0 |
 | **Risk Audit** | [PASS] Cases 1-7 pass, 8-9 idle (no live positions) |
@@ -155,7 +152,7 @@ User pastes the Codex engineering brief (produced in Step 3) into Codex manually
 | **Watchdog** | [OK] Started (2000ms interval, 5s timeout) |
 | **OR Logic** | [OK] 4 sessions replayed correctly |
 | **SIMA** | [DISABLED] Single-account mode -- expected for this config |
-| **GitHub** | [OPEN] PR #73 on build-983-phase4-dispatcher-final -- hardening pass pending P5 |
+| **GitHub** | [MERGED] PR #76 -- last stable merge. Build-984 Source Hardening is active. |
 
 ---
 

@@ -1,17 +1,17 @@
 {
-  "mission": "ADR-020 Phase 4 Event Lifecycle Refactoring -- PR #73 Hardening Pass",
+  "mission": "Build-984 Source Hardening -- 12 Deferred Arena Findings (V12_002.Lifecycle.cs)",
   "mission_status": "ACTIVE",
   "milestone": "M3",
-  "build_tag": "Build-983-Phase4-Dispatcher",
-  "branch": "build-983-phase4-dispatcher-final",
-  "pr": "#73",
+  "build_tag": "1111.004-v28.0-pr75-repairs",
+  "branch": "build-984-source-hardening",
+  "pr": "#76",
   "plan_path": "docs/brain/implementation_plan.md",
-  "last_updated": "2026-05-04T20:01:00Z",
+  "last_updated": "2026-05-05T18:13:00Z",
   "morpheus_mode": true,
   "agent_readiness_target": "LEVEL_5",
   "phase": "P3",
-  "current_phase": "P3_PLAN_COMPLETE",
-  "status": "AWAITING_DIRECTOR_APPROVAL",
+  "current_phase": "B984_P3_ARCHITECT",
+  "status": "AWAITING_CLAUDE_ARCHITECT_BRIEF",
   "agents": {
     "P1_orchestrator": "Antigravity",
     "P2_forensics": "Codex",
@@ -48,66 +48,91 @@
       "phase": "ARENA_RETRO_AUDIT",
       "status": "COMPLETE",
       "timestamp": "2026-05-03T00:02:00Z",
-      "verdict": "2/2 FAIL -- Null Fix confirmed by Codex and Claude Sonnet"
+      "reason": "Null Fix confirmed 2/2 FAIL -- plan rejected"
     },
     {
-      "phase": "P3_HARDENING_V2",
+      "phase": "P3_ARCHITECT_V2_RAII",
       "status": "COMPLETE",
-      "timestamp": "2026-05-03T22:52:00Z",
-      "authored_by": "Claude Sonnet 4.6 (as P3 Architect)",
-      "note": "Full BROKEN/FIXED proofs for 4 forensic sites. 3 phantom blocks scoped for removal. 2 real RAII fixes. 2 confirmed-clean sites documented."
+      "timestamp": "2026-05-03T02:00:00Z"
     },
     {
-      "phase": "P5_ENGINEER_BUILD982",
+      "phase": "P5_ENGINEER_RAII",
       "status": "COMPLETE",
-      "timestamp": "2026-05-04T10:00:00Z",
-      "note": "Codex executed Build-982-Phase2-RAII surgical edits. Compiled and pushed as PR #73."
+      "timestamp": "2026-05-04T10:00:00Z"
     },
     {
-      "phase": "P6_VALIDATION_BUILD982",
-      "status": "COMPLETE",
+      "phase": "P6_VALIDATOR_RAII",
+      "status": "PASS",
       "timestamp": "2026-05-04T10:37:00Z",
-      "verdict": "PASS -- Gemini CLI independent validation"
+      "agent": "Gemini CLI"
     },
     {
-      "phase": "PR73_BOT_AUDIT",
+      "phase": "P5_PR76_REPAIRS",
       "status": "COMPLETE",
-      "timestamp": "2026-05-04T19:00:00Z",
-      "note": "CodeRabbit/DeepSource/KiloCode bots identified 9 defects (D1-D9). P1 catalogued. P3 verified independently."
+      "timestamp": "2026-05-05T00:00:00Z",
+      "details": "D1/D2/D3/D6 confirmed live. BUILD_TAG bumped to pr75-repairs."
     },
     {
-      "phase": "P3_PR73_HARDENING",
+      "phase": "P4_PHASE4_ARENA_AUDIT",
+      "status": "PASS",
+      "timestamp": "2026-05-04T17:30:00Z",
+      "details": "12 findings triaged as pre-existing source defects. Path A approved. All 7 extraction checklist items PASS."
+    },
+    {
+      "phase": "P5_PHASE4_EXTRACTION",
+      "status": "CONFIRMED_LIVE",
+      "timestamp": "2026-05-05T18:10:00Z",
+      "details": "ProcessOnStateChange extracted into 5 handlers. Verified in live src/V12_002.Lifecycle.cs lines 93/220/302/404/451."
+    },
+    {
+      "phase": "B984_P1_DECLARATION",
       "status": "COMPLETE",
-      "timestamp": "2026-05-04T20:01:00Z",
-      "authored_by": "Claude Sonnet 4.6 (as P3 Architect)",
-      "note": "9 defects verified. Implementation plan written. Backward-compat stub pattern applied to Photon properties. Shutdown guard designed as dequeue-always/execute-conditionally."
+      "timestamp": "2026-05-05T18:12:00Z",
+      "details": "Phase 4 declared complete by Director. Build-984 Source Hardening opened. 12 deferred findings scope confirmed."
     }
   ],
-  "active_agent": {
-    "name": "Director (User)",
-    "phase": "DIRECTOR_GATE",
-    "started_at": "2026-05-04T20:01:00Z",
-    "status": "PLAN_READY_FOR_DIRECTOR_GATE"
+  "current_blockers": [],
+  "open_findings": {
+    "source": "Phase 4 Arena Audit (Codex 5.3, 2026-05-04)",
+    "count": 12,
+    "triage": "ALL pre-existing source defects in V12_002.Lifecycle.cs",
+    "known_confirmed": [
+      {
+        "id": "F-01",
+        "severity": "MEDIUM",
+        "location": "V12_002.Lifecycle.cs:263-268 (OnStateChangeConfigure)",
+        "description": "FleetDispatchSlot layout invariant -- throws InvalidOperationException cold on Configure if struct padding changes"
+      },
+      {
+        "id": "F-02",
+        "severity": "HIGH",
+        "location": "V12_002.Lifecycle.cs:345 (OnStateChangeDataLoaded)",
+        "description": "BarsArray[1] accessed without guard -- NullReferenceException if AddDataSeries did not complete in Configure"
+      },
+      {
+        "id": "F-03",
+        "severity": "LOW",
+        "location": "V12_002.Lifecycle.cs:295-297 (OnStateChangeConfigure)",
+        "description": "AddDataSeries ordering concern -- called after other state setup, NT8 doc recommends SetDefaults"
+      },
+      {
+        "id": "F-04",
+        "severity": "LOW",
+        "location": "V12_002.Lifecycle.cs:327-342 (OnStateChangeDataLoaded)",
+        "description": "Silent target count override -- ConfiguredTargetCount mutated in backward-compat path without logging"
+      },
+      {
+        "id": "F-05 to F-12",
+        "severity": "TBD",
+        "location": "V12_002.Lifecycle.cs (various handlers)",
+        "description": "8 additional pre-existing defects identified by Arena auditor. To be formally catalogued by Claude (P3 Architect)."
+      }
+    ]
   },
-  "p3_handoff": {
-    "plan_validated": true,
-    "plan_author": "Claude Sonnet 4.6",
-    "plan_version": "v3_pr73_hardening",
-    "defects_addressed": 9,
-    "files_modified": 4,
-    "docs_modified": 1,
-    "phantom_blocks_to_fix": 3,
-    "shutdown_guards_to_add": 1,
-    "backward_compat_stubs": 2,
-    "dead_fields_to_remove": 3,
-    "python_lint_fixes": 1,
-    "roadmap_lines_to_update": 8,
-    "ready_for_p5": false,
-    "director_gate_required": true,
-    "last_relay": {
-      "agent": "Claude (P3 Architect)",
-      "time": "2026-05-04T20:01:00Z",
-      "status": "AWAITING_SIGNOFF"
-    }
-  }
+  "previous_missions": {
+    "Build-982-Phase2-RAII": "COMPLETE",
+    "Build-983-Phase3-PR75-Repairs": "COMPLETE",
+    "Build-983-Phase4-Dispatcher": "COMPLETE"
+  },
+  "nexus_relay_timestamp": "2026-05-05T18:13:00Z"
 }
