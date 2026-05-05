@@ -279,7 +279,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception _mmioEx)
             {
                 _photonMmioMirror = null;
-                Print("[PHOTON MMIO] mirror unavailable (hot path unaffected): " + _mmioEx.Message);
+                Print("[PHOTON MMIO] mirror unavailable (hot path unaffected): " + _mmioEx.ToString());
             }
 
             // V14.2 Sovereign Photon [ADR-011]: Pre-allocate execution ID dedup rings
@@ -492,7 +492,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (_photonMmioMirror != null)
             {
                 try { _photonMmioMirror.Dispose(); }
-                catch (Exception ex) { Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.Message); }
+                catch (Exception ex) { Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.ToString()); }
                 _photonMmioMirror = null;
             }
 
