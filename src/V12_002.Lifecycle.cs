@@ -71,7 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     try { cmd.Execute(this); }
                     catch (Exception exCmd)
                     {
-                        Print("[SHUTDOWN] Actor cmd failed during drain: " + exCmd.Message);
+                        Print("[SHUTDOWN] Actor cmd failed during drain: " + exCmd.ToString());
                     }
                     actorDrained++;
                 }
@@ -84,7 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception exOuter)
             {
-                Print("[SHUTDOWN] DrainQueuesForShutdown outer exception: " + exOuter.Message);
+                Print("[SHUTDOWN] DrainQueuesForShutdown outer exception: " + exOuter.ToString());
             }
         }
 
@@ -508,7 +508,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.Phase7 [GAP-4]: Dispose SIMA toggle semaphore to release OS handle.
                 // In finally block: guaranteed to run even if ClearAllSubscribers throws.
                 try { _simaToggleSem?.Dispose(); }
-                catch (Exception exSem) { Print("[SHUTDOWN] SemaphoreSlim dispose failed: " + exSem.Message); }
+                catch (Exception exSem) { Print("[SHUTDOWN] SemaphoreSlim dispose failed: " + exSem.ToString()); }
             }
 
             // Clear references
@@ -563,7 +563,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 try { Enqueue(ctx => ctx.HydrateWorkingOrdersFromBroker()); }
                 catch (Exception exReconnect)
                 {
-                    Print("[B983-D6] CRITICAL: Reconnect re-adoption Enqueue failed: " + exReconnect.Message
+                    Print("[B983-D6] CRITICAL: Reconnect re-adoption Enqueue failed: " + exReconnect.ToString()
                         + " -- orders may not be re-adopted. Manual intervention required.");
                 }
             }
