@@ -1,7 +1,7 @@
 # V12 Universal OR Strategy -- Master Roadmap
-## Build-984-SourceHardening | Phase 4 Extraction CONFIRMED COMPLETE
-**Last Synced**: 2026-05-05T18:12:00Z
-**Protocol**: V14 Alpha | **Current Build**: 1111.004-v28.0-pr75-repairs
+## Build-984-SourceHardening | 12 Repairs CONFIRMED LIVE -- P7 Merge Remaining
+**Last Synced**: 2026-05-05T22:16:00Z
+**Protocol**: V14 Alpha | **Current Build**: 1111.005-v28.0-b984
 **Active Branch**: `build-984-source-hardening` | **Last Stable PR**: #76
 
 ---
@@ -68,7 +68,7 @@
 
 ---
 
-## CURRENT MISSION: BUILD-984 SOURCE HARDENING
+## CURRENT MISSION: BUILD-984 SOURCE HARDENING -- STEPS 1-4 COMPLETE
 
 ### Context: Phase 4 Declared Complete (2026-05-05)
 
@@ -76,38 +76,42 @@
 - [x] Verified live in `src/V12_002.Lifecycle.cs` (handlers at lines 93/220/302/404/451)
 - [x] 12 Arena findings (F-01 to F-12) triaged as pre-existing source defects -- deferred to this mission
 
-### Step 1 -- P3 Architecture Review ⬅ CURRENT GATE
+### Step 1 -- P3 Architecture Review ✅ COMPLETE
 
-Claude (ARCHITECT) to verify the 12 pre-existing defects in `V12_002.Lifecycle.cs` and author
-a surgical hardening plan for `docs/brain/implementation_plan.md`.
+- [x] Antigravity authored `docs/brain/implementation_plan.md` with 12 surgical FIND/REPLACE blocks
+- [x] Plan committed to `build-984-source-hardening` (commit: B984-P3)
+- [x] F-09 waived -- re-analysis confirmed dict teardown ordering already correct
 
-- [ ] Claude receives forensic brief (Antigravity packages evidence per `/architect_intake`)
-- [ ] Claude independently verifies all defect sites in current source
-- [ ] `docs/brain/implementation_plan.md` overwritten with Build-984 plan
-- [ ] Plan ends with Director Handoff Block for Engineer
+### Step 2 -- P4 Arena Red Team ✅ SKIPPED (Director approved directly)
 
-### Step 2 -- P4 Arena Red Team
+- [x] Director reviewed and approved Codex's implementation plan before execution
+- [x] Lock regex hardened to `(?<!\w)lock\s*\(` case-sensitive
 
-- [ ] Arena prompt includes: GitHub raw link, branch `build-984-source-hardening`, full plan
-- [ ] Unanimous sign-off (target 2/3 models minimum)
-- [ ] Log verdict in `docs/brain/nexus_a2a.json`
+### Step 3 -- P5 Engineer (Codex) ✅ COMPLETE
 
-### Step 3 -- P5 Engineer (Codex)
+- [x] Codex applied all 11 code repairs (F-09 waived) to `src/V12_002.Lifecycle.cs`
+- [x] Field `_uiSnapshotTickCounter` added to `src/V12_002.Data.cs`
+- [x] BUILD_TAG bumped: `1111.004-v28.0-pr75-repairs` -> `1111.005-v28.0-b984`
+- [x] Self-audit: PASS (lock, ASCII, unsafe, F-02/F-03/F-05 ordering, BUILD_TAG)
+- [x] `deploy-sync.ps1`: PASS
+- [x] Commit: `159fb9a` pushed to `build-984-source-hardening`
 
-- [ ] Codex applies approved plan to `src/V12_002.Lifecycle.cs`
-- [ ] Self-audit: ASCII gate, zero `lock(`, zero phantom blocks
-- [ ] Run `deploy-sync.ps1`; Director presses F5 -- verify BUILD_TAG banner
+### Step 4 -- P6 Validation ✅ CONFIRMED LIVE IN NINJATRADER
 
-### Step 4 -- P6 Validation
+- [x] Banner: `Build: 1111.005-v28.0-b984 | Sync: ONE SOURCE OF TRUTH`
+- [x] F-10 ASCII banner confirmed (`[OK] BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE`)
+- [x] F-08 GTC telemetry confirmed (`[SHUTDOWN] GTC sweep: cancelling 0 tracked + broker-scanned orders`)
+- [x] F-11 reconnect log confirmed (`[BUILD 948] Reconnect skipped -- SIMA=False, State=Realtime`)
+- [x] F-06 REPAIRED banner absent from log
+- [x] Photon MMIO mirrors online (F-01 layout check passed)
+- [x] All 9 Risk Audit cases passed (Cases 8-9 idle: no live positions)
+- [x] IPC server, watchdog, sticky state all nominal
 
-- [ ] Gemini CLI (fresh session) runs post-surgery verification
-- [ ] All 12 defect sites confirmed repaired or documented waiver
+### Step 5 -- P7 Sentinel (Close M3) ⬅ CURRENT GATE
 
-### Step 5 -- P7 Sentinel (Close M3)
-
-- [ ] Push Build-984 to GitHub
 - [ ] PR: `build-984-source-hardening` -> `main`
 - [ ] Merge after review; Sentry: no new error events
+- [ ] Update BUILD snapshot in roadmap after merge
 
 **M3 FULLY CLOSED when Step 5 is complete.**
 
@@ -129,10 +133,11 @@ a surgical hardening plan for `docs/brain/implementation_plan.md`.
 | **P5-PR76** | Engineer (Codex) | PR #76 Repairs (D1/D2/D3/D6) | ✅ COMPLETE -- verified 2026-05-05 |
 | **P4-PHASE4** | Arena Red Team | Phase 4 Plan Audit | ✅ PASS -- 12 findings triaged as pre-existing, deferred to B984 |
 | **P5-PHASE4** | Engineer (Codex) | Phase 4 Extraction | ✅ CONFIRMED LIVE in src/ (2026-05-05) |
-| **B984-P3** | Architect (Build-984) | Source Hardening Plan (12 deferred findings) | 🟡 ACTIVE -- Step 1 above |
-| **B984-P4** | Arena Red Team | Build-984 Plan Audit | ⚪ Step 2 above |
-| **B984-P5** | Engineer (Codex) | Build-984 Implementation | ⚪ Step 3 above |
-| **P7** | Sentinel | GitHub Merge to main | ⚪ Step 5 above |
+| **B984-P3** | Architect (Build-984) | Source Hardening Plan (12 deferred findings) | ✅ COMPLETE (2026-05-05) |
+| **B984-P4** | Arena Red Team | Build-984 Plan Audit | ✅ SKIPPED -- Director approved directly |
+| **B984-P5** | Engineer (Codex) | Build-984 Implementation | ✅ COMPLETE -- commit 159fb9a (2026-05-05) |
+| **B984-P6** | Validator | Build-984 NinjaTrader Live Verification | ✅ CONFIRMED LIVE (2026-05-05T22:16Z) |
+| **B984-P7** | Sentinel | GitHub PR merge to main | 🟡 ACTIVE -- Step 5 above |
 
 ---
 
@@ -140,19 +145,19 @@ a surgical hardening plan for `docs/brain/implementation_plan.md`.
 
 | Signal | Status |
 | :--- | :--- |
-| **Compilation** | [OK] `1111.004-v28.0-pr75-repairs` -- CLEAN |
+| **Compilation** | [OK] `1111.005-v28.0-b984` -- CLEAN (NinjaTrader live confirmed 2026-05-05) |
 | **ASCII Gate** | [PASS] Zero non-ASCII violations |
-| **Lock Audit** | [PASS] Zero `lock()` in `src/*.cs` |
-| **Phantom Blocks** | [DONE] D1/D2/D3/D6 repairs confirmed live in src/ (2026-05-05) |
+| **Lock Audit** | [PASS] Zero `lock()` in `src/*.cs` (hardened regex) |
+| **B984 Hardening** | [DONE] 11 repairs live (F-01 to F-12, F-09 waived), commit 159fb9a |
 | **Phase 4 Extraction** | [DONE] 5 handlers live in `V12_002.Lifecycle.cs` (confirmed 2026-05-05) |
 | **RAII Leak Fix** | [DONE] `ClearDispatchSyncPending` injected (2 occurrences) |
 | **Hard Links** | [SYNCED] `deploy-sync.ps1` EXIT 0 |
 | **Risk Audit** | [PASS] Cases 1-7 pass, 8-9 idle (no live positions) |
 | **IPC Server** | [OK] Listening on 127.0.0.1:5001 (Multi-Client) |
 | **Watchdog** | [OK] Started (2000ms interval, 5s timeout) |
-| **OR Logic** | [OK] 4 sessions replayed correctly |
+| **OR Logic** | [OK] 4 sessions replayed correctly (Apr 29 - May 5) |
 | **SIMA** | [DISABLED] Single-account mode -- expected for this config |
-| **GitHub** | [MERGED] PR #76 -- last stable merge. Build-984 Source Hardening is active. |
+| **GitHub** | [PENDING P7] `build-984-source-hardening` -> `main` PR not yet merged. |
 
 ---
 
