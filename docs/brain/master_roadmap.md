@@ -142,7 +142,8 @@
 | **B984-P4** | Arena Red Team | Build-984 Plan Audit | ✅ SKIPPED -- Director approved directly |
 | **B984-P5** | Engineer (Codex) | Build-984 Implementation | ✅ COMPLETE -- commit 159fb9a (2026-05-05) |
 | **B984-P6** | Validator | Build-984 NinjaTrader Live Verification | ✅ CONFIRMED LIVE (2026-05-05T22:16Z) |
-| **B984-P7** | Sentinel | GitHub PR merge to main | 🟡 ACTIVE -- Step 5 above |
+| **B984-P3-CI** | Orchestrator | PR Intelligence (Qwen/GLM/PR-Agent) | ✅ COMPLETE (2026-05-06) |
+| **B984-P7** | Sentinel | GitHub PR merge to main | ✅ **COMPLETE** (2026-05-06) |
 
 ---
 
