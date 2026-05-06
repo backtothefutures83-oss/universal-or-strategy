@@ -88,7 +88,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ProcessShutdownSIMA()
         {
-            CancelAllV12GtcOrders(false); // [BUILD 948] GTC sweep before teardown -- skip accounts with open positions
+            CancelAllV12GtcOrders(false); // [BUILD 984] GTC sweep before teardown -- skip accounts with open positions
             StopReaperAudit();
             UnsubscribeFromFleetAccounts();
             // v28.0 shutdown drain: sideband-aware, XorShadow-free (we do not verify on shutdown;
@@ -179,7 +179,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.Phase6 [HYDRATE]: Seed expectedPositions from live broker state
             HydrateExpectedPositionsFromBroker();
 
-            // [BUILD 948] Adopt any working broker orders into tracking dicts; sets _orderAdoptionComplete = true
+            // [BUILD 984] Adopt any working broker orders into tracking dicts; sets _orderAdoptionComplete = true
             HydrateWorkingOrdersFromBroker();
 
             // Build 1103: Enrich reconstructed positions with persisted trail state.
@@ -258,7 +258,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Build 948 [FIX-B]: Re-adopt working broker orders into tracking dicts after restart or reconnect.
+        /// Build 984 [FIX-B]: Re-adopt working broker orders into tracking dicts after restart or reconnect.
         /// Derives the original entry key by stripping the well-known order-name prefix (e.g. "Stop_" -> stopOrders).
         /// Sets _orderAdoptionComplete = true when done so REAPER can resume auditing.
         /// MUST be called on the strategy thread (via TriggerCustomEvent when initiated from a callback).
@@ -759,7 +759,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Build 948 [FIX-A]: Sweep and cancel all V12-managed GTC orders before SIMA disable or strategy terminate.
+        /// Build 984 [FIX-A]: Sweep and cancel all V12-managed GTC orders before SIMA disable or strategy terminate.
         /// Phase 1 scans tracked order dicts; Phase 2 scans broker order lists for any V12-prefixed orders.
         /// force=true: cancel regardless of open positions (strategy terminate).
         /// force=false: skip accounts that have an open position for this instrument (SIMA disable -- prevent naked accounts).
@@ -768,7 +768,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             int trackedCancels = SweepTrackedOrders(force);
             int brokerCancels  = SweepBrokerOrders(force);
-            Print(string.Format("[BUILD 948] GTC sweep: cancelled {0} tracked + {1} broker-scanned orders",
+            Print(string.Format("[BUILD 984] GTC sweep: cancelled {0} tracked + {1} broker-scanned orders",
                 trackedCancels, brokerCancels));
         }
 
