@@ -50,6 +50,8 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 
 - Touch only what you must. Clean up only your own mess.
 - Do NOT "improve" adjacent code, comments, or formatting.
+- **WHITESPACE MUTATION BANNED**: Never mutate whitespace, line endings, or indentation across files. This creates bloated diffs that obscure logic and break CI limits.
+- **STRICT DIFF LIMIT**: Pull Request diffs MUST remain under 150,000 characters. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
 - If unrelated dead code is noticed, REPORT it -- do not act on it.
 - Every changed line must trace directly to the Mission Brief.
 
