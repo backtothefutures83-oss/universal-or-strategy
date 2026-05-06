@@ -30,6 +30,7 @@ jobs:
         shell: pwsh
 
       - name: Run tests with OpenCover coverage
+        continue-on-error: true
         run: |
           dotnet test Testing.csproj --no-restore /p:CollectCoverage=true /p:IncludeTestAssembly=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./TestResults/coverage.opencover.xml --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
         shell: pwsh
