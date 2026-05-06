@@ -1,10 +1,11 @@
 # ARCHITECT INTAKE -- Build-984-SourceHardening -- 2026-05-05
 
 ## MISSION METADATA
+
 - **BUILD_TAG**: `1111.004-v28.0-pr75-repairs` (new tag will be `1111.005-v28.0-b984`)
 - **MISSION**: Build-984 Source Hardening
 - **BRANCH**: `build-984-source-hardening` (branch off from PR #76 baseline)
-- **REPO**: https://github.com/mkalhitti-cloud/universal-or-strategy
+- **REPO**: <https://github.com/mkalhitti-cloud/universal-or-strategy>
 - **PLAN FILE**: `docs/brain/implementation_plan.md` (OVERWRITE with new plan)
 
 ---
@@ -21,7 +22,7 @@ by the next mission (Build-984) as surgical source hardening, NOT as part of the
 
 **Phase 4 is now confirmed complete.** The 5 handlers exist live:
 
-```
+```text
 OnStateChangeSetDefaults  -> line 93
 OnStateChangeConfigure    -> line 220
 OnStateChangeDataLoaded   -> line 302
@@ -39,6 +40,7 @@ surgical implementation plan for the ENGINEER to execute.
 All defects are located in `src/V12_002.Lifecycle.cs`.
 
 ### F-01 -- Struct Layout Invariant: Hard Crash on Configure
+
 **Severity**: MEDIUM | **Handler**: `OnStateChangeConfigure` | **Lines**: 260-269
 
 ```csharp
@@ -58,6 +60,7 @@ No logging before throw, no recovery path, no graceful degradation.
 ---
 
 ### F-02 -- BarsArray Index Access Without Guard
+
 **Severity**: HIGH | **Handler**: `OnStateChangeDataLoaded` | **Line**: 345
 
 ```csharp
@@ -71,6 +74,7 @@ atrIndicator = this.ATR(BarsArray[1], RMAATRPeriod);
 ---
 
 ### F-03 -- AddDataSeries Ordering Concern
+
 **Severity**: LOW | **Handler**: `OnStateChangeConfigure` | **Lines**: 294-297
 
 ```csharp
@@ -85,6 +89,7 @@ code (F-01), so if F-01 fires, secondary series are never registered.
 ---
 
 ### F-04 -- Silent Target Count Override
+
 **Severity**: LOW | **Handler**: `OnStateChangeDataLoaded` | **Lines**: 327-342
 
 ```csharp
@@ -103,6 +108,7 @@ Session log was truncated before the full triage table was captured.
 
 **Architect task**: Independently read `V12_002.Lifecycle.cs` and catalogue F-05 to F-12.
 Focus areas:
+
 1. `OnStateChangeRealtime` (lines 404-449): `_isTerminating` guards, ChartControl null path
 2. `OnStateChangeTerminated` (lines 451-534): Teardown ordering vs `_isTerminating = true`,
    `CancelAllV12GtcOrders(force: false)` placement

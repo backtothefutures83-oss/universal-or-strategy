@@ -1,3 +1,6 @@
+// <copyright file="V12_002.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
 // Based on UniversalORStrategyV10_3.cs (BUILD 1702)
 // SIMA Architecture: One strategy instance on Master account broadcasts to all Apex accounts

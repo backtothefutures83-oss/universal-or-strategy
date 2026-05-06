@@ -1,8 +1,11 @@
 # CODEX P4 AUDIT: V14.2 Sovereign Photon
 
 ## Audit Date: 2026-04-04
+
 ## Auditor: CODEX (P4 Engineer)
+
 ## Plan File: docs/brain/implementation_plan.md (Build 1109.003-v14.2)
+
 ## Verdict: REVISION REQUIRED
 
 Seven issues identified. Three are blocking (B1-B3). Four are non-blocking observations (O1-O4).
@@ -39,7 +42,7 @@ Since both producer and consumer are the same thread (O1), false sharing is impo
 
 The Interlocked free-stack for Claim() is correctly structured:
 
-```
+```text
 Claim: top = Interlocked.Decrement(ref _freeTop);
        if (top < 0) { Interlocked.Increment(ref _freeTop); return null; }
        slotIndex = _freeStack[top];
@@ -100,6 +103,7 @@ This is the design gap identified in the audit prompt, and it is confirmed as a 
    - `foreach (var ord in req.Orders)` -- OrderId registration (line 152-158)
 
 Without an Order[] reference in the ring slot, the consumer cannot:
+
 - Submit orders to the broker
 - Initialize the FollowerBracketFSM
 - Register OrderIds for FSM lookup
@@ -173,6 +177,7 @@ Three differences:
 3. **`order` variable**: The plan references `order.OrderId` but the `ProcessOnExecutionUpdate` method does not have a local variable named `order`. The method receives `string orderId` and `Execution execution`. The existing code accesses `execution.Order.OrderId`. The plan's reference to `order` is undefined.
 
 **Impact**: The fallback dedup section as written in the plan will NOT COMPILE. Even after fixing variable names, the key construction differs from the existing implementation, which could cause:
+
 - False negatives (failing to detect true duplicates) if the new hash has different collision characteristics
 - False positives (blocking legitimate executions) -- unlikely but possible
 
@@ -198,6 +203,7 @@ Note: The intermediate `GetStableHash()` step is intentionally dropped -- it was
 ### Shutdown Drain Gap
 
 The existing `ProcessShutdownSIMA()` (SIMA.Lifecycle.cs lines 89-107) drains only `_pendingFleetDispatches` (the ConcurrentQueue). After Photon integration, `_photonDispatchRing` also needs draining on shutdown. Any slots remaining in the ring at shutdown will have:
+
 - ReservedDelta not rolled back (expectedPositions leak)
 - DispatchSyncPending not cleared (sync barrier leak)
 - Pool-claimed Order[] not released (pool slot leak)

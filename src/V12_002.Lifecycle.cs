@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Lifecycle.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // Build 971: V12_002 Lifecycle -- OnStateChange, OnConnectionStatusUpdate, OnMarketData
 using System;
 using System.Collections.Generic;
@@ -346,7 +349,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // B984-F02: Guard BarsArray[1] -- only valid if AddDataSeries completed in Configure.
-            // Audit marker: BarsArray.Count >= 2
+            // Audit marker: BarsArray.Length >= 2 (use .Length, not .Count -- ISeries<T> has no .Count)
             if (BarsArray != null && BarsArray.Length >= 2)
             {
                 atrIndicator = this.ATR(BarsArray[1], RMAATRPeriod);
@@ -487,7 +490,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 });
             }
 
-            // [BUILD 948] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
+            // [BUILD 984] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
             // Must run while dicts are still populated and accounts still subscribed.
             // force=false: soft terminate, protects brackets for open positions.
             // B984-F08: Log entry count before sweep for post-mortem tracing.
@@ -554,7 +557,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         }
 
-        #region OnConnectionStatusUpdate - Build 948: Mid-session re-adoption on Rithmic reconnect
+        #region OnConnectionStatusUpdate - Build 984: Mid-session re-adoption on Rithmic reconnect
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs connectionStatusUpdate)
         {
@@ -573,7 +576,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!enableSima || strategyState != State.Realtime)
             {
                 if (status == ConnectionStatus.Connected)
-                    Print(string.Format("[BUILD 948] Reconnect skipped -- SIMA={0}, State={1}", enableSima, strategyState));
+                    Print(string.Format("[BUILD 984] Reconnect skipped -- SIMA={0}, State={1}", enableSima, strategyState));
                 return;
             }
 
@@ -581,12 +584,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 // Gate REAPER until re-adoption completes after reconnect
                 _orderAdoptionComplete = false;
-                Print("[BUILD 948] Connection lost -- order adoption gate reset, REAPER paused.");
+                Print("[BUILD 984] Connection lost -- order adoption gate reset, REAPER paused.");
             }
             else if (status == ConnectionStatus.Connected)
             {
                 // Re-adopt working orders after reconnect; runs on strategy thread via TriggerCustomEvent
-                Print("[BUILD 948] Reconnected -- scheduling working order re-adoption.");
+                Print("[BUILD 984] Reconnected -- scheduling working order re-adoption.");
                 try { Enqueue(ctx => ctx.HydrateWorkingOrdersFromBroker()); }
                 catch (Exception exReconnect)
                 {
