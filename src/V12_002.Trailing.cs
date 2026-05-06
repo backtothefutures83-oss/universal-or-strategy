@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Trailing.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.46 MODULAR: Trailing Stop Module (Extracted from Orders.cs)
 // Contains: ManageTrailingStops, CleanupStalePendingReplacements, UpdateStopOrder,
 //           CalculateStopForLevel, MoveStopsToBreakevenWithOffset, MoveSpecificTarget

@@ -211,7 +211,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private struct QueuedAccountOrderUpdate { public Account Account; public OrderEventArgs EventArgs; }
         private readonly ConcurrentQueue<QueuedAccountOrderUpdate> _accountOrderQueue = new ConcurrentQueue<QueuedAccountOrderUpdate>();
 
-        // [BUILD 948] Order adoption gate -- REAPER skips audit cycles until working orders have been re-adopted.
+        // [BUILD 984] Order adoption gate -- REAPER skips audit cycles until working orders have been re-adopted.
         private volatile bool _orderAdoptionComplete = false;
 
         // RMA Mode tracking

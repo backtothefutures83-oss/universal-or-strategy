@@ -440,7 +440,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // Build 948 [FIX-C]: Defensive expectedPositions re-assertion.
+            // [BUILD 984] [FIX-C]: Defensive expectedPositions re-assertion.
             // If ExecuteFollowerCascadeCleanup ran concurrently before Fix A sealed the gap,
             // DeltaExpectedPositionLocked may have zeroed expectedPositions for this account.
             // Without re-asserting, the replacement fill triggers REAPER Critical Desync:

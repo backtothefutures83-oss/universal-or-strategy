@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Orders.Management.Flatten.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // Build 971: Orders.Management.Flatten -- SyncPositionState, ManageCIT, FlattenAll, FlattenPositionByName, IsOrderTerminal, HasActiveOrPendingOrderForEntry
 // V12 Orders.Management Module (Extracted)
 using System;
@@ -88,7 +91,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (order.OrderType != OrderType.Limit) continue; // only chase limit entries
                 if (_citNudgedKeys.ContainsKey(key)) continue;    // [BUILD 949] one-shot: already nudged
 
-                // [BUILD 948 CIT FIX] Correct directional bar-price logic:
+                // [BUILD 984 CIT FIX] Correct directional bar-price logic:
                 // - LONG entry (Buy): price must DROP DOWN to the limit -> compare Low[0] <= limitPrice
                 // - SHORT entry (Sell): price must RISE UP to the limit -> compare High[0] >= limitPrice
                 // Previous bug: Short used Low[0] <= limitPrice which is ALWAYS true when clicking

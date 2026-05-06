@@ -1,3 +1,6 @@
+// <copyright file="V12_002.SIMA.Lifecycle.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // Build 971: SIMA Lifecycle -- ApplySimaState, EnumerateApexAccounts, Hydrate*, CancelAll*, Sweep*
 // V12 SIMA Module (Extracted)
 using System;

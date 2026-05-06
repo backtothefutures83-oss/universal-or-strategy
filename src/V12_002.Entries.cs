@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Entries.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.Phase7 STUB: Entry Engine Module -- all logic partitioned into mode-specific nodes.
 // FFMA  -> Entries.FFMA.cs
 // OR    -> Entries.OR.cs

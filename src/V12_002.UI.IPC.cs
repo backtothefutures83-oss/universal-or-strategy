@@ -1,3 +1,6 @@
+// <copyright file="V12_002.UI.IPC.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.44 MODULAR: IPC Integration Module (Split from UI.cs)
 // Contains: TCP IPC server, command dispatcher, remote signal handling
 using System;

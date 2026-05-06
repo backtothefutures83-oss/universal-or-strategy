@@ -532,7 +532,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    // Build 948 [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
+                    // [BUILD 984] [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
                     // Bidirectional .Contains() caused accidental cascade of unrelated positions:
                     // e.g. signal "OR" matched "Fleet_Apex_RETEST_OR_1" incidentally.
                     // Anchoring on underscores prevents substring contamination across signal families.
@@ -553,7 +553,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
 
-                    // Build 948 [FIX-A]: Skip cascade teardown if this follower has an in-flight Replace FSM.
+                    // [BUILD 984] [FIX-A]: Skip cascade teardown if this follower has an in-flight Replace FSM.
                     // A chart-drag cancel on the master reaches this path. Destroying the follower here zeroes
                     // expectedPositions mid-replace; the replacement fill then triggers REAPER Critical Desync
                     // (actualQty != 0, expectedQty == 0) -> Emergency Flatten.

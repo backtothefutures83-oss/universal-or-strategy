@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Symmetry.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.50 SYMMETRY GUARD - Master-Fill Anchored Fleet Risk Isolation
 using System;
 using System.Collections.Generic;
