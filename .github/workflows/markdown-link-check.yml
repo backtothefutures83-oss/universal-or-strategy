@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Links
-        uses: tcort/markdown-link-check@v1
+        uses: tcort/markdown-link-check@v3.12.0
         with:
           use-quiet-mode: 'yes'
           use-verbose-mode: 'yes'
