@@ -1,8 +1,11 @@
 # GEMINI CLI P4 AUDIT: V14.2 Sovereign Photon
 
 ## Audit Date: 2026-04-04
+
 ## Auditor: Claude Opus 4.6 (acting as Gemini P4 Engineer)
+
 ## Plan File: docs/brain/implementation_plan.md
+
 ## Verdict: REVISION REQUIRED
 
 ---
@@ -43,7 +46,7 @@
 
 On the consumer side, `PumpFleetDispatch` dequeues a `FleetDispatchSlot` and needs to call `acct.Submit(Order[])`. The comment says:
 
-```
+```text
 // Build Order[] from pool slot (already claimed in dispatch)
 // ... (process _ringSlot same as existing FleetDispatchRequest logic) ...
 ```
@@ -51,6 +54,7 @@ On the consumer side, `PumpFleetDispatch` dequeues a `FleetDispatchSlot` and nee
 This is underspecified. There is no mechanism to retrieve the `Order[]` from the slot. The existing `FleetDispatchRequest` struct HAS an `Order[] Orders` field. The new `FleetDispatchSlot` does NOT.
 
 **The plan must either:**
+
 - (a) Add an `Order[]` field (or `int PoolSlotIndex`) to `FleetDispatchSlot`, or
 - (b) Add an `Order[][] _photonSlotOrders` parallel array indexed by ring buffer position, or
 - (c) Use a separate `ConcurrentDictionary<string, Order[]>` keyed by FleetEntryName.
@@ -235,6 +239,7 @@ while (_photonDispatchRing != null && _photonDispatchRing.TryDequeue(out ringSlo
 All string literals in the plan use straight double quotes, ASCII dashes (`--`), ASCII arrows (`->`), and standard alphanumeric/punctuation characters. No emoji, curly quotes, em-dashes, or Unicode arrows detected.
 
 Specific verification:
+
 - `"[PHOTON] Pool exhausted -- fallback to heap alloc"` -- ASCII clean
 - `"[PHOTON] Ring full -- fallback to ConcurrentQueue"` -- ASCII clean
 - `"[PHOTON_CRC] INTEGRITY FAILURE on slot: expected=0x{0:X4} got=0x{1:X4} entry={2} -- SKIPPING"` -- ASCII clean
@@ -249,6 +254,7 @@ Grep of the full plan text confirms zero instances of `lock(`, `Monitor.Enter`, 
 #### Ghost-Order Prevention (Signed Delta Rollback): PASS WITH OBSERVATION
 
 The dispatch path preserves signed delta rollback:
+
 - `reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;` (unchanged)
 - `AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);` (unchanged)
 - Error path: `AddExpectedPositionDeltaLocked(req.ExpectedKey, -req.ReservedDelta);` (unchanged)
@@ -264,9 +270,11 @@ The plan does not modify `_followerReplaceSpecs` or the two-phase Replace FSM. T
 #### Build 981 Protocol (Direct stopOrders Writes): PASS
 
 The plan does not modify the dict registration block in ExecuteSmartDispatchEntry (lines 330-338):
+
 ```csharp
 stopOrders[fleetEntryName] = stop;  // Direct write, no enqueue
 ```
+
 This is preserved. **PASS.**
 
 ---
@@ -311,21 +319,21 @@ The plan inserts ring consumption BEFORE the ConcurrentQueue drain but AFTER the
 
 #### P1 -- Must Fix Before Merge
 
-4. **Add ring buffer drain to shutdown paths**: ProcessShutdownSIMA() and DrainQueuesForShutdown() must drain `_photonDispatchRing` with delta rollback, just as they drain `_pendingFleetDispatches`.
+1. **Add ring buffer drain to shutdown paths**: ProcessShutdownSIMA() and DrainQueuesForShutdown() must drain `_photonDispatchRing` with delta rollback, just as they drain `_pendingFleetDispatches`.
 
-5. **Add ring buffer drain to isFlattenRunning abort path** in PumpFleetDispatch (lines 48-59). Currently only drains the ConcurrentQueue.
+2. **Add ring buffer drain to isFlattenRunning abort path** in PumpFleetDispatch (lines 48-59). Currently only drains the ConcurrentQueue.
 
-6. **Fix undefined variable names in fallback dedup**: `cumulativeFilledQuantity` and `order` are not in scope in `ProcessOnExecutionUpdate`. Must use `execution.Order.Filled` (or `orderFilled` parameter) and `execution.Order`.
+3. **Fix undefined variable names in fallback dedup**: `cumulativeFilledQuantity` and `order` are not in scope in `ProcessOnExecutionUpdate`. Must use `execution.Order.Filled` (or `orderFilled` parameter) and `execution.Order`.
 
 #### P2 -- Should Fix
 
-7. **Document pool exhaustion as accepted degradation**: 3 concurrent signals with 12 accounts = 36 slots > 32 capacity. Fallback to heap allocation + ConcurrentQueue is the correct safety net, but this should be explicitly documented as a design decision, not a latent surprise.
+1. **Document pool exhaustion as accepted degradation**: 3 concurrent signals with 12 accounts = 36 slots > 32 capacity. Fallback to heap allocation + ConcurrentQueue is the correct safety net, but this should be explicitly documented as a design decision, not a latent surprise.
 
-8. **Consider increasing SPSC ring + pool to 64**: Power-of-2, supports 5 concurrent signals x 12 accounts (60 < 64). Minimal memory overhead (64 x ~120 bytes = 7.5KB).
+2. **Consider increasing SPSC ring + pool to 64**: Power-of-2, supports 5 concurrent signals x 12 accounts (60 < 64). Minimal memory overhead (64 x ~120 bytes = 7.5KB).
 
-9. **Remove or rename `crcValid` output parameter** from TryDequeue. It is always set to `true` and never used meaningfully.
+3. **Remove or rename `crcValid` output parameter** from TryDequeue. It is always set to `true` and never used meaningfully.
 
-10. **PhotonOrderPool.Release() O(n) scan**: Add a `PoolSlotIndex` to FleetDispatchSlot for O(1) release. Minor performance improvement.
+4. **PhotonOrderPool.Release() O(n) scan**: Add a `PoolSlotIndex` to FleetDispatchSlot for O(1) release. Minor performance improvement.
 
 ---
 

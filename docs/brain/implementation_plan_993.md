@@ -1,4 +1,5 @@
 # Build 993: Master Account Hydration & CANCEL_ALL Repair
+
 **Status**: PENDING ENGINEER EXECUTION
 **Author**: ARCHITECT (Claude / Sonnet 4.6)
 **Date**: 2026-03-16
@@ -19,7 +20,7 @@ Stop_/T_ bracket orders on the Master account (Sim101):
 
 ## Evidence From Live Test Logs
 
-```
+```text
 [SIMA HYDRATE] SimApexSim_02: Seeded expected=9 from broker (Long 9)
 -- Sim101/Master is MISSING (no fleet match)
 
@@ -45,6 +46,7 @@ even for master (when `targetAcct == this.Account`). CANCEL_ALL must match this.
 ## Changes
 
 ### Change 1: HydrateExpectedPositionsFromBroker -- Add Master
+
 **File**: `src/V12_002.SIMA.Lifecycle.cs`
 **Location**: After the closing `}` of the fleet loop (after line 193 -- after the
 `if (hydratedCount > 0)` block), before the closing `}` of the method.
@@ -83,6 +85,7 @@ if (!masterIsFleet993)
 ```
 
 ### Change 2: HydrateWorkingOrdersFromBroker -- Add Master Bracket Adoption
+
 **File**: `src/V12_002.SIMA.Lifecycle.cs`
 **Location**: After the fleet loop's closing `}` (after line 324 -- after the fleet catch block),
 BEFORE the call to `HydrateFSMsFromWorkingOrders()`.
@@ -146,16 +149,19 @@ if (!masterIsFleetForOrders993)
 follower FSM path. Order adoption only.
 
 ### Change 3: CANCEL_ALL Master Loop -- Use Account.Cancel (match REAPER pattern)
+
 **File**: `src/V12_002.UI.IPC.Commands.Fleet.cs`
 **Location**: Line 122 -- the `CancelOrder(order);` inside the master loop.
 
 **Old**:
+
 ```csharp
 CancelOrder(order);
 cancelled++;
 ```
 
 **New**:
+
 ```csharp
 // Build 993: Use Account.Cancel() -- CancelOrder() cannot cancel orders from previous strategy instance.
 // Mirrors ProcessReaperFlattenQueue() which uses targetAcct.Cancel() for all accounts including master.
@@ -164,6 +170,7 @@ cancelled++;
 ```
 
 ### Change 4: BUILD_TAG = "993"
+
 **File**: `src/V12_002.cs`
 **Location**: Line 44
 
@@ -228,6 +235,7 @@ public const string BUILD_TAG = "993";  // V12.993: Phase 5.6 Master Account Hyd
 ## Safety Assessment
 
 **Preserved invariants**:
+
 - Semantic Separation (Build 990): SweepTrackedOrders(force=false) still skips brackets -- unchanged
 - FSM lifecycle: HydrateFSMsFromWorkingOrders() unchanged; master has no FSM (correct)
 - REAPER suppression: isFlattenRunning guard unchanged
@@ -235,6 +243,7 @@ public const string BUILD_TAG = "993";  // V12.993: Phase 5.6 Master Account Hyd
 - `lock(stateLock)`: Zero new usages
 
 **Risk surface**:
+
 - Change 1: Read-only position scan. Enqueue is safe for off-strategy-thread hydration call.
 - Change 2: Read-only order scan. Writes to ConcurrentDictionary (thread-safe).
 - Change 3: `Account.Cancel()` is the REAPER-proven API. Idempotent.
@@ -247,6 +256,7 @@ public const string BUILD_TAG = "993";  // V12.993: Phase 5.6 Master Account Hyd
 ## Live Validation Criteria
 
 After NT8 disable/re-enable with open position + brackets:
+
 1. Log MUST show: `[SIMA HYDRATE] Sim101 (Master): Seeded expected=N from broker`
 2. Log MUST show: `[SIMA HYDRATE] Sim101 (Master): Adopted Stop_X -> stopOrders[X]` (per bracket)
 3. REAPER log MUST show: `Expected=N, Actual=N` (no desync) or heartbeat flat

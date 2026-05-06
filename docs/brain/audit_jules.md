@@ -1,5 +1,7 @@
 # JULES P4 AUDIT: V14.2 Sovereign Photon
+
 ## Audit Date: 2026-04-04
+
 ## Verdict: REVISION REQUIRED
 
 ---
@@ -66,7 +68,8 @@ The consumer method at plan line 178 sets `crcValid = true` and comments "Caller
 **ISSUE 2.2a [HIGH]: `Claim()` has an ABA race on the free stack.**
 
 The `Claim()` method does:
-```
+
+```csharp
 int top = Interlocked.Decrement(ref _freeTop);
 int slotIndex = _freeStack[top];
 ```
@@ -119,7 +122,7 @@ The ConcurrentQueue fallback path prevents data loss, but it defeats the purpose
 
 **Severity**: HIGH. The plan's own "fleet scaling" analysis (lines 762-786) acknowledges 12 accounts but does not analyze burst scenarios. The claim "32 slots sufficient" is not rigorously justified.
 
-**Recommendation**: Increase ring capacity to 64 (next power of 2). This handles 5 concurrent signals for 12 accounts (5 * 11 = 55 < 64) with headroom. Pool capacity should match: 64 slots with 64 pre-allocated `Order[7]` arrays. Memory cost: 64 * 7 * 8 bytes (reference pointers) = 3.5 KB. Negligible.
+**Recommendation**: Increase ring capacity to 64 (next power of 2). This handles 5 concurrent signals for 12 accounts (5 *11 = 55 < 64) with headroom. Pool capacity should match: 64 slots with 64 pre-allocated `Order[7]` arrays. Memory cost: 64* 7 * 8 bytes (reference pointers) = 3.5 KB. Negligible.
 
 ---
 
@@ -164,17 +167,20 @@ With ring capacity 512 and table capacity 1024, the maximum load factor is 512/1
 **ISSUE 3.5a [MEDIUM]: Fallback dedup key format changed -- potential regression.**
 
 The existing fallback dedup (V12_002.Orders.Callbacks.Execution.cs, lines 218-221) constructs:
+
 ```csharp
 string dedupOrderIdentity = GetStableHash(uniqueOrderId);  // FNV-1a 32-bit, returns hex string
 string fallbackKey = string.Format("{0}|{1}", dedupOrderIdentity, dedupFilledQuantity);
 ```
 
 The plan's replacement (line 633) constructs:
+
 ```csharp
 string _fallbackKey = (order.OrderId ?? orderName) + "|" + cumulativeFilledQuantity;
 ```
 
 These produce DIFFERENT keys for the same execution event:
+
 - Old: `GetStableHash("exec-123") + "|" + 5` = `"A1B2C3D4|5"` (32-bit hex hash of OrderId, then filled qty)
 - New: `"exec-123" + "|" + 5` = `"exec-123|5"` (raw OrderId, then filled qty)
 
@@ -203,12 +209,14 @@ Additionally, the plan's fallback key uses `order.OrderId ?? orderName`. The exi
 The `FleetDispatchSlot` struct (plan lines 236-253) does NOT contain an `Order[]` field. The orders are claimed separately from `PhotonOrderPool` and populated in the dispatch loop (plan line 672-683). But the `FleetDispatchSlot` that is enqueued into the ring does NOT carry a reference to the `Order[]` array.
 
 The existing `PumpFleetDispatch` consumer (SIMA.Fleet.cs:101-134) requires `req.Orders` to:
+
 1. Call `req.Account.Submit(req.Orders)` at line 134
 2. Iterate `req.Orders` to populate `FollowerBracketFSM` fields (entry, stop, targets) at lines 101-131
 3. Register `ord.OrderId` for O(1) FSM lookup at lines 152-158
 
 The plan's consumer section (lines 724-756) says:
-```
+
+```text
 // Build Order[] from pool slot (already claimed in dispatch)
 // ... (process _ringSlot same as existing FleetDispatchRequest logic) ...
 ```
@@ -230,7 +238,8 @@ Option (a) is strongly recommended. The Orders field is already a managed refere
 **ISSUE 4.2a [HIGH]: Full consumer body is placeholder.**
 
 Plan lines 745-748:
-```
+
+```text
 // Valid slot -- submit to broker
 // Build Order[] from pool slot (already claimed in dispatch)
 // ... (process _ringSlot same as existing FleetDispatchRequest logic) ...
@@ -238,6 +247,7 @@ Plan lines 745-748:
 ```
 
 The existing PumpFleetDispatch consumer (SIMA.Fleet.cs:62-191) is 130 lines of critical logic:
+
 - Stale dispatch rejection via MetadataGuardTimestamp (line 69)
 - FSM creation with Entry/Stop/Target order assignment (lines 89-131)
 - `acct.Submit(req.Orders)` (line 134)
@@ -277,6 +287,7 @@ The existing PumpFleetDispatch abort path (SIMA.Fleet.cs:48-59) drains `_pending
 If a flatten is triggered while the ring has pending slots, those slots will never be consumed (the pump aborts before reaching the ring drain). The slots remain in the ring, occupying pool capacity. Worse: the `_pendingFleetDispatchCount` was incremented for each ring slot, but never decremented (the abort path only decrements for ConcurrentQueue items).
 
 **Action Required**: The abort-and-drain path must also drain the ring buffer:
+
 ```csharp
 FleetDispatchSlot abortSlot;
 ushort abortCrc;
@@ -311,6 +322,7 @@ If the strategy is terminated while the ring has pending slots, the ring's inter
 **ISSUE 4.6a [MEDIUM]: Dispatch code must prime the pump for ring path.**
 
 The existing dispatch code (SIMA.Dispatch.cs:485) primes the pump:
+
 ```csharp
 if (!_pendingFleetDispatches.IsEmpty)
     try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
@@ -319,6 +331,7 @@ if (!_pendingFleetDispatches.IsEmpty)
 With the ring buffer, the pump must also be primed when ring items are enqueued. The plan's dispatch code (line 702) enqueues to the ring but does NOT add a `TriggerCustomEvent` pump prime for the ring path. The existing pump prime only checks `_pendingFleetDispatches.IsEmpty`.
 
 **Action Required**: After the fleet loop, the pump prime condition must check BOTH the ring and the legacy queue:
+
 ```csharp
 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
     try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
@@ -343,10 +356,13 @@ Wait -- the plan shows the pump prime at plan line 753-754 inside the PumpFleetD
 ## Cross-Component Risks
 
 ### R1: Pool Slot Leak on Ring-Full Path (MEDIUM)
+
 Described in Issue 2.2c. When `_photonPool.Claim()` succeeds but `_photonDispatchRing.TryEnqueue()` fails, the pool slot is passed to the legacy `FleetDispatchRequest.Orders`. After PumpFleetDispatch processes the legacy request, the pool slot is NOT released (PumpFleetDispatch's existing code does not call `_photonPool.Release()`). The pool slowly leaks slots.
 
 ### R2: Dual-Path Consumer Complexity (MEDIUM)
+
 The consumer now has two paths: ring (zero-alloc) and ConcurrentQueue (legacy fallback). Both must maintain identical invariants:
+
 - MetadataGuardTimestamp stale check
 - FSM creation and order-to-FSM registration
 - DispatchSyncPending clear
@@ -359,7 +375,9 @@ The consumer now has two paths: ring (zero-alloc) and ConcurrentQueue (legacy fa
 Any divergence between the two paths creates a behavior asymmetry bug. The plan should specify a shared `ProcessFleetSlot()` helper to guarantee identical behavior.
 
 ### R3: Diagnostic Observability Gap (LOW)
+
 The plan adds `[PHOTON_HEALTH]` logging to the REAPER cycle. However, there is no logging for:
+
 - How many dispatches used the ring path vs fallback path per session
 - Whether pool exhaustion events correlate with ring-full events
 - Ring high-water-mark (maximum concurrent occupancy)
@@ -367,7 +385,9 @@ The plan adds `[PHOTON_HEALTH]` logging to the REAPER cycle. However, there is n
 These would be valuable for capacity tuning.
 
 ### R4: No Unit Test or Isolation Test Specified (LOW)
+
 The plan specifies only SIM tests (manual). No automated test for:
+
 - SPSCRing wraparound at capacity boundary
 - PhotonOrderPool claim/release cycle balance
 - ExecutionIdRing eviction correctness at boundary
@@ -387,29 +407,29 @@ These components are pure data structures with no NT8 dependency and could be un
 
 ### SHOULD FIX (High/Medium)
 
-3. **Increase ring + pool capacity from 32 to 64** -- protects against burst scenarios with 12 accounts. Memory cost is negligible (~7 KB total). (Issue 2.3a)
+1. **Increase ring + pool capacity from 32 to 64** -- protects against burst scenarios with 12 accounts. Memory cost is negligible (~7 KB total). (Issue 2.3a)
 
-4. **Add ring drain to PumpFleetDispatch abort path** -- prevents orphaned slots and leaked `_pendingFleetDispatchCount` during flatten. (Issue 4.4a)
+2. **Add ring drain to PumpFleetDispatch abort path** -- prevents orphaned slots and leaked `_pendingFleetDispatchCount` during flatten. (Issue 4.4a)
 
-5. **Add `_pendingFleetDispatchCount` decrement to ring consumer path** -- must be in a `finally` block. (Issue 4.3a)
+3. **Add `_pendingFleetDispatchCount` decrement to ring consumer path** -- must be in a `finally` block. (Issue 4.3a)
 
-6. **Fix pump prime to check both ring and legacy queue** -- both in the initial prime (after fleet loop in Dispatch.cs) and in the self-reschedule. (Issue 4.6a)
+4. **Fix pump prime to check both ring and legacy queue** -- both in the initial prime (after fleet loop in Dispatch.cs) and in the self-reschedule. (Issue 4.6a)
 
-7. **Add pool slot release to ring consumer success path** -- prevent pool leak. Currently only a comment placeholder. (Issue 2.2b)
+5. **Add pool slot release to ring consumer success path** -- prevent pool leak. Currently only a comment placeholder. (Issue 2.2b)
 
-8. **Handle pool-sourced Order[] in ring-full fallback** -- either release the pool slot immediately, or ensure the legacy consumer releases it after processing. (Issue 2.2c / R1)
+6. **Handle pool-sourced Order[] in ring-full fallback** -- either release the pool slot immediately, or ensure the legacy consumer releases it after processing. (Issue 2.2c / R1)
 
-9. **Document strategy-thread-only constraint on PhotonOrderPool** -- or add debug assertions. (Issue 2.2a)
+7. **Document strategy-thread-only constraint on PhotonOrderPool** -- or add debug assertions. (Issue 2.2a)
 
-10. **Verify fallback dedup replacement uses correct variable names** from the `ProcessOnExecutionUpdate` method signature. (Issue 3.5a)
+8. **Verify fallback dedup replacement uses correct variable names** from the `ProcessOnExecutionUpdate` method signature. (Issue 3.5a)
 
 ### NICE TO HAVE (Low)
 
-11. **Add `#pragma warning disable 0169`** for padding fields in SPSCRing. (Issue 1.1b)
+1. **Add `#pragma warning disable 0169`** for padding fields in SPSCRing. (Issue 1.1b)
 
-12. **Add ring drain to `DrainQueuesForShutdown()`** for clean termination. (Issue 4.5a)
+2. **Add ring drain to `DrainQueuesForShutdown()`** for clean termination. (Issue 4.5a)
 
-13. **Add ring/pool path-split diagnostics** (ring-hits vs fallback-hits counter). (R3)
+3. **Add ring/pool path-split diagnostics** (ring-hits vs fallback-hits counter). (R3)
 
 ---
 
@@ -443,6 +463,7 @@ These components are pure data structures with no NT8 dependency and could be un
 ## Verdict Rationale
 
 **REVISION REQUIRED** due to:
+
 1. One BLOCKER (FleetDispatchSlot missing Order[] field -- consumer cannot compile or function)
 2. One HIGH gap (consumer body is a placeholder, not implementable specification)
 3. One HIGH capacity concern (32-slot ring insufficient for 12-account burst)

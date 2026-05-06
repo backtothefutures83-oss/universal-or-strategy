@@ -11,6 +11,7 @@
 ## Phase 6 Closure (For Record)
 
 Build 1002 Phase 6 sign-off confirmed by P5 Architect (Claude):
+
 - C7 stale hydrated FSM auto-termination: LIVE, ghost FSMs closing correctly
 - MetadataGuard G3 (IPC) + G4 (REAPER) gating: ACTIVE via deploy-sync.ps1
 - No lock(stateLock) in new paths: CONFIRMED
@@ -26,6 +27,7 @@ IPC commands carry NO sender-side UTC timestamp. G3 duplicate protection covers 
 commands (FLATTEN, CANCEL_ALL) using coarse minute-granularity server-side time binning.
 
 Phase 7 closes these three gaps:
+
 1. Introduce optional `ts=<UTC_TICKS>` field in the IPC command protocol (sender side)
 2. Wire G1 universally at the strategy-thread parse boundary (pre-routing, all commands)
 3. Extend G3 deduplication to all 8 entry commands with sub-minute resolution
@@ -45,6 +47,7 @@ Phase 7 closes these three gaps:
 | BUILD_TAG still "1002" | `src/V12_002.cs` | Line 44 | P0 |
 
 **Existing assets to reuse (no new logic):**
+
 - `MetadataGuardTimestamp(long eventTicks, string context)` -- `V12_002.MetadataGuard.cs` line 17
   - Threshold: 5000ms, fail-open on exception, handles `eventTicks <= 0` (returns true)
   - **DO NOT MODIFY this function**
@@ -102,6 +105,7 @@ private bool MetadataGuardCommandTimestamp(long senderTicks, string context)
 ```
 
 **Invariants:**
+
 - `MetadataGuardTimestamp` is UNCHANGED -- this is a thin wrapper only
 - Fail-open when `senderTicks == 0` (backward compat for senders without ts= field)
 - Fail-open on exception (catch block returns true)
@@ -114,11 +118,13 @@ private bool MetadataGuardCommandTimestamp(long senderTicks, string context)
 **Step 1: Extract senderTicks in ProcessIpcCommands()**
 
 In `ProcessIpcCommands()`, locate the line that splits parts:
+
 ```csharp
 string[] parts = command.Split('|');
 ```
 
 Immediately after, before the allowlist check, add:
+
 ```csharp
 // Build 1003: Extract optional sender UTC ticks for G1 command-age validation
 long senderTicks = 0;
@@ -139,6 +145,7 @@ if (!MetadataGuardCommandTimestamp(senderTicks, parts[0]))
 **Step 2: Thread senderTicks through ProcessIpcCommandCore()**
 
 Change the signature of `ProcessIpcCommandCore()` to accept `senderTicks`:
+
 ```csharp
 // BEFORE:
 private void ProcessIpcCommandCore(string command, string[] parts)
@@ -166,6 +173,7 @@ private bool TryHandleFleetCommand(string command, string[] parts, long senderTi
 **Step 2: Upgrade cmdId seed (C4)**
 
 Locate the existing cmdId line (currently line ~80):
+
 ```csharp
 // BEFORE:
 string cmdId = action + "|" + (DateTime.UtcNow.Ticks / TimeSpan.TicksPerMinute).ToString();
@@ -180,6 +188,7 @@ string cmdId = senderTicks > 0
 **Step 3: Extend G3 to entry commands (C3)**
 
 The existing pattern for FLATTEN (line ~81) is:
+
 ```csharp
 if (!MetadataGuardDuplicate(cmdId, action)) return true;
 ```
@@ -204,7 +213,7 @@ immediately before the dispatch call:
 
 Sender-side format upgrade (backward-compatible):
 
-```
+```text
 // Legacy (still accepted, G1 fail-open):
 FLATTEN|
 LONG|ES|1.5|2.0
@@ -215,6 +224,7 @@ LONG|ES|1.5|2.0|ts=638765432100000000
 ```
 
 **Sender implementation pattern:**
+
 ```python
 # Python sender example
 import time

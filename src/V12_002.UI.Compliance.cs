@@ -1,3 +1,6 @@
+// <copyright file="V12_002.UI.Compliance.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.44 MODULAR: Apex Compliance Hub Module (Split from UI.cs)
 // Contains: Compliance tracking, daily summaries, account metrics, performance logging
 using System;
@@ -287,12 +290,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         }
 
-        // [BUILD 948] Cap per-invocation drain to prevent strategy-thread starvation during broker replay bursts.
+        // [BUILD 984] Cap per-invocation drain to prevent strategy-thread starvation during broker replay bursts.
         private const int MaxAccountExecutionsPerDrain = 16;
 
         /// <summary>
         /// V12.Phase6 [CONCURRENCY-01]: Processes queued account execution events on the STRATEGY THREAD.
-        /// [BUILD 948] Drain is capped at MaxAccountExecutionsPerDrain per invocation; remaining items
+        /// [BUILD 984] Drain is capped at MaxAccountExecutionsPerDrain per invocation; remaining items
         /// are rescheduled via TriggerCustomEvent to yield the strategy thread between bursts.
         /// </summary>
         private void ProcessAccountExecutionQueue()
@@ -319,7 +322,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ProcessQueuedExecution(item);
             }
 
-            // [BUILD 948] Reschedule if items remain after hitting the drain cap
+            // [BUILD 984] Reschedule if items remain after hitting the drain cap
             if (!_accountExecutionQueue.IsEmpty)
                 try { TriggerCustomEvent(o => ProcessAccountExecutionQueue(), null); } catch { }
 

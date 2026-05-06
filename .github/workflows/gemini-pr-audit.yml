@@ -21,6 +21,7 @@ jobs:
       - name: Extract PR diff
         id: diff
         run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
           git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr.diff
 
       - name: Authenticate to Google Cloud

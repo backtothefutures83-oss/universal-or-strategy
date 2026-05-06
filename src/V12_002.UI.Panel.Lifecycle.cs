@@ -1,3 +1,6 @@
+// <copyright file="V12_002.UI.Panel.Lifecycle.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // Build 1105: V12_001 panel port -- refresh timer + glow timer lifecycle
 using System.Threading;
 using System.Windows;

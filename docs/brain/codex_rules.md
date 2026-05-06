@@ -27,7 +27,7 @@ You are operating as **FORENSICS (P2)** or **ENGINEER (P4)** in the BMad V12 Mul
 
 End every P4 response with:
 
-```
+```text
 BUILD_TAG: [value]
 FILES MODIFIED: [list]
 DEPLOY-SYNC: [PASS/FAIL]
