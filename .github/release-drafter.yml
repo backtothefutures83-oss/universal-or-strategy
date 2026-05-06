@@ -1,0 +1,23 @@
+name-template: 'Build $NEXT_PATCH_VERSION'
+tag-template: 'v$NEXT_PATCH_VERSION'
+categories:
+  - title: '🛡️ Security & Hardening'
+    labels:
+      - 'security'
+      - 'hardening'
+  - title: '🔍 Forensics & Audits'
+    labels:
+      - 'forensics'
+      - 'audit'
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+  - title: '🚀 Core Updates'
+    labels:
+      - 'core'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'bug'
+template: |
+  ## Changes
+  $CHANGES

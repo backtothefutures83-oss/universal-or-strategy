@@ -489,3 +489,40 @@ is already established. Execution Engine second because it has the most cross-fi
 
 *Plan authored by: P3 ARCHITECT (Antigravity in PLAN-ONLY mode)*
 *Protocol: V14 Alpha | Build-984 | 2026-05-05*
+
+---
+
+## P3-CI: Workflow Hardening Suite (Build 984.1)
+
+**Status**: IMPLEMENTED | **Branch**: build-984-hardening
+
+Installed and configured 6 core GitHub Actions workflows to satisfy CI/CD security and repository hygiene requirements.
+
+### 1. Dependency Review (`dependency-review.yml`)
+- **Function**: Blocks PRs that introduce vulnerable dependencies or invalid licenses.
+- **Trigger**: `pull_request`
+
+### 2. OSV-Scanner (`osv-scanner.yml`)
+- **Function**: Scans project dependencies against Google's OSV vulnerability database.
+- **Trigger**: `push` to main/dev, `pull_request`, `schedule` (weekly).
+
+### 3. Codecov Reporting (`codecov.yml`)
+- **Function**: Uploads coverage reports to Codecov.io for visual PR feedback.
+- **Trigger**: `workflow_run` (after `dotnet-test.yml` completes).
+- **Target**: `./TestResults/coverage.opencover.xml`
+
+### 4. Markdown Link Check (`markdown-link-check.yml`)
+- **Function**: Validates internal and external links in `.md` files.
+- **Config**: `.github/mlc_config.json` (ignores local `file:///` artifacts).
+- **Trigger**: `push`, `pull_request`.
+
+### 5. Stale Bot (`stale.yml`)
+- **Function**: Automates management of inactive issues and PRs (60 days stale -> 7 days warning -> close).
+- **Trigger**: `schedule` (daily).
+
+### 6. Release Drafter (`release-drafter.yml`)
+- **Function**: Drafts release notes based on PR labels (mapped to V12 labels: `fix`, `enhancement`, `docs`, `maintenance`).
+- **Config**: `.github/release-drafter.yml`.
+- **Trigger**: `push` to main.
+
+---
