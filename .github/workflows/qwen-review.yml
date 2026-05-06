@@ -20,3 +20,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           QWEN_TOKEN: ${{ secrets.QWEN_TOKEN }}
+        with:
+          model: qwen-3.6-max

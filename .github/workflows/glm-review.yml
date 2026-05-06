@@ -1,0 +1,34 @@
+name: GLM OpenCode Review
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+      - build-984-hardening
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+        
+      - name: GLM PR Review via OpenCode
+        uses: anomalyco/opencode/github@latest
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZHIPUAI_API_KEY: ${{ secrets.GLM_API_KEY }}
+        with:
+          model: zhipuai/glm-5.1
+          use_github_token: true
+          prompt: |
+            Review this pull request focusing on C# logic, NinjaTrader conventions, and high-performance practices.
