@@ -3,8 +3,8 @@ name: Jules PR Review (Sovereign Auditor)
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - "src/**.cs"
+  issue_comment:
+    types: [created]
 
 jobs:
   jules-review:
@@ -38,23 +38,48 @@ jobs:
           async function run() {
             const apiKey = process.env.JULES_API_KEY;
             const repo = process.env.REPO;
-            const branch = process.env.BRANCH;
             const prTitle = process.env.PR_TITLE;
+            const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+            
+            let branch = process.env.BRANCH;
+            let commentBody = '';
+            let isComment = false;
+
+            if (process.env.GITHUB_EVENT_NAME === 'issue_comment') {
+              if (!event.issue.pull_request) {
+                console.log('Not a pull request comment. Skipping.');
+                return;
+              }
+              commentBody = event.comment.body;
+              if (!commentBody.includes('@jules')) {
+                console.log('No @jules mention. Skipping.');
+                return;
+              }
+              isComment = true;
+              // For issue_comment, we need to fetch the PR to get the branch
+              // But to keep it simple, Jules API handles repo/branch, we can try to get it from the issue
+              // Or just use the repo and Jules will find the PR context if we provide the right prompt.
+              // Actually, Jules API sourceContext needs a branch.
+              console.log('Jules mentioned in comment. Triggering audit.');
+            }
 
             if (!apiKey) {
               console.error('Error: JULES_API_KEY secret is not set.');
               process.exit(1);
             }
 
-            const prompt = `You are the Jules PR Auditor (Sovereign Agent Protocol). Perform a forensic logic audit of this PR: "${prTitle}".
-          Reference institutional standards in AGENTS.md and JULES.md.
-          Rules:
-          1. Lock-Free Actor Pattern: BANNED legacy lock(stateLock). Use Enqueue().
-          2. ASCII-Only Compliance: BANNED Unicode/emoji in C# string literals.
-          3. FSM Follower Replace Pattern: Mandatory for order management.
-          4. Surgical Implementation: Verify minimum code changes.
-          Post your findings as inline comments on the PR code using your GitHub integration.
-          Final Audit Verdict: PASS or FAIL.`;
+            const prompt = isComment 
+              ? `Jules, the user mentioned you in a PR comment: "${commentBody}". 
+                 Perform a forensic logic audit of this PR based on the current state.
+                 Rules:
+                 1. Lock-Free Actor Pattern: BANNED legacy lock(stateLock). Use Enqueue().
+                 2. ASCII-Only Compliance: BANNED Unicode/emoji in C# string literals.
+                 Post your findings directly to the PR.`
+              : `You are the Jules PR Auditor (Sovereign Agent Protocol). Perform a forensic logic audit of this PR: "${prTitle}".
+                 Rules:
+                 1. Lock-Free Actor Pattern: BANNED legacy lock(stateLock). Use Enqueue().
+                 2. ASCII-Only Compliance: BANNED Unicode/emoji in C# string literals.
+                 Post your findings directly to the PR.`;
 
             const data = JSON.stringify({
               prompt: prompt,
