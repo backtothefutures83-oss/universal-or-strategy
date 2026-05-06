@@ -526,3 +526,17 @@ Installed and configured 6 core GitHub Actions workflows to satisfy CI/CD securi
 - **Trigger**: `push` to main.
 
 ---
+
+## PR Intelligence Suite
+
+**Status**: COMPLETE | **Branch**: build-984-hardening
+
+### 1. Qwen PR Reviewer (`qwen-review.yml`)
+- **Function**: Automated code review and issue management via QwenLM.
+- **Trigger**: `pull_request` on `[main, dev, build-984-hardening]`.
+
+### 2. GLM OpenCode Reviewer (`glm-review.yml`)
+- **Function**: Automated code review via GLM OpenCode.
+- **Trigger**: `pull_request` on `[main, dev, build-984-hardening]`.
+
+---

@@ -11,7 +11,7 @@
   "agent_readiness_target": "LEVEL_5",
   "phase": "P3",
   "current_phase": "B984_P3_WORKFLOW_HARDENING",
-  "status": "WORKFLOW_SUITE_INSTALLED_AWAITING_PR",
+  "status": "PR_INTELLIGENCE_SUITE_EXTENDED_QWEN_GLM_PRAGENT",
   "agents": {
     "P1_orchestrator": "Antigravity",
     "P2_forensics": "Codex",
@@ -95,6 +95,18 @@
       "status": "COMPLETE",
       "timestamp": "2026-05-06T03:30:00Z",
       "details": "Installed and configured 6-pillar CI suite: Dependency Review, OSV-Scanner, Codecov, MLC, Stale, Release Drafter. Secrets configured."
+    },
+    {
+      "phase": "B984_P3_PR_INTELLIGENCE_SUITE",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-06T17:38:00Z",
+      "details": "Installed Qwen Code Review, GLM OpenCode Review, and CodiumAI PR-Agent with V12 DNA (.pr_agent.toml)."
+    },
+    {
+      "phase": "B984_P7_SENTINEL_MERGE",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-06T17:53:00Z",
+      "details": "PR #80 Admin Merged into main. Redundant Jules PRs closed. Branch cleanup complete."
     }
   ],
   "current_blockers": [],
