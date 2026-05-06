@@ -7,6 +7,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Links
-        uses: JustinBeckwith/link-check@v1.0.10
+        uses: JustinBeckwith/linkinator-action@v1
         with:
-          configFile: '.github/mlc_config.json'
+          config: '.github/mlc_config.json'
