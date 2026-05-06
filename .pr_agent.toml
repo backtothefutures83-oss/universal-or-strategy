@@ -1,0 +1,13 @@
+[pr_reviewer]
+extra_instructions = """
+STRICT RULE: C# string literals must be ASCII-only. Flag any Unicode, emojis, or curly quotes.
+STRICT RULE: The `lock(stateLock)` pattern is BANNED. Ensure all state mutations use the Enqueue/FSM model.
+STRICT RULE: Verify that any order replacement uses the two-phase Replace FSM pattern.
+"""
+
+[pr_code_suggestions]
+extra_instructions = """
+STRICT RULE: C# string literals must be ASCII-only. Flag any Unicode, emojis, or curly quotes.
+STRICT RULE: The `lock(stateLock)` pattern is BANNED. Ensure all state mutations use the Enqueue/FSM model.
+STRICT RULE: Verify that any order replacement uses the two-phase Replace FSM pattern.
+"""
