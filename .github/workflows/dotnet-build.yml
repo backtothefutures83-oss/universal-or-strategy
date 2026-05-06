@@ -29,12 +29,19 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore dependencies (if .csproj present)
+      - name: Restore dependencies
         run: |
-          if (Test-Path "*.csproj") {
-            dotnet restore --nologo
+          if (Test-Path "Linting.csproj") {
+            dotnet restore Linting.csproj --nologo
           } else {
-            Write-Host "No .csproj found -- skipping restore (NinjaScript partial-class project)."
+            Write-Host "Linting.csproj not found -- skipping restore."
+          }
+        shell: pwsh
+
+      - name: Build and Compile Check
+        run: |
+          if (Test-Path "Linting.csproj") {
+            dotnet build Linting.csproj --no-restore --nologo
           }
         shell: pwsh
 
