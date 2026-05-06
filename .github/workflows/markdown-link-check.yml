@@ -1,0 +1,22 @@
+name: Markdown Link Check
+on: [push, pull_request]
+
+jobs:
+  markdown-link-check:
+    runs-on: ubuntu-latest
+    steps:
+<<<<<<< HEAD
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Check Links
+        uses: JustinBeckwith/linkinator-action@3d5ba091319fa7b0ac14703761eebb7d100e6f6d
+        with:
+          config: '.github/mlc_config.json'
+=======
+      - uses: actions/checkout@v4
+      - name: Check Links
+        uses: tcort/markdown-link-check@v3.12.0
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'yes'
+          config-file: '.github/mlc_config.json'
+>>>>>>> main

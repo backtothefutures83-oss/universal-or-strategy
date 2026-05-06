@@ -11,5 +11,6 @@
     "c:\\WSGTA\\universal-or-strategy\\.claude\\worktrees\\charming-archimedes\\universal-or-strategy.sln"
   ],
   "dotnet.defaultSolution": "universal-or-strategy.sln",
-  "snyk.advanced.autoSelectOrganization": true
+  "snyk.advanced.autoSelectOrganization": true,
+  "snyk.advanced.organization": "2d20166f-7a49-4af7-9b5f-55339f300d72"
 }
