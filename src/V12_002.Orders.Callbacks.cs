@@ -369,57 +369,74 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Stop replacement check
             if (orderName.StartsWith("Stop_") || orderName.StartsWith("S_"))
             {
-                foreach (var kvp in pendingStopReplacements.ToArray())
-                {
-                    if ((kvp.Value.OldOrder == order
-                        || (kvp.Value.OldOrder != null && kvp.Value.OldOrder.OrderId == order.OrderId))
-                        && activePositions.TryGetValue(kvp.Key, out var pos))
-                    {
-                        // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
-                        int _stopQty;
-                        _stopQty = pos.RemainingContracts;
-                        if (_stopQty > 0)
-                        {
-                            CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
-                            // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
-                            if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
-                            {
-                                TargetSnapshot[] _mSnap = kvp.Value.CapturedTargets;
-                                string _mKey = kvp.Key;
-                                TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
-                            }
-                        }
-                        if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
-                        handled = true;
-                        break;
-                    }
-                }
-
-                // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
-                // If no pendingStopReplacement matched, check if this stop cancel completes a
-                // final-target/trim close where activePositions was intentionally kept alive.
+                handled = HandleOrderCancelled_ProcessStopReplacement(order);
                 if (!handled)
+                    HandleOrderCancelled_PurgePendingCleanup(order);
+            }
+
+            if (!handled && HandleOrderCancelled_RollbackUnfilledEntry(order))
+                return true;
+
+            RemoveGhostOrderRef(order, "CANCELLED");
+            return true;
+        }
+
+        private bool HandleOrderCancelled_ProcessStopReplacement(Order order)
+        {
+            foreach (var kvp in pendingStopReplacements.ToArray())
+            {
+                if ((kvp.Value.OldOrder == order
+                    || (kvp.Value.OldOrder != null && kvp.Value.OldOrder.OrderId == order.OrderId))
+                    && activePositions.TryGetValue(kvp.Key, out var pos))
                 {
-                    foreach (var kvp in stopOrders.ToArray())
+                    // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
+                    int _stopQty;
+                    _stopQty = pos.RemainingContracts;
+                    if (_stopQty > 0)
                     {
-                        if (kvp.Value == order)
+                        CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
+                        // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
+                        if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
                         {
-                            PositionInfo cleanupPos;
-                            if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
-                                && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
-                            {
-                                stopOrders.TryRemove(kvp.Key, out _);
-                                activePositions.TryRemove(kvp.Key, out _);
-                                SymmetryGuardForgetEntry(kvp.Key);
-                                Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
-                            }
-                            break;
+                            TargetSnapshot[] _mSnap = kvp.Value.CapturedTargets;
+                            string _mKey = kvp.Key;
+                            TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
                         }
                     }
+                    if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                    return true;
                 }
             }
 
-            if (!handled && entryOrders.Values.Contains(order))
+            return false;
+        }
+
+        private void HandleOrderCancelled_PurgePendingCleanup(Order order)
+        {
+            // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
+            // If no pendingStopReplacement matched, check if this stop cancel completes a
+            // final-target/trim close where activePositions was intentionally kept alive.
+            foreach (var kvp in stopOrders.ToArray())
+            {
+                if (kvp.Value == order)
+                {
+                    PositionInfo cleanupPos;
+                    if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
+                        && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
+                    {
+                        stopOrders.TryRemove(kvp.Key, out _);
+                        activePositions.TryRemove(kvp.Key, out _);
+                        SymmetryGuardForgetEntry(kvp.Key);
+                        Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
+                    }
+                    break;
+                }
+            }
+        }
+
+        private bool HandleOrderCancelled_RollbackUnfilledEntry(Order order)
+        {
+            if (entryOrders.Values.Contains(order))
             {
                 foreach (var kvp in activePositions.ToArray())
                 {
@@ -433,8 +450,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            RemoveGhostOrderRef(order, "CANCELLED");
-            return true;
+            return false;
         }
 
         private bool HandleOrderPriceOrQuantityChanged(Order order, double limitPrice, double stopPrice, int quantity)
