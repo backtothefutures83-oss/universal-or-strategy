@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Qwen PR Review
-        uses: QwenLM/qwen-code-issue-and-pr-automation@main
+        uses: QwenLM/qwen-code-action@main
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
