@@ -105,9 +105,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (kvp.Value == masterOrder &&
                             activePositions.TryGetValue(kvp.Key, out var mp) && !mp.IsFollower)
                         {
-                            masterEntryName = kvp.Key;
-                            isTargetMove = true;
-                            masterTargetNum = t;
+                            masterEntryName  = kvp.Key;
+                            isTargetMove     = true;
+                            masterTargetNum  = t;
                             break;
                         }
                     }
@@ -148,76 +148,76 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return ctx.Followers;
             }
 
-            // [BUILD 926 -- Codex P1 Fix]: Fallback type match now uses SignalName parsing.
-            //
-            // ROOT CAUSE: IsRMATrade=true is stamped on ALL fleet followers (ExecuteSmartDispatchEntry
-            // line 434) to enforce point-based trailing. Using IsRMATrade as a type discriminator
-            // caused OR followers to fail the !IsRMATrade predicate and be excluded from OR
-            // propagation, and incorrectly included in RMA propagation.
-            //
-            // FIX: Fleet entry names are stamped with the trade type at dispatch time:
-            //   Format: "Fleet_<AccountName>_<TRADETYPE>_<Index>"
-            //   Example: "Fleet_PA-APEX-422136-05_OR_0", "Fleet_APEX-09_RMA_1"
-            //
-            // [BUILD 927 -- Codex P2 Fix]: Do NOT use Contains("_TYPE_") -- if an account name
-            // itself contains a trade-type substring (e.g. _RMA_, _OR_), Contains() misclassifies
-            // the follower by matching the account name token instead of the TRADETYPE segment.
-            //
-            // SAFE APPROACH: Extract TRADETYPE by segment position.
-            // TRADETYPE is always the second-to-last underscore-delimited segment:
-            //   lastUnderscore      = before the numeric Index
-            //   secondLastUnderscore = before the TRADETYPE token
-            // Example: "Fleet_SimApexSim_02_OR_0"
-            //   lastUs  -> before "0"    -> remaining = "Fleet_SimApexSim_02_OR"
-            //   typeUs  -> before "OR"   -> extracted = "OR"  ?
-            var fallback = new List<string>();
-            foreach (var kvp in activePositions)
-            {
-                if (!kvp.Value.IsFollower || kvp.Value.ExecutingAccount == null) continue;
-                if (masterTradeType == null)
+                // [BUILD 926 -- Codex P1 Fix]: Fallback type match now uses SignalName parsing.
+                //
+                // ROOT CAUSE: IsRMATrade=true is stamped on ALL fleet followers (ExecuteSmartDispatchEntry
+                // line 434) to enforce point-based trailing. Using IsRMATrade as a type discriminator
+                // caused OR followers to fail the !IsRMATrade predicate and be excluded from OR
+                // propagation, and incorrectly included in RMA propagation.
+                //
+                // FIX: Fleet entry names are stamped with the trade type at dispatch time:
+                //   Format: "Fleet_<AccountName>_<TRADETYPE>_<Index>"
+                //   Example: "Fleet_PA-APEX-422136-05_OR_0", "Fleet_APEX-09_RMA_1"
+                //
+                // [BUILD 927 -- Codex P2 Fix]: Do NOT use Contains("_TYPE_") -- if an account name
+                // itself contains a trade-type substring (e.g. _RMA_, _OR_), Contains() misclassifies
+                // the follower by matching the account name token instead of the TRADETYPE segment.
+                //
+                // SAFE APPROACH: Extract TRADETYPE by segment position.
+                // TRADETYPE is always the second-to-last underscore-delimited segment:
+                //   lastUnderscore      = before the numeric Index
+                //   secondLastUnderscore = before the TRADETYPE token
+                // Example: "Fleet_SimApexSim_02_OR_0"
+                //   lastUs  -> before "0"    -> remaining = "Fleet_SimApexSim_02_OR"
+                //   typeUs  -> before "OR"   -> extracted = "OR"  ?
+                var fallback = new List<string>();
+                foreach (var kvp in activePositions)
                 {
-                    fallback.Add(kvp.Key);
-                    continue;
-                }
-
-                // --- Segment-position extraction ---
-                string sig = kvp.Value.SignalName ?? kvp.Key;
-                string followerType = null;
-                int lastUs = sig.LastIndexOf('_');
-                if (lastUs > 0)
-                {
-                    int typeUs = sig.LastIndexOf('_', lastUs - 1);
-                    if (typeUs >= 0)
+                    if (!kvp.Value.IsFollower || kvp.Value.ExecutingAccount == null) continue;
+                    if (masterTradeType == null)
                     {
-                        string extracted = sig.Substring(typeUs + 1, lastUs - typeUs - 1);
-                        // Validate against known set -- rejects garbage from unusual account names
-                        if (extracted == "OR"     || extracted == "RMA"  ||
-                            extracted == "TREND"  || extracted == "RETEST" ||
-                            extracted == "MOMO"   || extracted == "FFMA"  ||
-                            // Build 930 Fix P2: Suffix-marker support -- FFMA_MNL, FFMA_MNL_MKT, OR_RETEST etc.
-                            extracted.StartsWith("FFMA_") || extracted.StartsWith("MOMO_") ||
-                            extracted.StartsWith("OR_")   || extracted.StartsWith("RMA_")  ||
-                            extracted.StartsWith("TREND_") || extracted.StartsWith("RETEST_"))
-                            followerType = extracted.Split('_')[0]; // normalize to base type
+                        fallback.Add(kvp.Key);
+                        continue;
                     }
-                }
 
-                // Fallback: segment parsing failed -- use boolean flags (RMA/OR ambiguity defaults to RMA)
-                if (followerType == null)
-                {
-                    if      (kvp.Value.IsTRENDTrade)  followerType = "TREND";
-                    else if (kvp.Value.IsRetestTrade)  followerType = "RETEST";
-                    else if (kvp.Value.IsMOMOTrade)    followerType = "MOMO";
-                    else if (kvp.Value.IsFFMATrade)    followerType = "FFMA";
-                    else                               followerType = "RMA";
-                }
+                    // --- Segment-position extraction ---
+                    string sig = kvp.Value.SignalName ?? kvp.Key;
+                    string followerType = null;
+                    int lastUs = sig.LastIndexOf('_');
+                    if (lastUs > 0)
+                    {
+                        int typeUs = sig.LastIndexOf('_', lastUs - 1);
+                        if (typeUs >= 0)
+                        {
+                            string extracted = sig.Substring(typeUs + 1, lastUs - typeUs - 1);
+                            // Validate against known set -- rejects garbage from unusual account names
+                            if (extracted == "OR"     || extracted == "RMA"  ||
+                                extracted == "TREND"  || extracted == "RETEST" ||
+                                extracted == "MOMO"   || extracted == "FFMA"  ||
+                                // Build 930 Fix P2: Suffix-marker support -- FFMA_MNL, FFMA_MNL_MKT, OR_RETEST etc.
+                                extracted.StartsWith("FFMA_") || extracted.StartsWith("MOMO_") ||
+                                extracted.StartsWith("OR_")   || extracted.StartsWith("RMA_")  ||
+                                extracted.StartsWith("TREND_") || extracted.StartsWith("RETEST_"))
+                                followerType = extracted.Split('_')[0]; // normalize to base type
+                        }
+                    }
 
-                if (followerType == masterTradeType)
-                    fallback.Add(kvp.Key);
-            }
+                    // Fallback: segment parsing failed -- use boolean flags (RMA/OR ambiguity defaults to RMA)
+                    if (followerType == null)
+                    {
+                        if      (kvp.Value.IsTRENDTrade)  followerType = "TREND";
+                        else if (kvp.Value.IsRetestTrade)  followerType = "RETEST";
+                        else if (kvp.Value.IsMOMOTrade)    followerType = "MOMO";
+                        else if (kvp.Value.IsFFMATrade)    followerType = "FFMA";
+                        else                               followerType = "RMA";
+                    }
+
+                    if (followerType == masterTradeType)
+                        fallback.Add(kvp.Key);
+                }
 
             return fallback;
-        }
+            }
 
         private void PropagateMaster_ApplyFollowerMove(IEnumerable<string> followerEntryNames, bool isEntryMove, bool isStopMove, bool isTargetMove, int masterTargetNum, double newLimit, double newStop, int newMasterQty)
         {

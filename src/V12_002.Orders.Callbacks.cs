@@ -382,57 +382,57 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         private bool HandleOrderCancelled_ProcessStopReplacement(Order order)
-        {
-            foreach (var kvp in pendingStopReplacements.ToArray())
             {
-                if ((kvp.Value.OldOrder == order
-                    || (kvp.Value.OldOrder != null && kvp.Value.OldOrder.OrderId == order.OrderId))
-                    && activePositions.TryGetValue(kvp.Key, out var pos))
+                foreach (var kvp in pendingStopReplacements.ToArray())
                 {
-                    // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
-                    int _stopQty;
-                    _stopQty = pos.RemainingContracts;
-                    if (_stopQty > 0)
+                    if ((kvp.Value.OldOrder == order
+                        || (kvp.Value.OldOrder != null && kvp.Value.OldOrder.OrderId == order.OrderId))
+                        && activePositions.TryGetValue(kvp.Key, out var pos))
                     {
-                        CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
-                        // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
-                        if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
+                        // Build 955: Snapshot qty under stateLock -- single atomic read for both check and use.
+                        int _stopQty;
+                        _stopQty = pos.RemainingContracts;
+                        if (_stopQty > 0)
                         {
-                            TargetSnapshot[] _mSnap = kvp.Value.CapturedTargets;
-                            string _mKey = kvp.Key;
-                            TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
+                            CreateNewStopOrder(kvp.Key, _stopQty, kvp.Value.StopPrice, kvp.Value.Direction);
+                            // Build 950: Restore OCO-cascade-cancelled targets after stop replacement.
+                            if (kvp.Value.BracketRestorationNeeded && kvp.Value.CapturedTargets != null)
+                            {
+                                TargetSnapshot[] _mSnap = kvp.Value.CapturedTargets;
+                                string _mKey = kvp.Key;
+                                TriggerCustomEvent(o => RestoreCascadedTargets(_mKey, _mSnap), null);
+                            }
                         }
-                    }
-                    if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+                        if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
                     return true;
+                    }
                 }
-            }
 
             return false;
         }
 
         private void HandleOrderCancelled_PurgePendingCleanup(Order order)
         {
-            // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
-            // If no pendingStopReplacement matched, check if this stop cancel completes a
-            // final-target/trim close where activePositions was intentionally kept alive.
-            foreach (var kvp in stopOrders.ToArray())
-            {
-                if (kvp.Value == order)
-                {
-                    PositionInfo cleanupPos;
-                    if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
-                        && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
+                // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
+                // If no pendingStopReplacement matched, check if this stop cancel completes a
+                // final-target/trim close where activePositions was intentionally kept alive.
+                    foreach (var kvp in stopOrders.ToArray())
                     {
-                        stopOrders.TryRemove(kvp.Key, out _);
-                        activePositions.TryRemove(kvp.Key, out _);
-                        SymmetryGuardForgetEntry(kvp.Key);
-                        Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
+                        if (kvp.Value == order)
+                        {
+                            PositionInfo cleanupPos;
+                            if (activePositions.TryGetValue(kvp.Key, out cleanupPos) && cleanupPos != null
+                                && cleanupPos.PendingCleanup && cleanupPos.RemainingContracts <= 0)
+                            {
+                                stopOrders.TryRemove(kvp.Key, out _);
+                                activePositions.TryRemove(kvp.Key, out _);
+                                SymmetryGuardForgetEntry(kvp.Key);
+                                Print("[A2-2] Deferred PendingCleanup purge (master stop cancel): " + kvp.Key);
+                            }
+                            break;
+                        }
                     }
-                    break;
-                }
             }
-        }
 
         private bool HandleOrderCancelled_RollbackUnfilledEntry(Order order)
         {
