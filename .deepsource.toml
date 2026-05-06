@@ -4,3 +4,4 @@ enabled = true
 
 [analyzers.meta]
 lang_version = "8.0"
+# Note: DeepSource may report partial results on hosted CI due to missing NinjaTrader assemblies.

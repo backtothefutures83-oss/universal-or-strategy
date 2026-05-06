@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Properties.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -403,6 +406,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Exhaustion Cancel Enabled", Description = "Cancel orders after RmaMaxProbeCount probes without fill.", GroupName = "14. RMA Intelligence", Order = 5)]
         public bool RmaExhaustionEnabled { get; set; }
 
+        /// <summary>REMOVED (Build-983). Photon CPU affinity deferred to M4.
+        /// Stub retained for workspace XML backward compatibility.</summary>
+        [Browsable(false)]
+        [System.Xml.Serialization.XmlIgnore]
+        public bool EnablePhotonAffinityBind { get; set; }
+
+        /// <summary>REMOVED (Build-983). Photon CPU affinity deferred to M4.
+        /// Stub retained for workspace XML backward compatibility.</summary>
+        [Browsable(false)]
+        [System.Xml.Serialization.XmlIgnore]
+        public int CpuAffinityMask { get; set; }
 
         #endregion
     }

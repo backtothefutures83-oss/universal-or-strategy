@@ -357,6 +357,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("[FSM] Master filled during cancel wait -- routing "
                             + fsm.SignalName + " to repair instead of replace.");
                         _followerReplaceSpecs.TryRemove(fsm.SignalName, out _);
+                        string masterFilledExpKey = ExpKey(acctName);
+                        ClearDispatchSyncPending(masterFilledExpKey);
                         _reaperRepairQueue.Enqueue(acctName);
                         ProcessReaperRepairQueue();
                         return;
@@ -421,14 +423,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PositionInfo cancelledFollowerPos;
                 if (activePositions.TryGetValue(matchedEntry, out cancelledFollowerPos) && cancelledFollowerPos != null)
                 {
-                    string cancelAcctKey = cancelledFollowerPos.ExecutingAccount != null
-                        ? cancelledFollowerPos.ExecutingAccount.Name : Account.Name;
-                    int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
-                        ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
-                    DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
-                    // B957/D2: Release the SIMA dispatch-sync barrier for this account. Without this, the barrier
-                    // remains permanently blocked after a follower cancel, starving future dispatches.
-                    _dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
+                    if (cancelledFollowerPos.ExecutingAccount == null)
+                    {
+                        Print("[B983-D2] HandleMatchedFollowerOrder: ExecutingAccount null for " + matchedEntry
+                            + " -- skipping ExpKey delta and sync barrier ops to avoid master domain bleed.");
+                    }
+                    else
+                    {
+                        string cancelAcctKey = cancelledFollowerPos.ExecutingAccount.Name;
+                        int cancelDelta = (cancelledFollowerPos.Direction == MarketPosition.Long)
+                            ? -cancelledFollowerPos.TotalContracts : cancelledFollowerPos.TotalContracts;
+                        DeltaExpectedPositionLocked(ExpKey(cancelAcctKey), cancelDelta);
+                        // B957/D2: Release the SIMA dispatch-sync barrier for this account. Without this, the barrier
+                        // remains permanently blocked after a follower cancel, starving future dispatches.
+                        _dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
+                    }
                 }
                 Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
                 Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
@@ -523,7 +532,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
-                    // Build 948 [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
+                    // [BUILD 984] [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
                     // Bidirectional .Contains() caused accidental cascade of unrelated positions:
                     // e.g. signal "OR" matched "Fleet_Apex_RETEST_OR_1" incidentally.
                     // Anchoring on underscores prevents substring contamination across signal families.
@@ -544,7 +553,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
 
-                    // Build 948 [FIX-A]: Skip cascade teardown if this follower has an in-flight Replace FSM.
+                    // [BUILD 984] [FIX-A]: Skip cascade teardown if this follower has an in-flight Replace FSM.
                     // A chart-drag cancel on the master reaches this path. Destroying the follower here zeroes
                     // expectedPositions mid-replace; the replacement fill then triggers REAPER Critical Desync
                     // (actualQty != 0, expectedQty == 0) -> Emergency Flatten.

@@ -1,3 +1,6 @@
+// <copyright file="V12_002.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
 // Based on UniversalORStrategyV10_3.cs (BUILD 1702)
 // SIMA Architecture: One strategy instance on Master account broadcasts to all Apex accounts
@@ -41,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.004-v28.0-pr56";  // PR56 pre-merge repair -- fleet slice + watchdog + flatten safety
+        public const string BUILD_TAG = "1111.005-v28.0-b984";  // PR76 confirmed: D1 drain overflow log, D2 ExpKey null guard, D3 semaphore finally, D6 reconnect catch
 
         public class UILiveTargetSnapshot
         {
@@ -208,7 +211,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private struct QueuedAccountOrderUpdate { public Account Account; public OrderEventArgs EventArgs; }
         private readonly ConcurrentQueue<QueuedAccountOrderUpdate> _accountOrderQueue = new ConcurrentQueue<QueuedAccountOrderUpdate>();
 
-        // [BUILD 948] Order adoption gate -- REAPER skips audit cycles until working orders have been re-adopted.
+        // [BUILD 984] Order adoption gate -- REAPER skips audit cycles until working orders have been re-adopted.
         private volatile bool _orderAdoptionComplete = false;
 
         // RMA Mode tracking
@@ -576,6 +579,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentQueue<FleetDispatchRequest> _pendingFleetDispatches
             = new ConcurrentQueue<FleetDispatchRequest>();
         private volatile int _pendingFleetDispatchCount = 0;
+        // D7: _dispatchInvocationCount / _dispatchPeakElapsedTicks / _dispatchTotalElapsedTicks
+        // removed (Build-983). Fields were declared but never wired into EmitMetricsSummary.
+        // Re-introduce if/when FleetDispatch performance telemetry is instrumented (M5).
 
         // REAP-01: UTC ticks captured each time expectedPositions is set to a non-zero value.
         // REAPER uses this to suppress false "Critical Desync" alerts within a 5-second grace window

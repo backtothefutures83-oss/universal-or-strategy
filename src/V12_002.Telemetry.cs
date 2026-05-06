@@ -1,3 +1,6 @@
+// <copyright file="V12_002.Telemetry.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12_002.Telemetry.cs -- Distributed Tracing + Logic Metrics for V12 Kernel
 // Build 1105: Implements lightweight trace propagation and FSM counters.
 // Protocol: Lock-free (Interlocked only). ASCII-only. No external dependencies.

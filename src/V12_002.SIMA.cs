@@ -1,3 +1,6 @@
+// <copyright file="V12_002.SIMA.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.12 FLEET SYMMETRY & SAFETY HARDENING - Single-Instance Multi-Account Copy Trading Engine
 // SIMA Module (Extracted)
 using System;

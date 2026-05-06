@@ -120,7 +120,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 if (_processedCommandIds.TryAdd(commandId, nowUtc))
+                {
                     return true;
+                }
 
                 Print(string.Format("[METADATA-G3] DUPLICATE command {0} for {1} -- rejected", commandId, context));
                 return false;

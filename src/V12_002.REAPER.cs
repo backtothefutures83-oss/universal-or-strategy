@@ -1,3 +1,6 @@
+// <copyright file="V12_002.REAPER.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
+// </copyright>
 // V12.17 THREADING FIX: Reaper (Safety Hub) Module
 // REAPER Module (Extracted)
 // FIX: acct.Flatten() calls moved from background thread -> strategy thread via TriggerCustomEvent
