@@ -88,7 +88,7 @@ jobs:
                 source: `sources/github/${repo}`,
                 githubRepoContext: { startingBranch: branch }
               },
-              automationMode: "NONE",
+              automationMode: "AUTOMATION_MODE_UNSPECIFIED",
               title: `Audit: ${prTitle || `PR #${prNumber}`}`
             });
 
