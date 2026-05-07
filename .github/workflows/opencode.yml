@@ -8,15 +8,13 @@ jobs:
   review:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: write
+      contents: read
       pull-requests: write
-      issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
-      - uses: anomalyco/opencode/github@latest
+      - uses: anomalyco/opencode/github@2dffdfff4aa02d5c4df128035d0bfce2fd309ebd
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
