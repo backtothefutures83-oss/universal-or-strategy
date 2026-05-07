@@ -24,8 +24,8 @@ jobs:
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
           REPOSITORY: '${{ github.repository }}'
         with:
-          openai_model: qwen-max
-          openai_api_key: ${{ secrets.QWEN_TOKEN }}
+          openai_model: qwen-plus
+          openai_api_key: ${{ secrets.QWEN_TOKEN || secrets.DASHSCOPE_API_KEY }}
           openai_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
           qwen_debug: true
           workflow_name: 'qwen-review'
