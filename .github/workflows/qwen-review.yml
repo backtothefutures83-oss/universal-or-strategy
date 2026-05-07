@@ -14,67 +14,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         
-      - name: Qwen PR Review
-        id: qwen_pr_review
-        uses: QwenLM/qwen-code-action@main
+      - name: Qwen PR Review via OpenCode
+        uses: anomalyco/opencode/github@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
-          ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPOSITORY: '${{ github.repository }}'
+          DASHSCOPE_API_KEY: ${{ secrets.QWEN_TOKEN || secrets.DASHSCOPE_API_KEY }}
         with:
-          openai_model: qwen-plus
-          openai_api_key: ${{ secrets.QWEN_TOKEN || secrets.DASHSCOPE_API_KEY }}
-          openai_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-          qwen_debug: true
-          workflow_name: 'qwen-review'
-          settings: |-
-            {
-              "model": {
-                "maxSessionTurns": 25
-              },
-              "telemetry": {
-                "enabled": false
-              },
-              "mcpServers": {
-                "github": {
-                  "command": "docker",
-                  "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.18.0"
-                  ],
-                  "includeTools": [
-                    "add_comment_to_pending_review",
-                    "create_pending_pull_request_review",
-                    "pull_request_read",
-                    "submit_pending_pull_request_review"
-                  ],
-                  "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
-                  }
-                }
-              },
-              "tools": {
-                "core": [
-                  "run_shell_command(cat)",
-                  "run_shell_command(echo)",
-                  "run_shell_command(grep)",
-                  "run_shell_command(head)",
-                  "run_shell_command(tail)"
-                ]
-              }
-            }
-          prompt: '/qwen-review'
-
-      - name: Print Qwen Output
-        if: always()
-        run: |
-          echo "::: Qwen STDOUT :::"
-          cat qwen-artifacts/stdout.log || echo "No stdout log"
-          echo "::: Qwen STDERR :::"
-          cat qwen-artifacts/stderr.log || echo "No stderr log"
+          model: qwen
+          use_github_token: true
+          prompt: |
+            Review this pull request focusing on C# logic, NinjaTrader conventions, and high-performance practices.
