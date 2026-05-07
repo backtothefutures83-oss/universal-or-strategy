@@ -27,6 +27,7 @@ jobs:
           openai_model: qwen-max
           openai_api_key: ${{ secrets.QWEN_TOKEN }}
           openai_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+          qwen_debug: true
           workflow_name: 'qwen-review'
           settings: |-
             {
@@ -54,7 +55,7 @@ jobs:
                     "submit_pending_pull_request_review"
                   ],
                   "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
                   }
                 }
               },
@@ -73,7 +74,7 @@ jobs:
       - name: Print Qwen Output
         if: always()
         run: |
-          echo "Qwen Response:"
-          echo "${{ steps.qwen_pr_review.outputs.qwen_response }}"
-          echo "Qwen Errors:"
-          echo "${{ steps.qwen_pr_review.outputs.qwen_errors }}"
+          echo "::: Qwen STDOUT :::"
+          cat qwen-artifacts/stdout.log || echo "No stdout log"
+          echo "::: Qwen STDERR :::"
+          cat qwen-artifacts/stderr.log || echo "No stderr log"
