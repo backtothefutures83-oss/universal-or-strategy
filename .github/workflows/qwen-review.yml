@@ -15,6 +15,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         
       - name: Qwen PR Review
+        id: qwen_pr_review
         uses: QwenLM/qwen-code-action@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,3 +69,11 @@ jobs:
               }
             }
           prompt: '/qwen-review'
+
+      - name: Print Qwen Output
+        if: always()
+        run: |
+          echo "Qwen Response:"
+          echo "${{ steps.qwen_pr_review.outputs.qwen_response }}"
+          echo "Qwen Errors:"
+          echo "${{ steps.qwen_pr_review.outputs.qwen_errors }}"
