@@ -22,7 +22,6 @@ jobs:
         
       - name: GLM PR Review via OpenCode
         uses: anomalyco/opencode/github@latest
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ZHIPUAI_API_KEY: ${{ secrets.GLM_API_KEY }}

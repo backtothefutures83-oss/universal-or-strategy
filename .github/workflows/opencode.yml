@@ -16,15 +16,12 @@ jobs:
           persist-credentials: false
           submodules: false
       - uses: anomalyco/opencode/github@latest
-        continue-on-error: true
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ZHIPUAI_API_KEY: ${{ secrets.GLM_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: anthropic/claude-3-5-sonnet-latest
+          model: zhipuai/glm-5.1
           use_github_token: true
           prompt: |
-            Review this pull request:
-            - Check for code quality issues
-            - Look for potential bugs
-            - Suggest improvements
+            Review this pull request focusing on C# logic, NinjaTrader 8 conventions,
+            lock-free actor patterns, and high-performance trading system practices.
