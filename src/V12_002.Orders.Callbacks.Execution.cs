@@ -57,6 +57,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Build 935 [CB-B935-001]: Flat-position cleanup extracted from OnPositionUpdate.
         private void HandleFlatPositionUpdate(string acctName) // [B967-FIX-01]
         {
+            HandleFlatPosition_SyncExpected(acctName);
+            if (HandleFlatPosition_ReconcileOrphans())
+                return;
+            HandleFlatPosition_CleanupActivePositions();
+        }
+
+        private void HandleFlatPosition_SyncExpected(string acctName)
+        {
             // [H-14]: Sync expectedPositions on flat. Build 931: guard against spurious flat.
             string flatAcctName = acctName;
             if (!string.IsNullOrEmpty(flatAcctName))
@@ -106,15 +114,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print($"[OnPositionUpdate] expectedPositions cleared for {flatExpKey} (position flat)");
                 }
             }
+        }
 
+        private bool HandleFlatPosition_ReconcileOrphans()
+        {
             // V8.22: Scan for orphans even if activePositions is empty (strategy restart)
             if (activePositions.Count == 0)
             {
                 Print("EXTERNAL CLOSE/RESTART DETECTED - Scanning for orphaned bracket orders...");
                 ReconcileOrphanedOrders("Position went flat");
-                return;
+                return true;
             }
 
+            return false;
+            }
+
+        private void HandleFlatPosition_CleanupActivePositions()
+        {
             List<string> positionsToCleanup = new List<string>();
             foreach (var kvp in activePositions.ToArray())
             {
@@ -197,6 +213,49 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (string.IsNullOrEmpty(orderName)) return;
 
+                if (ProcessOnExecution_Dedup(orderName, executionId, quantity, execution))
+                    return;
+
+                ProcessOnExecution_TrackCompliance(execution);
+
+                // ============================================================
+                // 1. STOP LOSS FILL - Manual OCO: Cancel all remaining targets
+                // ============================================================
+                if (orderName.StartsWith("Stop_"))
+                    ProcessOnExecution_HandleStopFill(orderName, price, quantity);
+
+                // ============================================================
+                // 2. TARGET 1-5 FILL - Reduce stop quantity (unified loop)
+                // V12.1101E [SK-01/A-1]: First-Writer-Wins guard prevents double-decrement.
+                // ============================================================
+                else if (orderName.StartsWith("T1_") || orderName.StartsWith("T2_") || orderName.StartsWith("T3_") ||
+                         orderName.StartsWith("T4_") || orderName.StartsWith("T5_"))
+                    ProcessOnExecution_HandleTargetFill(orderName, price, quantity, execution);
+
+                // ============================================================
+                // 5. TRIM EXECUTION - V10.3.1: Enhanced Stop Integrity
+                // ============================================================
+                // (!) CRITICAL: When a TRIM executes, we MUST reduce the stop order quantity
+                // to match the new position size. If we don't, hitting the stop after a trim
+                // would close more contracts than we hold, creating an unintended REVERSE position.
+                // Example: Long 4 contracts, stop at 4. Trim 2 (now Long 2). If stop stays at 4,
+                // getting stopped out would SELL 4 (close 2 + go SHORT 2) = DISASTER.
+                else if (orderName.StartsWith("Trim_"))
+                    ProcessOnExecution_HandleTrimFill(orderName, price, quantity);
+
+                // Build 1105: Shadow callback injection -- closes 100-500ms leader flatten gap.
+                // ManageTrailingStops covers steady-state trailing. This covers immediate
+                // execution events (stop fill, target fill) where next trailing cycle is too late.
+                ProcessOnExecution_RunShadowCheck();
+            }
+            catch (Exception ex)
+            {
+                Print("Error OnExecutionUpdate: " + ex.Message);
+            }
+        }
+
+        private bool ProcessOnExecution_Dedup(string orderName, string executionId, int quantity, Execution execution)
+        {
                 // V12.962 INLINE ACTOR: Dedup guard -- lock-free, serial execution guaranteed by _drainToken.
                 // V12.Phase7 [C-01]: Prevent double-decrement if OnOrderUpdate + OnExecutionUpdate both fire.
                 if (!string.IsNullOrEmpty(executionId))
@@ -206,7 +265,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (_executionIdRing.ContainsOrAdd(_execHash))
                     {
                         Print(string.Format("[DEDUP] Skipping duplicate execution {0} for {1}", executionId, orderName));
-                        return;
+                    return true;
                     }
                 }
                 else
@@ -223,10 +282,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         Print(string.Format("[DEDUP] Skipping duplicate execution (fallback) orderId={0}",
                             execution.Order.OrderId));
-                        return;
+                    return true;
                     }
                 }
 
+            return false;
+        }
+
+        private void ProcessOnExecution_TrackCompliance(Execution execution)
+        {
                 // V12.12: Compliance tracking for single-account mode
                 // [939-P0]: Marshal Account.Get() off broker thread via TriggerCustomEvent.
                 if (EnableComplianceHub && !EnableSIMA)
@@ -235,9 +299,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     TriggerCustomEvent(o => UpdateAccountMetricsFromAccount(Account), null);
                     LogApexPerformance();
                 }
+        }
 
-                // Helper: Extract entry name from order name (removes prefix and optional timestamp suffix)
-                Func<string, string, string> extractEntryName = (name, prefix) =>
+        private string ProcessOnExecution_ExtractEntryName(string name, string prefix)
                 {
                     if (!name.StartsWith(prefix)) return "";
                     string entryPart = name.Substring(prefix.Length);
@@ -246,14 +310,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (lastUnderscore > 0 && entryPart.Length - lastUnderscore > 10)
                         entryPart = entryPart.Substring(0, lastUnderscore);
                     return entryPart;
-                };
+        }
 
-                // ============================================================
-                // 1. STOP LOSS FILL - Manual OCO: Cancel all remaining targets
-                // ============================================================
-                if (orderName.StartsWith("Stop_"))
+        private void ProcessOnExecution_HandleStopFill(string orderName, double price, int quantity)
                 {
-                    string entryName = extractEntryName(orderName, "Stop_");
+            string entryName = ProcessOnExecution_ExtractEntryName(orderName, "Stop_");
                     if (!string.IsNullOrEmpty(entryName) && activePositions.TryGetValue(entryName, out PositionInfo pos))
                     {
                         int remainingAfterStop;
@@ -301,17 +362,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                // ============================================================
-                // 2. TARGET 1-5 FILL - Reduce stop quantity (unified loop)
-                // V12.1101E [SK-01/A-1]: First-Writer-Wins guard prevents double-decrement.
-                // ============================================================
-                else if (orderName.StartsWith("T1_") || orderName.StartsWith("T2_") || orderName.StartsWith("T3_") ||
-                         orderName.StartsWith("T4_") || orderName.StartsWith("T5_"))
+        private void ProcessOnExecution_HandleTargetFill(string orderName, double price, int quantity, Execution execution)
                 {
                     // Extract target number from prefix (T1_, T2_, etc.)
                     int targetNum = orderName[1] - '0';
                     string targetPrefix = "T" + targetNum + "_";
-                    string entryName = extractEntryName(orderName, targetPrefix);
+            string entryName = ProcessOnExecution_ExtractEntryName(orderName, targetPrefix);
 
                     if (!string.IsNullOrEmpty(entryName) && activePositions.TryGetValue(entryName, out PositionInfo pos))
                     {
@@ -359,17 +415,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                // ============================================================
-                // 5. TRIM EXECUTION - V10.3.1: Enhanced Stop Integrity
-                // ============================================================
-                // (!) CRITICAL: When a TRIM executes, we MUST reduce the stop order quantity
-                // to match the new position size. If we don't, hitting the stop after a trim
-                // would close more contracts than we hold, creating an unintended REVERSE position.
-                // Example: Long 4 contracts, stop at 4. Trim 2 (now Long 2). If stop stays at 4,
-                // getting stopped out would SELL 4 (close 2 + go SHORT 2) = DISASTER.
-                else if (orderName.StartsWith("Trim_"))
+        private void ProcessOnExecution_HandleTrimFill(string orderName, double price, int quantity)
                 {
-                    string entryName = extractEntryName(orderName, "Trim_");
+            string entryName = ProcessOnExecution_ExtractEntryName(orderName, "Trim_");
                     if (!string.IsNullOrEmpty(entryName) && activePositions.TryGetValue(entryName, out PositionInfo pos))
                     {
                         int previousQty;
@@ -410,15 +458,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                // Build 1105: Shadow callback injection -- closes 100-500ms leader flatten gap.
-                // ManageTrailingStops covers steady-state trailing. This covers immediate
-                // execution events (stop fill, target fill) where next trailing cycle is too late.
-                ShadowEngineCheck();
-            }
-            catch (Exception ex)
+        private void ProcessOnExecution_RunShadowCheck()
             {
-                Print("Error OnExecutionUpdate: " + ex.Message);
-            }
+            ShadowEngineCheck();
         }
 
         /// <summary>

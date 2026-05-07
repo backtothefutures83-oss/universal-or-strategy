@@ -42,13 +42,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             _propagationActive = true;
             try
             {
+                string masterEntryName;
+                bool isEntryMove;
+                bool isStopMove;
+                bool isTargetMove;
+                int masterTargetNum;
+                if (!PropagateMaster_IdentifyMove(masterOrder, out masterEntryName, out isEntryMove, out isStopMove, out isTargetMove, out masterTargetNum))
+                    return;
 
+                IEnumerable<string> followerEntryNames = PropagateMaster_ResolveFollowers(masterEntryName);
+                PropagateMaster_ApplyFollowerMove(followerEntryNames, isEntryMove, isStopMove, isTargetMove, masterTargetNum, newLimit, newStop, newMasterQty);
+            } // end try
+            finally
+            {
+                // [BUILD 924 -- Fix C] Always clear propagation flag, even on exception.
+                _propagationActive = false;
+            }
+        }
+
+        private bool PropagateMaster_IdentifyMove(Order masterOrder, out string masterEntryName, out bool isEntryMove, out bool isStopMove, out bool isTargetMove, out int masterTargetNum)
+        {
             // --- Step 1: Identify master position and move type via object identity ---
-            string masterEntryName = null;
-            bool isEntryMove  = false;
-            bool isStopMove   = false;
-            bool isTargetMove = false;
-            int  masterTargetNum = 0;
+            masterEntryName = null;
+            isEntryMove = false;
+            isStopMove = false;
+            isTargetMove = false;
+            masterTargetNum = 0;
 
             foreach (var kvp in entryOrders)
             {
@@ -95,8 +114,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            if (masterEntryName == null) return; // Not a tracked master order
+            return masterEntryName != null; // Not a tracked master order
+        }
 
+        private IEnumerable<string> PropagateMaster_ResolveFollowers(string masterEntryName)
+        {
             // --- Step 2: Resolve follower entry names via Symmetry dispatch context ---
 
             // [BUILD 926 -- Codex P1 Fix]: Derive master TradeType from boolean flags.
@@ -118,16 +140,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else                                     masterTradeType = "OR";
             }
 
-            IEnumerable<string> followerEntryNames;
             if (symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId) &&
                 symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
             {
                 // ADR-019: ctx.Followers is an immutable snapshot published via Interlocked.CompareExchange.
                 // Zero-alloc, lock-free, point-in-time consistent. Hot path on every master price move.
-                followerEntryNames = ctx.Followers;
+                return ctx.Followers;
             }
-            else
-            {
+
                 // [BUILD 926 -- Codex P1 Fix]: Fallback type match now uses SignalName parsing.
                 //
                 // ROOT CAUSE: IsRMATrade=true is stamped on ALL fleet followers (ExecuteSmartDispatchEntry
@@ -195,9 +215,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (followerType == masterTradeType)
                         fallback.Add(kvp.Key);
                 }
-                followerEntryNames = fallback;
+
+            return fallback;
             }
 
+        private void PropagateMaster_ApplyFollowerMove(IEnumerable<string> followerEntryNames, bool isEntryMove, bool isStopMove, bool isTargetMove, int masterTargetNum, double newLimit, double newStop, int newMasterQty)
+        {
             // --- Step 3: Apply move to each linked follower ---
             foreach (string fleetEntryName in followerEntryNames)
             {
@@ -217,12 +240,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     PropagateMasterStopMove(fleetEntryName, pos, newStop);
                 else if (isTargetMove)
                     PropagateMasterTargetMove(fleetEntryName, pos, masterTargetNum, newLimit);
-            }
-            } // end try
-            finally
-            {
-                // [BUILD 924 -- Fix C] Always clear propagation flag, even on exception.
-                _propagationActive = false;
             }
         }
 
@@ -440,6 +457,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
+            string expectedKey;
+            int expectedDelta;
+            bool zeroStartReasserted;
+            SubmitFollowerReplacement_ReassertExpected(fleetSignalName, accountName, qty, spec, out expectedKey, out expectedDelta, out zeroStartReasserted);
+
+            Order newEntry = SubmitFollowerReplacement_CreateEntry(acct, fleetSignalName, price, qty, spec);
+            if (!SubmitFollowerReplacement_SubmitEntry(acct, newEntry, fleetSignalName, expectedKey, expectedDelta, zeroStartReasserted))
+                return;
+
+            SubmitFollowerReplacement_RegisterState(newEntry, fleetSignalName, accountName, qty);
+
+            Print("[FSM] Replacement submitted: " + fleetSignalName
+                + " @ " + price + " x" + qty);
+        }
+
+        private void SubmitFollowerReplacement_ReassertExpected(string fleetSignalName, string accountName, int qty, FollowerReplaceSpec spec, out string expectedKey, out int expectedDelta, out bool zeroStartReasserted)
+        {
             // [BUILD 984] [FIX-C]: Defensive expectedPositions re-assertion.
             // If ExecuteFollowerCascadeCleanup ran concurrently before Fix A sealed the gap,
             // DeltaExpectedPositionLocked may have zeroed expectedPositions for this account.
@@ -448,8 +482,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             string _b948ExpKey = ExpKey(accountName);
             int _b948CurrentExp = 0;
             expectedPositions.TryGetValue(_b948ExpKey, out _b948CurrentExp);
-            bool _b948ZeroStartReasserted = _b948CurrentExp == 0 && qty != 0;
-            if (_b948ZeroStartReasserted)
+            zeroStartReasserted = _b948CurrentExp == 0 && qty != 0;
+            if (zeroStartReasserted)
             {
                 int _b948Delta = spec.EntryAction == OrderAction.Buy ? qty : -qty;
                 AddExpectedPositionDeltaLocked(_b948ExpKey, _b948Delta);
@@ -458,28 +492,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     accountName, _b948Delta));
             }
 
-            // [FIX-PM-02c]: preserve order type so StopMarket followers remain StopMarket.
-            double limitPx = !spec.IsStopType ? price : 0;
-            double stopPx  =  spec.IsStopType ? price : 0;
-            string expectedKey = ExpKey(accountName);
-            int expectedDelta = 0;
+            expectedKey = _b948ExpKey;
+            expectedDelta = 0;
             PositionInfo trackedPos;
-            if (!_b948ZeroStartReasserted
+            if (!zeroStartReasserted
                 && activePositions.TryGetValue(fleetSignalName, out trackedPos) && trackedPos != null)
             {
                 int qtyDiff = qty - trackedPos.TotalContracts;
                 if (qtyDiff != 0)
                     expectedDelta = trackedPos.Direction == MarketPosition.Long ? qtyDiff : -qtyDiff;
             }
+        }
+
+        private Order SubmitFollowerReplacement_CreateEntry(Account acct, string fleetSignalName, double price, int qty, FollowerReplaceSpec spec)
+        {
+            // [FIX-PM-02c]: preserve order type so StopMarket followers remain StopMarket.
+            double limitPx = !spec.IsStopType ? price : 0;
+            double stopPx  =  spec.IsStopType ? price : 0;
 
             // [923A-P1-GUID]: 8-char GUID fragment as ocoId; signal name = fleetSignalName (GHOST-FIX-1).
-            Order newEntry = acct.CreateOrder(
+            return acct.CreateOrder(
                 Instrument, spec.EntryAction, spec.EntryOrderType, TimeInForce.Gtc,
                 qty, limitPx, stopPx,
                 "MGE_" + Guid.NewGuid().ToString("N").Substring(0, 8),
                 fleetSignalName, null);
+        }
 
-            if (!_b948ZeroStartReasserted && expectedDelta != 0)
+        private bool SubmitFollowerReplacement_SubmitEntry(Account acct, Order newEntry, string fleetSignalName, string expectedKey, int expectedDelta, bool zeroStartReasserted)
+        {
+            if (!zeroStartReasserted && expectedDelta != 0)
             {
                 AddExpectedPositionDeltaLocked(expectedKey, expectedDelta);
                 Print("[FSM] Replacement expected sync: "
@@ -492,13 +533,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception submitEx)
             {
-                if (!_b948ZeroStartReasserted && expectedDelta != 0)
+                if (!zeroStartReasserted && expectedDelta != 0)
                     AddExpectedPositionDeltaLocked(expectedKey, -expectedDelta);
 
                 Print("[FSM] SUBMIT FAIL: replacement submit threw for " + fleetSignalName + ": " + submitEx.Message);
-                return;
+                return false;
             }
 
+            return true;
+        }
+
+        private void SubmitFollowerReplacement_RegisterState(Order newEntry, string fleetSignalName, string accountName, int qty)
+        {
             // B966: wrap dict write + pos mutation in Enqueue so it flows through actor pipeline.
             // Order submission stays outside; captures prevent stale closure refs.
             { var _ne966 = newEntry; var _fsn966 = fleetSignalName; var _qty966 = qty;
@@ -540,9 +586,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     pos966.T5Contracts = ft5;
                 }
             }); }
-
-            Print("[FSM] Replacement submitted: " + fleetSignalName
-                + " @ " + price + " x" + qty);
         }
 
         // B957/C1: SubmitFollowerTargetReplacement -- called on strategy thread via TriggerCustomEvent

@@ -369,6 +369,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Stop replacement check
             if (orderName.StartsWith("Stop_") || orderName.StartsWith("S_"))
             {
+                handled = HandleOrderCancelled_ProcessStopReplacement(order);
+                if (!handled)
+                    HandleOrderCancelled_PurgePendingCleanup(order);
+            }
+
+            if (!handled && HandleOrderCancelled_RollbackUnfilledEntry(order))
+                return true;
+
+            RemoveGhostOrderRef(order, "CANCELLED");
+            return true;
+        }
+
+        private bool HandleOrderCancelled_ProcessStopReplacement(Order order)
+            {
                 foreach (var kvp in pendingStopReplacements.ToArray())
                 {
                     if ((kvp.Value.OldOrder == order
@@ -390,16 +404,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
                         }
                         if (pendingStopReplacements.TryRemove(kvp.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
-                        handled = true;
-                        break;
+                    return true;
                     }
                 }
 
+            return false;
+        }
+
+        private void HandleOrderCancelled_PurgePendingCleanup(Order order)
+        {
                 // A2-2: Deferred PendingCleanup purge -- master stop terminal (Build 960 audit fix).
                 // If no pendingStopReplacement matched, check if this stop cancel completes a
                 // final-target/trim close where activePositions was intentionally kept alive.
-                if (!handled)
-                {
                     foreach (var kvp in stopOrders.ToArray())
                     {
                         if (kvp.Value == order)
@@ -416,10 +432,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                             break;
                         }
                     }
-                }
             }
 
-            if (!handled && entryOrders.Values.Contains(order))
+        private bool HandleOrderCancelled_RollbackUnfilledEntry(Order order)
+        {
+            if (entryOrders.Values.Contains(order))
             {
                 foreach (var kvp in activePositions.ToArray())
                 {
@@ -433,8 +450,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            RemoveGhostOrderRef(order, "CANCELLED");
-            return true;
+            return false;
         }
 
         private bool HandleOrderPriceOrQuantityChanged(Order order, double limitPrice, double stopPrice, int quantity)

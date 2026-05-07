@@ -63,6 +63,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // Build 1000: Master account managed order tracking
             if (acct == this.Account && order.Instrument != null && order.Instrument.FullName == Instrument.FullName)
+                ProcessAccountOrder_UpdateMasterExpected(order);
+            // Build 1104.1: Fleet account expectedPositions tracking (symmetric with Master at line 65)
+            // Without this, expectedPositions stays stale after fleet stop/target fills,
+            // causing REAPER to see Expected != Actual and trigger false flattens.
+            else if (IsFleetAccount(acct))
+                ProcessAccountOrder_UpdateFleetExpected(order, acct);
+
+            ProcessAccountOrder_EnqueueTerminalUpdate(sender, e, order);
+        }
+
+        private void ProcessAccountOrder_UpdateMasterExpected(Order order)
             {
                 if (order.OrderState == OrderState.Filled || order.OrderState == OrderState.PartFilled)
                 {
@@ -94,10 +105,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
-            // Build 1104.1: Fleet account expectedPositions tracking (symmetric with Master at line 65)
-            // Without this, expectedPositions stays stale after fleet stop/target fills,
-            // causing REAPER to see Expected != Actual and trigger false flattens.
-            else if (IsFleetAccount(acct))
+
+        private void ProcessAccountOrder_UpdateFleetExpected(Order order, Account acct)
             {
                 if (order.OrderState == OrderState.Filled || order.OrderState == OrderState.PartFilled)
                 {
@@ -131,6 +140,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
+        private void ProcessAccountOrder_EnqueueTerminalUpdate(object sender, OrderEventArgs e, Order order)
+        {
             if (order.OrderState != OrderState.Cancelled && order.OrderState != OrderState.Rejected &&
                 order.OrderState != OrderState.Unknown)
             {
@@ -317,6 +328,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
+                if (HandleMatchedFollower_PendingCancelReplace(matchedEntry, order, acctName))
+                    return;
+
+                if (HandleMatchedFollower_TargetReplaceCancel(order))
+                    return;
+
+                HandleMatchedFollower_DeltaRollback(matchedEntry);
+                Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
+                Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
+            }
+            else
+            {
+                // Build 950: Follower stop replacement -- mirrors HandleOrderCancelled master path.
+                // Follower stop cancels arrive via OnAccountOrderUpdate (not OnOrderUpdate), so
+                // HandleOrderCancelled never fires for them. Match pendingStopReplacements here.
+                // This block is in the else branch because stop orders are not in entryOrders.
+                if (HandleMatchedFollower_StopReplacement(order))
+                    return;
+
+                HandleMatchedFollower_PendingCleanupPurge(order);
+
+                Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
+                RemoveGhostOrderRef(order, reason);
+            }
+        }
+
+        private bool HandleMatchedFollower_PendingCancelReplace(string matchedEntry, Order order, string acctName)
+        {
                 // Build 947 FSM: if this cancel was our PendingCancel, submit replacement instead of DESYNC
                 FollowerReplaceSpec fsm;
                 if (_followerReplaceSpecs.TryGetValue(matchedEntry, out fsm)
@@ -361,7 +400,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ClearDispatchSyncPending(masterFilledExpKey);
                         _reaperRepairQueue.Enqueue(acctName);
                         ProcessReaperRepairQueue();
-                        return;
+                    return true;
                     }
 
                     bool replacementScheduled = false;
@@ -383,13 +422,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _followerReplaceSpecs.TryRemove(sigName, out _);
                     }
                     if (replacementScheduled)
-                        return; // FSM-controlled replace cancel -- reservation stays live until resubmit completes.
-                } // END of PendingCancel block
+                    return true; // FSM-controlled replace cancel -- reservation stays live until resubmit completes.
+            }
 
+            return false;
+        }
+
+        private bool HandleMatchedFollower_TargetReplaceCancel(Order order)
+        {
                 // B957/C1: Check for follower TARGET replace FSM spec before doing delta rollback.
                 // If this cancel was part of a two-phase target replacement, submit the new order
                 // and return -- no delta rollback needed (position remains open, just target moved).
-                {
                     FollowerTargetReplaceSpec tSpec = null;
                     string tFsmMatchKey = null;
                     foreach (var tKvp in _followerTargetReplaceSpecs.ToArray())
@@ -414,10 +457,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             Print("[FSM_TGT] TriggerCustomEvent failed for " + capturedKey + ": " + tFsmEx.Message);
                         }
-                        return; // FSM-controlled target cancel -- skip delta rollback, not a real desync
+                return true; // FSM-controlled target cancel -- skip delta rollback, not a real desync
                     }
+
+            return false;
                 }
 
+        private void HandleMatchedFollower_DeltaRollback(string matchedEntry)
+        {
                 // A2-3: Direction-aware delta rollback on CONFIRMED cancel -- deferred from SymmetryGuardCascadeFollowerCleanup
                 // to prevent REAPER desync on microsecond fill race (Build 960 audit fix).
                 PositionInfo cancelledFollowerPos;
@@ -439,10 +486,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _dispatchSyncPendingExpKeys.TryRemove(ExpKey(cancelAcctKey), out _); // [B967-FIX-02]
                     }
                 }
-                Print(string.Format("[SIMA] Follower entry cancelled: {0} on {1}. Reaper monitoring.", matchedEntry, acctName));
-                Draw.TextFixed(this, "SIMA_DESYNC_" + acctName, "(!) FOLLOWER DESYNC: " + acctName, TextPosition.TopLeft, Brushes.Red, new SimpleFont("Arial", 11), Brushes.Transparent, Brushes.Transparent, 50);
             }
-            else
+
+        private bool HandleMatchedFollower_StopReplacement(Order order)
             {
                 // Build 950: Follower stop replacement -- mirrors HandleOrderCancelled master path.
                 // Follower stop cancels arrive via OnAccountOrderUpdate (not OnOrderUpdate), so
@@ -473,10 +519,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 } // if (_rQty > 0)
                             } // if (activePositions.TryGetValue)
                             if (pendingStopReplacements.TryRemove(_psr.Key, out _)) Interlocked.Decrement(ref pendingReplacementCount);
-                            return;
+                        return true;
+                    }
                         }
                     }
+
+            return false;
                 }
+
+        private void HandleMatchedFollower_PendingCleanupPurge(Order order)
+        {
                 // A2-2: Deferred PendingCleanup purge -- follower stop terminal (Build 960 audit fix).
                 if (order.Name.StartsWith("Stop_") || order.Name.StartsWith("S_"))
                 {
@@ -497,10 +549,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
                 }
-
-                Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
-                RemoveGhostOrderRef(order, reason);
-            }
         }
 
         // Build 935 [R-01]: SIMA cascade cleanup for unmatched master-cancel events.
@@ -513,37 +561,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 string masterEntryName;
                 string[] dispatchFollowers;
-                if (IsMasterReplaceCascadeCancellation(order, snapshot, out masterEntryName, out dispatchFollowers))
-                {
-                    Print(string.Format("[FSM] Suppressing cascade teardown for master replace cancel: {0}", masterEntryName));
-                    RemoveGhostOrderRef(order, reason);
+                if (ExecuteFollowerCascade_SuppressMasterReplace(order, reason, snapshot, out masterEntryName, out dispatchFollowers))
                     return;
-                }
 
                 string orderSignal = order.Name;
                 Dictionary<string, PositionInfo> snapshotByKey = new Dictionary<string, PositionInfo>();
                 foreach (var kvp in snapshot)
                     snapshotByKey[kvp.Key] = kvp.Value;
 
-                IEnumerable<string> followerKeys = Array.Empty<string>();
-                if (!string.IsNullOrEmpty(masterEntryName) && dispatchFollowers != null && dispatchFollowers.Length > 0)
-                {
-                    followerKeys = dispatchFollowers;
-                }
-                else
-                {
-                    // [BUILD 984] [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
-                    // Bidirectional .Contains() caused accidental cascade of unrelated positions:
-                    // e.g. signal "OR" matched "Fleet_Apex_RETEST_OR_1" incidentally.
-                    // Anchoring on underscores prevents substring contamination across signal families.
-                    followerKeys = snapshot
-                        .Where(kvp => kvp.Value != null && kvp.Value.IsFollower
-                            && (kvp.Key == orderSignal
-                                || kvp.Key.Contains("_" + orderSignal + "_")
-                                || kvp.Key.EndsWith("_" + orderSignal)))
-                        .Select(kvp => kvp.Key)
-                        .ToArray();
-                }
+                IEnumerable<string> followerKeys = ExecuteFollowerCascade_ResolveFollowers(orderSignal, masterEntryName, dispatchFollowers, snapshot);
 
                 foreach (string followerKey in followerKeys)
                 {
@@ -566,7 +592,48 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                     if (!cascadePos.EntryFilled)
+                        ExecuteFollowerCascade_CleanupUnfilled(masterEntryName, orderSignal, followerKey, cascadePos);
+                    else
+                        ExecuteFollowerCascade_EmergencyFlattenFilled(masterEntryName, orderSignal, followerKey, cascadePos);
+                }
+            }
+            RemoveGhostOrderRef(order, reason);
+        }
+
+        private bool ExecuteFollowerCascade_SuppressMasterReplace(Order order, string reason, KeyValuePair<string, PositionInfo>[] snapshot, out string masterEntryName, out string[] dispatchFollowers)
+        {
+            if (IsMasterReplaceCascadeCancellation(order, snapshot, out masterEntryName, out dispatchFollowers))
+            {
+                Print(string.Format("[FSM] Suppressing cascade teardown for master replace cancel: {0}", masterEntryName));
+                RemoveGhostOrderRef(order, reason);
+                return true;
+            }
+
+            return false;
+        }
+
+        private IEnumerable<string> ExecuteFollowerCascade_ResolveFollowers(string orderSignal, string masterEntryName, string[] dispatchFollowers, KeyValuePair<string, PositionInfo>[] snapshot)
                     {
+            if (!string.IsNullOrEmpty(masterEntryName) && dispatchFollowers != null && dispatchFollowers.Length > 0)
+                return dispatchFollowers;
+
+            // [BUILD 984] [FIX-B]: Delimiter-anchored match replaces bidirectional .Contains().
+            // Bidirectional .Contains() caused accidental cascade of unrelated positions:
+            // e.g. signal "OR" matched "Fleet_Apex_RETEST_OR_1" incidentally.
+            // Anchoring on underscores prevents substring contamination across signal families.
+            return snapshot
+                .Where(kvp => kvp.Value != null && kvp.Value.IsFollower
+                    && (kvp.Key == orderSignal
+                        || kvp.Key.Contains("_" + orderSignal + "_")
+                        || kvp.Key.EndsWith("_" + orderSignal)))
+                .Select(kvp => kvp.Key)
+                .ToArray();
+        }
+
+        private void ExecuteFollowerCascade_CleanupUnfilled(string masterEntryName, string orderSignal, string followerKey, PositionInfo cascadePos)
+        {
+            string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
+
                         Print(string.Format("[GHOST_FIX] SIMA CASCADE: Master cancel of {0} triggers follower teardown for {1} on {2}",
                             !string.IsNullOrEmpty(masterEntryName) ? masterEntryName : orderSignal, followerKey, cascadeAcctName));
                         CleanupPosition(followerKey);
@@ -589,8 +656,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                             try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
                         }
                     }
-                    else
+
+        private void ExecuteFollowerCascade_EmergencyFlattenFilled(string masterEntryName, string orderSignal, string followerKey, PositionInfo cascadePos)
                     {
+            string cascadeAcctName = cascadePos.ExecutingAccount != null ? cascadePos.ExecutingAccount.Name : "NULL";
+
                         Print(string.Format("[DEAD-01] CASCADE-FILLED: Master cancel {0} -- follower {1} on {2} is FILLED. Issuing emergency flatten.",
                             !string.IsNullOrEmpty(masterEntryName) ? masterEntryName : orderSignal, followerKey, cascadeAcctName));
                         if (cascadePos.ExecutingAccount != null)
@@ -599,10 +669,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                             TriggerCustomEvent(o => EmergencyFlattenSingleFleetAccount(filledFollowerAcct), null);
                         }
                     }
-                }
-            }
-            RemoveGhostOrderRef(order, reason);
-        }
 
         private void ProcessQueuedAccountOrder(QueuedAccountOrderUpdate item)
         {
