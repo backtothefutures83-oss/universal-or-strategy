@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           persist-credentials: false
-      - uses: anomalyco/opencode/github@2dffdfff4aa02d5c4df128035d0bfce2fd309ebd
+      - uses: anomalyco/opencode/github@latest
+        continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

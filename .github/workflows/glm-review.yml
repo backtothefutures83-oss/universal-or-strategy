@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
         
       - name: GLM PR Review via OpenCode
-        uses: anomalyco/opencode/github@2dffdfff4aa02d5c4df128035d0bfce2fd309ebd
+        uses: anomalyco/opencode/github@latest
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
