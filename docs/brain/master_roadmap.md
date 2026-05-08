@@ -178,16 +178,16 @@
 
 | Rank | Method | File | Complexity | Score | Phase 4? | Action |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
-| 1 | `ManageTrailingStops` | `Trailing.cs` | 151 | 398 | Indirect | M5 Zero-Alloc |
-| 2 | `TryHandleFleetCommand` | `UI.IPC.Commands.Fleet.cs` | 156 | 279 | No | Phase 2 follow-up |
-| 3 | `ProcessOnStateChange` | `Lifecycle.cs` | 91 | 252 | YES | Phase 4 wraps it |
-| 4 | `HydrateWorkingOrdersFromBroker` | `SIMA.Lifecycle.cs` | 96 | 230 | YES | Phase 4 wraps it |
-| 5 | `ProcessQueuedExecution` | `UI.Compliance.cs` | 87 | 216 | Indirect | M9 extraction |
-| 6 | `ProcessIpcCommands` | `UI.IPC.cs` | 68 | 216 | No | Phase 2 follow-up |
-| 7 | `HydrateFSMsFromWorkingOrders` | `SIMA.Lifecycle.cs` | 76 | 182 | YES | Phase 4 wraps it |
-| 8 | `ExecuteSmartDispatchEntry` | `SIMA.Dispatch.cs` | 100 | 179 | YES | Phase 4 scaffolds this |
-| 9 | `AuditSingleFleetAccount` | `REAPER.Audit.cs` | 83 | 148 | No | M9 REAPER extraction |
-| 10 | `PropagateMasterPriceMove` | `Orders.Callbacks.Propagation.cs` | 82 | 147 | No | Monitor only |
+| 1 | `ManageTrailingStops` | `Trailing.cs` | 151 | 408 | Indirect | M5 Zero-Alloc |
+| 2 | `HydrateWorkingOrdersFromBroker`| `SIMA.Lifecycle.cs` | 96 | 238 | YES | Phase 4 wraps it |
+| 3 | `ProcessQueuedExecution` | `UI.Compliance.cs` | 87 | 216 | Indirect | M9 extraction |
+| 4 | `HydrateFSMsFromWorkingOrders` | `SIMA.Lifecycle.cs` | 76 | 188 | YES | Phase 4 wraps it |
+| 5 | `ExecuteSmartDispatchEntry` | `SIMA.Dispatch.cs` | 100 | 179 | YES | Phase 4 scaffolds this |
+| 6 | `ProcessIpc_MatchSymbol` | `UI.IPC.cs` | 49 | 159 | No | Phase 2 follow-up |
+| 7 | `SubmitBracketOrders` | `Orders.Management.cs` | 53 | 143 | No | M7 Concurrency |
+| 8 | `OnStateChangeTerminated` | `Lifecycle.cs` | 43 | 121 | YES | Phase 4 wraps it |
+| 9 | `AuditSingleFleetAccount` | `REAPER.Audit.cs` | 45 | 87 | No | M9 REAPER extraction |
+| -- | **`ExecuteTRENDEntry`** | `Entries.Trend.cs` | **10** | **--** | ✅ | **REFACTORED** |
 
 ---
 
