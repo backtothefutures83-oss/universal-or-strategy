@@ -2,8 +2,8 @@
 
 ## Build-984-SourceHardening | 12 Repairs CONFIRMED LIVE -- COMPLIANCE PASS
 
-**Last Synced**: 2026-05-08T12:00:00Z
-**Protocol**: V14 Alpha | **Current Build**: 1111.006-phase-6-t0
+**Last Synced**: 2026-05-07T23:40:00Z
+**Protocol**: V14 Alpha | **Current Build**: 1111.006-v28.0-b984-complete
 **Status**: 🟢 **READY FOR MERGE** (StyleCop & ASCII Gates PASS)
 **Active Branch**: `build-984-source-hardening` | **Last Stable PR**: #76
 
@@ -36,7 +36,7 @@
 
 ---
 
-## THE 5 REFACTORING PHASES -- STATUS
+## THE 4 REFACTORING PHASES -- STATUS
 
 | Phase | Title | Status |
 | :---: | :--- | :---: |
@@ -45,7 +45,6 @@
 | **Phase 3** | Strategy Patterns (RAII + Resource Leak Remediation) | ✅ DONE |
 | **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | ✅ DONE |
 | **Phase 5** | Modularization (StickyState + Trend + UI/Photon IO Subgraphs) | ✅ DONE |
-| **Phase 6** | Hot Path Execution Hardening (T1/T2/T3 god-function extraction) | 🟡 IN PROGRESS |
 
 ---
 
@@ -124,30 +123,6 @@
 
 ---
 
-## CURRENT MISSION: PHASE 6 -- HOT PATH Execution HARDENING
-
-Phase 6 is a discrete milestone bridging M5 (Zero-Allocation Hot Path) and M7 (Concurrency Hardening). It targets the extraction of three god-functions: `ManageTrailingStops` (151 CYC), `ProcessOnExecutionUpdate` (120 CYC), and `ExecuteSmartDispatchEntry` (100 CYC).
-
-### References
-- `epic:d897fcf5-7eec-48e1-87cc-43d34a8ca7b7`
-- `spec:d897fcf5-7eec-48e1-87cc-43d34a8ca7b7/4d69f7d8-473e-412c-8928-5c0304018e82` (Epic Brief)
-- `spec:d897fcf5-7eec-48e1-87cc-43d34a8ca7b7/513f05c0-ec33-4c5a-bd87-96c848fb3958` (Refactoring Approach)
-
-### Ticket Sequence
-- [x] T0
-- [ ] T1.A
-- [ ] T1.B
-- [ ] T1.C
-- [ ] T1.D
-- [ ] T2.A
-- [ ] T3.A
-- [ ] T3.B
-- [ ] T3.C
-- [ ] T3.D
-- [ ] T4
-
----
-
 ## ADR-020 PHASE GATE STATUS
 
 | Phase | Role | Purpose | Status |
@@ -203,16 +178,15 @@ Phase 6 is a discrete milestone bridging M5 (Zero-Allocation Hot Path) and M7 (C
 
 | Rank | Method | File | Complexity | Score | Phase 4? | Action |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
-| 1 | `ManageTrailingStops` | `Trailing.cs` | 151 | 408 | Indirect | Phase 6 / IN PROGRESS |
+| 1 | `ManageTrailingStops` | `Trailing.cs` | 151 | 408 | Indirect | M5 Zero-Alloc |
 | 2 | `HydrateWorkingOrdersFromBroker`| `SIMA.Lifecycle.cs` | 96 | 238 | YES | Phase 4 wraps it |
 | 3 | `ProcessQueuedExecution` | `UI.Compliance.cs` | 87 | 216 | Indirect | M9 extraction |
 | 4 | `HydrateFSMsFromWorkingOrders` | `SIMA.Lifecycle.cs` | 76 | 188 | YES | Phase 4 wraps it |
-| 5 | `ExecuteSmartDispatchEntry` | `SIMA.Dispatch.cs` | 100 | 179 | YES | Phase 6 / IN PROGRESS |
+| 5 | `ExecuteSmartDispatchEntry` | `SIMA.Dispatch.cs` | 100 | 179 | YES | Phase 4 scaffolds this |
 | 6 | `ProcessIpc_MatchSymbol` | `UI.IPC.cs` | 49 | 159 | No | Phase 2 follow-up |
 | 7 | `SubmitBracketOrders` | `Orders.Management.cs` | 53 | 143 | No | M7 Concurrency |
 | 8 | `OnStateChangeTerminated` | `Lifecycle.cs` | 43 | 121 | YES | Phase 4 wraps it |
 | 9 | `AuditSingleFleetAccount` | `REAPER.Audit.cs` | 45 | 87 | No | M9 REAPER extraction |
-| 10 | `ProcessOnExecutionUpdate` | `Orders.Callbacks.Execution.cs` | 120 | -- | No | Phase 6 / IN PROGRESS |
 | -- | **`ExecuteTRENDEntry`** | `Entries.Trend.cs` | **10** | **--** | ✅ | **REFACTORED** |
 
 ---
