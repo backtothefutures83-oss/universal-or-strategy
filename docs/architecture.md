@@ -156,21 +156,22 @@ flowchart TD
     class Trend_Main,REAPER_Repair,Telemetry,StructuredLog stable
 ```
 
-## 📊 Technical Debt & Complexity Heatmap (Phase 5/6 Status)
+## 📊 Technical Debt & Complexity Heatmap (Phase 6 COMPLETE)
 
 | Rank | Symbol | File | Complexity (CYC) | Status |
 | :--- | :--- | :--- | :---: | :--- |
-| 1 | `ManageTrailingStops` | `V12_002.Trailing.cs` | 151 | 🔴 **CRITICAL** (M5 Target) |
-| 2 | `OnOrderUpdate` | `V12_002.Orders.Callbacks.Execution.cs` | 120 | 🔴 **CRITICAL** (Hardening) |
-| 3 | `OnAccountOrderUpdate` | `V12_002.UI.Callbacks.cs` | 110 | 🔴 **CRITICAL** (Hardening) |
-| 4 | `ExecuteSmartDispatchEntry` | `V12_002.SIMA.Dispatch.cs` | 100 | 🔴 **CRITICAL** (Hardening) |
-| 5 | `HydrateWorkingOrdersFromBroker` | `V12_002.SIMA.Lifecycle.cs` | 96 | 🔴 **CRITICAL** (Hardening) |
-| -- | `ExecuteTRENDEntry` | `V12_002.Entries.Trend.cs` | **10** | 🟢 **OPTIMIZED** (Phase 5 Part 1) |
+| -- | `ManageTrailingStops` | `V12_002.Trailing.cs` | **< 30** | 🟢 **OPTIMIZED** (Phase 6) |
+| -- | `ExecuteSmartDispatchEntry` | `V12_002.SIMA.Dispatch.cs` | **< 30** | 🟢 **OPTIMIZED** (Phase 6) |
+| -- | `ProcessOnExecutionUpdate` | `V12_002.Orders.Callbacks.Execution.cs` | **< 20** | 🟢 **OPTIMIZED** (Phase 6) |
+| -- | `ExecuteTRENDEntry` | `V12_002.Entries.Trend.cs` | **10** | 🟢 **OPTIMIZED** (Phase 5) |
+| 1 | `OnAccountOrderUpdate` | `V12_002.UI.Callbacks.cs` | 110 | 🔴 **CRITICAL** (Phase 7 Target) |
+| 2 | `HydrateWorkingOrdersFromBroker` | `V12_002.SIMA.Lifecycle.cs` | 96 | 🔴 **CRITICAL** (Phase 7 Target) |
 
 ## 🛡️ Sovereign Hardening Status
 - **Lock Audit**: `(?<!\w)lock\s*\(` Case-sensitive check: **PASS** (Zero hits).
 - **ASCII Integrity**: Zero non-ASCII string literals in strategy source: **PASS**.
 - **Deployment**: `deploy-sync.ps1` hard-link synchronization: **ACTIVE**.
+- **Diff Guard**: character limit enforcement (< 150k): **ACTIVE**.
 
 > [!NOTE]
 > `ExecuteTRENDEntry` was successfully extracted from a 120+ complexity God-function into a lean 10-complexity entry point during Phase 5.
