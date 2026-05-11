@@ -102,8 +102,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (ord != null
                     && !IsOrderTerminal(ord.OrderState)
                     && activePositions.TryGetValue(kvp.Key, out var pos)
-                    && pos.ExecutingAccount != null
-                    && pos.ExecutingAccount.Name == flatAcctName)
+                    && pos.ExecutingAccount?.Name == flatAcctName)
                 {
                     return true;
                 }
@@ -116,8 +115,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             foreach (var kvp in activePositions.ToArray())
             {
-                if (kvp.Value.ExecutingAccount != null
-                    && kvp.Value.ExecutingAccount.Name == flatAcctName
+                if (kvp.Value.ExecutingAccount?.Name == flatAcctName
                     && !kvp.Value.EntryFilled)
                 {
                     return true;
@@ -488,22 +486,5 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
 
         #endregion
-    
-
-        private string ProcessOnExecution_ExtractEntryName(string name, string prefix)
-                {
-                    if (!name.StartsWith(prefix)) return "";
-                    string entryPart = name.Substring(prefix.Length);
-                    // Strip timestamp suffix if present (format: _123456789012345)
-                    int lastUnderscore = entryPart.LastIndexOf('_');
-                    if (lastUnderscore > 0 && entryPart.Length - lastUnderscore > 10)
-                        entryPart = entryPart.Substring(0, lastUnderscore);
-                    return entryPart;
-        }
-
-        private void ProcessOnExecution_RunShadowCheck()
-            {
-            ShadowEngineCheck();
-        }
-}
+    }
 }

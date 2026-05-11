@@ -36,34 +36,57 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region Trailing Stops
 
-        private void ManageTrailingStops()        {
+        private void ManageTrailingStops()
+        {
             bool _shouldExit;
             ManageTrail_AdaptiveThrottleTick(out _shouldExit);
             if (_shouldExit) return;
-            // V8.30: Thread-safe snapshot iteration - prevents "Collection was modified" exception            var positionSnapshot = activePositions.ToArray();
-            foreach (var kvp in positionSnapshot)            {
+
+            // V8.30: Thread-safe snapshot iteration - prevents "Collection was modified" exception
+            var positionSnapshot = activePositions.ToArray();
+            foreach (var kvp in positionSnapshot)
+            {
                 string entryName = kvp.Key;
                 PositionInfo pos = kvp.Value;
-                // V8.30: Verify position still exists (may have been removed by callback thread)                if (!activePositions.ContainsKey(entryName)) continue;
+
+                // V8.30: Verify position still exists (may have been removed by callback thread)
+                if (!activePositions.ContainsKey(entryName)) continue;
+
                 if (!pos.EntryFilled || !pos.BracketSubmitted) continue;
                 if (pos.IsFollower && SymmetryGuardIsAnchorPending(entryName)) continue;
-                // Increment tick counter on every call                pos.TicksSinceEntry++;
-                // Update extreme price                pos.ExtremePriceSinceEntry = pos.Direction == MarketPosition.Long ? Math.Max(pos.ExtremePriceSinceEntry, Close[0]) : Math.Min(pos.ExtremePriceSinceEntry, Close[0]);
+
+                // Increment tick counter on every call
+                pos.TicksSinceEntry++;
+
+                // Update extreme price
+                pos.ExtremePriceSinceEntry = pos.Direction == MarketPosition.Long ? Math.Max(pos.ExtremePriceSinceEntry, Close[0]) : Math.Min(pos.ExtremePriceSinceEntry, Close[0]);
+
                 if (ManageTrail_RunPerTradeBranches(entryName, pos)) continue;
-                // Standard TREND/RETEST are EMA-only;
- point-based BE/T1/T2/T3 is RMA-only for these trade types.                bool isTrendOrRetestTrade = pos.IsTRENDTrade || pos.IsRetestTrade;
+
+                // Standard TREND/RETEST are EMA-only; point-based BE/T1/T2/T3 is RMA-only for these trade types.
+                bool isTrendOrRetestTrade = pos.IsTRENDTrade || pos.IsRetestTrade;
                 bool allowPointBasedTrailing = !isTrendOrRetestTrade || pos.IsRMATrade;
-                if (!allowPointBasedTrailing)                    continue;
+                if (!allowPointBasedTrailing)
+                    continue;
                 double _newStopPrice = pos.CurrentStopPrice;
                 int _newTrailLevel = pos.CurrentTrailLevel;
                 ManageTrail_RunPointBasedTrailing(entryName, pos, ref _newStopPrice, ref _newTrailLevel);
-}
-            // V12.10: FLEET SYMMETRY SYNC PASS            // When SIMA is enabled, force followers to match the Leader's trail level.            // Followers calculate stops relative to their OWN entry prices but are triggered            // by the Leader's profit progress. This prevents slippage-induced desync.            if (EnableSIMA)            {
+            }
+
+            // V12.10: FLEET SYMMETRY SYNC PASS
+            // When SIMA is enabled, force followers to match the Leader's trail level.
+            // Followers calculate stops relative to their OWN entry prices but are triggered
+            // by the Leader's profit progress. This prevents slippage-induced desync.
+            // [LD-003] Thread-Safety: Use a fresh snapshot for fleet sync to prevent stale stop synchronization.
+            if (EnableSIMA)
+            {
                 var updatedSnapshot = activePositions.ToArray();
                 ManageTrail_RunFleetSymmetrySync(updatedSnapshot);
-}
-            // Build 1105: Shadow Mode auto-propagation (runs after fleet sync)            ShadowEngineCheck();
-}
+            }
+
+            // Build 1105: Shadow Mode auto-propagation (runs after fleet sync)
+            ShadowEngineCheck();
+        }
 
         private void ManageTrail_RunFleetSymmetrySync(KeyValuePair<string, PositionInfo>[] positionSnapshot)
         {
@@ -204,7 +227,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (shouldUpdate)
                     {
                         UpdateStopOrder(entryName, pos, trendStop, pos.CurrentTrailLevel);
-                        // Print(string.Format("TREND E1 TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
+                        Print(string.Format("TREND E1 TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
                         //    trendStop, ema9Live, TRENDEntry2ATRMultiplier));
                     }
                 }
@@ -462,6 +485,5 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V8.30: Clean up stale pending replacements that are older than 5 seconds
         // Prevents memory leak and ensures positions remain protected
         #endregion
-    
-}
+    }
 }
