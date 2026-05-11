@@ -529,10 +529,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
-                // V12.Phase7 [GAP-4]: Dispose SIMA toggle semaphore to release OS handle.
-                // In finally block: guaranteed to run even if ClearAllSubscribers throws.
-                try { _simaToggleSem?.Dispose(); }
-                catch (Exception exSem) { Print("[SHUTDOWN] SemaphoreSlim dispose failed: " + exSem.ToString()); }
+                // V12.Phase7 [GAP-4]: No disposal needed for lock-free int gate (_simaToggleState).
+                // Interlocked primitives have no OS handles to release.
             }
 
             // Clear references

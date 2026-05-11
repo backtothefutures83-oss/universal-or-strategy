@@ -44,9 +44,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ExecuteSmartDispatchEntry(string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType = OrderType.Market, params string[] masterEntryNames)
         {
-            // V12.Phase8 [F-03]: Semaphore guard -- non-blocking (Build 1109 freeze-proof).
-            // Wait(0) returns instantly. If contended, defer to next strategy-thread cycle.
-            if (!_simaToggleSem.Wait(0))
+            // V12.Phase8 [F-03]: Lock-free gate guard -- non-blocking (Build 1109 freeze-proof).
+            // Interlocked.CompareExchange returns instantly. If contended, defer to next strategy-thread cycle.
+            if (Interlocked.CompareExchange(ref _simaToggleState, 1, 0) != 0)
             {
                 Print("[DISPATCH] Semaphore contended -- deferring dispatch (non-blocking)");
                 string _defTradeType = tradeType;
@@ -84,7 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (isFlattenRunning)
                 {
                     Print("[DISPATCH] (!) Aborting dispatch -- flatten in progress (isFlattenRunning=true)");
-                    return; // finally block releases _simaToggleSem
+                    return; // finally block releases _simaToggleState gate
                 }
 
                 // Phase 6 [MG-D1]: MetadataGuard -- reject duplicate dispatch signals.
@@ -328,8 +328,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
-                // V12.Phase8 [F-03]: Always release the SIMA toggle semaphore.
-                _simaToggleSem.Release();
+                // V12.Phase8 [F-03]: Always release the SIMA toggle gate via Interlocked.Exchange.
+                Interlocked.Exchange(ref _simaToggleState, 0);
             }
         }
 
