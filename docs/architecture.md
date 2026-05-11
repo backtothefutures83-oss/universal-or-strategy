@@ -151,9 +151,9 @@ flowchart TD
     classDef ultraComplexity fill:#f33,stroke:#333,stroke-width:4px,color:#fff;
     classDef stable fill:#9f9,stroke:#333,stroke-width:1px;
 
-    class UI_Call,Exec_Logic,SIMA_LC,SIMA_Disp,Trailing_Main ultraComplexity
+    class UI_Call,SIMA_LC ultraComplexity
     class SIMA_Main,OR_Main,REAPER_Audit,Exec_Account,UI_Comp highComplexity
-    class Trend_Main,REAPER_Repair,Telemetry,StructuredLog stable
+    class Exec_Logic,SIMA_Disp,Trailing_Main,Trend_Main,REAPER_Repair,Telemetry,StructuredLog stable
 ```
 
 ## 📊 Technical Debt & Complexity Heatmap (Phase 6 COMPLETE)

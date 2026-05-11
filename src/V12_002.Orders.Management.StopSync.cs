@@ -36,15 +36,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void RefreshActivePositionOrders()
         {
-            if (activePositions == null || activePositions.IsEmpty)
-            {
-                Print("[SYNC_ALL] No active positions to refresh.");
-                return;
-            }
-
-            // Snapshot under stateLock -- satisfies stateLock invariant for dict reads
-            List<KeyValuePair<string, PositionInfo>> snapshot;
-            snapshot = activePositions.ToList();
+            var snapshot = ValidateAndSnapshotPositions();
+            if (snapshot == null) return;
 
             int refreshed = 0;
             foreach (var kvp in snapshot)
@@ -52,19 +45,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string entryName = kvp.Key;
                 PositionInfo pos = kvp.Value;
 
-                // Guard: entry must be filled and position open
-                if (!pos.EntryFilled || pos.RemainingContracts <= 0) continue;
-
-                // Guard: skip SIMA followers -- fleet dispatch is out of scope for Phase 9.1
-                if (pos.IsFollower)
-                {
-                    Print(string.Format("[SYNC_ALL] Skipping follower position {0}", entryName));
-                    continue;
-                }
-
                 for (int targetNum = 1; targetNum <= 5; targetNum++)
                 {
-                    // Skip already-filled targets
                     if (IsTargetFilled(pos, targetNum)) continue;
 
                     int targetQty = GetTargetContracts(pos, targetNum);
@@ -73,14 +55,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     var targetDict = GetTargetOrdersDictionary(targetNum);
                     if (targetDict == null) continue;
 
-                    // Check if a live limit order exists for this target slot
                     Order existingOrder = null;
                     bool hasWorkingOrder = targetDict.TryGetValue(entryName, out existingOrder) &&
                                            existingOrder != null &&
                                            (existingOrder.OrderState == OrderState.Working ||
                                             existingOrder.OrderState == OrderState.Accepted);
 
-                    // [C-06 parity]: Skip ChangePending orders to avoid broker race
                     if (existingOrder != null && existingOrder.OrderState == OrderState.ChangePending)
                     {
                         Print(string.Format("[SYNC_ALL] T{0} {1}: ChangePending -- skipping", targetNum, entryName));
@@ -91,101 +71,141 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (isNowRunner)
                     {
-                        // Runner targets must have NO limit order -- cancel any existing one
-                        if (hasWorkingOrder)
-                        {
-                            try
-                            {
-                                CancelOrderSafe(existingOrder, pos);
-                                // B957: Do NOT TryRemove from targetDict here -- the cancel is async.
-                                // The broker-confirmed terminal callback will perform the removal under stateLock
-                                // once confirmed, preventing premature cleanup before the cancel is acknowledged.
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancel requested -> now Runner (awaiting broker confirm)", targetNum, entryName));
-                                refreshed++;
-                            }
-                            catch (Exception ex)
-                            {
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: CancelOrder failed -- {2}", targetNum, entryName, ex.Message));
-                            }
-                        }
+                        SyncRunnerTarget(entryName, pos, targetNum, targetDict, existingOrder, ref refreshed);
                         continue;
                     }
 
-                    // Limit/ATR/Ticks/Points: recalculate price from live ATR and entry
-                    // Build 1102Y [P-06]: Role-aware reprice -- RMA/SIMA positions use stamped role; others use slot-based.
-                    double newPrice = CalculateTargetPriceFromPos(pos.Direction, pos.EntryPrice, pos, targetNum);
-                    if (newPrice <= 0)
-                    {
-                        Print(string.Format("[SYNC_ALL] T{0} {1}: Calculated price invalid ({2:F2}) -- skipped", targetNum, entryName, newPrice));
-                        continue;
-                    }
-
-                    if (hasWorkingOrder)
-                    {
-                        // Shift existing limit if it moved by >= 1 tick
-                        if (Math.Abs(existingOrder.LimitPrice - newPrice) >= tickSize)
-                        {
-                            try
-                            {
-                                ChangeOrder(existingOrder, existingOrder.Quantity, newPrice, 0);
-                                switch (targetNum)
-                                {
-                                    case 1: pos.Target1Price = newPrice; break;
-                                    case 2: pos.Target2Price = newPrice; break;
-                                    case 3: pos.Target3Price = newPrice; break;
-                                    case 4: pos.Target4Price = newPrice; break;
-                                    case 5: pos.Target5Price = newPrice; break;
-                                }
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: Repriced -> {2:F2}", targetNum, entryName, newPrice));
-                                refreshed++;
-                            }
-                            catch (Exception ex)
-                            {
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: ChangeOrder failed -- {2}", targetNum, entryName, ex.Message));
-                            }
-                        }
-                        else
-                        {
-                            Print(string.Format("[SYNC_ALL] T{0} {1}: Price unchanged at {2:F2} -- no action", targetNum, entryName, newPrice));
-                        }
-                    }
-                    else
-                    {
-                        // No working order (e.g. Runner->Limit swap): submit a fresh limit order
-                        try
-                        {
-                            Order newLimit = pos.Direction == MarketPosition.Long
-                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Limit, targetQty, newPrice, 0, "", "T" + targetNum + "_" + entryName)
-                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Limit, targetQty, newPrice, 0, "", "T" + targetNum + "_" + entryName);
-
-                            if (newLimit != null)
-                            {
-                                targetDict[entryName] = newLimit;
-                                switch (targetNum)
-                                {
-                                    case 1: pos.Target1Price = newPrice; break;
-                                    case 2: pos.Target2Price = newPrice; break;
-                                    case 3: pos.Target3Price = newPrice; break;
-                                    case 4: pos.Target4Price = newPrice; break;
-                                    case 5: pos.Target5Price = newPrice; break;
-                                }
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: New limit submitted @ {2:F2} qty={3}", targetNum, entryName, newPrice, targetQty));
-                                refreshed++;
-                            }
-                            else
-                            {
-                                Print(string.Format("[SYNC_ALL] T{0} {1}: SubmitOrderUnmanaged returned null @ {2:F2}", targetNum, entryName, newPrice));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Print(string.Format("[SYNC_ALL] T{0} {1}: Submit failed -- {2}", targetNum, entryName, ex.Message));
-                        }
-                    }
+                    SyncLimitTarget(entryName, pos, targetNum, targetQty, targetDict, existingOrder, hasWorkingOrder, ref refreshed);
                 }
             }
 
             Print(string.Format("[SYNC_ALL] Complete. Positions scanned: {0} | Actions taken: {1}", snapshot.Count, refreshed));
+        }
+
+        private List<KeyValuePair<string, PositionInfo>> ValidateAndSnapshotPositions()
+        {
+            if (activePositions == null || activePositions.IsEmpty)
+            {
+                Print("[SYNC_ALL] No active positions to refresh.");
+                return null;
+            }
+
+            List<KeyValuePair<string, PositionInfo>> snapshot = activePositions.ToList();
+            List<KeyValuePair<string, PositionInfo>> filtered = new List<KeyValuePair<string, PositionInfo>>();
+
+            foreach (var kvp in snapshot)
+            {
+                PositionInfo pos = kvp.Value;
+
+                if (!pos.EntryFilled || pos.RemainingContracts <= 0) continue;
+
+                if (pos.IsFollower)
+                {
+                    Print(string.Format("[SYNC_ALL] Skipping follower position {0}", kvp.Key));
+                    continue;
+                }
+
+                filtered.Add(kvp);
+            }
+
+            return filtered;
+        }
+
+        private void SyncRunnerTarget(string entryName, PositionInfo pos, int targetNum,
+            ConcurrentDictionary<string, Order> targetDict, Order existingOrder, ref int refreshed)
+        {
+            bool hasWorkingOrder = existingOrder != null &&
+                                   (existingOrder.OrderState == OrderState.Working ||
+                                    existingOrder.OrderState == OrderState.Accepted);
+
+            if (!hasWorkingOrder) return;
+
+            try
+            {
+                CancelOrderSafe(existingOrder, pos);
+                // B957: Do NOT TryRemove from targetDict here -- the cancel is async.
+                // The broker-confirmed terminal callback will perform the removal under stateLock
+                // once confirmed, preventing premature cleanup before the cancel is acknowledged.
+                Print(string.Format("[SYNC_ALL] T{0} {1}: Limit cancel requested -> now Runner (awaiting broker confirm)", targetNum, entryName));
+                refreshed++;
+            }
+            catch (Exception ex)
+            {
+                Print(string.Format("[SYNC_ALL] T{0} {1}: CancelOrder failed -- {2}", targetNum, entryName, ex.Message));
+            }
+        }
+
+        private void SyncLimitTarget(string entryName, PositionInfo pos, int targetNum, int targetQty,
+            ConcurrentDictionary<string, Order> targetDict, Order existingOrder, bool hasWorkingOrder, ref int refreshed)
+        {
+            // Build 1102Y [P-06]: Role-aware reprice -- RMA/SIMA positions use stamped role; others use slot-based.
+            double newPrice = CalculateTargetPriceFromPos(pos.Direction, pos.EntryPrice, pos, targetNum);
+            if (newPrice <= 0)
+            {
+                Print(string.Format("[SYNC_ALL] T{0} {1}: Calculated price invalid ({2:F2}) -- skipped", targetNum, entryName, newPrice));
+                return;
+            }
+
+            if (hasWorkingOrder)
+            {
+                if (Math.Abs(existingOrder.LimitPrice - newPrice) >= tickSize)
+                {
+                    try
+                    {
+                        ChangeOrder(existingOrder, existingOrder.Quantity, newPrice, 0);
+                        switch (targetNum)
+                        {
+                            case 1: pos.Target1Price = newPrice; break;
+                            case 2: pos.Target2Price = newPrice; break;
+                            case 3: pos.Target3Price = newPrice; break;
+                            case 4: pos.Target4Price = newPrice; break;
+                            case 5: pos.Target5Price = newPrice; break;
+                        }
+                        Print(string.Format("[SYNC_ALL] T{0} {1}: Repriced -> {2:F2}", targetNum, entryName, newPrice));
+                        refreshed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Print(string.Format("[SYNC_ALL] T{0} {1}: ChangeOrder failed -- {2}", targetNum, entryName, ex.Message));
+                    }
+                }
+                else
+                {
+                    Print(string.Format("[SYNC_ALL] T{0} {1}: Price unchanged at {2:F2} -- no action", targetNum, entryName, newPrice));
+                }
+            }
+            else
+            {
+                try
+                {
+                    Order newLimit = pos.Direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Limit, targetQty, newPrice, 0, "", "T" + targetNum + "_" + entryName)
+                        : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Limit, targetQty, newPrice, 0, "", "T" + targetNum + "_" + entryName);
+
+                    if (newLimit != null)
+                    {
+                        targetDict[entryName] = newLimit;
+                        switch (targetNum)
+                        {
+                            case 1: pos.Target1Price = newPrice; break;
+                            case 2: pos.Target2Price = newPrice; break;
+                            case 3: pos.Target3Price = newPrice; break;
+                            case 4: pos.Target4Price = newPrice; break;
+                            case 5: pos.Target5Price = newPrice; break;
+                        }
+                        Print(string.Format("[SYNC_ALL] T{0} {1}: New limit submitted @ {2:F2} qty={3}", targetNum, entryName, newPrice, targetQty));
+                        refreshed++;
+                    }
+                    else
+                    {
+                        Print(string.Format("[SYNC_ALL] T{0} {1}: SubmitOrderUnmanaged returned null @ {2:F2}", targetNum, entryName, newPrice));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Print(string.Format("[SYNC_ALL] T{0} {1}: Submit failed -- {2}", targetNum, entryName, ex.Message));
+                }
+            }
         }
 
         /// <summary>

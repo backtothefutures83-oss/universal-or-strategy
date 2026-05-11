@@ -39,79 +39,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (string.IsNullOrEmpty(entryName)) return;
             try
             {
-                int cancelledStops = 0;
-                int cancelledTargets = 0;
-                int cancelledEntries = 0;
-
-                // Build 1104: route all cleanup cancels through the gateway so follower orders use
-                // Account.Cancel() while master orders keep the managed cancel path.
                 PositionInfo cleanupPosRef;
                 activePositions.TryGetValue(entryName, out cleanupPosRef);
-
-                // Stop: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
-                if (stopOrders.TryGetValue(entryName, out var stopOrder))
-                {
-                    if (stopOrder != null)
-                    {
-                        if (IsOrderTerminal(stopOrder.OrderState))
-                            stopOrders.TryRemove(entryName, out _);
-                        else
-                        {
-                            CancelOrderSafe(stopOrder, cleanupPosRef);
-                            cancelledStops++;
-                        }
-                    }
-                    else
-                        stopOrders.TryRemove(entryName, out _);
-                }
-
-                // T1-T5: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
-                for (int tNum = 1; tNum <= 5; tNum++)
-                {
-                    var tDict = GetTargetOrdersDictionary(tNum);
-                    if (tDict == null) continue;
-
-                    if (tDict.TryGetValue(entryName, out var tOrder))
-                    {
-                        if (tOrder != null)
-                        {
-                            if (IsOrderTerminal(tOrder.OrderState))
-                                tDict.TryRemove(entryName, out _);
-                            else
-                            {
-                                CancelOrderSafe(tOrder, cleanupPosRef);
-                                cancelledTargets++;
-                            }
-                        }
-                        else
-                        {
-                            tDict.TryRemove(entryName, out _);
-                        }
-                    }
-                }
-
-                // Entry: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
-                if (entryOrders.TryGetValue(entryName, out var eOrder))
-                {
-                    if (eOrder != null)
-                    {
-                        if (IsOrderTerminal(eOrder.OrderState))
-                        {
-                            entryOrders.TryRemove(entryName, out _);
-                            _citNudgedKeys.TryRemove(entryName, out _);
-                        }
-                        else
-                        {
-                            CancelOrderSafe(eOrder, cleanupPosRef);
-                            cancelledEntries++;
-                        }
-                    }
-                    else
-                    {
-                        entryOrders.TryRemove(entryName, out _);
-                        _citNudgedKeys.TryRemove(entryName, out _);
-                    }
-                }
+                
+                var (cancelledStops, cancelledTargets, cancelledEntries) = CancelAllOrdersForEntry(entryName, cleanupPosRef);
 
                 if (pendingStopReplacements.TryRemove(entryName, out _)) Interlocked.Decrement(ref pendingReplacementCount);
 
@@ -119,57 +50,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print(string.Format("CLEANUP SUMMARY for {0}: Stops={1} Targets={2} Entries={3}",
                         entryName, cancelledStops, cancelledTargets, cancelledEntries));
 
-                // V12.Phase8.2 [META-GUARD]: Pre-compute followerExpected before any purge decision.
-                // If the Reaper has a non-zero expectedPositions for this account, a Repair Hook is planning
-                // to re-issue the entry. Purging now would destroy the PositionInfo metadata
-                // (price/qty/direction) that the Repair Hook reads to reconstruct the order.
+                if (EvaluateFollowerRepairBlock(entryName))
+                    return;
+
                 int followerExpected = 0;
-                if (activePositions.TryGetValue(entryName, out var metaGuardCheck)
-                    && metaGuardCheck.IsFollower
-                    && metaGuardCheck.ExecutingAccount != null)
+                if (activePositions.TryGetValue(entryName, out var metaCheck)
+                    && metaCheck.IsFollower
+                    && metaCheck.ExecutingAccount != null)
                 {
-                    string followerAcctName = metaGuardCheck.ExecutingAccount.Name;
-                    // Build 1102U [BUG-1]: Must use composite key to match new ExpKey scheme.
-                    expectedPositions.TryGetValue(ExpKey(followerAcctName), out followerExpected);
-                    if (followerExpected != 0)
-                    {
-                        Print(string.Format("[META-GUARD] {0}: Broker is flat but expectedPositions={1}. " +
-                            "Retaining activePositions metadata for Repair Hook. Will purge after repair completes.",
-                            entryName, followerExpected));
-                        return;
-                    }
+                    expectedPositions.TryGetValue(ExpKey(metaCheck.ExecutingAccount.Name), out followerExpected);
                 }
-
-                // V12.1101E [DESYNC-01]: Defer activePositions removal until no dict holds an active/pending order.
-                // V12.Phase8.2 [META-GUARD]: Skip purge if Reaper Repair Hook is active (followerExpected != 0).
-                if (followerExpected == 0 && !HasActiveOrPendingOrderForEntry(entryName))
-                {
-                    bool removed;
-                    removed = activePositions.TryRemove(entryName, out _);
-                    if (removed) SymmetryGuardForgetEntry(entryName);
-                }
-
-                // [FIX-ZP-02]: Secondary safety net for SIMA followers -- force purge if broker confirms flat.
-                // Guards against lingering non-terminal dict entries preventing HasActiveOrPendingOrderForEntry
-                // from returning false even though the actual broker position is already flat.
-                if (followerExpected == 0
-                    && activePositions.TryGetValue(entryName, out var followerCheck)
-                    && followerCheck.IsFollower
-                    && followerCheck.ExecutingAccount != null)
-                {
-                    var brokerPos = followerCheck.ExecutingAccount.Positions
-                        .FirstOrDefault(p => p.Instrument == Instrument);
-                    if (brokerPos != null && brokerPos.MarketPosition == MarketPosition.Flat)
-                    {
-                        bool removedFZP;
-                        removedFZP = activePositions.TryRemove(entryName, out _);
-                        if (removedFZP)
-                        {
-                            SymmetryGuardForgetEntry(entryName);
-                            Print(string.Format("[FIXED_G] Purging {0} - confirmed flat by broker.", entryName));
-                        }
-                    }
-                }
+                
+                PurgePositionIfEligible(entryName, followerExpected);
             }
             finally
             {
@@ -177,6 +69,146 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (TryTerminateFollowerBracket(entryName, out removedFsm) && removedFsm != null)
                 {
                     Print(string.Format("[FSM-C1] Terminated FSM for {0} (was {1})", entryName, removedFsm.State));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Cancel all orders (stops, targets T1-T5, entries) for the specified entry name.
+        /// Returns cancellation counts for summary logging.
+        /// </summary>
+        private (int cancelledStops, int cancelledTargets, int cancelledEntries) CancelAllOrdersForEntry(string entryName, PositionInfo cleanupPosRef)
+        {
+            int cancelledStops = 0;
+            int cancelledTargets = 0;
+            int cancelledEntries = 0;
+
+            // Stop: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
+            if (stopOrders.TryGetValue(entryName, out var stopOrder))
+            {
+                if (stopOrder != null)
+                {
+                    if (IsOrderTerminal(stopOrder.OrderState))
+                        stopOrders.TryRemove(entryName, out _);
+                    else
+                    {
+                        CancelOrderSafe(stopOrder, cleanupPosRef);
+                        cancelledStops++;
+                    }
+                }
+                else
+                    stopOrders.TryRemove(entryName, out _);
+            }
+
+            // T1-T5: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
+            for (int tNum = 1; tNum <= 5; tNum++)
+            {
+                var tDict = GetTargetOrdersDictionary(tNum);
+                if (tDict == null) continue;
+
+                if (tDict.TryGetValue(entryName, out var tOrder))
+                {
+                    if (tOrder != null)
+                    {
+                        if (IsOrderTerminal(tOrder.OrderState))
+                            tDict.TryRemove(entryName, out _);
+                        else
+                        {
+                            CancelOrderSafe(tOrder, cleanupPosRef);
+                            cancelledTargets++;
+                        }
+                    }
+                    else
+                    {
+                        tDict.TryRemove(entryName, out _);
+                    }
+                }
+            }
+
+            // Entry: TryGetValue only; remove only if terminal; otherwise cancel and keep ref
+            if (entryOrders.TryGetValue(entryName, out var eOrder))
+            {
+                if (eOrder != null)
+                {
+                    if (IsOrderTerminal(eOrder.OrderState))
+                    {
+                        entryOrders.TryRemove(entryName, out _);
+                        _citNudgedKeys.TryRemove(entryName, out _);
+                    }
+                    else
+                    {
+                        CancelOrderSafe(eOrder, cleanupPosRef);
+                        cancelledEntries++;
+                    }
+                }
+                else
+                {
+                    entryOrders.TryRemove(entryName, out _);
+                    _citNudgedKeys.TryRemove(entryName, out _);
+                }
+            }
+
+            return (cancelledStops, cancelledTargets, cancelledEntries);
+        }
+
+        /// <summary>
+        /// Evaluate if META-GUARD blocks position purge due to active Reaper repair.
+        /// Returns true if purge should be blocked (expectedPositions != 0 for follower).
+        /// </summary>
+        private bool EvaluateFollowerRepairBlock(string entryName)
+        {
+            if (activePositions.TryGetValue(entryName, out var metaGuardCheck)
+                && metaGuardCheck.IsFollower
+                && metaGuardCheck.ExecutingAccount != null)
+            {
+                string followerAcctName = metaGuardCheck.ExecutingAccount.Name;
+                int followerExpected = 0;
+                expectedPositions.TryGetValue(ExpKey(followerAcctName), out followerExpected);
+                if (followerExpected != 0)
+                {
+                    Print(string.Format("[META-GUARD] {0}: Broker is flat but expectedPositions={1}. " +
+                        "Retaining activePositions metadata for Repair Hook. Will purge after repair completes.",
+                        entryName, followerExpected));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Purge activePositions entry if no active/pending orders remain and META-GUARD allows.
+        /// Includes FIX-ZP-02 secondary follower purge for broker-confirmed flat positions.
+        /// </summary>
+        private void PurgePositionIfEligible(string entryName, int followerExpected)
+        {
+            // V12.1101E [DESYNC-01]: Defer activePositions removal until no dict holds an active/pending order.
+            // V12.Phase8.2 [META-GUARD]: Skip purge if Reaper Repair Hook is active (followerExpected != 0).
+            if (followerExpected == 0 && !HasActiveOrPendingOrderForEntry(entryName))
+            {
+                bool removed;
+                removed = activePositions.TryRemove(entryName, out _);
+                if (removed) SymmetryGuardForgetEntry(entryName);
+            }
+
+            // [FIX-ZP-02]: Secondary safety net for SIMA followers -- force purge if broker confirms flat.
+            // Guards against lingering non-terminal dict entries preventing HasActiveOrPendingOrderForEntry
+            // from returning false even though the actual broker position is already flat.
+            if (followerExpected == 0
+                && activePositions.TryGetValue(entryName, out var followerCheck)
+                && followerCheck.IsFollower
+                && followerCheck.ExecutingAccount != null)
+            {
+                var brokerPos = followerCheck.ExecutingAccount.Positions
+                    .FirstOrDefault(p => p.Instrument == Instrument);
+                if (brokerPos != null && brokerPos.MarketPosition == MarketPosition.Flat)
+                {
+                    bool removedFZP;
+                    removedFZP = activePositions.TryRemove(entryName, out _);
+                    if (removedFZP)
+                    {
+                        SymmetryGuardForgetEntry(entryName);
+                        Print(string.Format("[FIXED_G] Purging {0} - confirmed flat by broker.", entryName));
+                    }
                 }
             }
         }

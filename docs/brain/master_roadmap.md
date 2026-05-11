@@ -45,7 +45,8 @@
 | **Phase 3** | Strategy Patterns (RAII + Resource Leak Remediation) | ✅ DONE |
 | **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | ✅ DONE |
 | **Phase 5** | Modularization (StickyState + Trend + UI/Photon IO Subgraphs) | ✅ DONE |
-| **Phase 6** | Hot Path Execution Hardening (T1/T2/T3 god-function extraction) | 🟡 IN PROGRESS |
+| **Phase 6** | Hot Path Execution Hardening (T1/T2/T3 god-function extraction) | ✅ DONE |
+| **Phase 7** | Concurrency Hardening (M7) + Complexity Extraction (red files) | 🟡 IN PROGRESS |
 
 ---
 
@@ -69,7 +70,7 @@
 | **M4** | Rithmic Sidecar (SovereignBridge.exe) | 🔵 DEFERRED | OPTIONAL |
 | **M5** | Zero-Allocation Hot Path | 🔵 PLANNED | OPTIONAL |
 | **M6** | Cache-Aligned Data Structures | 🔵 PLANNED | OPTIONAL |
-| **M7** | Concurrency Hardening (SPSC/MPMC) | 🔵 PLANNED | OPTIONAL |
+| **M7** | Concurrency Hardening (SPSC/MPMC) | 🟡 IN PROGRESS | OPTIONAL |
 | **M8** | Distributed Optimization (Photon Kernel) | 🔵 DEFERRED (needs M4) | OPTIONAL |
 | **M9** | Full Autonomy (AMAL Loop) | ⚪ DEFERRED (needs M4/M8) | OPTIONAL |
 
@@ -153,6 +154,49 @@ Phase 6 is a discrete milestone bridging M5 (Zero-Allocation Hot Path) and M7 (C
 - [x] T3.A-D: ExecuteSmartDispatchEntry Subgraph Extraction
 - [x] T4: Final Integration, Logic Hygiene & Regression Test
 - [x] T5: Logic Drift ([LD-002]) & Thread-Safety ([LD-003]) Repairs
+
+---
+
+## CURRENT MISSION: PHASE 7 -- CONCURRENCY HARDENING + COMPLEXITY EXTRACTION
+**Status**: 🟡 IN PROGRESS
+**Build**: `1111.007-phase7-t1` | **Confirmed LIVE**: 2026-05-11
+**Protocol**: V12 DNA Lock-Free Actor / Zero-Allocation Hot Path
+
+### Phase 7 Targets (architecture.md red/ultraComplexity files)
+
+| Target | File | CYC | Lock-Free Status | Complexity Extraction |
+| :--- | :--- | :---: | :---: | :--- |
+| T1 `ExecuteTargetAction` | `V12_002.UI.Callbacks.cs` | 24→3 | ✅ CLEAN | ✅ COMPLETE (2026-05-11) |
+| T2 `ExecuteRunnerAction` | `V12_002.UI.Callbacks.cs` | 24→<5 | ✅ CLEAN | ✅ COMPLETE (2026-05-11) |
+| T3 `OnKeyDown` | `V12_002.UI.Callbacks.cs` | 28 | ✅ CLEAN | ⚪ DEFERRED (P3 review needed) |
+| T4 `SIMA.Lifecycle.cs` lock-free | `V12_002.SIMA.Lifecycle.cs` | — | ✅ COMPLETE (2026-05-11) | ⚪ TBD |
+> NOTE: architecture.md hotspot map was incorrect. `OnAccountOrderUpdate` (15 CYC) is NOT the god-function.
+> Real hotspots in `UI.Callbacks.cs`: `OnKeyDown` (28), `ExecuteTargetAction` (24), `ExecuteRunnerAction` (24).
+
+### Phase 7 Completed Work
+
+- [x] Bob `v12-phase7-lead` mode + `/phase7` command provisioned
+- [x] T1 Lock-Free Audit: `UI.Callbacks.cs` ALREADY COMPLIANT -- reference implementation
+- [x] T2 Lock-Free Surgery: `SIMA.Lifecycle.cs` -- SemaphoreSlim -> Interlocked (5 files, 48 lines)
+  - `V12_002.cs`: Replaced `_simaToggleSem` with `int _simaToggleState`
+  - `V12_002.SIMA.Lifecycle.cs`: `ProcessApplySimaState()` -> Interlocked.CompareExchange gate
+  - `V12_002.SIMA.Dispatch.cs`: Gate acquire + release -> Interlocked (finally block)
+  - `V12_002.Lifecycle.cs`: SemaphoreSlim disposal removed
+- [x] NinjaTrader LIVE verification: All 9 risk audit cases PASS (2026-05-11)
+
+### Phase 7 Remaining Work
+
+- [x] BUILD_TAG bump: `1111.007-phase7-t1` CONFIRMED LIVE (2026-05-11)
+- [x] Complexity extraction: `ExecuteTargetAction` (24→3 CYC) -- UI.Callbacks.cs COMPLETE
+- [x] Complexity extraction: `ExecuteRunnerAction` (24→<5 CYC) -- UI.Callbacks.cs COMPLETE
+- [x] Complexity extraction: `HydrateWorkingOrdersFromBroker` (96→<15 CYC) -- SIMA.Lifecycle.cs COMPLETE
+
+### Phase 7 Next Queue (after full codebase audit)
+
+- [ ] Full codebase complexity audit (Bob `/audit` scan -- all src/ files, CYC > 20 report)
+- [ ] M5 Branch Elimination: `RouteTargetActionToHandler` + `DispatchRunnerAction` -> dictionary dispatch (Bob `/optimize`)
+- [ ] M5 Branch Elimination: scan remaining switch/if chains across all src/ files
+- [ ] `OnKeyDown` (28 CYC) -- P3 ARCHITECT review required before extraction (command pattern architectural change)
 
 ---
 
