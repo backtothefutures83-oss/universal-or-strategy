@@ -4,4 +4,18 @@ enabled = true
 
 [analyzers.meta]
 lang_version = "8.0"
-# Note: DeepSource may report partial results on hosted CI due to missing NinjaTrader assemblies.
+
+exclude_patterns = [
+    "docs/**",
+    ".github/**",
+    "**/*.md",
+    ".agent/**",
+    ".agents/**",
+    ".bob/**",
+    ".codex/**",
+    ".cursor/**",
+    ".gemini/**",
+    "Traycerrefactor/**",
+    "artifacts/**",
+    "benchmarks/**"
+]

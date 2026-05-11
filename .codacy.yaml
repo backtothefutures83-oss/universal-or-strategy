@@ -1,0 +1,17 @@
+---
+exclude_paths:
+  - "docs/**"
+  - ".github/**"
+  - "**/*.md"
+  - ".agent/**"
+  - ".agents/**"
+  - ".bob/**"
+  - ".codex/**"
+  - ".cursor/**"
+  - ".gemini/**"
+  - "Traycerrefactor/**"
+  - "artifacts/**"
+  - "benchmarks/**"
+  - "node_modules/**"
+  - "obj/**"
+  - "bin/**"

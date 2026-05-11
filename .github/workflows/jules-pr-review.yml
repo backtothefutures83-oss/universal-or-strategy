@@ -47,12 +47,16 @@ jobs:
             const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
 
             let prNumber = process.env.PR_NUMBER;
+            if (prNumber && !/^\d+$/.test(prNumber)) {
+              console.error('Invalid PR number');
+              process.exit(1);
+            }
             let branch = process.env.BRANCH;
             let isComment = (process.env.GITHUB_EVENT_NAME === 'issue_comment');
             let commentBody = isComment ? event.comment.body : '';
             const safeCommentBody = commentBody
               .replace(/[\r\n]+/g, ' ')
-              .replace(/[`"]/g, "'")
+              .replace(/[`"<>]/g, '')
               .slice(0, 500);
 
             console.log(`Starting Jules Audit for ${repo}...`);
