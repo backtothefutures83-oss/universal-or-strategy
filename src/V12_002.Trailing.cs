@@ -228,12 +228,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         UpdateStopOrder(entryName, pos, trendStop, pos.CurrentTrailLevel);
                         Print(string.Format("TREND E1 TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
-                        //    trendStop, ema9Live, TRENDEntry2ATRMultiplier));
-                    }
-                }
-                return true;
-            }
-
+                        trendStop, ema9Live, TRENDEntry1ATRMultiplier));
+                        }
+                        }
+                        return true;
+                        }
             // V8.2: TREND Entry 2 uses EMA15 trailing stop (1.1x ATR from live EMA15)
             if (pos.IsTRENDTrade && pos.IsTRENDEntry2 && !pos.IsRMATrade)
             {
