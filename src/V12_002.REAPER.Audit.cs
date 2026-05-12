@@ -58,6 +58,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // Build 935 [REAPER-B935-003]: Per-account audit logic extracted from AuditApexPositions.
         // Returns true if the account has non-zero state (for heartbeat counter).
+        // Build 935 [REAPER-B935-002]: Refactored dispatcher -- routes to extracted sub-methods.
         private bool AuditSingleFleetAccount(Account acct, bool shouldLog)
         {
             Position pos;
@@ -85,39 +86,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (actualQty == 0 && expectedQty != 0)
                 {
-                    // GHOST-FIX-3: Skip repair for Master -- it uses no FollowerBracketFSM -- repair path not applicable.
-                    if (acct.Name == Account.Name)
-                    {
-                        if (shouldLog)
-                        {
-                            Print($"[REAPER] {acct.Name} is the Master account -- skipping follower repair.");
-                        }
-                        return hasState;
-                    }
-
-                    if (syncPending || inFillGrace)
-                    {
-                        if (shouldLog)
-                        {
-                            string reason = syncPending ? "dispatch sync pending" : "fill grace active";
-                            Print($"[REAPER] {acct.Name}: repair deferred ({reason}) while expected={expectedQty}, actual=0.");
-                        }
-                        return hasState;
-                    }
-
-                    string repairKey;
-                    if (EnqueueReaperRepairCandidate(acct, shouldLog, expectedQty, accountFsms, out repairKey))
-                    {
-                        // B957/E1: Clear in-flight guard if TriggerCustomEvent fails, preventing permanent lockout.
-                        try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); }
-                        catch (Exception repairTriggerEx)
-                        {
-                            _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
-                            Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
-                        }
-                    }
-
-                    return hasState;
+                    return AuditFleet_HandleDesyncRepair(acct, shouldLog, expectedQty, actualQty, syncPending, inFillGrace, accountFsms, hasState);
                 }
 
                 bool isCriticalDesync = (actualQty != 0 && expectedQty == 0)
@@ -125,53 +94,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (isCriticalDesync)
                 {
-                    // Build 999: Position Pass grace -- defer critical desync when account failed Phase 5 Position Pass.
-                    // Applies only to the case where actualQty!=0 and expectedQty==0 (no FSM created on reconnect).
-                    // Does NOT apply when sign mismatch (that is a genuine live desync -- fire immediately).
-                    if (actualQty != 0 && expectedQty == 0)
+                    bool shouldDefer = AuditFleet_CheckPositionPassGrace(acct, shouldLog, actualQty, expectedQty);
+                    if (shouldDefer)
                     {
-                        DateTime ppFailedTime;
-                        if (_positionPassFailedFirstSeen.TryGetValue(acct.Name, out ppFailedTime))
-                        {
-                            double graceElapsed = (DateTime.UtcNow - ppFailedTime).TotalSeconds;
-                            if (graceElapsed < 10.0)
-                            {
-                                if (shouldLog)
-                                {
-                                    Print(string.Format("[REAPER] {0}: Position Pass grace ({1:F1}s/10s) -- deferring critical desync. Stop replace in progress.",
-                                        acct.Name, graceElapsed));
-                                }
-                                return hasState; // Defer -- check again next audit cycle
-                            }
-                            // Grace expired -- clear entry and fall through to critical desync
-                            _positionPassFailedFirstSeen.TryRemove(acct.Name, out _);
-                            Print(string.Format("[REAPER] {0}: Position Pass grace expired ({1:F1}s) -- firing critical desync.",
-                                acct.Name, graceElapsed));
-                        }
+                        return hasState;
                     }
-
-                    if (shouldLog)
-                    {
-                        Print($"[REAPER] * CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
-                    }
-                    if (AutoFlattenDesync)
-                    {
-                        if (shouldLog)
-                        {
-                            Print($"[REAPER] * QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
-                        }
-                        if (EnqueueReaperFlattenCandidate(acct))
-                        {
-                            try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }
-                            catch (Exception _flatTriggerEx)
-                            {
-                                _reaperFlattenInFlight.TryRemove(acct.Name + "_" + Instrument.FullName, out _);
-                                Print("[REAPER] TriggerCustomEvent failed for flatten of "
-                                    + acct.Name + ": " + _flatTriggerEx.Message
-                                    + " -- in-flight cleared, will re-detect next cycle");
-                            }
-                        }
-                    }
+                    AuditFleet_HandleCriticalDesyncFlatten(acct, shouldLog, expectedQty, actualQty);
                 }
                 else if (shouldLog)
                 {
@@ -179,31 +107,137 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            // --- NAKED POSITION AUDIT (Build 1102R) ---------------------------------
             if (actualQty != 0)
             {
-                bool hasWorkingStop = AuditFleet_CheckWorkingStop(acct);
+                AuditFleet_HandleNakedPosition(acct, pos, actualQty, expectedKey, shouldLog);
+            }
 
-                if (!hasWorkingStop)
+            return hasState;
+        }
+        // Build 935 [REAPER-B935-003]: Extracted from AuditSingleFleetAccount -- Handle ghost position repair.
+        // Ghost position = actual=0 but expected!=0 (follower failed to fill, or stop hit before fill).
+        private bool AuditFleet_HandleDesyncRepair(Account acct, bool shouldLog, int expectedQty, int actualQty,
+            bool syncPending, bool inFillGrace, List<FollowerBracketFSM> accountFsms, bool hasState)
+        {
+            // GHOST-FIX-3: Skip repair for Master -- it uses no FollowerBracketFSM -- repair path not applicable.
+            if (acct.Name == Account.Name)
+            {
+                if (shouldLog)
                 {
-                    if (EnqueueReaperNakedStopCandidate(acct, pos, actualQty, expectedKey, shouldLog))
-                    {
-                        try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
-                        catch (Exception tcEx)
-                        {
-                            _reaperNakedStopInFlight.TryRemove(expectedKey, out _); // [Build 969]
-                            Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
-                        }
-                    }
+                    Print($"[REAPER] {acct.Name} is the Master account -- skipping follower repair.");
                 }
-                else
+                return hasState;
+            }
+
+            if (syncPending || inFillGrace)
+            {
+                if (shouldLog)
                 {
-                    _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+                    string reason = syncPending ? "dispatch sync pending" : "fill grace active";
+                    Print($"[REAPER] {acct.Name}: repair deferred ({reason}) while expected={expectedQty}, actual=0.");
+                }
+                return hasState;
+            }
+
+            string repairKey;
+            if (EnqueueReaperRepairCandidate(acct, shouldLog, expectedQty, accountFsms, out repairKey))
+            {
+                // B957/E1: Clear in-flight guard if TriggerCustomEvent fails, preventing permanent lockout.
+                try { TriggerCustomEvent(o => ProcessReaperRepairQueue(), null); }
+                catch (Exception repairTriggerEx)
+                {
+                    _repairInFlight.TryRemove(repairKey, out _); // [Build 968]
+                    Print("[REAPER] TriggerCustomEvent failed for " + repairKey + ": " + repairTriggerEx.Message + " -- in-flight cleared.");
                 }
             }
 
             return hasState;
         }
+
+        // Build 935 [REAPER-B935-004]: Extracted from AuditSingleFleetAccount -- Check Position Pass grace.
+        // Position Pass grace = 10s window after reconnect where actualQty!=0 but expectedQty==0 (FSM not yet created).
+        // Returns true if critical desync should be deferred (still in grace window).
+        private bool AuditFleet_CheckPositionPassGrace(Account acct, bool shouldLog, int actualQty, int expectedQty)
+        {
+            // Build 999: Position Pass grace -- defer critical desync when account failed Phase 5 Position Pass.
+            // Applies only to the case where actualQty!=0 and expectedQty==0 (no FSM created on reconnect).
+            // Does NOT apply when sign mismatch (that is a genuine live desync -- fire immediately).
+            if (actualQty != 0 && expectedQty == 0)
+            {
+                DateTime ppFailedTime;
+                if (_positionPassFailedFirstSeen.TryGetValue(acct.Name, out ppFailedTime))
+                {
+                    double graceElapsed = (DateTime.UtcNow - ppFailedTime).TotalSeconds;
+                    if (graceElapsed < 10.0)
+                    {
+                        if (shouldLog)
+                        {
+                            Print(string.Format("[REAPER] {0}: Position Pass grace ({1:F1}s/10s) -- deferring critical desync. Stop replace in progress.",
+                                acct.Name, graceElapsed));
+                        }
+                        return true; // Defer -- check again next audit cycle
+                    }
+                    // Grace expired -- clear entry and fall through to critical desync
+                    _positionPassFailedFirstSeen.TryRemove(acct.Name, out _);
+                    Print(string.Format("[REAPER] {0}: Position Pass grace expired ({1:F1}s) -- firing critical desync.",
+                        acct.Name, graceElapsed));
+                }
+            }
+            return false; // No deferral
+        }
+
+        // Build 935 [REAPER-B935-005]: Extracted from AuditSingleFleetAccount -- Handle critical desync flatten.
+        // Critical desync = sign mismatch OR unexpected position (actualQty!=0 when expectedQty==0 after grace).
+        private void AuditFleet_HandleCriticalDesyncFlatten(Account acct, bool shouldLog, int expectedQty, int actualQty)
+        {
+            if (shouldLog)
+            {
+                Print($"[REAPER] * CRITICAL DESYNC on {acct.Name}: Expected={expectedQty}, Actual={actualQty}");
+            }
+            if (AutoFlattenDesync)
+            {
+                if (shouldLog)
+                {
+                    Print($"[REAPER] * QUEUING FLATTEN for {acct.Name} - Emergency Re-sync!");
+                }
+                if (EnqueueReaperFlattenCandidate(acct))
+                {
+                    try { TriggerCustomEvent(o => ProcessReaperFlattenQueue(), null); }
+                    catch (Exception _flatTriggerEx)
+                    {
+                        _reaperFlattenInFlight.TryRemove(acct.Name + "_" + Instrument.FullName, out _);
+                        Print("[REAPER] TriggerCustomEvent failed for flatten of "
+                            + acct.Name + ": " + _flatTriggerEx.Message
+                            + " -- in-flight cleared, will re-detect next cycle");
+                    }
+                }
+            }
+        }
+
+        // Build 935 [REAPER-B935-006]: Extracted from AuditSingleFleetAccount -- Handle naked position audit.
+        // Naked position = position exists but no working stop order (protection missing).
+        private void AuditFleet_HandleNakedPosition(Account acct, Position pos, int actualQty, string expectedKey, bool shouldLog)
+        {
+            bool hasWorkingStop = AuditFleet_CheckWorkingStop(acct);
+
+            if (!hasWorkingStop)
+            {
+                if (EnqueueReaperNakedStopCandidate(acct, pos, actualQty, expectedKey, shouldLog))
+                {
+                    try { TriggerCustomEvent(e => ProcessReaperNakedStopQueue(), null); }
+                    catch (Exception tcEx)
+                    {
+                        _reaperNakedStopInFlight.TryRemove(expectedKey, out _); // [Build 969]
+                        Print(string.Format("[REAPER][NAKED_STOP] TriggerCustomEvent failed for {0}: {1} -- in-flight cleared.", acct.Name, tcEx.Message));
+                    }
+                }
+            }
+            else
+            {
+                _nakedPositionFirstSeen.TryRemove(acct.Name, out _);
+            }
+        }
+
 
         private void AuditFleet_CalculateExpectedActual(
             Account acct, bool shouldLog,
@@ -384,28 +418,39 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // Build 935 [REAPER-B935-004]: Audit the Master account when it isn't covered by AccountPrefix.
-        // Returns true if the master account has non-zero state.
-        private bool AuditMasterAccountIfNeeded(bool shouldLog)
+        // Build 935 [REAPER-B935-007]: Extracted from AuditMasterAccountIfNeeded -- Calculate master position state.
+        // Reads actual position from broker and expected position from expectedPositions dictionary.
+        private void AuditMaster_CalculatePositionState(
+            bool shouldLog,
+            out Position masterPos,
+            out int masterActualQty,
+            out int masterExpectedQty,
+            out string masterExpectedKey,
+            out bool hasState)
         {
-            Position masterPos = Account.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
-            int masterActualQty = 0;
+            masterPos = Account.Positions.FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+            masterActualQty = 0;
             if (masterPos != null && masterPos.MarketPosition != MarketPosition.Flat)
             {
                 masterActualQty = masterPos.MarketPosition == MarketPosition.Long ? masterPos.Quantity : -masterPos.Quantity;
             }
 
-            int masterExpectedQty = 0;
-            string masterExpectedKey = ExpKey(Account.Name);
+            masterExpectedQty = 0;
+            masterExpectedKey = ExpKey(Account.Name);
             // Build 1102U [BUG-1]: Composite key + stateLock guard.
             expectedPositions.TryGetValue(masterExpectedKey, out masterExpectedQty);
 
-            bool hasState = masterExpectedQty != 0 || masterActualQty != 0;
+            hasState = masterExpectedQty != 0 || masterActualQty != 0;
             if (shouldLog && hasState)
             {
                 Print($"[REAPER] {Account.Name} (Master): Expected={masterExpectedQty}, Actual={masterActualQty}");
             }
+        }
 
+        // Build 935 [REAPER-B935-008]: Extracted from AuditMasterAccountIfNeeded -- Handle desync and flatten.
+        // Detects position mismatches and enqueues emergency flatten if AutoFlattenDesync enabled.
+        private void AuditMaster_HandleDesyncFlatten(bool shouldLog, int masterActualQty, int masterExpectedQty)
+        {
             if (masterExpectedQty != masterActualQty)
             {
                 if (masterActualQty == 0 && masterExpectedQty != 0)
@@ -433,10 +478,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
+        }
 
-            // Build 998: Master naked-position audit -- mirrors AuditSingleFleetAccount lines 160-200.
-            // AuditMasterAccountIfNeeded previously only checked expectedPositions vs actual.
-            // A naked master position (no working stop) was never detected or recovered.
+        // Build 935 [REAPER-B935-009]: Extracted from AuditMasterAccountIfNeeded -- Handle naked position detection.
+        // Build 998: Master naked-position audit -- mirrors AuditSingleFleetAccount lines 160-200.
+        // Detects positions without working stop orders and enqueues emergency stop after grace period.
+        private void AuditMaster_HandleNakedPosition(Position masterPos, int masterActualQty, string masterExpectedKey)
+        {
             if (masterActualQty != 0)
             {
                 bool masterHasWorkingStop = Account.Orders.Any(o =>
@@ -470,6 +518,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     _nakedPositionFirstSeen.TryRemove(Account.Name, out _);
                 }
             }
+        }
+
+        // Build 935 [REAPER-B935-004]: Audit the Master account when it isn't covered by AccountPrefix.
+        // Returns true if the master account has non-zero state.
+        // Build 935 [REAPER-B935-010]: Refactored dispatcher -- routes to extracted sub-methods.
+        private bool AuditMasterAccountIfNeeded(bool shouldLog)
+        {
+            Position masterPos;
+            int masterActualQty;
+            int masterExpectedQty;
+            string masterExpectedKey;
+            bool hasState;
+
+            AuditMaster_CalculatePositionState(shouldLog, out masterPos, out masterActualQty, out masterExpectedQty, out masterExpectedKey, out hasState);
+            AuditMaster_HandleDesyncFlatten(shouldLog, masterActualQty, masterExpectedQty);
+            AuditMaster_HandleNakedPosition(masterPos, masterActualQty, masterExpectedKey);
 
             return hasState;
         }
