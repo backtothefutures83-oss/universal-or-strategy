@@ -145,14 +145,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Core FSM transition logic. Driven exclusively by broker confirmations.
-        /// Shadow Mode: Observes reality and logs divergences.
+        /// Resolves AccountEvent to FollowerBracketFSM via 3-tier lookup strategy.
+        /// Tier 1: O(1) OrderId map lookup (primary).
+        /// Tier 2: SignalName parsing and matching (secondary).
+        /// Tier 3: O(N) fallback scan across all FSMs (last resort).
+        /// Back-fills OrderId map when found via fallback for future O(1) access.
         /// </summary>
-        private void ProcessBracketEvent(AccountEvent evt)
+        private FollowerBracketFSM ResolveFsmFromEvent(AccountEvent evt)
         {
-            // V12.Phase2: Implement FSM transition logic based on docs/copy_trader_design.md Section 1.3
-            
-            // 1. Find the FSM by OrderId, SignalName, or fallback scan
             FollowerBracketFSM fsm = null;
             
             // Phase 3 [Step 4]: O(1) Lookup via OrderId map (primary)
@@ -204,10 +204,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                     _orderIdToFsmKey[evt.OrderId] = fsm.EntryName;
             }
 
-            if (fsm == null) return; // Not tracked by FSM system yet
+            return fsm;
+        }
+
+        /// <summary>
+        /// Handles Filled/PartFilled events with stop/target detection and contract tracking.
+        /// Updates FSM state based on remaining contracts after fill.
+        /// </summary>
+        private void HandleFsmFilled(AccountEvent evt, FollowerBracketFSM fsm)
+        {
+            // Phase 2 [D2/D3]: Precise target matching with null guards
+            bool isStop = !string.IsNullOrEmpty(evt.SignalName) && (evt.SignalName.StartsWith("Stop_") || evt.SignalName.StartsWith("S_"));
+            bool isTarget = !string.IsNullOrEmpty(evt.SignalName) && (evt.SignalName.StartsWith("T1_") || evt.SignalName.StartsWith("T2_") ||
+                             evt.SignalName.StartsWith("T3_") || evt.SignalName.StartsWith("T4_") || evt.SignalName.StartsWith("T5_"));
+
+            if (isStop || isTarget)
+            {
+                fsm.RemainingContracts = Math.Max(0, fsm.RemainingContracts - Math.Max(0, evt.FilledQty));
+                fsm.State = fsm.RemainingContracts <= 0 ? FollowerBracketState.Filled : FollowerBracketState.Active;
+            }
+            else if (fsm.State == FollowerBracketState.Accepted || fsm.State == FollowerBracketState.Submitted)
+            {
+                // Entry filled -> Bracket is now ACTIVE
+                fsm.State = FollowerBracketState.Active;
+            }
+        }
+
+        /// <summary>
+        /// Core FSM transition logic. Driven exclusively by broker confirmations.
+        /// Shadow Mode: Observes reality and logs divergences.
+        /// </summary>
+        private void ProcessBracketEvent(AccountEvent evt)
+        {
+            FollowerBracketFSM fsm = ResolveFsmFromEvent(evt);
+            if (fsm == null) return;
             if (!MetadataGuardFsmEvent(evt, fsm)) return;
 
-            // 2. Process State Transition
             FollowerBracketState oldState = fsm.State;
             
             switch (evt.NewState)
@@ -220,21 +252,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 case OrderState.Filled:
                 case OrderState.PartFilled:
-                    // Phase 2 [D2/D3]: Precise target matching with null guards
-                    bool isStop = !string.IsNullOrEmpty(evt.SignalName) && (evt.SignalName.StartsWith("Stop_") || evt.SignalName.StartsWith("S_"));
-                    bool isTarget = !string.IsNullOrEmpty(evt.SignalName) && (evt.SignalName.StartsWith("T1_") || evt.SignalName.StartsWith("T2_") || 
-                                     evt.SignalName.StartsWith("T3_") || evt.SignalName.StartsWith("T4_") || evt.SignalName.StartsWith("T5_"));
-
-                    if (isStop || isTarget)
-                    {
-                        fsm.RemainingContracts = Math.Max(0, fsm.RemainingContracts - Math.Max(0, evt.FilledQty));
-                        fsm.State = fsm.RemainingContracts <= 0 ? FollowerBracketState.Filled : FollowerBracketState.Active;
-                    }
-                    else if (fsm.State == FollowerBracketState.Accepted || fsm.State == FollowerBracketState.Submitted)
-                    {
-                        // Entry filled -> Bracket is now ACTIVE
-                        fsm.State = FollowerBracketState.Active;
-                    }
+                    HandleFsmFilled(evt, fsm);
                     break;
 
                 case OrderState.Cancelled:
