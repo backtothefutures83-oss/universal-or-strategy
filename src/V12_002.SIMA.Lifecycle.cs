@@ -326,98 +326,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                             ord.OrderState != OrderState.ChangePending &&
                             ord.OrderState != OrderState.ChangeSubmitted) continue;
 
-                        string name = ord.Name ?? string.Empty;
-                        ConcurrentDictionary<string, Order> targetDict = null;
-                        string key     = null;
-                        string dictName = null;
+                        string orderKey;
+                        string dictName;
+                        ConcurrentDictionary<string, Order> targetDict = ClassifyAndRouteFleetOrder(ord, out orderKey, out dictName);
+                        
+                        if (targetDict == null || orderKey == null) continue;
 
-                        if (name.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = stopOrders;   key = name.Substring(5); dictName = "stopOrders"; }
-                        else if (name.StartsWith("S_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = stopOrders;   key = name.Substring(2); dictName = "stopOrders"; }
-                        else if (name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = target1Orders; key = name.Substring(3); dictName = "target1Orders"; }
-                        else if (name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = target2Orders; key = name.Substring(3); dictName = "target2Orders"; }
-                        else if (name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = target3Orders; key = name.Substring(3); dictName = "target3Orders"; }
-                        else if (name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = target4Orders; key = name.Substring(3); dictName = "target4Orders"; }
-                        else if (name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = target5Orders; key = name.Substring(3); dictName = "target5Orders"; }
-                        // [Codex P1] Adopt Fleet_ prefixed follower entry orders into entryOrders.
-                        // Without this, broker-resident follower entries are invisible after reconnect.
-                        // ProcessQueuedExecution finds them by object ref in entryOrders, so a missed
-                        // adoption means SymmetryGuardOnFollowerFill is bypassed and the new filled
-                        // position launches without its protective bracket orders.
-                        else if (name.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase))
-                        { targetDict = entryOrders; key = name; dictName = "entryOrders"; }
-
-                        if (targetDict == null || key == null) continue;
-
-                        targetDict[key] = ord;
+                        targetDict[orderKey] = ord;
 
                         // [Build 980 Nexus] Rebuild activePositions structs so Rehydration does not lead to divergent REAPER audits.
-                        if (targetDict == entryOrders && !activePositions.ContainsKey(key))
+                        if (targetDict == entryOrders && !activePositions.ContainsKey(orderKey))
                         {
-                            MarketPosition mp = (ord.OrderAction == OrderAction.Buy || ord.OrderAction == OrderAction.BuyToCover) ? MarketPosition.Long : MarketPosition.Short;
-                            double ePrice = ord.LimitPrice != 0 ? ord.LimitPrice : (ord.StopPrice != 0 ? ord.StopPrice : ord.AverageFillPrice);
-                            
-                            var pos = new PositionInfo
-                            {
-                                SignalName = key,
-                                Direction = mp,
-                                TotalContracts = ord.Quantity,
-                                RemainingContracts = ord.Quantity,
-                                EntryPrice = ePrice,
-                                InitialStopPrice = 0,
-                                CurrentStopPrice = 0,
-                                EntryOrderType = ord.OrderType,
-                                EntryFilled = false,
-                                IsFollower = key.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase),
-                                ExecutingAccount = acct,
-                                BracketSubmitted = false,
-                                ExtremePriceSinceEntry = ePrice,
-                                CurrentTrailLevel = 0,
-                                OcoGroupId = "V12_" + GetStableHash(key)
-                            };
-                            
-                            // Get standard distribution
-                            int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
-                            GetTargetDistribution(ord.Quantity, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
-                            pos.T1Contracts = t1Qty;
-                            pos.T2Contracts = t2Qty;
-                            pos.T3Contracts = t3Qty;
-                            pos.T4Contracts = t4Qty;
-                            pos.T5Contracts = t5Qty;
-                            
-                            // [Build 980 Phase 3]: Reconstruct trade DNA from signal name -- lost across restart.
-                            // Fleet entry names follow pattern: Fleet_<AcctName>_<TradeType>_<index>
-                            pos.IsMOMOTrade = key.IndexOf("_MOMO_", StringComparison.OrdinalIgnoreCase) >= 0;
-                            pos.IsRMATrade = key.IndexOf("_RMA_", StringComparison.OrdinalIgnoreCase) >= 0
-                                || key.IndexOf("_TREND_RMA_", StringComparison.OrdinalIgnoreCase) >= 0;
-                            pos.IsTRENDTrade = key.IndexOf("_TREND_", StringComparison.OrdinalIgnoreCase) >= 0;
-                            pos.IsRetestTrade = key.IndexOf("_RETEST_", StringComparison.OrdinalIgnoreCase) >= 0;
-                            if (pos.IsMOMOTrade) pos.IsRMATrade = false; // MOMO overrides generic RMA flag
-
-                            activePositions[key] = pos;
-                            Print(string.Format("[SIMA HYDRATE] Rebuilt activePositions struct for {0} | DNA: IsMOMO={1} IsRMA={2} IsTREND={3} IsRetest={4}",
-                                key, pos.IsMOMOTrade, pos.IsRMATrade, pos.IsTRENDTrade, pos.IsRetestTrade));
+                            RebuildActivePositionForFleetEntry(ord, orderKey, acct);
                         }
                         else
                         {
-                            // [Build 980 Phase 3]: Force-sync TotalContracts and ExecutingAccount if struct already exists.
-                            PositionInfo existingPos;
-                            if (activePositions.TryGetValue(key, out existingPos))
-                            {
-                                existingPos.TotalContracts = ord.Quantity;
-                                existingPos.ExecutingAccount = acct;
-                                Print(string.Format("[SIMA HYDRATE] Force-synced TotalContracts={0} ExecutingAccount={1} for {2}",
-                                    ord.Quantity, acct.Name, key));
-                            }
+                            SyncExistingPositionMetadata(ord, orderKey, acct);
                         }
 
-                        Print(string.Format("[SIMA HYDRATE] Adopted working order {0} into {1}", name, dictName));
+                        Print(string.Format("[SIMA HYDRATE] Adopted working order {0} into {1}", ord.Name ?? string.Empty, dictName));
                         adoptedCount++;
                     }
                 }
@@ -425,6 +352,102 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print(string.Format("[SIMA HYDRATE] WARNING: Could not read orders for {0}: {1}", acct.Name, ex.Message));
                 }
+            }
+        }
+
+        private ConcurrentDictionary<string, Order> ClassifyAndRouteFleetOrder(Order ord, out string orderKey, out string dictName)
+        {
+            string name = ord.Name ?? string.Empty;
+            ConcurrentDictionary<string, Order> targetDict = null;
+            orderKey = null;
+            dictName = null;
+
+            if (name.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = stopOrders; orderKey = name.Substring(5); dictName = "stopOrders"; }
+            else if (name.StartsWith("S_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = stopOrders; orderKey = name.Substring(2); dictName = "stopOrders"; }
+            else if (name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = target1Orders; orderKey = name.Substring(3); dictName = "target1Orders"; }
+            else if (name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = target2Orders; orderKey = name.Substring(3); dictName = "target2Orders"; }
+            else if (name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = target3Orders; orderKey = name.Substring(3); dictName = "target3Orders"; }
+            else if (name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = target4Orders; orderKey = name.Substring(3); dictName = "target4Orders"; }
+            else if (name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = target5Orders; orderKey = name.Substring(3); dictName = "target5Orders"; }
+            // [Codex P1] Adopt Fleet_ prefixed follower entry orders into entryOrders.
+            // Without this, broker-resident follower entries are invisible after reconnect.
+            // ProcessQueuedExecution finds them by object ref in entryOrders, so a missed
+            // adoption means SymmetryGuardOnFollowerFill is bypassed and the new filled
+            // position launches without its protective bracket orders.
+            else if (name.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase))
+            { targetDict = entryOrders; orderKey = name; dictName = "entryOrders"; }
+
+            return targetDict;
+        }
+
+        private void RebuildActivePositionForFleetEntry(Order ord, string key, Account acct)
+        {
+            MarketPosition mp = (ord.OrderAction == OrderAction.Buy || ord.OrderAction == OrderAction.BuyToCover)
+                ? MarketPosition.Long
+                : MarketPosition.Short;
+            double ePrice = ord.LimitPrice != 0
+                ? ord.LimitPrice
+                : (ord.StopPrice != 0 ? ord.StopPrice : ord.AverageFillPrice);
+            
+            var pos = new PositionInfo
+            {
+                SignalName = key,
+                Direction = mp,
+                TotalContracts = ord.Quantity,
+                RemainingContracts = ord.Quantity,
+                EntryPrice = ePrice,
+                InitialStopPrice = 0,
+                CurrentStopPrice = 0,
+                EntryOrderType = ord.OrderType,
+                EntryFilled = false,
+                IsFollower = key.StartsWith("Fleet_", StringComparison.OrdinalIgnoreCase),
+                ExecutingAccount = acct,
+                BracketSubmitted = false,
+                ExtremePriceSinceEntry = ePrice,
+                CurrentTrailLevel = 0,
+                OcoGroupId = "V12_" + GetStableHash(key)
+            };
+            
+            // Get standard distribution
+            int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+            GetTargetDistribution(ord.Quantity, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
+            pos.T1Contracts = t1Qty;
+            pos.T2Contracts = t2Qty;
+            pos.T3Contracts = t3Qty;
+            pos.T4Contracts = t4Qty;
+            pos.T5Contracts = t5Qty;
+            
+            // [Build 980 Phase 3]: Reconstruct trade DNA from signal name -- lost across restart.
+            // Fleet entry names follow pattern: Fleet_<AcctName>_<TradeType>_<index>
+            pos.IsMOMOTrade = key.IndexOf("_MOMO_", StringComparison.OrdinalIgnoreCase) >= 0;
+            pos.IsRMATrade = key.IndexOf("_RMA_", StringComparison.OrdinalIgnoreCase) >= 0
+                || key.IndexOf("_TREND_RMA_", StringComparison.OrdinalIgnoreCase) >= 0;
+            pos.IsTRENDTrade = key.IndexOf("_TREND_", StringComparison.OrdinalIgnoreCase) >= 0;
+            pos.IsRetestTrade = key.IndexOf("_RETEST_", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (pos.IsMOMOTrade) pos.IsRMATrade = false; // MOMO overrides generic RMA flag
+
+            activePositions[key] = pos;
+            Print(string.Format("[SIMA HYDRATE] Rebuilt activePositions struct for {0} | DNA: IsMOMO={1} IsRMA={2} IsTREND={3} IsRetest={4}",
+                key, pos.IsMOMOTrade, pos.IsRMATrade, pos.IsTRENDTrade, pos.IsRetestTrade));
+        }
+
+        private void SyncExistingPositionMetadata(Order ord, string key, Account acct)
+        {
+            // [Build 980 Phase 3]: Force-sync TotalContracts and ExecutingAccount if struct already exists.
+            PositionInfo existingPos;
+            if (activePositions.TryGetValue(key, out existingPos))
+            {
+                existingPos.TotalContracts = ord.Quantity;
+                existingPos.ExecutingAccount = acct;
+                Print(string.Format("[SIMA HYDRATE] Force-synced TotalContracts={0} ExecutingAccount={1} for {2}",
+                    ord.Quantity, acct.Name, key));
             }
         }
 
