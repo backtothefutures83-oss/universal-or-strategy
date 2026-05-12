@@ -29,6 +29,8 @@ Long-term strategic documents governing the codebase and workflow.
 Dynamic documents used for the current implementation cycle.
 
 *   [task.md](task.md) - The current active mission status and ticket tracking.
+*   [T2: ExecuteOnExecutionUpdate_CIT_Repair](phase7_sprint5_t2.md) - COMPLETE
+*   [T3: ExecuteSmartDispatchEntry Extraction](phase7_sprint5_t03_ExecuteSmartDispatchEntry.md) - COMPLETE
 *   [implementation_plan.md](implementation_plan.md) - Surgical implementation steps for the active engineer.
 *   [forensics_report.md](forensics_report.md) - Root cause analysis and technical evidence.
 *   [mini-spec.md](mini-spec.md) - Technical requirements and metabolic design for the active mission.
