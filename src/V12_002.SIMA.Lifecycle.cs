@@ -514,21 +514,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             try
             {
-                MarketPosition masterMP = MarketPosition.Flat;
-                int masterQty = 0;
-                double masterAvgPrice = 0;
-                foreach (Position brokerPos in Account.Positions.ToArray())
-                {
-                    if (brokerPos != null && brokerPos.Instrument != null
-                        && brokerPos.Instrument.FullName == Instrument.FullName
-                        && brokerPos.MarketPosition != MarketPosition.Flat)
-                    {
-                        masterMP = brokerPos.MarketPosition;
-                        masterQty = brokerPos.Quantity;
-                        masterAvgPrice = brokerPos.AveragePrice;
-                        break;
-                    }
-                }
+                int masterQty;
+                double masterAvgPrice;
+                MarketPosition masterMP = FindMasterPositionFromBroker(out masterQty, out masterAvgPrice);
 
                 if (masterMP != MarketPosition.Flat && masterQty > 0)
                 {
@@ -541,47 +529,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Order adoptedStop = stopKvp.Value;
                         double stopPrice = adoptedStop != null ? adoptedStop.StopPrice : 0;
 
-                        int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
-                        GetTargetDistribution(masterQty, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
-
-                        bool trendMnlMatch = key.StartsWith("TrendMnl", StringComparison.OrdinalIgnoreCase);
-                        Print(string.Format("[SIMA HYDRATE] Master stop key audit for {0}: TrendMnlStartsWith={1}",
-                            key, trendMnlMatch));
-
-                        var pos = new PositionInfo
-                        {
-                            SignalName = key,
-                            Direction = masterMP,
-                            TotalContracts = masterQty,
-                            RemainingContracts = masterQty,
-                            EntryPrice = masterAvgPrice,
-                            InitialStopPrice = stopPrice,
-                            CurrentStopPrice = stopPrice,
-                            EntryOrderType = OrderType.Market,
-                            EntryFilled = true,
-                            IsFollower = false,
-                            ExecutingAccount = null,
-                            BracketSubmitted = true,
-                            ExtremePriceSinceEntry = masterAvgPrice,
-                            CurrentTrailLevel = 0,
-                            OcoGroupId = "V12_" + GetStableHash(key),
-                            T1Contracts = t1Qty,
-                            T2Contracts = t2Qty,
-                            T3Contracts = t3Qty,
-                            T4Contracts = t4Qty,
-                            T5Contracts = t5Qty
-                        };
-
-                        pos.IsMOMOTrade = key.StartsWith("MOMO", StringComparison.OrdinalIgnoreCase);
-                        pos.IsTRENDTrade = trendMnlMatch
-                            || key.StartsWith("TRMA_", StringComparison.OrdinalIgnoreCase);
-                        pos.IsRetestTrade = key.StartsWith("Retest", StringComparison.OrdinalIgnoreCase);
-                        pos.IsRMATrade = key.StartsWith("TRMA_", StringComparison.OrdinalIgnoreCase)
-                            || pos.IsRetestTrade;
-                        pos.IsFFMATrade = key.StartsWith("FFMA", StringComparison.OrdinalIgnoreCase);
-                        if (pos.IsMOMOTrade) pos.IsRMATrade = false;
-
+                        PositionInfo pos = BuildMasterPositionInfo(key, masterMP, masterQty, masterAvgPrice, stopPrice);
                         activePositions[key] = pos;
+
                         Print(string.Format("[SIMA HYDRATE] Reconstructed master position for {0} | Dir={1} Qty={2} AvgPx={3} StopPx={4}",
                             key, masterMP, masterQty, masterAvgPrice, stopPrice));
                     }
@@ -591,6 +541,71 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print(string.Format("[SIMA HYDRATE] WARNING: Master position reconstruction failed: {0}", ex.Message));
             }
+        }
+
+        private MarketPosition FindMasterPositionFromBroker(out int qty, out double avgPrice)
+        {
+            qty = 0;
+            avgPrice = 0;
+
+            foreach (Position brokerPos in Account.Positions.ToArray())
+            {
+                if (brokerPos != null && brokerPos.Instrument != null
+                    && brokerPos.Instrument.FullName == Instrument.FullName
+                    && brokerPos.MarketPosition != MarketPosition.Flat)
+                {
+                    qty = brokerPos.Quantity;
+                    avgPrice = brokerPos.AveragePrice;
+                    return brokerPos.MarketPosition;
+                }
+            }
+
+            return MarketPosition.Flat;
+        }
+
+        private PositionInfo BuildMasterPositionInfo(string key, MarketPosition masterMP, int masterQty, double masterAvgPrice, double stopPrice)
+        {
+            int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+            GetTargetDistribution(masterQty, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
+
+            bool trendMnlMatch = key.StartsWith("TrendMnl", StringComparison.OrdinalIgnoreCase);
+            Print(string.Format("[SIMA HYDRATE] Master stop key audit for {0}: TrendMnlStartsWith={1}",
+                key, trendMnlMatch));
+
+            var pos = new PositionInfo
+            {
+                SignalName = key,
+                Direction = masterMP,
+                TotalContracts = masterQty,
+                RemainingContracts = masterQty,
+                EntryPrice = masterAvgPrice,
+                InitialStopPrice = stopPrice,
+                CurrentStopPrice = stopPrice,
+                EntryOrderType = OrderType.Market,
+                EntryFilled = true,
+                IsFollower = false,
+                ExecutingAccount = null,
+                BracketSubmitted = true,
+                ExtremePriceSinceEntry = masterAvgPrice,
+                CurrentTrailLevel = 0,
+                OcoGroupId = "V12_" + GetStableHash(key),
+                T1Contracts = t1Qty,
+                T2Contracts = t2Qty,
+                T3Contracts = t3Qty,
+                T4Contracts = t4Qty,
+                T5Contracts = t5Qty
+            };
+
+            pos.IsMOMOTrade = key.StartsWith("MOMO", StringComparison.OrdinalIgnoreCase);
+            pos.IsTRENDTrade = trendMnlMatch
+                || key.StartsWith("TRMA_", StringComparison.OrdinalIgnoreCase);
+            pos.IsRetestTrade = key.StartsWith("Retest", StringComparison.OrdinalIgnoreCase);
+            pos.IsRMATrade = key.StartsWith("TRMA_", StringComparison.OrdinalIgnoreCase)
+                || pos.IsRetestTrade;
+            pos.IsFFMATrade = key.StartsWith("FFMA", StringComparison.OrdinalIgnoreCase);
+            if (pos.IsMOMOTrade) pos.IsRMATrade = false;
+
+            return pos;
         }
 
         /// <summary>
