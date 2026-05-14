@@ -154,7 +154,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Account = sender as Account,
                 EventArgs = e
             });
-            try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+            try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); }
+            catch (Exception ex)
+            {
+                if (_diagFleet)
+                    Print("[FLEET_CATCH] OnAccountOrderUpdate trigger failed: " + ex.Message);
+            }
         }
 
         // Build 935 [R-02]: Cap per-drain budget to prevent strategy-thread starvation
@@ -170,7 +175,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.Phase7 [THREAD-01a]: Buffer-and-wait during flatten (symmetric with ProcessAccountExecutionQueue).
             if (isFlattenRunning)
             {
-                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); }
+                catch (Exception ex)
+                {
+                    if (_diagFleet)
+                        Print("[FLEET_CATCH] ProcessAccountOrderQueue flatten gate failed: " + ex.Message);
+                }
                 return;
             }
 
@@ -181,7 +191,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (isFlattenRunning)
                 {
                     _accountOrderQueue.Enqueue(item);
-                    try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+                    try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); }
+                    catch (Exception ex)
+                    {
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] ProcessAccountOrderQueue drain loop failed: " + ex.Message);
+                    }
                     return;
                 }
                 drainedCount++;
@@ -189,21 +204,68 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             // If items remain after budget exhausted, reschedule for next strategy-thread slice.
             if (!_accountOrderQueue.IsEmpty)
-                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); } catch { }
+                try { TriggerCustomEvent(o => ProcessAccountOrderQueue(), null); }
+                catch (Exception ex)
+                {
+                    if (_diagFleet)
+                        Print("[FLEET_CATCH] ProcessAccountOrderQueue reschedule failed: " + ex.Message);
+                }
         }
 
-        // Build 935 [R-01]: Returns true if 'order' belongs to 'entryKey' position.
-        // Encapsulates the 7-way compound OR so the outer search loop stays trivial.
+        // Build 1111.007-phase7-tW2 [T-W2]: Helper for Entry/Stop/T1 predicate (ref-equality short-circuit).
+        // Preserves asymmetric pattern: ref-first then OrderId fallback. NO order null guard (H10).
+        private bool TryFindOrder_MatchesEntryStopOrT1(ConcurrentDictionary<string, Order> dict, string entryKey, Order order)
+        {
+            return dict.TryGetValue(entryKey, out var tracked)
+                && (tracked == order || (tracked != null && tracked.OrderId == order.OrderId));
+        }
+
+        // Build 1111.007-phase7-tW2 [T-W2]: Helper for T2-T5 predicate (OrderId-only equality).
+        // Preserves asymmetric pattern: NO ref-equality check (H9). NO order null guard (H10).
+        private bool TryFindOrder_MatchesT2ThroughT5(ConcurrentDictionary<string, Order> dict, string entryKey, Order order)
+        {
+            return dict.TryGetValue(entryKey, out var tracked)
+                && tracked != null && tracked.OrderId == order.OrderId;
+        }
+
+        // Build 1111.007-phase7-tW2 [T-W2]: Returns true if 'order' belongs to 'entryKey' position.
+        // Reduced from CYC=25 to CYC=8 via two-helper extraction. Preserves exact short-circuit order (B7/H11).
         private bool TryFindOrderInPosition(Order order, string entryKey, out string matchedEntry)
         {
             matchedEntry = null;
-            if ((entryOrders.TryGetValue(entryKey,   out var eOrder)  && (eOrder  == order || (eOrder  != null && eOrder.OrderId  == order.OrderId))) ||
-                (stopOrders.TryGetValue(entryKey,    out var sOrder)  && (sOrder  == order || (sOrder  != null && sOrder.OrderId  == order.OrderId))) ||
-                (target1Orders.TryGetValue(entryKey, out var t1Order) && (t1Order == order || (t1Order != null && t1Order.OrderId == order.OrderId))) ||
-                (target2Orders.TryGetValue(entryKey, out var t2Order) && (t2Order != null && t2Order.OrderId == order.OrderId)) ||
-                (target3Orders.TryGetValue(entryKey, out var t3Order) && (t3Order != null && t3Order.OrderId == order.OrderId)) ||
-                (target4Orders.TryGetValue(entryKey, out var t4Order) && (t4Order != null && t4Order.OrderId == order.OrderId)) ||
-                (target5Orders.TryGetValue(entryKey, out var t5Order) && (t5Order != null && t5Order.OrderId == order.OrderId)))
+            // Sequential 7-step check preserving exact short-circuit order (B7/H11):
+            // Entry/Stop/T1 use ref-first helper; T2-T5 use id-only helper (H9 asymmetry).
+            if (TryFindOrder_MatchesEntryStopOrT1(entryOrders, entryKey, order))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            if (TryFindOrder_MatchesEntryStopOrT1(stopOrders, entryKey, order))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            if (TryFindOrder_MatchesEntryStopOrT1(target1Orders, entryKey, order))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            if (TryFindOrder_MatchesT2ThroughT5(target2Orders, entryKey, order))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            if (TryFindOrder_MatchesT2ThroughT5(target3Orders, entryKey, order))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            if (TryFindOrder_MatchesT2ThroughT5(target4Orders, entryKey, order))
+            {
+                matchedEntry = entryKey;
+                return true;
+            }
+            if (TryFindOrder_MatchesT2ThroughT5(target5Orders, entryKey, order))
             {
                 matchedEntry = entryKey;
                 return true;
@@ -653,7 +715,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 DeltaExpectedPositionLocked(ExpKey(cascadeAcctName), rollbackDelta);
                             }
                             ClearDispatchSyncPending(ExpKey(cascadeAcctName));
-                            try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); } catch { }
+                            try { RemoveDrawObject("SIMA_DESYNC_" + cascadeAcctName); }
+                            catch (Exception ex)
+                            {
+                                if (_diagFleet)
+                                    Print("[FLEET_CATCH] ExecuteFollowerCascade desync cleanup failed: " + ex.Message);
+                            }
                         }
                     }
 

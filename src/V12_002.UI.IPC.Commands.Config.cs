@@ -399,6 +399,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             if (action == "DIAG_IPC")
             {
+                // T-Q1: Toggle catch logging flag
+                _diagIpc = !_diagIpc;
+                Print("[DIAG_IPC] Catch logging: " + (_diagIpc ? "ENABLED" : "DISABLED"));
+
                 Print("[DIAG_IPC] Invalid UTF-8 count   : " + _ipcInvalidUtf8Count);
                 Print("[DIAG_IPC] Allowlist reject count: " + _ipcAllowlistRejectCount);
                 Print("[DIAG_IPC] Queue depth peak      : " + _ipcQueueDepthPeak);

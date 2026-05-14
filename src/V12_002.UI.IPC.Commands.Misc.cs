@@ -115,6 +115,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (action != "DIAG_FLEET")
                 return false;
 
+            // T-Q1: Toggle catch logging flag
+            _diagFleet = !_diagFleet;
+            Print("[DIAG_FLEET] Catch logging: " + (_diagFleet ? "ENABLED" : "DISABLED"));
+
             Print("[DIAG] ##################################################");
             Print($"[DIAG] EnableSIMA = {EnableSIMA}");
             Print($"[DIAG] AccountPrefix = \"{AccountPrefix}\"");

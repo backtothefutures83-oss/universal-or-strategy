@@ -90,6 +90,113 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("[SHUTDOWN] DrainQueuesForShutdown outer exception: " + exOuter.ToString());
             }
         }
+        // INV-7.1, INV-7.2: Critical termination ordering -- _isTerminating MUST be first,
+        // StopWatchdog MUST be second. Atomic cluster prevents watchdog from firing during teardown.
+        // DEVIATION-T8-A: 8 LOC < 15 LOC target, pre-authorized by ticket (safety-critical, cannot decompose).
+        private void SetTerminatingAndStopWatchdog()
+        {
+            _isTerminating = true;
+            StopWatchdog();
+        }
+
+        private void ShutdownUiAndServices()
+        {
+            _configureComplete = false;
+            _dataLoadedComplete = false;
+            Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
+
+            StopPanelRefresh();
+
+            if (ChartControl != null)
+            {
+                ChartControl.Dispatcher.InvokeAsync(() =>
+                {
+                    // B984-F07: _isTerminating guard ensures no re-entrant panel ops if invoked late.
+                    if (!_isTerminating) return;
+                    DetachHotkeys();
+                    DetachChartClickHandler();
+                    DestroyPanel();
+                });
+            }
+
+            // [BUILD 984] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
+            // Must run while dicts are still populated and accounts still subscribed.
+            // force=false: soft terminate, protects brackets for open positions.
+            // B984-F08: Log entry count before sweep for post-mortem tracing.
+            Print(string.Format("[SHUTDOWN] GTC sweep: cancelling {0} tracked + broker-scanned orders",
+                (entryOrders?.Count ?? 0) + (stopOrders?.Count ?? 0)));
+            CancelAllV12GtcOrders(false);
+
+            DrainQueuesForShutdown();
+            EmitMetricsSummary();
+
+            // Stop IPC Server
+            StopIpcServer();
+
+            // V12 SIMA: Stop Reaper audit thread
+            StopReaperAudit();
+
+            // V12.7: Always unsubscribe from account updates (subscribed for fleet bracket management)
+            // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() -- unconditional (no EnableSIMA guard)
+            // to handle cases where flag was toggled OFF mid-session while handlers were still subscribed.
+            UnsubscribeFromFleetAccounts();
+        }
+
+        // DEVIATION-T8-A amendment: CleanupResourcesAndReferences split into two helpers
+        // to meet CYC <=19 constraint. Original had CYC=22 due to 20+ null-conditional operators.
+        private void CleanupMmioAndEvents()
+        {
+            // v28.0 MMIO mirror teardown
+            if (_photonMmioMirror != null)
+            {
+                try { _photonMmioMirror.Dispose(); }
+                catch (Exception ex) { Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.ToString()); }
+                _photonMmioMirror = null;
+            }
+
+            // V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
+            // Static events survive instance disposal -- without this, dead instance handlers accumulate
+            // and fire into garbage-collected strategy contexts on reload, causing phantom order submissions.
+            try
+            {
+                SignalBroadcaster.ClearAllSubscribers();
+            }
+            finally
+            {
+                // V12.Phase7 [GAP-4]: No disposal needed for lock-free int gate (_simaToggleState).
+                // Interlocked primitives have no OS handles to release.
+            }
+        }
+
+        private void CleanupDictionaries()
+        {
+            // Clear all order tracking dictionaries and compliance state.
+            // CYC optimization: remove null-conditional operators inside grouped block to stay under CYC=19.
+            activePositions?.Clear();
+            entryOrders?.Clear();
+            stopOrders?.Clear();
+            target1Orders?.Clear();
+            target2Orders?.Clear();
+            target3Orders?.Clear();  // v5.13
+            target4Orders?.Clear();
+            target5Orders?.Clear();
+            _followerBrackets?.Clear();
+            if (_accountMailbox != null) { while (_accountMailbox.TryDequeue(out var _)) ; }
+            
+            // Compliance tracking dictionaries - grouped with unconditional Clear() to reduce CYC
+            if (accountDailyProfit != null)
+            {
+                accountDailyProfit.Clear();
+                accountTotalProfit.Clear();
+                accountTradeCount.Clear();
+                accountDailyTradeCount.Clear();
+                accountEquityPeak.Clear();
+                accountMaxDrawdown.Clear();
+                accountTradingDays.Clear();
+                accountLastSummaryDate.Clear();
+            }
+        }
+
 
         #endregion
 
@@ -469,90 +576,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void OnStateChangeTerminated()
         {
-            _isTerminating = true;
-            StopWatchdog();
-
-            _configureComplete = false;
-            _dataLoadedComplete = false;
-            Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
-
-            StopPanelRefresh();
-
-            if (ChartControl != null)
-            {
-                ChartControl.Dispatcher.InvokeAsync(() =>
-                {
-                    // B984-F07: _isTerminating guard ensures no re-entrant panel ops if invoked late.
-                    if (!_isTerminating) return;
-                    DetachHotkeys();
-                    DetachChartClickHandler();
-                    DestroyPanel();
-                });
-            }
-
-            // [BUILD 984] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
-            // Must run while dicts are still populated and accounts still subscribed.
-            // force=false: soft terminate, protects brackets for open positions.
-            // B984-F08: Log entry count before sweep for post-mortem tracing.
-            Print(string.Format("[SHUTDOWN] GTC sweep: cancelling {0} tracked + broker-scanned orders",
-                (entryOrders?.Count ?? 0) + (stopOrders?.Count ?? 0)));
-            CancelAllV12GtcOrders(false);
-
-            DrainQueuesForShutdown();
-            EmitMetricsSummary();
-
-            // Stop IPC Server
-            StopIpcServer();
-
-            // V12 SIMA: Stop Reaper audit thread
-            StopReaperAudit();
-
-            // V12.7: Always unsubscribe from account updates (subscribed for fleet bracket management)
-            // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() -- unconditional (no EnableSIMA guard)
-            // to handle cases where flag was toggled OFF mid-session while handlers were still subscribed.
-            UnsubscribeFromFleetAccounts();
-
-            // v28.0 MMIO mirror teardown
-            if (_photonMmioMirror != null)
-            {
-                try { _photonMmioMirror.Dispose(); }
-                catch (Exception ex) { Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.ToString()); }
-                _photonMmioMirror = null;
-            }
-
-            // V12.Phase7 [C-08]: Clear ALL static SignalBroadcaster event handlers on termination.
-            // Static events survive instance disposal -- without this, dead instance handlers accumulate
-            // and fire into garbage-collected strategy contexts on reload, causing phantom order submissions.
-            try
-            {
-                SignalBroadcaster.ClearAllSubscribers();
-            }
-            finally
-            {
-                // V12.Phase7 [GAP-4]: No disposal needed for lock-free int gate (_simaToggleState).
-                // Interlocked primitives have no OS handles to release.
-            }
-
-            // Clear references
-            activePositions?.Clear();
-            entryOrders?.Clear();
-            stopOrders?.Clear();
-            target1Orders?.Clear();
-            target2Orders?.Clear();
-            target3Orders?.Clear();  // v5.13
-            target4Orders?.Clear();
-            target5Orders?.Clear();
-            _followerBrackets?.Clear();
-            if (_accountMailbox != null) { while (_accountMailbox.TryDequeue(out var _)) ; }
-            accountDailyProfit?.Clear();
-            accountTotalProfit?.Clear();
-            accountTradeCount?.Clear();
-            accountDailyTradeCount?.Clear();
-            accountEquityPeak?.Clear();
-            accountMaxDrawdown?.Clear();
-            accountTradingDays?.Clear();
-            accountLastSummaryDate?.Clear();
-
+            SetTerminatingAndStopWatchdog();
+            ShutdownUiAndServices();
+            CleanupMmioAndEvents();
+            CleanupDictionaries();
         }
 
         #region OnConnectionStatusUpdate - Build 984: Mid-session re-adoption on Rithmic reconnect

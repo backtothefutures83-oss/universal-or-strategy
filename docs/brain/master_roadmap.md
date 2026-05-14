@@ -1,4 +1,4 @@
-# V12 Universal OR Strategy -- Master Roadmap
+﻿# V12 Universal OR Strategy -- Master Roadmap
 
 ## Build-984-SourceHardening | 12 Repairs CONFIRMED LIVE -- COMPLIANCE PASS
 
@@ -46,7 +46,7 @@
 | **Phase 4** | Event Lifecycle Dispatcher (ADR-020) | ✅ DONE |
 | **Phase 5** | Modularization (StickyState + Trend + UI/Photon IO Subgraphs) | ✅ DONE |
 | **Phase 6** | Hot Path Execution Hardening (T1/T2/T3 god-function extraction) | ✅ DONE |
-| **Phase 7** | Concurrency Hardening (M7) + Complexity Extraction (red files) | 🟡 IN PROGRESS |
+| **Phase 7** | Concurrency Hardening (M7) + Complexity Extraction (red files) | ✅ COMPLEXITY AUDIT DONE, extractions ongoing |
 
 ---
 
@@ -170,6 +170,10 @@ Phase 6 is a discrete milestone bridging M5 (Zero-Allocation Hot Path) and M7 (C
 | T2 `ExecuteRunnerAction` | `V12_002.UI.Callbacks.cs` | 24→<5 | ✅ CLEAN | ✅ COMPLETE (2026-05-11) |
 | T3 `OnKeyDown` | `V12_002.UI.Callbacks.cs` | 28 | ✅ CLEAN | ⚪ DEFERRED (P3 review needed) |
 | T4 `SIMA.Lifecycle.cs` lock-free | `V12_002.SIMA.Lifecycle.cs` | — | ✅ COMPLETE (2026-05-11) | ⚪ TBD |
+| T-Q1 Empty-catch logging | 4 files | — | ✅ CLEAN | ✅ COMPLETE (2026-05-13) |
+| T-W1 `ShouldSkipFleetAccount` | `V12_002.SIMA.Fleet.cs` | 25→10 | ✅ CLEAN | ✅ COMPLETE (2026-05-13) |
+| T-H `ValidateStopPrice` | `V12_002.Orders.Management.StopSync.cs` | 33→19 | ✅ CLEAN | ✅ COMPLETE (2026-05-13) |
+| T-W2 `TryFindOrderInPosition` | `V12_002.Orders.Callbacks.AccountOrders.cs` | 25→8 | ✅ CLEAN | ✅ COMPLETE (2026-05-13) |
 > NOTE: architecture.md hotspot map was incorrect. `OnAccountOrderUpdate` (15 CYC) is NOT the god-function.
 > Real hotspots in `UI.Callbacks.cs`: `OnKeyDown` (28), `ExecuteTargetAction` (24), `ExecuteRunnerAction` (24).
 
@@ -280,8 +284,48 @@ Phase 6 is a discrete milestone bridging M5 (Zero-Allocation Hot Path) and M7 (C
 
 > [!NOTE]
 > F-001 and F-002 are LETHAL only for the SPSC ring buffers needed by the Rithmic sidecar.
-> With Rithmic deferred, these are dormant -- they do not affect the current NT8 strategy execution.
-re LETHAL only for the SPSC ring buffers needed by the Rithmic sidecar.
-> With Rithmic deferred, these are dormant -- they do not affect the current NT8 strategy execution.
-ey do not affect the current NT8 strategy execution.
-ed, these are dormant -- they do not affect the current NT8 strategy execution.
+---
+
+## PHASE 7 STATUS: COMPLEXITY AUDIT COMPLETE (2026-05-13)
+
+**Audit**: 54 symbols exceeding CYC > 20 threshold
+
+### C# Source Findings (45 symbols, excluding test/tooling)
+
+| Priority | Symbol | File | CYC | Refactoring Approach |
+| :--- | :--- | :--- | :---: | :--- |
+| **CRITICAL** | `OnKeyDown` | `V12_002.UI.Callbacks.cs:337` | 49 | Command Pattern dispatcher |
+| **CRITICAL** | `ProcessIpc_MatchSymbol` | `V12_002.UI.IPC.cs:325` | 49 | FSM message router (M5) |
+| **HIGH** | `AttachPanelHandlers` | `V12_002.UI.Panel.Handlers.cs:17` | 39 | Split per-control methods |
+| **HIGH** | `OnSyncAllClick` | `V12_002.UI.Panel.Handlers.cs:238` | 37 | Extract SyncOrchestrator |
+| **HIGH** | `ManageTrail_RunPerTradeBranches` | `V12_002.Trailing.cs:193` | 36 | Extract per-strategy handlers |
+| **HIGH** | `UpdateContextualUI` | `V12_002.UI.Panel.Handlers.cs:427` | 36 | State Pattern |
+| **HIGH** | `ValidateStopPrice` | `V12_002.Orders.Management.StopSync.cs:551` | 33 | Validation rules objects |
+| **HIGH** | `ExecuteSmartDispatchEntry` | `V12_002.SIMA.Dispatch.cs:45` | 33 | Phase 7 Sprint 5 (in progress) |
+| **MEDIUM** | `OnStateChangeDataLoaded` | `V12_002.Lifecycle.cs:414` | 30 | Initializaton pipeline |
+| **MEDIUM** | `FlattenFilledMasterPositions` | `V12_002.Orders.Management.Flatten.cs:263` | 29 | Per-account handlers |
+| **MEDIUM** | 32 more CYC 21-29 | see full report | -- | Various |
+
+### Audit Triage
+- **Python test harnesses excluded** -- 9 symbols in `scripts/` are tooling, not production risk
+- **45 C# symbols** in `src/` tracked for refactoring
+- **Report**: `docs/brain/complexity_audit_cyc20_report.md`
+
+### Updated Phase 7 Queue (post-audit)
+
+- [x] Full codebase complexity audit (CYC > 20) -- COMPLETE (2026-05-13)
+- [x] T-Q1: Empty-catch logging (4 files) -- COMPLETE (2026-05-13)
+- [x] T-W1: `ShouldSkipFleetAccount` (25→10 CYC) -- COMPLETE (2026-05-13)
+- [x] T-H: `ValidateStopPrice` (33→19 CYC) -- COMPLETE (2026-05-13)
+- [x] T-W2: `TryFindOrderInPosition` (25→8 CYC) -- COMPLETE (2026-05-13)
+- [ ] **T-W1-Perf**: `ShouldSkipFleet_RunHealthCheck` (CYC=20, threshold 18) -- PARKED for next Epic (low-frequency 1-5 Hz dispatch, 2 enumerator allocations per invocation)
+- [ ] `OnKeyDown` (49 CYC) -- P3 ARCHITECT review -> Command Pattern extraction
+- [ ] `ProcessIpc_MatchSymbol` (49 CYC) -- P3 ARCHITECT review -> FSM message router
+- [ ] `AttachPanelHandlers` (39 CYC) -- split into per-control methods
+- [ ] `OnSyncAllClick` (37 CYC) -- extract SyncOrchestrator class
+- [ ] `ManageTrail_RunPerTradeBranches` (36 CYC) -- extract per-strategy trail handlers
+- [ ] `UpdateContextualUI` (36 CYC) -- convert to State Pattern
+- [ ] `ExecuteSmartDispatchEntry` (33 CYC) -- Phase 7 Sprint 5 (continuing)
+- [ ] M5 Branch Elimination: dictionary dispatch + remaining switch/if chains
+- [ ] P0/P1 findings triage -- categorize by change frequency + risk
+

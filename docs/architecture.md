@@ -164,6 +164,9 @@ flowchart TD
 | -- | `ExecuteSmartDispatchEntry` | `V12_002.SIMA.Dispatch.cs` | **< 30** | 🟢 **OPTIMIZED** (Phase 6) |
 | -- | `ProcessOnExecutionUpdate` | `V12_002.Orders.Callbacks.Execution.cs` | **< 20** | 🟢 **OPTIMIZED** (Phase 6) |
 | -- | `ExecuteTRENDEntry` | `V12_002.Entries.Trend.cs` | **10** | 🟢 **OPTIMIZED** (Phase 5) |
+| -- | `ValidateStopPrice` | `V12_002.Orders.Management.StopSync.cs` | **33→19** | 🟢 **OPTIMIZED** (Phase 7) |
+| -- | `ShouldSkipFleetAccount` | `V12_002.SIMA.Fleet.cs` | **25→10** | 🟢 **OPTIMIZED** (Phase 7) |
+| -- | `TryFindOrderInPosition` | `V12_002.Orders.Callbacks.AccountOrders.cs` | **25→8** | 🟢 **OPTIMIZED** (Phase 7) |
 | 1 | `OnAccountOrderUpdate` | `V12_002.UI.Callbacks.cs` | 110 | 🔴 **CRITICAL** (Phase 7 Target) |
 | 2 | `HydrateWorkingOrdersFromBroker` | `V12_002.SIMA.Lifecycle.cs` | 96 | 🔴 **CRITICAL** (Phase 7 Target) |
 

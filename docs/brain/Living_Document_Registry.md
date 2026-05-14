@@ -31,6 +31,15 @@ Dynamic documents used for the current implementation cycle.
 *   [task.md](task.md) - The current active mission status and ticket tracking.
 *   [T2: ExecuteOnExecutionUpdate_CIT_Repair](phase7_sprint5_t2.md) - COMPLETE
 *   [T3: ExecuteSmartDispatchEntry Extraction](phase7_sprint5_t03_ExecuteSmartDispatchEntry.md) - COMPLETE
+*   [T4: SubmitBracketOrders Extraction](phase7_sprint5_t04_SubmitBracketOrders.md) - COMPLETE
+*   [T5: MoveSpecificTarget CYC Reduction](phase7_sprint5_t05_MoveSpecificTarget.md) - PARKED (superseded by Epic Phase 7 ticket queue)
+*   [T13: SweepBrokerOrders Extraction](phase7_sprint5_t13_SweepBrokerOrders.md) - COMPLETE (CYC 28→15)
+*   [T13: SweepBrokerOrders Acceptance](phase7_sprint5_t13_ACCEPTANCE_REPORT.md) - ACCEPTED
+*   [T14: BuildUiLivePositionSnapshot Extraction](phase7_sprint5_t14_BuildUiLivePositionSnapshot.md) - COMPLETE (CYC 20→2)
+*   [T14: BuildUiLivePositionSnapshot Acceptance](phase7_sprint5_t14_ACCEPTANCE_REPORT.md) - ACCEPTED
+*   [T15: ExecuteWatchdogDirectFallback Extraction](phase7_sprint5_t15_ExecuteWatchdogDirectFallback.md) - COMPLETE (CYC 20→3)
+*   [T15: ExecuteWatchdogDirectFallback Acceptance](phase7_sprint5_t15_ACCEPTANCE_REPORT.md) - ACCEPTED
+*   [T16: CreateNewStopOrder Extraction](phase7_sprint5_t16_CreateNewStopOrder.md) - COMPLETE (CYC 21->6)
 *   [implementation_plan.md](implementation_plan.md) - Surgical implementation steps for the active engineer.
 *   [forensics_report.md](forensics_report.md) - Root cause analysis and technical evidence.
 *   [mini-spec.md](mini-spec.md) - Technical requirements and metabolic design for the active mission.
@@ -57,4 +66,4 @@ Design decisions and inspiration for the project's evolution.
 
 ---
 **Registry Status**: MAINTAINED
-**Last Update**: 2026-05-09
+**Last Update**: 2026-05-13 (T16 CreateNewStopOrder added; Epic Phase 7 Complexity Extraction queued)

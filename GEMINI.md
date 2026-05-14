@@ -25,10 +25,13 @@
 - **FORENSICS (Codex)**: P2 Diagnosis & Proof of Failure.
 - **ARCHITECT (Claude Code)**: P3 Design & Strategic Planning. PLAN-ONLY by default.
 - **ADJUDICATOR (Arena AI)**: **P4 Vetting Gate**. Adversarial consensus and **PR Audit** required BEFORE surgery.
-- **ENGINEER (P5)**: Surgical Execution. Target selection is mandatory:
-  - **Bob CLI** (`v12-engineer`): Extraction specialist.
-  - **Codex CLI** (`codex-rescue`): Logic hardening specialist.
-  - **Gemini CLI** (`yolo`): **Utility Specialist & Research Hub**. Handles non-`src/` tasks (docs, infra, configs), model-agnostic operations, **Official Web Research**, and **Video Synthesis** (YouTube/Visual context). **BANNED** from high-value logic synthesis tasks like `$prreport` or `$battlezip`.
+- **ENGINEER (P5)**: Surgical Execution. Target selection follows strict routing logic:
+  - **If task involves `src/` code**:
+      - **Bob CLI** (`v12-engineer`): Acts as both Architect and Engineer in Orchestrator mode. Specialist for extraction, refactoring, and God-function splitting.
+      - **Codex CLI** (`codex-rescue`): Specialist for surgical logic hardening and lock-free kernel updates.
+  - **If task involves non-`src/` code (docs, infra, configs)**:
+      - **Jules AI**: Primary non-src engineer for GitHub-based workflows. If the task can be done remotely via GitHub APIs, use Jules.
+      - **Gemini CLI** (`yolo`): Secondary non-src local engineer. If the task requires local file access, web research, or visual context that Jules cannot access, use Gemini CLI. **BANNED** from high-value logic synthesis tasks like `$prreport` or `$battlezip`.
 - **VALIDATOR (Rider / AMAL)**: **P6 Post-Surgery Performance**. ASCII Gate & Allocation checks.
 - **SENTINEL (GitHub / Sentry)**: **P7 Infrastructure & Security**. Supply chain & environmental health.
 
@@ -132,6 +135,14 @@ Bias toward caution over speed. For trivial tasks, use judgment.
   3. [Step] -> verify: [check]
 - Define "done" before starting. Strong criteria let you loop independently.
 - Weak criteria ("make it work") require constant clarification -- avoid them.
+
+## Section 13: Autonomous Skill Creation & Self-Improvement (MANDATORY PILLAR)
+
+**All agents MUST perform a post-use audit after every skill or tool use:**
+1. Check if any instruction was ambiguous or produced an unexpected result.
+2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
+3. State `skill(name): no gaps identified` if no gap is found.
+4. Skipping the post-use audit is a protocol violation.
 
 ## Section 14: $claudecloud Protocol Hardening (Permanent Standard)
 

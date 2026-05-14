@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.007-phase7-t3";  // Sprint5 T3: ExecuteSmartDispatchEntry extraction (CYC 29->22)
+        public const string BUILD_TAG = "1111.007-phase7-t4";  // T4: Sprint 5 acceptance gate
 
         public class UILiveTargetSnapshot
         {
@@ -336,6 +336,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile bool _configureComplete = false;
         private volatile bool _dataLoadedComplete = false;
         private int _startupReadinessLogEmitted = 0;
+        private volatile bool _diagFleet;  // T-Q1: Fleet dispatch + account queue catch logging
+        private volatile bool _diagIpc;    // T-Q1: MMIO mirror publish catch logging
         protected void Enqueue(Action<V12_002> action) {
             if (action == null) return;
             _cmdQueue.Enqueue(new DelegateCommand(action));

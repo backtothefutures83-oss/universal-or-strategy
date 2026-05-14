@@ -62,7 +62,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Volatile.Write(ref _simaTogglePending, 1);
                     bool _defEnabled = enabled;
                     Print("[SIMA_WARN] Toggle gate contended after 3 retries -- scheduling deferred retry");
-                    try { TriggerCustomEvent(o => ProcessApplySimaState(_defEnabled), null); } catch { }
+                    try { TriggerCustomEvent(o => ProcessApplySimaState(_defEnabled), null); }
+                    catch (Exception ex)
+                    {
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] ApplySimaState toggle retry failed: " + ex.Message);
+                    }
                     return;
                 }
                 retries++;
@@ -452,6 +457,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
+        /// Validates whether an order state qualifies for adoption into tracking dictionaries.
+        /// Build 994: Master account also accepts Unknown state (NT8 Sim previous-session orders).
+        /// </summary>
+        /// <param name="state">Order state to validate</param>
+        /// <param name="includeMasterUnknown">If true, also accepts Unknown state for master account orders</param>
+        /// <returns>True if order should be adopted</returns>
+        private bool IsOrderStateAdoptable(OrderState state, bool includeMasterUnknown)
+        {
+            if (state == OrderState.Working) return true;
+            if (state == OrderState.Accepted) return true;
+            if (state == OrderState.Submitted) return true;
+            if (state == OrderState.ChangePending) return true;
+            if (state == OrderState.ChangeSubmitted) return true;
+            if (includeMasterUnknown && state == OrderState.Unknown) return true;
+            return false;
+        }
+
+        /// <summary>
         /// Phase 2: Adopt working orders from master account into tracking dictionaries.
         /// Master account does not use FSM -- bracket orders only.
         /// </summary>
@@ -463,33 +486,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 foreach (Order ord in masterBroker996h.Orders.ToArray())
                 {
                     if (ord.Instrument?.FullName != Instrument?.FullName) continue;
-                    // Build 994: Also accept Unknown -- NT8 Sim marks previous-session orders as Unknown.
-                    if (ord.OrderState != OrderState.Working    &&
-                        ord.OrderState != OrderState.Accepted   &&
-                        ord.OrderState != OrderState.Submitted  &&
-                        ord.OrderState != OrderState.ChangePending &&
-                        ord.OrderState != OrderState.ChangeSubmitted &&
-                        ord.OrderState != OrderState.Unknown) continue;
+                    if (!IsOrderStateAdoptable(ord.OrderState, includeMasterUnknown: true)) continue;
 
                     string name = ord.Name ?? string.Empty;
-                    ConcurrentDictionary<string, Order> targetDict = null;
-                    string key  = null;
-                    string dictName = null;
-
-                    if (name.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = stopOrders;   key = name.Substring(5); dictName = "stopOrders"; }
-                    else if (name.StartsWith("S_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = stopOrders;   key = name.Substring(2); dictName = "stopOrders"; }
-                    else if (name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = target1Orders; key = name.Substring(3); dictName = "target1Orders"; }
-                    else if (name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = target2Orders; key = name.Substring(3); dictName = "target2Orders"; }
-                    else if (name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = target3Orders; key = name.Substring(3); dictName = "target3Orders"; }
-                    else if (name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = target4Orders; key = name.Substring(3); dictName = "target4Orders"; }
-                    else if (name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
-                    { targetDict = target5Orders; key = name.Substring(3); dictName = "target5Orders"; }
+                    string key, dictName;
+                    ConcurrentDictionary<string, Order> targetDict =
+                        ClassifyMasterOrderByPrefix(name, out key, out dictName);
 
                     if (targetDict == null || key == null) continue;
 
@@ -504,6 +506,46 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("[SIMA HYDRATE] WARNING: Could not adopt orders for {0} (Master): {1}",
                     Account.Name, ex.Message));
             }
+        }
+
+        /// <summary>
+        /// Classifies a master account order by its name prefix and returns the target tracking dictionary.
+        /// Extracts the entry key by stripping the well-known prefix (e.g. "Stop_" -> stopOrders).
+        /// </summary>
+        /// <param name="orderName">Order name to classify</param>
+        /// <param name="key">Output: Entry key (name with prefix stripped)</param>
+        /// <param name="dictName">Output: Dictionary name for diagnostics</param>
+        /// <returns>Target dictionary, or null if prefix not recognized</returns>
+        private ConcurrentDictionary<string, Order> ClassifyMasterOrderByPrefix(
+            string orderName,
+            out string key,
+            out string dictName)
+        {
+            key = null;
+            dictName = null;
+            
+            if (orderName.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(5); dictName = "stopOrders"; return stopOrders; }
+            
+            if (orderName.StartsWith("S_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(2); dictName = "stopOrders"; return stopOrders; }
+            
+            if (orderName.StartsWith("T1_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(3); dictName = "target1Orders"; return target1Orders; }
+            
+            if (orderName.StartsWith("T2_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(3); dictName = "target2Orders"; return target2Orders; }
+            
+            if (orderName.StartsWith("T3_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(3); dictName = "target3Orders"; return target3Orders; }
+            
+            if (orderName.StartsWith("T4_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(3); dictName = "target4Orders"; return target4Orders; }
+            
+            if (orderName.StartsWith("T5_", StringComparison.OrdinalIgnoreCase))
+            { key = orderName.Substring(3); dictName = "target5Orders"; return target5Orders; }
+            
+            return null;
         }
 
         /// <summary>
@@ -1031,7 +1073,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                         CancelOrderOnAccount(ord, ord.Account);
                         trackedCancels++;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] SweepTrackedOrders cancel failed: " + ex.Message);
+                    }
                 }
             }
             return trackedCancels;
@@ -1064,43 +1110,73 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ord.OrderState != OrderState.Submitted  &&
                         ord.OrderState != OrderState.ChangePending &&
                         ord.OrderState != OrderState.ChangeSubmitted) continue;
+                        
                         string ordName = ord.Name ?? string.Empty;
-                        bool isV12 = false;
-                        for (int pi = 0; pi < v12Prefixes.Length; pi++)
-                        {
-                            if (ordName.StartsWith(v12Prefixes[pi], StringComparison.OrdinalIgnoreCase))
-                            { isV12 = true; break; }
-                        }
-                        if (!isV12) continue;
+                        if (!IsV12OrderPrefix(ordName, v12Prefixes)) continue;
 
                         // [FIX-FF]: Explicit bracket exclusion on soft disable.
                         // Bracket orders protect live positions -- never cancel them during
                         // SIMA disable or soft terminate. Defensive guard against naming drift.
-                        if (!force)
-                        {
-                            bool isBracketOrder =
-                                ordName.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("S_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("T5_", StringComparison.OrdinalIgnoreCase) ||
-                                ordName.StartsWith("Target_", StringComparison.OrdinalIgnoreCase);
-                            if (isBracketOrder)
-                            {
-                                Print(string.Format("[FIX-FF] Protected bracket order from sweep: {0} on {1}",
-                                    ordName, acct.Name));
-                                continue;
-                            }
-                        }
+                        if (ShouldProtectBracketOrder(ordName, force, acct.Name)) continue;
 
-                        try { acct.Cancel(new[] { ord }); brokerCancels++; } catch { }
+                        try { acct.Cancel(new[] { ord }); brokerCancels++; }
+                        catch (Exception ex)
+                        {
+                            if (_diagFleet)
+                                Print("[FLEET_CATCH] SweepBrokerOrders per-order cancel failed: " + ex.Message);
+                        }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    if (_diagFleet)
+                        Print("[FLEET_CATCH] SweepBrokerOrders account iteration failed: " + ex.Message);
+                }
             }
             return brokerCancels;
+        }
+
+        /// <summary>
+        /// Helper: Check if order name matches any V12 prefix.
+        /// Extracted from SweepBrokerOrders to reduce cyclomatic complexity.
+        /// </summary>
+        private bool IsV12OrderPrefix(string orderName, string[] v12Prefixes)
+        {
+            for (int pi = 0; pi < v12Prefixes.Length; pi++)
+            {
+                if (orderName.StartsWith(v12Prefixes[pi], StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Helper: Determine if bracket order should be protected from cancellation.
+        /// Bracket orders (Stop_, S_, T1_-T5_, Target_) protect live positions and must
+        /// never be cancelled during soft disable (force=false).
+        /// Extracted from SweepBrokerOrders to reduce cyclomatic complexity.
+        /// </summary>
+        private bool ShouldProtectBracketOrder(string orderName, bool force, string accountName)
+        {
+            if (force) return false;
+
+            bool isBracketOrder =
+                orderName.StartsWith("Stop_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("S_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("T5_", StringComparison.OrdinalIgnoreCase) ||
+                orderName.StartsWith("Target_", StringComparison.OrdinalIgnoreCase);
+            
+            if (isBracketOrder)
+            {
+                Print(string.Format("[FIX-FF] Protected bracket order from sweep: {0} on {1}",
+                    orderName, accountName));
+                return true;
+            }
+            return false;
         }
 
 

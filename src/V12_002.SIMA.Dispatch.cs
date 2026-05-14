@@ -205,7 +205,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // V14.2 FIX-F7: Pump prime checks BOTH ring and legacy queue
                 if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
+                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+                    catch (Exception ex)
+                    {
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] ExecuteSmartDispatchEntry pump prime failed: " + ex.Message);
+                    }
 
                 // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) -- stop clock, flush forensic report.
                 sw.Stop();
@@ -587,7 +592,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // MMIO mirror is a best-effort write-through -- never blocks or fails hot path.
                 if (_photonMmioMirror != null)
                 {
-                    try { _photonMmioMirror.TryPublish(ref _slot); } catch { }
+                    try { _photonMmioMirror.TryPublish(ref _slot); }
+                    catch (Exception ex)
+                    {
+                        if (_diagIpc)
+                            Print("[IPC_CATCH] Dispatch_PublishMarketBracketToPhoton MMIO failed: " + ex.Message);
+                    }
                 }
             }
             else
@@ -712,7 +722,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (_photonMmioMirror != null)
                 {
-                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
+                    try { _photonMmioMirror.TryPublish(ref _slotLmt); }
+                    catch (Exception ex)
+                    {
+                        if (_diagIpc)
+                            Print("[IPC_CATCH] Dispatch_BuildFollowerOrders MMIO failed: " + ex.Message);
+                    }
                 }
             }
             else

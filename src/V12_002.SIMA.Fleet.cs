@@ -72,7 +72,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
                 if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty)
                     || !_pendingFleetDispatches.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
+                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+                    catch (Exception ex)
+                    {
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] ProcessFleetSlot pump prime failed: " + ex.Message);
+                    }
             }
         }
 
@@ -308,7 +313,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
                 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); } catch { }
+                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+                    catch (Exception ex)
+                    {
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] ValidateDispatchTimestamp pump prime failed: " + ex.Message);
+                    }
                 return false;
             }
             return true;
@@ -334,6 +344,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Build 935 [SIMA-B935-001]: Skip-logic extracted from ExecuteSmartDispatchEntry fleet loop.
         // Returns true if the account should be skipped for this dispatch cycle.
         // Threading: strategy thread only. stateLock usage identical to original inline code.
+        /// <summary>
+        /// Build 935 [SIMA-B935-001]: Skip-logic extracted from ExecuteSmartDispatchEntry fleet loop.
+        /// Returns true if the account should be skipped for this dispatch cycle.
+        /// Threading: strategy thread only. stateLock usage identical to original inline code.
+        /// T-W1: Refactored to thin dispatcher (CYC <= 10) with two private helpers.
+        /// </summary>
         private bool ShouldSkipFleetAccount(Account acct, AccountRankInfo rankInfo,
             System.Collections.Generic.HashSet<string> activeAccountSnapshot, System.Text.StringBuilder dispatchLog)
         {
@@ -344,7 +360,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
             }
 
-            // Step 2: H-13 stale state reconciliation (Build 1004: FSM-primary, no expectedPositions read).
+            // Step 2: H-13 stale state reconciliation (void call, diagnostic-only)
+            ShouldSkipFleet_RunHealthCheck(acct, dispatchLog);
+
+            // Step 3: Consistency lock decision (bool return)
+            return ShouldSkipFleet_IsConsistencyLockHit(rankInfo, acct, dispatchLog);
+        }
+
+        /// <summary>
+        /// T-W1 Helper 1: H-13 stale state reconciliation (diagnostic-only).
+        /// Logs broker position vs FSM/activePositions/dispatch state.
+        /// RETURNS VOID per H8 constraint -- no bool decision path.
+        /// </summary>
+        /// <param name="acct">Fleet account to check</param>
+        /// <param name="dispatchLog">Batch log buffer for forensic output</param>
+        private void ShouldSkipFleet_RunHealthCheck(Account acct, StringBuilder dispatchLog)
+        {
             try
             {
                 // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
@@ -373,15 +404,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                         acct.Name, hasActiveFsmForAcct ? "FSM active" : (hasDispatchPending ? "dispatch pending" : "activePos present")));
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                if (_diagFleet)
+                    Print("[FLEET_CATCH] ProcessFleetSlot account iteration failed: " + ex.Message);
+            }
+        }
 
-            // Step 3: Consistency Lock -- skip if daily P&L cap hit.
+        /// <summary>
+        /// T-W1 Helper 2: Consistency Lock -- skip if daily P&L cap hit.
+        /// </summary>
+        /// <param name="rankInfo">Account rank info with DailyPL</param>
+        /// <param name="acct">Fleet account (for log output)</param>
+        /// <param name="dispatchLog">Batch log buffer for forensic output</param>
+        /// <returns>True if consistency lock fires (skip account), false otherwise</returns>
+        private bool ShouldSkipFleet_IsConsistencyLockHit(AccountRankInfo rankInfo, Account acct, StringBuilder dispatchLog)
+        {
             if (EnableConsistencyLock && rankInfo.DailyPL >= MaxDailyProfitCap)
             {
                 dispatchLog.AppendLine(string.Format("[DISPATCH] {0} SKIPPED - Consistency Lock ({1:C})", acct.Name, rankInfo.DailyPL));
                 return true;
             }
-
             return false;
         }
 
