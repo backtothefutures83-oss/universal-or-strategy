@@ -151,59 +151,103 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Tier 3: O(N) fallback scan across all FSMs (last resort).
         /// Back-fills OrderId map when found via fallback for future O(1) access.
         /// </summary>
-        private FollowerBracketFSM ResolveFsmFromEvent(AccountEvent evt)
+        /// <summary>
+        /// Tier 1: O(1) primary lookup via OrderId map.
+        /// </summary>
+        private FollowerBracketFSM ResolveFsm_ByOrderId(string orderId)
         {
-            FollowerBracketFSM fsm = null;
+            if (string.IsNullOrEmpty(orderId)) return null;
             
-            // Phase 3 [Step 4]: O(1) Lookup via OrderId map (primary)
-            if (!string.IsNullOrEmpty(evt.OrderId))
+            if (_orderIdToFsmKey.TryGetValue(orderId, out var entryName))
             {
-                if (_orderIdToFsmKey.TryGetValue(evt.OrderId, out var entryName))
-                {
-                    _followerBrackets.TryGetValue(entryName, out fsm);
-                }
+                _followerBrackets.TryGetValue(entryName, out var fsm);
+                return fsm;
             }
+            
+            return null;
+        }
 
-            // Fallback: Try matching by SignalName (secondary)
-            if (fsm == null && !string.IsNullOrEmpty(evt.SignalName))
+        /// <summary>
+        /// Tier 2: Secondary lookup via SignalName parsing with backfill.
+        /// Signal names are like "Stop_Fleet_Apex_1" or "T1_Fleet_Apex_1".
+        /// The fleetEntryName is the part after the first underscore.
+        /// </summary>
+        private FollowerBracketFSM ResolveFsm_BySignalName(string signalName, string orderId)
+        {
+            if (string.IsNullOrEmpty(signalName)) return null;
+            
+            int firstUnder = signalName.IndexOf('_');
+            if (firstUnder >= 0 && firstUnder < signalName.Length - 1)
             {
-                // Signal names are like "Stop_Fleet_Apex_1" or "T1_Fleet_Apex_1"
-                // The fleetEntryName is the part after the first underscore.
-                int firstUnder = evt.SignalName.IndexOf('_');
-                if (firstUnder >= 0 && firstUnder < evt.SignalName.Length - 1)
+                string fleetEntryName = signalName.Substring(firstUnder + 1);
+                if (_followerBrackets.TryGetValue(fleetEntryName, out var fsm))
                 {
-                    string fleetEntryName = evt.SignalName.Substring(firstUnder + 1);
-                    if (_followerBrackets.TryGetValue(fleetEntryName, out fsm))
-                    {
-                        // Back-fill the OrderId map if we found it via signal
-                        if (!string.IsNullOrEmpty(evt.OrderId))
-                            _orderIdToFsmKey[evt.OrderId] = fleetEntryName;
-                    }
+                    // Back-fill the OrderId map if we found it via signal
+                    if (!string.IsNullOrEmpty(orderId))
+                        _orderIdToFsmKey[orderId] = fleetEntryName;
+                    
+                    return fsm;
                 }
             }
             
-            // Last resort: search all FSMs (slow O(N) scan)
-            if (fsm == null)
+            return null;
+        }
+
+        /// <summary>
+        /// Tier 3: Last-resort O(N) scan with backfill.
+        /// Scan order: StopOrder -> Targets[0-4] -> EntryOrder.
+        /// </summary>
+        private FollowerBracketFSM ResolveFsm_ByScan(string accountAlias, string orderId)
+        {
+            if (string.IsNullOrEmpty(orderId)) return null;
+            
+            foreach (var f in _followerBrackets.Values)
             {
-                foreach (var f in _followerBrackets.Values)
+                if (f.AccountName != accountAlias) continue;
+                
+                if (f.StopOrder != null && f.StopOrder.OrderId == orderId)
                 {
-                    if (f.AccountName != evt.AccountAlias) continue;
-                    
-                    if (f.StopOrder != null && f.StopOrder.OrderId == evt.OrderId) { fsm = f; break; }
-                    bool foundT = false;
-                    for (int i = 0; i < 5; i++)
-                    {
-                        if (f.Targets[i] != null && f.Targets[i].OrderId == evt.OrderId) { fsm = f; foundT = true; break; }
-                    }
-                    if (foundT) break;
-                    if (f.EntryOrder != null && f.EntryOrder.OrderId == evt.OrderId) { fsm = f; break; }
+                    _orderIdToFsmKey[orderId] = f.EntryName;
+                    return f;
                 }
                 
-                // Back-fill if found
-                if (fsm != null && !string.IsNullOrEmpty(evt.OrderId))
-                    _orderIdToFsmKey[evt.OrderId] = fsm.EntryName;
+                bool foundT = false;
+                for (int i = 0; i < 5; i++)
+                {
+                    if (f.Targets[i] != null && f.Targets[i].OrderId == orderId)
+                    {
+                        _orderIdToFsmKey[orderId] = f.EntryName;
+                        foundT = true;
+                        return f;
+                    }
+                }
+                if (foundT) break;
+                
+                if (f.EntryOrder != null && f.EntryOrder.OrderId == orderId)
+                {
+                    _orderIdToFsmKey[orderId] = f.EntryName;
+                    return f;
+                }
             }
+            
+            return null;
+        }
 
+        /// <summary>
+        /// 3-tier FSM resolution router: OrderId (O(1)) -> SignalName -> Scan (O(N)).
+        /// </summary>
+        private FollowerBracketFSM ResolveFsmFromEvent(AccountEvent evt)
+        {
+            // Tier 1: O(1) OrderId lookup (primary)
+            FollowerBracketFSM fsm = ResolveFsm_ByOrderId(evt.OrderId);
+            if (fsm != null) return fsm;
+
+            // Tier 2: SignalName parsing (secondary)
+            fsm = ResolveFsm_BySignalName(evt.SignalName, evt.OrderId);
+            if (fsm != null) return fsm;
+
+            // Tier 3: O(N) scan (last resort)
+            fsm = ResolveFsm_ByScan(evt.AccountAlias, evt.OrderId);
             return fsm;
         }
 

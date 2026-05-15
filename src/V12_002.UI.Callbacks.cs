@@ -38,6 +38,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private System.Windows.Shapes.Rectangle _chartHoverOverlay;
         private Grid _chartOverlayParentGrid;
 
+        // [Phase7-UI T-A] Command Pattern: Pre-allocated dictionary for basic hotkeys (zero allocation on hot path)
+        private Dictionary<Key, Action> _keyCommands;
+
         private void AttachHotkeys()
         {
             if (ChartControl?.OwnerChart != null)
@@ -334,48 +337,70 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print("V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)");
         }
 
+        // [Phase7-UI T-A] OnKeyDown residual dispatcher (CYC 3) - Command Pattern with O(1) lookup
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            // Basic hotkeys
-            if (e.Key == Key.L) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); Enqueue(ctx => ctx.ExecuteLong(orContracts)); e.Handled = true; }
-            else if (e.Key == Key.S) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); Enqueue(ctx => ctx.ExecuteShort(orContracts)); e.Handled = true; }
-            // V12.1101E [PH5-COLLIDE-01]: Panic hotkey routes through lifecycle-safe flatten pipeline.
-            else if (e.Key == Key.F) { FlattenAll(); e.Handled = true; }
-
-            // v5.12: T1 Actions (1 + letter)
-            else if (Keyboard.IsKeyDown(Key.D1) || Keyboard.IsKeyDown(Key.NumPad1))
+            // Basic hotkeys (no modifiers) - O(1) dictionary lookup
+            if (_keyCommands != null && _keyCommands.TryGetValue(e.Key, out var cmd))
             {
-                if (e.Key == Key.M) { ExecuteTargetAction("T1", "market"); e.Handled = true; }
-                else if (e.Key == Key.O) { ExecuteTargetAction("T1", "1point"); e.Handled = true; }
-                else if (e.Key == Key.W) { ExecuteTargetAction("T1", "2point"); e.Handled = true; }
-                else if (e.Key == Key.K) { ExecuteTargetAction("T1", "marketprice"); e.Handled = true; }
-                else if (e.Key == Key.B) { ExecuteTargetAction("T1", "breakeven"); e.Handled = true; }
-                else if (e.Key == Key.C) { ExecuteTargetAction("T1", "cancel"); e.Handled = true; }
+                cmd();
+                e.Handled = true;
+                return;
             }
 
-            // v5.12: T2 Actions (2 + letter)
-            else if (Keyboard.IsKeyDown(Key.D2) || Keyboard.IsKeyDown(Key.NumPad2))
+            // T1 Actions (1 + letter)
+            if (Keyboard.IsKeyDown(Key.D1) || Keyboard.IsKeyDown(Key.NumPad1))
             {
-                if (e.Key == Key.M) { ExecuteTargetAction("T2", "market"); e.Handled = true; }
-                else if (e.Key == Key.O) { ExecuteTargetAction("T2", "1point"); e.Handled = true; }
-                else if (e.Key == Key.W) { ExecuteTargetAction("T2", "2point"); e.Handled = true; }
-                else if (e.Key == Key.K) { ExecuteTargetAction("T2", "marketprice"); e.Handled = true; }
-                else if (e.Key == Key.B) { ExecuteTargetAction("T2", "breakeven"); e.Handled = true; }
-                else if (e.Key == Key.C) { ExecuteTargetAction("T2", "cancel"); e.Handled = true; }
+                HandleTargetAction("T1", e.Key);
+                e.Handled = true;
+                return;
             }
 
-            // v5.12: Runner Actions (3 + letter)
-            else if (Keyboard.IsKeyDown(Key.D3) || Keyboard.IsKeyDown(Key.NumPad3))
+            // T2 Actions (2 + letter)
+            if (Keyboard.IsKeyDown(Key.D2) || Keyboard.IsKeyDown(Key.NumPad2))
             {
-                if (e.Key == Key.M) { Enqueue(ctx => ctx.ExecuteRunnerAction("market")); e.Handled = true; }
-                else if (e.Key == Key.O) { Enqueue(ctx => ctx.ExecuteRunnerAction("stop1pt")); e.Handled = true; }
-                else if (e.Key == Key.W) { Enqueue(ctx => ctx.ExecuteRunnerAction("stop2pt")); e.Handled = true; }
-                else if (e.Key == Key.B) { Enqueue(ctx => ctx.ExecuteRunnerAction("stopbe")); e.Handled = true; }
-                else if (e.Key == Key.P) { Enqueue(ctx => ctx.ExecuteRunnerAction("lock50")); e.Handled = true; }  // P for Profit
-                else if (e.Key == Key.D) { Enqueue(ctx => ctx.ExecuteRunnerAction("disabletrail")); e.Handled = true; }
+                HandleTargetAction("T2", e.Key);
+                e.Handled = true;
+                return;
+            }
+
+            // Runner Actions (3 + letter)
+            if (Keyboard.IsKeyDown(Key.D3) || Keyboard.IsKeyDown(Key.NumPad3))
+            {
+                HandleRunnerAction(e.Key);
+                e.Handled = true;
+                return;
             }
 
             // RMA uses Shift+Click (R conflicts with NT search, Ctrl conflicts with chart drag)
+        }
+
+        // [Phase7-UI T-A] Helper: Route T1/T2 target actions (CYC 6)
+        private void HandleTargetAction(string target, Key key)
+        {
+            switch (key)
+            {
+                case Key.M: ExecuteTargetAction(target, "market"); break;
+                case Key.O: ExecuteTargetAction(target, "1point"); break;
+                case Key.W: ExecuteTargetAction(target, "2point"); break;
+                case Key.K: ExecuteTargetAction(target, "marketprice"); break;
+                case Key.B: ExecuteTargetAction(target, "breakeven"); break;
+                case Key.C: ExecuteTargetAction(target, "cancel"); break;
+            }
+        }
+
+        // [Phase7-UI T-A] Helper: Route runner actions (CYC 6)
+        private void HandleRunnerAction(Key key)
+        {
+            switch (key)
+            {
+                case Key.M: Enqueue(ctx => ctx.ExecuteRunnerAction("market")); break;
+                case Key.O: Enqueue(ctx => ctx.ExecuteRunnerAction("stop1pt")); break;
+                case Key.W: Enqueue(ctx => ctx.ExecuteRunnerAction("stop2pt")); break;
+                case Key.B: Enqueue(ctx => ctx.ExecuteRunnerAction("stopbe")); break;
+                case Key.P: Enqueue(ctx => ctx.ExecuteRunnerAction("lock50")); break;
+                case Key.D: Enqueue(ctx => ctx.ExecuteRunnerAction("disabletrail")); break;
+            }
         }
 
         #endregion

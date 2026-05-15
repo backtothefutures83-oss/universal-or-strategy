@@ -366,43 +366,89 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void HandleFleetStopFill(QueuedAccountExecution item, Order ocoOrder, Account ocoAcct, string ocoName)
         {
+            // Phase 1: Cancel orphaned targets
+            int cancelledTargets = CancelOrphanedTargets(ocoAcct);
+            if (cancelledTargets > 0)
+                Print(string.Format("[1104.1 OCO] Fleet {0}: stop filled -- cancelled {1} orphaned targets.",
+                    ocoAcct.Name, cancelledTargets));
+
+            // Phase 2: Update position state
+            _nakedPositionFirstSeen.TryRemove(ocoAcct.Name, out _);
+
+            string ocoEntryKey = ExtractEntryKeyFromStopName(ocoName);
+            if (string.IsNullOrEmpty(ocoEntryKey)) return;
+
+            PositionInfo ocoPos;
+            if (!activePositions.TryGetValue(ocoEntryKey, out ocoPos) || ocoPos == null) return;
+
+            int stopQty = Math.Max(0, item.EventArgs.Execution.Quantity);
+            FinalizeStopFilledPosition(ocoEntryKey, ocoPos, stopQty);
+        }
+
+        /// <summary>
+        /// Cancel all working target orders (T1-T5) for the specified fleet account.
+        /// Called when a stop order fills to prevent orphaned profit targets.
+        /// </summary>
+        /// <param name="account">The fleet account whose targets should be cancelled</param>
+        /// <returns>Count of cancelled target orders</returns>
+        private int CancelOrphanedTargets(Account account)
+        {
             int cancelledTargets = 0;
-            foreach (Order o in ocoAcct.Orders.ToArray())
+            foreach (Order o in account.Orders.ToArray())
             {
                 if (o == null || o.Instrument?.FullName != Instrument?.FullName) continue;
                 if (o.OrderState != OrderState.Working && o.OrderState != OrderState.Accepted) continue;
                 if (o.Name != null && (o.Name.StartsWith("T1_") || o.Name.StartsWith("T2_") ||
                     o.Name.StartsWith("T3_") || o.Name.StartsWith("T4_") || o.Name.StartsWith("T5_")))
                 {
-                    CancelOrderOnAccount(o, ocoAcct);
+                    CancelOrderOnAccount(o, account);
                     cancelledTargets++;
                 }
             }
-            if (cancelledTargets > 0)
-                Print(string.Format("[1104.1 OCO] Fleet {0}: stop filled -- cancelled {1} orphaned targets.",
-                    ocoAcct.Name, cancelledTargets));
+            return cancelledTargets;
+        }
 
-            _nakedPositionFirstSeen.TryRemove(ocoAcct.Name, out _);
+        /// <summary>
+        /// Extract the entry key from a stop order name by stripping the "Stop_" prefix
+        /// and removing the trailing account-specific segment (after last underscore).
+        /// Example: "Stop_MOMO_1234_Sim101" -> "MOMO_1234"
+        /// </summary>
+        /// <param name="stopOrderName">The stop order name (e.g., "Stop_MOMO_1234_Sim101")</param>
+        /// <returns>Entry key string, or empty string if invalid</returns>
+        private string ExtractEntryKeyFromStopName(string stopOrderName)
+        {
+            if (string.IsNullOrEmpty(stopOrderName) || stopOrderName.Length <= 5)
+                return string.Empty;
 
-            string ocoEntryKey = ocoName.Length > 5 ? ocoName.Substring(5) : "";
+            string ocoEntryKey = stopOrderName.Substring(5); // Strip "Stop_"
             int ocoLastUnderscore = ocoEntryKey.LastIndexOf('_');
             if (ocoLastUnderscore > 0)
                 ocoEntryKey = ocoEntryKey.Substring(0, ocoLastUnderscore);
-            PositionInfo ocoPos;
-            if (!string.IsNullOrEmpty(ocoEntryKey) && activePositions.TryGetValue(ocoEntryKey, out ocoPos) && ocoPos != null)
+
+            return ocoEntryKey;
+        }
+
+        /// <summary>
+        /// Update position state after a stop order fill. Decrements RemainingContracts
+        /// and performs full cleanup if position is fully closed.
+        /// </summary>
+        /// <param name="entryKey">The position entry key</param>
+        /// <param name="pos">The PositionInfo struct (pre-validated, non-null)</param>
+        /// <param name="filledQuantity">Quantity filled by the stop order</param>
+        private void FinalizeStopFilledPosition(string entryKey, PositionInfo pos, int filledQuantity)
+        {
+            int stopQty = Math.Max(0, filledQuantity);
+            pos.RemainingContracts = Math.Max(0, pos.RemainingContracts - stopQty);
+
+            if (pos.RemainingContracts <= 0)
             {
-                int stopQty = Math.Max(0, item.EventArgs.Execution.Quantity);
-                ocoPos.RemainingContracts = Math.Max(0, ocoPos.RemainingContracts - stopQty);
-                if (ocoPos.RemainingContracts <= 0)
-                {
-                    stopOrders.TryRemove(ocoEntryKey, out _);
-                    if (pendingStopReplacements.TryRemove(ocoEntryKey, out _))
-                        Interlocked.Decrement(ref pendingReplacementCount);
-                    activePositions.TryRemove(ocoEntryKey, out _);
-                    entryOrders.TryRemove(ocoEntryKey, out _);
-                    SymmetryGuardForgetEntry(ocoEntryKey);
-                    Print(string.Format("[1104.1 OCO] Fleet position {0} fully closed by stop.", ocoEntryKey));
-                }
+                stopOrders.TryRemove(entryKey, out _);
+                if (pendingStopReplacements.TryRemove(entryKey, out _))
+                    Interlocked.Decrement(ref pendingReplacementCount);
+                activePositions.TryRemove(entryKey, out _);
+                entryOrders.TryRemove(entryKey, out _);
+                SymmetryGuardForgetEntry(entryKey);
+                Print(string.Format("[1104.1 OCO] Fleet position {0} fully closed by stop.", entryKey));
             }
         }
 

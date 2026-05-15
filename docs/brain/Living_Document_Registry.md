@@ -45,6 +45,17 @@ Dynamic documents used for the current implementation cycle.
 *   [mini-spec.md](mini-spec.md) - Technical requirements and metabolic design for the active mission.
 *   [walkthrough.md](walkthrough.md) - Step-by-step verification and logic walkthrough for reviewers.
 
+### MP-0: Dictionary Dispatch Conversion (COMPLETE 2026-05-15)
+*   [forensics_mp0_dispatch.md](forensics_mp0_dispatch.md) - Source-verified audit: 14 candidates reviewed, 2 confirmed, 12 disqualified with reasoning.
+*   [mp0_implementation_plan.md](mp0_implementation_plan.md) - Dict dispatch pattern spec (Action delegates, Init_Services init, zero-alloc constraints).
+*   [mp0_completion_report.md](mp0_completion_report.md) - Mission acceptance: CYC 30->6, F5 PASS, BUILD_TAG 1111.007-mphase-mp0.
+
+### MP-1: SIMA Lifecycle Cluster (COMPLETE 2026-05-15)
+*   [mp1_sima_lifecycle_bob_prompt.md](../../../brain/87ca7479-83b5-4a9b-bcb3-ae6327b87852/artifacts/mp1_sima_lifecycle_bob_prompt.md) - Source-verified mission brief: 3 tickets confirmed, 7 disqualified.
+*   Tickets: MP1-A HydrateFSM_LinkBracketOrders (loop consolidation), MP1-B RecoverFSM_LinkRecoveredBrackets (loop consolidation), MP1-C HydrateExpectedPositionsFromBroker (helper extraction).
+*   F5 PASS 2026-05-15 11:58 Eastern | Logic Audit 1-9 PASS | Deploy-sync 29,938 chars.
+
+
 ---
 
 ## 🛡️ Specialized Protocols & Audits
@@ -66,4 +77,4 @@ Design decisions and inspiration for the project's evolution.
 
 ---
 **Registry Status**: MAINTAINED
-**Last Update**: 2026-05-13 (T16 CreateNewStopOrder added; Epic Phase 7 Complexity Extraction queued)
+**Last Update**: 2026-05-15 (MP-1 SIMA Lifecycle complete; F5 PASS 11:58 Eastern; Logic Audit 1-9 PASS; MP-2 Watch List Cluster 2 queued)

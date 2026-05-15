@@ -57,75 +57,89 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (!pos.EntryFilled || pos.RemainingContracts <= 0) continue;
 
-                    double newStopPrice;
-                    if (pos.Direction == MarketPosition.Long)
-                        newStopPrice = pos.EntryPrice + offsetPoints;
-                    else
-                        newStopPrice = pos.EntryPrice - offsetPoints;
-
-                    // Round to tick size
-                    newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
-
-                    // [Build 1108.002-HF1] Master-drives-followers: followers skip priceCleared gate.
-                    // BE is an explicit manual action -- threshold logic protects the master only.
-                    // UpdateStopOrder handles IsFollower routing (account-level cancel+resubmit).
-                    if (pos.IsFollower)
-                    {
-                        bool isBetterF = (pos.Direction == MarketPosition.Long && newStopPrice > pos.CurrentStopPrice)
-                                      || (pos.Direction == MarketPosition.Short && newStopPrice < pos.CurrentStopPrice);
-                        if (isBetterF)
-                        {
-                            UpdateStopOrder(entryName, pos, newStopPrice, 1);
-                            pos.ManualBreakevenTriggered = true;
-                            MarkStickyDirty();
-                            Print(string.Format("BE+{0} MOVED (follower): {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
-                        }
-                        continue;
-                    }
-
-                    // [V12.12] ARM GUARD: If price hasn't cleared the BE threshold yet, arm instead of executing.
-                    // ManageTrailingStops() will call UpdateStopOrder when price crosses the threshold.
-                    if (lastKnownPrice <= 0)
-                    {
-                        Print(string.Format("[BE_ABORT] {0}: Price data stale (0). Waiting for next tick.", entryName));
-                        continue;
-                    }
-                    double referencePrice = lastKnownPrice;
-                    bool priceCleared = pos.Direction == MarketPosition.Long
-                        ? referencePrice >= newStopPrice
-                        : referencePrice <= newStopPrice;
-
-                    if (!priceCleared)
-                    {
-                        pos.ManualBreakevenArmed = true;
-                        pos.ManualBreakevenTriggered = false;
-                        Print(string.Format("[V12] BE Armed: {0} Price has not reached threshold. Shielding entry once cleared.", entryName));
-                        continue;
-                    }
-
-                    // Only move stop if it's a better price (profit-protecting direction)
-                    bool isBetter = (pos.Direction == MarketPosition.Long && newStopPrice > pos.CurrentStopPrice)
-                                 || (pos.Direction == MarketPosition.Short && newStopPrice < pos.CurrentStopPrice);
-
-                    if (!isBetter)
-                    {
-                        Print(string.Format("BE+{0}: Stop already better for {1}. Current={2:F2}, Request={3:F2}",
-                            offsetPoints, entryName, pos.CurrentStopPrice, newStopPrice));
-                        continue;
-                    }
-
-                    // V12.10: Use UpdateStopOrder for proper Master/Follower routing
-                    // (ChangeOrder only works for Master -- followers were silently skipped)
-                    UpdateStopOrder(entryName, pos, newStopPrice, 1);
-                    pos.ManualBreakevenTriggered = true;
-                    MarkStickyDirty(); // Build 1103: Persist breakeven state
-                    Print(string.Format("BE+{0} MOVED: {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
+                    MoveStop_SinglePosition(entryName, pos, offsetPoints, lastKnownPrice);
                 }
             }
             catch (Exception ex)
             {
                 Print("ERROR MoveStopsToBreakevenWithOffset: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// [Phase7-M2-A] Helper: Processes single position breakeven logic.
+        /// Handles Master/Follower routing and ARM GUARD logic (V12.12).
+        /// Zero new heap allocations (hot-path critical).
+        /// </summary>
+        private void MoveStop_SinglePosition(
+            string entryName,
+            PositionInfo pos,
+            double offsetPoints,
+            double lastKnownPrice)
+        {
+            double newStopPrice;
+            if (pos.Direction == MarketPosition.Long)
+                newStopPrice = pos.EntryPrice + offsetPoints;
+            else
+                newStopPrice = pos.EntryPrice - offsetPoints;
+
+            // Round to tick size
+            newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
+
+            // [Build 1108.002-HF1] Master-drives-followers: followers skip priceCleared gate.
+            // BE is an explicit manual action -- threshold logic protects the master only.
+            // UpdateStopOrder handles IsFollower routing (account-level cancel+resubmit).
+            if (pos.IsFollower)
+            {
+                bool isBetterF = (pos.Direction == MarketPosition.Long && newStopPrice > pos.CurrentStopPrice)
+                              || (pos.Direction == MarketPosition.Short && newStopPrice < pos.CurrentStopPrice);
+                if (isBetterF)
+                {
+                    UpdateStopOrder(entryName, pos, newStopPrice, 1);
+                    pos.ManualBreakevenTriggered = true;
+                    MarkStickyDirty();
+                    Print(string.Format("BE+{0} MOVED (follower): {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
+                }
+                return;
+            }
+
+            // [V12.12] ARM GUARD: If price hasn't cleared the BE threshold yet, arm instead of executing.
+            // ManageTrailingStops() will call UpdateStopOrder when price crosses the threshold.
+            if (lastKnownPrice <= 0)
+            {
+                Print(string.Format("[BE_ABORT] {0}: Price data stale (0). Waiting for next tick.", entryName));
+                return;
+            }
+            double referencePrice = lastKnownPrice;
+            bool priceCleared = pos.Direction == MarketPosition.Long
+                ? referencePrice >= newStopPrice
+                : referencePrice <= newStopPrice;
+
+            if (!priceCleared)
+            {
+                pos.ManualBreakevenArmed = true;
+                pos.ManualBreakevenTriggered = false;
+                Print(string.Format("[V12] BE Armed: {0} Price has not reached threshold. Shielding entry once cleared.", entryName));
+                return;
+            }
+
+            // Only move stop if it's a better price (profit-protecting direction)
+            bool isBetter = (pos.Direction == MarketPosition.Long && newStopPrice > pos.CurrentStopPrice)
+                         || (pos.Direction == MarketPosition.Short && newStopPrice < pos.CurrentStopPrice);
+
+            if (!isBetter)
+            {
+                Print(string.Format("BE+{0}: Stop already better for {1}. Current={2:F2}, Request={3:F2}",
+                    offsetPoints, entryName, pos.CurrentStopPrice, newStopPrice));
+                return;
+            }
+
+            // V12.10: Use UpdateStopOrder for proper Master/Follower routing
+            // (ChangeOrder only works for Master -- followers were silently skipped)
+            UpdateStopOrder(entryName, pos, newStopPrice, 1);
+            pos.ManualBreakevenTriggered = true;
+            MarkStickyDirty(); // Build 1103: Persist breakeven state
+            Print(string.Format("BE+{0} MOVED: {1} Stop -> {2:F2}", offsetPoints, entryName, newStopPrice));
         }
 
         // [Phase7-S5-T05] Helper 1: Validate move target request

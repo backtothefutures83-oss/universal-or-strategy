@@ -86,46 +86,98 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void HandleTextBoxKeyInput(TextBox textBox, KeyEventArgs e)
         {
-            // Let Tab/Enter/Escape bubble for navigation
-            if (e.Key == Key.Tab || e.Key == Key.Enter || e.Key == Key.Escape)
+            // Navigation keys bubble to parent (no e.Handled)
+            if (TryHandleNavigationKey(e.Key))
                 return;
 
             // Stop event from bubbling to NinjaTrader chart - prevents symbol search
             e.Handled = true;
 
+            // Null safety
             if (textBox == null) return;
 
-            string keyChar = "";
-            if (e.Key >= Key.D0 && e.Key <= Key.D9)
-                keyChar = ((char)('0' + (e.Key - Key.D0))).ToString();
-            else if (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9)
-                keyChar = ((char)('0' + (e.Key - Key.NumPad0))).ToString();
-            else if (e.Key == Key.Back && textBox.Text.Length > 0 && textBox.SelectionStart > 0)
+            // Deletion operations (modify TextBox directly)
+            if (TryHandleBackspace(textBox, e.Key)) return;
+            if (TryHandleDelete(textBox, e.Key)) return;
+
+            // Character mapping (numeric, special, space)
+            string keyChar;
+            if (TryMapNumericKey(e.Key, out keyChar) ||
+                TryMapSpecialCharacter(e.Key, out keyChar))
+            {
+                int caret = textBox.SelectionStart;
+                textBox.Text = textBox.Text.Insert(caret, keyChar);
+                textBox.SelectionStart = caret + 1;
+                return;
+            }
+
+            // All other keys ignored (no-op)
+        }
+
+        private static bool TryHandleNavigationKey(Key key)
+        {
+            return key == Key.Tab || key == Key.Enter || key == Key.Escape;
+        }
+
+        private static bool TryMapNumericKey(Key key, out string keyChar)
+        {
+            if (key >= Key.D0 && key <= Key.D9)
+            {
+                keyChar = ((char)('0' + (key - Key.D0))).ToString();
+                return true;
+            }
+            if (key >= Key.NumPad0 && key <= Key.NumPad9)
+            {
+                keyChar = ((char)('0' + (key - Key.NumPad0))).ToString();
+                return true;
+            }
+            keyChar = null;
+            return false;
+        }
+
+        private static bool TryHandleBackspace(TextBox textBox, Key key)
+        {
+            if (key == Key.Back && textBox.Text.Length > 0 && textBox.SelectionStart > 0)
             {
                 int pos = textBox.SelectionStart;
                 textBox.Text = textBox.Text.Remove(pos - 1, 1);
                 textBox.SelectionStart = pos - 1;
-                return;
+                return true;
             }
-            else if (e.Key == Key.Delete && textBox.SelectionStart < textBox.Text.Length)
+            return false;
+        }
+
+        private static bool TryHandleDelete(TextBox textBox, Key key)
+        {
+            if (key == Key.Delete && textBox.SelectionStart < textBox.Text.Length)
             {
                 int pos = textBox.SelectionStart;
                 textBox.Text = textBox.Text.Remove(pos, 1);
                 textBox.SelectionStart = pos;
-                return;
+                return true;
             }
-            else if (e.Key == Key.OemPeriod || e.Key == Key.Decimal)
-                keyChar = ".";
-            else if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
-                keyChar = "-";
-            else if (e.Key == Key.Space)
-                keyChar = " ";
-            else
-                return;  // Ignore other keys
+            return false;
+        }
 
-            int caret = textBox.SelectionStart;
-            textBox.Text = textBox.Text.Insert(caret, keyChar);
-            textBox.SelectionStart = caret + 1;
+        private static bool TryMapSpecialCharacter(Key key, out string keyChar)
+        {
+            if (key == Key.OemPeriod || key == Key.Decimal)
+            {
+                keyChar = ".";
+                return true;
+            }
+            if (key == Key.OemMinus || key == Key.Subtract)
+            {
+                keyChar = "-";
+                return true;
+            }
+            if (key == Key.Space)
+            {
+                keyChar = " ";
+                return true;
+            }
+            keyChar = null;
+            return false;
         }
 
         private void ApplyTextBoxKeyboardHandlers(TextBox tb)

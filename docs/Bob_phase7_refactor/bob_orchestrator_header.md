@@ -1,7 +1,7 @@
 # Bob Orchestrator Header — Phase 7 Complexity Extraction
 
 Use this header at the top of every Bob Orchestrator session when executing a
-Phase 7 Traycer ticket. Update BUILD_TAG_BASELINE to the previous ticket's output
+Phase 7 ticket. Update BUILD_TAG_BASELINE to the previous ticket's output
 tag before pasting.
 
 ---
@@ -22,7 +22,7 @@ Post-edit:
 2. If any new logic constraints or workflow quirks were discovered, append them to .agent/skills/bob-cli-mastery/SKILL.md before returning success.
 
 --- TICKET BELOW ---
-[paste full Traycer ticket content here]
+[paste full ticket content here]
 ```
 
 ---

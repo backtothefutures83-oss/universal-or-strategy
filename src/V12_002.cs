@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.007-phase7-t4";  // T4: Sprint 5 acceptance gate
+        public const string BUILD_TAG = "1111.007-mphase-mp0";  // MP-0 COMPLETE: Dictionary dispatch conversion
 
         public class UILiveTargetSnapshot
         {
@@ -246,6 +246,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V11 Logic State
         private volatile bool isTrendRmaMode = false; // False = STD (All-in), True = RMA (9/15 Split)
         private volatile bool isRetestRmaMode = false; // V12: RETEST RMA toggle state
+
+        // MP0: Dictionary dispatch tables for IPC command routing
+        private Dictionary<string, Action> _modeSetFlagsDispatch;
+        private Dictionary<string, Action> _modeExecDispatch;
 
         // V12.2 Hybrid Sync: Logic State
         private volatile bool isTosSyncMode = false;

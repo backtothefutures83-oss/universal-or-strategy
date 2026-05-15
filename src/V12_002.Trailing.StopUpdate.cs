@@ -132,15 +132,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void UpdateExistingPendingReplacement(string entryName, PositionInfo pos, Order currentStop, double validatedStopPrice, int newTrailLevel)
         {
             // Build 955: Snapshot targets BEFORE TryAdd so any callback sees a fully-initialized record
-            var _b955TargetsA = new System.Collections.Generic.List<TargetSnapshot>();
-            for (int _tA = 1; _tA <= 5; _tA++)
-            {
-                var _tDA = GetTargetOrdersDictionary(_tA);
-                Order _tOA;
-                if (_tDA != null && _tDA.TryGetValue(entryName, out _tOA) && _tOA != null
-                    && (_tOA.OrderState == OrderState.Working || _tOA.OrderState == OrderState.Accepted))
-                    _b955TargetsA.Add(new TargetSnapshot { TargetNum = _tA, Price = _tOA.LimitPrice, Qty = _tOA.Quantity, CapturedOrder = _tOA });
-            }
+            var _b955TargetsA = CaptureTargetSnapshot(entryName);
 
             var newPending = new PendingStopReplacement
             {
@@ -150,8 +142,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Direction                 = pos.Direction,
                 OldOrder                  = currentStop,
                 CreatedTime               = DateTime.Now,
-                CapturedTargets           = _b955TargetsA.Count > 0 ? _b955TargetsA.ToArray() : null,
-                BracketRestorationNeeded  = _b955TargetsA.Count > 0
+                CapturedTargets           = _b955TargetsA,
+                BracketRestorationNeeded  = _b955TargetsA != null && _b955TargetsA.Length > 0
             };
 
             // V8.30: Thread-safe add or update
@@ -173,17 +165,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Build 950: Refresh CapturedTargets on the live pending record if not yet populated
                 if (!pending.BracketRestorationNeeded)
                 {
-                    var _b950Refresh = new System.Collections.Generic.List<TargetSnapshot>();
-                    for (int _t2 = 1; _t2 <= 5; _t2++)
-                    {
-                        var _tD2 = GetTargetOrdersDictionary(_t2);
-                        Order _tO2;
-                        if (_tD2 != null && _tD2.TryGetValue(entryName, out _tO2) && _tO2 != null
-                            && (_tO2.OrderState == OrderState.Working || _tO2.OrderState == OrderState.Accepted))
-                            _b950Refresh.Add(new TargetSnapshot { TargetNum = _t2, Price = _tO2.LimitPrice, Qty = _tO2.Quantity, CapturedOrder = _tO2 });
-                    }
-                    pending.CapturedTargets = _b950Refresh.Count > 0 ? _b950Refresh.ToArray() : null;
-                    pending.BracketRestorationNeeded = _b950Refresh.Count > 0;
+                    var _b950Refresh = RefreshTargetSnapshot(entryName);
+                    pending.CapturedTargets = _b950Refresh;
+                    pending.BracketRestorationNeeded = _b950Refresh != null && _b950Refresh.Length > 0;
                 }
             }
 
@@ -191,6 +175,34 @@ namespace NinjaTrader.NinjaScript.Strategies
             pos.CurrentTrailLevel = newTrailLevel;
             MarkStickyDirty();
             Print(string.Format("V8.12: Stop update queued for {0} (current state: {1})", entryName, currentStop.OrderState));
+        }
+
+        private TargetSnapshot[] CaptureTargetSnapshot(string entryName)
+        {
+            var _b955TargetsA = new System.Collections.Generic.List<TargetSnapshot>();
+            for (int _tA = 1; _tA <= 5; _tA++)
+            {
+                var _tDA = GetTargetOrdersDictionary(_tA);
+                Order _tOA;
+                if (_tDA != null && _tDA.TryGetValue(entryName, out _tOA) && _tOA != null
+                    && (_tOA.OrderState == OrderState.Working || _tOA.OrderState == OrderState.Accepted))
+                    _b955TargetsA.Add(new TargetSnapshot { TargetNum = _tA, Price = _tOA.LimitPrice, Qty = _tOA.Quantity, CapturedOrder = _tOA });
+            }
+            return _b955TargetsA.Count > 0 ? _b955TargetsA.ToArray() : null;
+        }
+
+        private TargetSnapshot[] RefreshTargetSnapshot(string entryName)
+        {
+            var _b950Refresh = new System.Collections.Generic.List<TargetSnapshot>();
+            for (int _t2 = 1; _t2 <= 5; _t2++)
+            {
+                var _tD2 = GetTargetOrdersDictionary(_t2);
+                Order _tO2;
+                if (_tD2 != null && _tD2.TryGetValue(entryName, out _tO2) && _tO2 != null
+                    && (_tO2.OrderState == OrderState.Working || _tO2.OrderState == OrderState.Accepted))
+                    _b950Refresh.Add(new TargetSnapshot { TargetNum = _t2, Price = _tO2.LimitPrice, Qty = _tO2.Quantity, CapturedOrder = _tO2 });
+            }
+            return _b950Refresh.Count > 0 ? _b950Refresh.ToArray() : null;
         }
 
         private void InitiateStopReplacement(string entryName, PositionInfo pos, Order currentStop, double validatedStopPrice, int newTrailLevel)

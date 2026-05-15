@@ -413,13 +413,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void OnStateChangeDataLoaded()
         {
+            // CRITICAL: Initialization sequence MUST be preserved exactly.
+            // Order: InstrumentConfig -> TargetConfig -> Indicators -> SessionLogging -> Services
             _dataLoadedComplete = false;
 
+            string symbol = Instrument.MasterInstrument.Name;
+            Init_InstrumentConfig(symbol);
+            Init_TargetConfiguration();
+            Init_Indicators();
+            Init_SessionLogging(symbol);
+            Init_Services(symbol);
+
+            _dataLoadedComplete = true;
+        }
+
+        private void Init_InstrumentConfig(string symbol)
+        {
             tickSize = Instrument.MasterInstrument.TickSize;
             pointValue = Instrument.MasterInstrument.PointValue;
             lastKnownPrice = 0; // V11 FIX: Reset price on load to prevent stale data (e.g. MES->MGC switch)
 
-            string symbol = Instrument.MasterInstrument.Name;
             if (symbol.Contains("MES") || symbol.Contains("ES"))
             {
                 minContracts = MESMinimum;
@@ -435,7 +448,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 minContracts = 1;
                 maxContracts = 20; // V12.1101E [B-9]: Conservative default for unknown instruments
             }
+        }
 
+        private void Init_TargetConfiguration()
+        {
             int persistedTargetCount = Math.Max(0, Math.Min(5, ConfiguredTargetCount));
             if (persistedTargetCount >= 1)
             {
@@ -454,7 +470,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("[COMPAT] ConfiguredTargetCount was 0 -- auto-detected {0} targets from TargetValue fields.", activeTargetCount));
                 ConfiguredTargetCount = activeTargetCount;
             }
+        }
 
+        private void Init_Indicators()
+        {
             // B984-F02: Guard BarsArray[1] -- only valid if AddDataSeries completed in Configure.
             // Audit marker: BarsArray.Length >= 2 (use .Length, not .Count -- ISeries<T> has no .Count)
             if (BarsArray != null && BarsArray.Length >= 2)
@@ -481,7 +500,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // V8.2 DEBUG: Verify EMA periods are correct
             Print(string.Format("EMA INIT DEBUG: ema9.Period={0} ema15.Period={1}", ema9.Period, ema15.Period));
+        }
 
+        private void Init_SessionLogging(string symbol)
+        {
             ResetOR();
 
             Print(string.Format("UniversalORStrategy {0} | {1} | Tick: {2} | PV: ${3}", BUILD_TAG, symbol, tickSize, pointValue));
@@ -506,11 +528,103 @@ namespace NinjaTrader.NinjaScript.Strategies
             // (tickSize, pointValue, minContracts, maxContracts) are populated before audit runs.
             ExecuteRiskLogicAudit();
 
+            // MP0: Initialize dictionary dispatch tables for IPC command routing
+            InitializeCommandDispatchers();
+        }
+
+        private void InitializeCommandDispatchers()
+        {
+            // MP0-A: SetFlags dispatch (9 entries)
+            _modeSetFlagsDispatch = new Dictionary<string, Action>(9, StringComparer.Ordinal)
+            {
+                ["MODE_RMA"] = () => {
+                    isRMAModeActive = !isRMAModeActive;
+                    ClearClickTraderBorderIfInactive();
+                },
+                ["MODE_MOMO"] = () => {
+                    isMOMOModeActive = !isMOMOModeActive;
+                    ClearClickTraderBorderIfInactive();
+                },
+                ["MODE_FFMA"] = () => {
+                    isFFMAModeArmed = true;
+                    Print("V12.24: FFMA AUTO armed -- reversal scanner active");
+                },
+                ["MODE_M"] = () => {
+                    Print("V12.24: MODE_M received -- immediate FFMA entry pending");
+                },
+                ["FFMA_DISARM"] = () => {
+                    isFFMAModeArmed = false;
+                    Print("V12.24: FFMA disarmed via panel ResetExecutionMode");
+                },
+                ["MODE_TREND_RMA"] = () => {
+                    isTrendRmaMode = true;
+                    Print("IPC: TREND RMA Mode Enabled");
+                },
+                ["MODE_TREND_STD"] = () => {
+                    isTrendRmaMode = false;
+                    Print("IPC: TREND Standard Mode Enabled");
+                },
+                ["MODE_RETEST_RMA"] = () => {
+                    isRetestRmaMode = true;
+                    Print("IPC: RETEST RMA Mode Enabled");
+                },
+                ["MODE_RETEST_STD"] = () => {
+                    isRetestRmaMode = false;
+                    Print("IPC: RETEST Standard Mode Enabled");
+                }
+            };
+
+            // MP0-B: ExecuteMode dispatch (6 unique handlers, 8 command strings)
+            // Shared handler for EXEC_TREND + EXEC_TREND_RMA
+            Action execTrendHandler = () => {
+                double trendDist = CalculateTRENDStopDistance();
+                int trendContracts = CalculatePositionSize(trendDist);
+                Enqueue(ctx => ctx.ExecuteTRENDEntry(trendContracts));
+            };
+
+            // Shared handler for EXEC_RETEST variants
+            Action execRetestHandler = () => {
+                double retestDist = CalculateRetestStopDistance();
+                int retestContracts = CalculatePositionSize(retestDist);
+                Enqueue(ctx => ctx.ExecuteRetestEntry(retestContracts));
+            };
+
+            _modeExecDispatch = new Dictionary<string, Action>(8, StringComparer.Ordinal)
+            {
+                ["EXEC_TREND"] = execTrendHandler,
+                ["EXEC_TREND_RMA"] = execTrendHandler,
+                ["EXEC_RETEST"] = execRetestHandler,
+                ["EXEC_RETEST_PLUS"] = execRetestHandler,
+                ["EXEC_RETEST_MINUS"] = execRetestHandler,
+                ["EXEC_MOMO"] = () => {
+                    double momoStopDist = Math.Min(MOMOStopPoints, MaximumStop);
+                    int momoContracts = CalculatePositionSize(momoStopDist);
+                    double capturedMomoPrice = lastKnownPrice;
+                    Enqueue(ctx => ctx.ExecuteMOMOEntry(capturedMomoPrice, momoContracts));
+                },
+                ["MODE_M"] = () => {
+                    // V12.24: Immediate market entry using FFMA trade DNA
+                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                    double ema9Value = _ema9Val;
+                    MarketPosition direction = currentPrice > ema9Value ? MarketPosition.Short : MarketPosition.Long;
+                    Print(string.Format("V12.24: MODE_M firing -- Price={0:F2} vs EMA9={1:F2} -> {2}", currentPrice, ema9Value, direction));
+                    double stopPrice = direction == MarketPosition.Long ? Low[0] : High[0];
+                    double ffmaStopDist = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
+                    if (ffmaStopDist < tickSize * 2) ffmaStopDist = tickSize * 2;
+                    int ffmaContracts = CalculatePositionSize(ffmaStopDist);
+                    Enqueue(ctx => ctx.ExecuteFFMAEntry(direction, ffmaContracts));
+                }
+            };
+        }
+
+        private void Init_Services(string symbol)
+        {
             // B984-F05: StickyState + IPC must complete BEFORE the load-complete gate flips
             // so EnsureStartupReady() gate does not open until services are ready.
 
             // Build 1103: Initialize sticky state path + hydrate persisted config.
             // MUST run BEFORE IPC startup so GET_LAYOUT serves last-synced state.
+            string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
             _stickyStatePath = System.IO.Path.Combine(logsDir,
                 string.Format("StickyState_{0}.v12state", symbol));
             bool stickyLoaded = LoadStickyState();
@@ -522,8 +636,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             StartIpcServer();
             TouchStrategyHeartbeat();
             PublishUiSnapshot();
-
-            _dataLoadedComplete = true;
         }
 
         private void OnStateChangeRealtime()

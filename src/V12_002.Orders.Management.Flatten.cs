@@ -271,72 +271,77 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (!pos.EntryFilled) continue;
 
-                Print(string.Format("FLATTEN: Closing filled {0} position",
-                    pos.Direction == MarketPosition.Long ? "LONG" : "SHORT"));
+                FlattenSinglePosition(entryName, pos);
+            }
+        }
 
-                // V12.1101E [PH5-COLLIDE-01]: Lifecycle-safe stop cancellation.
-                // Keep stop dictionary refs until broker-confirmed terminal state.
-                RequestStopCancelLifecycleSafe(entryName);
-                Print(string.Format("FLATTEN: Requested stop lifecycle cancel for {0}", entryName));
+        private void FlattenSinglePosition(string entryName, PositionInfo pos)
+        {
+            Print(string.Format("FLATTEN: Closing filled {0} position",
+                pos.Direction == MarketPosition.Long ? "LONG" : "SHORT"));
 
-                // V8.31: Also clear any pending stop replacements to prevent orphaned stops
-                if (pendingStopReplacements.TryRemove(entryName, out _))
+            // V12.1101E [PH5-COLLIDE-01]: Lifecycle-safe stop cancellation.
+            // Keep stop dictionary refs until broker-confirmed terminal state.
+            RequestStopCancelLifecycleSafe(entryName);
+            Print(string.Format("FLATTEN: Requested stop lifecycle cancel for {0}", entryName));
+
+            // V8.31: Also clear any pending stop replacements to prevent orphaned stops
+            if (pendingStopReplacements.TryRemove(entryName, out _))
+            {
+                Interlocked.Decrement(ref pendingReplacementCount);
+                Print(string.Format("V8.31: Cleared pending stop replacement for {0}", entryName));
+            }
+
+            // Cancel all target orders (T1-T5)
+            for (int tNum = 1; tNum <= 5; tNum++)
+            {
+                var tDict = GetTargetOrdersDictionary(tNum);
+                if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
                 {
-                    Interlocked.Decrement(ref pendingReplacementCount);
-                    Print(string.Format("V8.31: Cleared pending stop replacement for {0}", entryName));
+                    if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
+                        CancelOrderSafe(tOrder, pos);
                 }
+            }
 
-                // Cancel all target orders (T1-T5)
-                for (int tNum = 1; tNum <= 5; tNum++)
-                {
-                    var tDict = GetTargetOrdersDictionary(tNum);
-                    if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
-                    {
-                        if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
-                            CancelOrderSafe(tOrder, pos);
-                    }
-                }
+            // V8.28 FIX: Use LIVE position quantity instead of cached RemainingContracts
+            int livePositionQty = 0;
+            try
+            {
+                if (Position != null && Position.MarketPosition != MarketPosition.Flat)
+                    livePositionQty = Position.Quantity;
+            }
+            catch (Exception pEx) { Print("Flatten Error reading Position: " + pEx.Message); }
 
-                // V8.28 FIX: Use LIVE position quantity instead of cached RemainingContracts
-                int livePositionQty = 0;
-                try
-                {
-                    if (Position != null && Position.MarketPosition != MarketPosition.Flat)
-                        livePositionQty = Position.Quantity;
-                }
-                catch (Exception pEx) { Print("Flatten Error reading Position: " + pEx.Message); }
+            // Use the smaller of cached and live to avoid overselling
+            // V10 DIAGNOSTIC: Print values
+            Print(string.Format("FLATTEN DIAGNOSTIC: Entry={0} Cached={1} Live={2}", entryName, pos.RemainingContracts, livePositionQty));
 
-                // Use the smaller of cached and live to avoid overselling
-                // V10 DIAGNOSTIC: Print values
-                Print(string.Format("FLATTEN DIAGNOSTIC: Entry={0} Cached={1} Live={2}", entryName, pos.RemainingContracts, livePositionQty));
+            // V10 FLATTEN FIX: Trust cached contracts if live is 0 (latency protection)
+            // If cached says we have contracts, we close them.
+            int flattenQty = pos.RemainingContracts;
 
-                // V10 FLATTEN FIX: Trust cached contracts if live is 0 (latency protection)
-                // If cached says we have contracts, we close them.
-                int flattenQty = pos.RemainingContracts;
+            if (livePositionQty > 0)
+            {
+                // If NinjaTrader agrees we have a position, use the smaller to act safe?
+                // No, if real position is smaller, we might be over-closing.
+                // But if real is larger, we under-close.
+                // Let's stick to closing what we know we opened.
+                flattenQty = pos.RemainingContracts;
+            }
 
-                if (livePositionQty > 0)
-                {
-                    // If NinjaTrader agrees we have a position, use the smaller to act safe?
-                    // No, if real position is smaller, we might be over-closing.
-                    // But if real is larger, we under-close.
-                    // Let's stick to closing what we know we opened.
-                    flattenQty = pos.RemainingContracts;
-                }
+            // Submit market order to close position
+            if (flattenQty > 0)
+            {
+                Order flattenOrder = pos.Direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName)
+                    : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName);
 
-                // Submit market order to close position
-                if (flattenQty > 0)
-                {
-                    Order flattenOrder = pos.Direction == MarketPosition.Long
-                        ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName)
-                        : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName);
-
-                    if (flattenOrder == null) Print("FLATTEN ERROR: SubmitOrderUnmanaged returned NULL");
-                    else Print(string.Format("FLATTEN SENT: {0} {1} contracts", pos.Direction == MarketPosition.Long ? "SELL" : "BUY", flattenQty));
-                }
-                else
-                {
-                    Print("FLATTEN SKIPPED: Qty is 0");
-                }
+                if (flattenOrder == null) Print("FLATTEN ERROR: SubmitOrderUnmanaged returned NULL");
+                else Print(string.Format("FLATTEN SENT: {0} {1} contracts", pos.Direction == MarketPosition.Long ? "SELL" : "BUY", flattenQty));
+            }
+            else
+            {
+                Print("FLATTEN SKIPPED: Qty is 0");
             }
         }
 

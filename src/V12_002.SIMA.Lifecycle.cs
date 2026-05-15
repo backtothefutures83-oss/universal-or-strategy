@@ -213,65 +213,51 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void HydrateExpectedPositionsFromBroker()
         {
             int hydratedCount = 0;
+            
+            // Fleet accounts
             foreach (Account acct in Account.All)
             {
                 if (!IsFleetAccount(acct)) continue;
-
-                try
-                {
-                    // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
-                    foreach (Position pos in acct.Positions.ToArray())
-                    {
-                        if (pos != null && pos.Instrument != null
-                            && pos.Instrument.FullName == Instrument.FullName
-                            && pos.MarketPosition != MarketPosition.Flat)
-                        {
-                            int qty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
-                            // Build 980 [Nexus]: Route expected position seed through the Actor queue
-                            var capturedAcct = acct.Name;
-                            var capturedQty = qty;
-                            Enqueue(ctx => ctx.AddOrUpdateExpectedPosition(ExpKey(capturedAcct), capturedQty, v => capturedQty));
-                            Print($"[SIMA HYDRATE] {acct.Name}: Seeded expected={qty} from broker ({pos.MarketPosition} {pos.Quantity})");
-                            hydratedCount++;
-                            break;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Print($"[SIMA HYDRATE] WARNING: Could not read positions for {acct.Name}: {ex.Message}");
-                }
+                HydrateSingleAccountExpectedPosition(acct, ref hydratedCount);
             }
+            
             if (hydratedCount > 0)
-                Print($"[SIMA HYDRATE] Hydrated {hydratedCount} account(s) with live broker positions");
-
+                Print(string.Format("[SIMA HYDRATE] Hydrated {0} account(s) with live broker positions", hydratedCount));
+            
             // Build 993: Hydrate master account (mirrors AuditMasterAccountIfNeeded pattern).
             // IsFleetAccount excludes master -- must be handled separately, same as REAPER audit.
             bool masterIsFleet993 = IsFleetAccount(Account);
             if (!masterIsFleet993)
+                HydrateSingleAccountExpectedPosition(Account, ref hydratedCount);
+        }
+
+        private void HydrateSingleAccountExpectedPosition(Account acct, ref int hydratedCount)
+        {
+            try
             {
-                try
+                // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
+                foreach (Position pos in acct.Positions.ToArray())
                 {
-                    foreach (Position pos in Account.Positions.ToArray())
+                    if (pos != null && pos.Instrument != null
+                        && pos.Instrument.FullName == Instrument.FullName
+                        && pos.MarketPosition != MarketPosition.Flat)
                     {
-                        if (pos != null && pos.Instrument?.FullName == Instrument.FullName
-                            && pos.MarketPosition != MarketPosition.Flat)
-                        {
-                            int qty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
-                            var capturedQty993 = qty;
-                            Enqueue(ctx => ctx.AddOrUpdateExpectedPosition(ExpKey(Account.Name), capturedQty993, v => capturedQty993));
-                            Print(string.Format("[SIMA HYDRATE] {0} (Master): Seeded expected={1} from broker ({2} {3})",
-                                Account.Name, qty, pos.MarketPosition, pos.Quantity));
-                            hydratedCount++;
-                            break;
-                        }
+                        int qty = pos.MarketPosition == MarketPosition.Long ? pos.Quantity : -pos.Quantity;
+                        // Build 980 [Nexus]: Route expected position seed through the Actor queue
+                        var capturedAcct = acct.Name;
+                        var capturedQty = qty;
+                        Enqueue(ctx => ctx.AddOrUpdateExpectedPosition(ExpKey(capturedAcct), capturedQty, v => capturedQty));
+                        Print(string.Format("[SIMA HYDRATE] {0}: Seeded expected={1} from broker ({2} {3})",
+                            acct.Name, qty, pos.MarketPosition, pos.Quantity));
+                        hydratedCount++;
+                        break;
                     }
                 }
-                catch (Exception ex)
-                {
-                    Print(string.Format("[SIMA HYDRATE] WARNING: Could not read positions for {0} (Master): {1}",
-                        Account.Name, ex.Message));
-                }
+            }
+            catch (Exception ex)
+            {
+                Print(string.Format("[SIMA HYDRATE] WARNING: Could not read positions for {0}: {1}",
+                    acct.Name, ex.Message));
             }
         }
 
@@ -724,50 +710,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // Link target orders (match exact property names on FollowerBracketFSM)
+            var targetOrderSlots = new[]
+            {
+                target1Orders, target2Orders, target3Orders, target4Orders, target5Orders
+            };
             Order targetOrd;
-            if (target1Orders.TryGetValue(entryKey, out targetOrd) && targetOrd != null)
+            for (int i = 0; i < targetOrderSlots.Length; i++)
             {
-                fsm.Targets[0] = targetOrd;
-                if (!string.IsNullOrEmpty(targetOrd.OrderId))
+                if (targetOrderSlots[i].TryGetValue(entryKey, out targetOrd) && targetOrd != null)
                 {
-                    _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target2Orders.TryGetValue(entryKey, out targetOrd) && targetOrd != null)
-            {
-                fsm.Targets[1] = targetOrd;
-                if (!string.IsNullOrEmpty(targetOrd.OrderId))
-                {
-                    _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target3Orders.TryGetValue(entryKey, out targetOrd) && targetOrd != null)
-            {
-                fsm.Targets[2] = targetOrd;
-                if (!string.IsNullOrEmpty(targetOrd.OrderId))
-                {
-                    _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target4Orders.TryGetValue(entryKey, out targetOrd) && targetOrd != null)
-            {
-                fsm.Targets[3] = targetOrd;
-                if (!string.IsNullOrEmpty(targetOrd.OrderId))
-                {
-                    _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target5Orders.TryGetValue(entryKey, out targetOrd) && targetOrd != null)
-            {
-                fsm.Targets[4] = targetOrd;
-                if (!string.IsNullOrEmpty(targetOrd.OrderId))
-                {
-                    _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
-                    ordersIndexed++;
+                    fsm.Targets[i] = targetOrd;
+                    if (!string.IsNullOrEmpty(targetOrd.OrderId))
+                    {
+                        _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
+                        ordersIndexed++;
+                    }
                 }
             }
         }
@@ -869,50 +826,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // Link target orders
+            var targetOrderSlots = new[]
+            {
+                target1Orders, target2Orders, target3Orders, target4Orders, target5Orders
+            };
             Order tOrd;
-            if (target1Orders.TryGetValue(recoveredKey, out tOrd) && tOrd != null)
+            for (int i = 0; i < targetOrderSlots.Length; i++)
             {
-                fsm.Targets[0] = tOrd;
-                if (!string.IsNullOrEmpty(tOrd.OrderId))
+                if (targetOrderSlots[i].TryGetValue(recoveredKey, out tOrd) && tOrd != null)
                 {
-                    _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target2Orders.TryGetValue(recoveredKey, out tOrd) && tOrd != null)
-            {
-                fsm.Targets[1] = tOrd;
-                if (!string.IsNullOrEmpty(tOrd.OrderId))
-                {
-                    _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target3Orders.TryGetValue(recoveredKey, out tOrd) && tOrd != null)
-            {
-                fsm.Targets[2] = tOrd;
-                if (!string.IsNullOrEmpty(tOrd.OrderId))
-                {
-                    _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target4Orders.TryGetValue(recoveredKey, out tOrd) && tOrd != null)
-            {
-                fsm.Targets[3] = tOrd;
-                if (!string.IsNullOrEmpty(tOrd.OrderId))
-                {
-                    _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
-                    ordersIndexed++;
-                }
-            }
-            if (target5Orders.TryGetValue(recoveredKey, out tOrd) && tOrd != null)
-            {
-                fsm.Targets[4] = tOrd;
-                if (!string.IsNullOrEmpty(tOrd.OrderId))
-                {
-                    _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
-                    ordersIndexed++;
+                    fsm.Targets[i] = tOrd;
+                    if (!string.IsNullOrEmpty(tOrd.OrderId))
+                    {
+                        _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
+                        ordersIndexed++;
+                    }
                 }
             }
         }

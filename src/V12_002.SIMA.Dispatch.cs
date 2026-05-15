@@ -65,174 +65,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // [Phase 7.2 LATENCY] T0: Start immediately after semaphore acquired, before any work.
-            var sw = Stopwatch.StartNew();
-            long t0Ticks = sw.ElapsedTicks;
+            Dispatch_InitializeLatencyTracking(out var sw, out var t0Ticks, out var tLoopStartTicks, out var dispatchLog);
 
             try
             {
-                // V12.2: Diagnostic logging for copy trading troubleshooting
-                Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA} | OrderType={entryOrderType}");
-
-                if (!EnableSIMA)
-                {
-                    Print("[DISPATCH] [ERR] SIMA DISABLED - Enable in strategy parameters to copy trade");
+                if (!Dispatch_ValidatePreconditions(tradeType, action, quantity, entryPrice))
                     return;
-                }
-
-                // EMERGENCY FIX [H-12]: Abort dispatch if flatten is in progress to prevent re-entry race.
-                if (isFlattenRunning)
-                {
-                    Print("[DISPATCH] (!) Aborting dispatch -- flatten in progress (isFlattenRunning=true)");
-                    return; // finally block releases _simaToggleState gate
-                }
-
-                // Phase 6 [MG-D1]: MetadataGuard -- reject duplicate dispatch signals.
-                // Composite fingerprint prevents the same trade from dispatching twice within 10s.
-                string dispatchSig = string.Format("SD_{0}_{1}_{2}_{3:F2}", tradeType, action, quantity, entryPrice);
-                if (!MetadataGuardDuplicate(dispatchSig, "SmartDispatch"))
-                {
-                    Print("[DISPATCH] (!) Duplicate dispatch rejected by MetadataGuard");
-                    return;
-                }
 
                 Dispatch_ResolveFleetSnapshot(
                     tradeType, action, quantity, entryPrice, masterEntryNames,
                     out var fleet, out var activeAccountSnapshot, out var dispatchTargetCount, out var symmetryDispatchId);
                 if (fleet.Count == 0) return;
 
-                int rmaCount = 0;
+                Dispatch_ProcessFleetLoop(
+                    fleet, activeAccountSnapshot, dispatchTargetCount, symmetryDispatchId,
+                    tradeType, action, quantity, entryPrice, entryOrderType,
+                    sw, tLoopStartTicks, dispatchLog);
 
-                // [Phase 7.2 LATENCY] T_LoopStart + batch log buffer (flushed once after loop).
-                long tLoopStartTicks = sw.ElapsedTicks;
-                var dispatchLog = new StringBuilder(512);
-                dispatchLog.AppendLine(string.Format("[LATENCY] Loop start at {0:F3} ms from entry",
-                    (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency));
-
-                for (int i = 0; i < fleet.Count; i++)
-                {
-                    Account acct = fleet[i].Account;
-
-                    // V12.1: Skip Master account if its order was already placed by the caller
-                    if (acct == this.Account) continue;
-
-                    // Build 935 [SIMA-B935-001]: Inactive + H-13 + consistency lock delegated to ShouldSkipFleetAccount.
-                    if (ShouldSkipFleetAccount(acct, fleet[i], activeAccountSnapshot, dispatchLog)) continue;
-
-                    int reservedDelta = 0;
-                    bool registeredForCleanup = false;
-                    bool syncPending = false;
-                    string fleetEntryName = null;
-                    string expectedKey = null;
-                    try
-                    {
-                        bool _builtOk = Dispatch_BuildFollowerOrders(
-                            tradeType, action, quantity, entryPrice, entryOrderType, acct, i, symmetryDispatchId, dispatchTargetCount, dispatchLog,
-                            out PositionInfo fleetPos, out Order entry, out fleetEntryName, out expectedKey, out string ocoId, out int followerQty, out int ft1, out int ft2, out int ft3, out int ft4, out int ft5,
-                            out double stopPrice, out double t1TargetPrice, out double t2TargetPrice, out double t3TargetPrice, out double t4TargetPrice, out double t5TargetPrice);
-                        if (!_builtOk) continue;
-                        bool isMarketEntry = (entryOrderType == OrderType.Market);
-
-                        // V12.7: Submit only entry for Limit; market entries include stop + non-runner targets.
-                        if (isMarketEntry)
-                        {
-                            Dispatch_PublishMarketBracketToPhoton(
-                                acct,
-                                action,
-                                entry,
-                                fleetPos,
-                                fleetEntryName,
-                                expectedKey,
-                                ocoId,
-                                followerQty,
-                                entryPrice,
-                                stopPrice,
-                                dispatchTargetCount,
-                                dispatchLog,
-                                ref syncPending,
-                                ref reservedDelta,
-                                ref registeredForCleanup);
-                        }
-                        else
-                        {
-                            Dispatch_PublishLimitEntryToPhoton(
-                                acct,
-                                action,
-                                fleetPos,
-                                entry,
-                                fleetEntryName,
-                                expectedKey,
-                                followerQty,
-                                dispatchLog,
-                                ref syncPending,
-                                ref reservedDelta,
-                                ref registeredForCleanup);
-                        }
-
-                        rmaCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        if (syncPending)
-                        {
-                            ClearDispatchSyncPending(expectedKey);
-                            syncPending = false;
-                        }
-
-                        if (reservedDelta != 0)
-                            AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-
-                        if (registeredForCleanup)
-                        {
-                            // V12.Phase8 [F-01]: Full tracking-dict cleanup on Submit failure.
-                            activePositions.TryRemove(fleetEntryName, out _);
-                            entryOrders.TryRemove(fleetEntryName, out _);
-                            stopOrders.TryRemove(fleetEntryName, out _);
-                            for (int tNum = 1; tNum <= 5; tNum++)
-                            {
-                                var targetDict = GetTargetOrdersDictionary(tNum);
-                                if (targetDict != null)
-                                    targetDict.TryRemove(fleetEntryName, out _);
-                            }
-                        }
-                        // Phase 6: Clean up proactive FSM on dispatch failure (no-op if not yet created)
-                        if (!string.IsNullOrEmpty(fleetEntryName))
-                            _followerBrackets.TryRemove(fleetEntryName, out _);
-
-                        dispatchLog.AppendLine($"[DISPATCH] [X] FAILED on {acct.Name}: {ex.Message}");
-                    }
-                }
-
-                // V14.2 FIX-F7: Pump prime checks BOTH ring and legacy queue
-                if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
-                    catch (Exception ex)
-                    {
-                        if (_diagFleet)
-                            Print("[FLEET_CATCH] ExecuteSmartDispatchEntry pump prime failed: " + ex.Message);
-                    }
-
-                // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) -- stop clock, flush forensic report.
-                sw.Stop();
-                long tFinalTicks = sw.ElapsedTicks;
-                double totalMs  = tFinalTicks        * 1000.0 / Stopwatch.Frequency;
-                double setupMs  = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
-                double loopMs   = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
-
-                var report = new StringBuilder(1024);
-                report.AppendLine("+==============================================================+");
-                report.AppendLine("|          (+/-)  FORENSIC PULSE REPORT  Phase 7.2 Latency       |");
-                report.AppendLine("+==============================================================+");
-                report.AppendLine("|  TYPE | ACCOUNT                       | ORDER TYPE   |   RTT  |");
-                report.AppendLine("+==============================================================+");
-                report.Append(dispatchLog.ToString());
-                report.AppendLine("+--------------------------------------------------------------+");
-                report.AppendLine("|  TIMING SUMMARY                                              |");
-                report.AppendLine("+--------------------------------------------------------------+");
-                report.AppendLine(string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs));
-                report.AppendLine(string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs));
-                report.AppendLine("+==============================================================+");
-                Print(report.ToString().TrimEnd());
+                Dispatch_FinalizeAndReport(sw, t0Ticks, tLoopStartTicks, dispatchLog);
             }
             catch (Exception ex)
             {
@@ -243,6 +93,195 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V12.Phase8 [F-03]: Always release the SIMA toggle gate via Interlocked.Exchange.
                 Interlocked.Exchange(ref _simaToggleState, 0);
             }
+        }
+
+        private bool Dispatch_ValidatePreconditions(string tradeType, OrderAction action, int quantity, double entryPrice)
+        {
+            // V12.2: Diagnostic logging for copy trading troubleshooting
+            Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA}");
+
+            if (!EnableSIMA)
+            {
+                Print("[DISPATCH] [ERR] SIMA DISABLED - Enable in strategy parameters to copy trade");
+                return false;
+            }
+
+            // EMERGENCY FIX [H-12]: Abort dispatch if flatten is in progress to prevent re-entry race.
+            if (isFlattenRunning)
+            {
+                Print("[DISPATCH] (!) Aborting dispatch -- flatten in progress (isFlattenRunning=true)");
+                return false;
+            }
+
+            // Phase 6 [MG-D1]: MetadataGuard -- reject duplicate dispatch signals.
+            // Composite fingerprint prevents the same trade from dispatching twice within 10s.
+            string dispatchSig = string.Format("SD_{0}_{1}_{2}_{3:F2}", tradeType, action, quantity, entryPrice);
+            if (!MetadataGuardDuplicate(dispatchSig, "SmartDispatch"))
+            {
+                Print("[DISPATCH] (!) Duplicate dispatch rejected by MetadataGuard");
+                return false;
+            }
+
+            return true;
+        }
+
+        private void Dispatch_InitializeLatencyTracking(
+            out Stopwatch sw, out long t0Ticks, out long tLoopStartTicks, out StringBuilder dispatchLog)
+        {
+            // [Phase 7.2 LATENCY] T0: Start immediately after semaphore acquired, before any work.
+            sw = Stopwatch.StartNew();
+            t0Ticks = sw.ElapsedTicks;
+            tLoopStartTicks = sw.ElapsedTicks;
+            dispatchLog = new StringBuilder(512);
+            dispatchLog.AppendLine(string.Format("[LATENCY] Loop start at {0:F3} ms from entry",
+                (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency));
+        }
+
+        private int Dispatch_ProcessFleetLoop(
+            List<AccountRankInfo> fleet,
+            HashSet<string> activeAccountSnapshot,
+            int dispatchTargetCount,
+            string symmetryDispatchId,
+            string tradeType,
+            OrderAction action,
+            int quantity,
+            double entryPrice,
+            OrderType entryOrderType,
+            Stopwatch sw,
+            long tLoopStartTicks,
+            StringBuilder dispatchLog)
+        {
+            int rmaCount = 0;
+
+            for (int i = 0; i < fleet.Count; i++)
+            {
+                Account acct = fleet[i].Account;
+
+                // V12.1: Skip Master account if its order was already placed by the caller
+                if (acct == this.Account) continue;
+
+                // Build 935 [SIMA-B935-001]: Inactive + H-13 + consistency lock delegated to ShouldSkipFleetAccount.
+                if (ShouldSkipFleetAccount(acct, fleet[i], activeAccountSnapshot, dispatchLog)) continue;
+
+                int reservedDelta = 0;
+                bool registeredForCleanup = false;
+                bool syncPending = false;
+                string fleetEntryName = null;
+                string expectedKey = null;
+                try
+                {
+                    bool _builtOk = Dispatch_BuildFollowerOrders(
+                        tradeType, action, quantity, entryPrice, entryOrderType, acct, i, symmetryDispatchId, dispatchTargetCount, dispatchLog,
+                        out PositionInfo fleetPos, out Order entry, out fleetEntryName, out expectedKey, out string ocoId, out int followerQty, out int ft1, out int ft2, out int ft3, out int ft4, out int ft5,
+                        out double stopPrice, out double t1TargetPrice, out double t2TargetPrice, out double t3TargetPrice, out double t4TargetPrice, out double t5TargetPrice);
+                    if (!_builtOk) continue;
+                    bool isMarketEntry = (entryOrderType == OrderType.Market);
+
+                    // V12.7: Submit only entry for Limit; market entries include stop + non-runner targets.
+                    if (isMarketEntry)
+                    {
+                        Dispatch_PublishMarketBracketToPhoton(
+                            acct,
+                            action,
+                            entry,
+                            fleetPos,
+                            fleetEntryName,
+                            expectedKey,
+                            ocoId,
+                            followerQty,
+                            entryPrice,
+                            stopPrice,
+                            dispatchTargetCount,
+                            dispatchLog,
+                            ref syncPending,
+                            ref reservedDelta,
+                            ref registeredForCleanup);
+                    }
+                    else
+                    {
+                        Dispatch_PublishLimitEntryToPhoton(
+                            acct,
+                            action,
+                            fleetPos,
+                            entry,
+                            fleetEntryName,
+                            expectedKey,
+                            followerQty,
+                            dispatchLog,
+                            ref syncPending,
+                            ref reservedDelta,
+                            ref registeredForCleanup);
+                    }
+
+                    rmaCount++;
+                }
+                catch (Exception ex)
+                {
+                    if (syncPending)
+                    {
+                        ClearDispatchSyncPending(expectedKey);
+                        syncPending = false;
+                    }
+
+                    if (reservedDelta != 0)
+                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+
+                    if (registeredForCleanup)
+                    {
+                        // V12.Phase8 [F-01]: Full tracking-dict cleanup on Submit failure.
+                        activePositions.TryRemove(fleetEntryName, out _);
+                        entryOrders.TryRemove(fleetEntryName, out _);
+                        stopOrders.TryRemove(fleetEntryName, out _);
+                        for (int tNum = 1; tNum <= 5; tNum++)
+                        {
+                            var targetDict = GetTargetOrdersDictionary(tNum);
+                            if (targetDict != null)
+                                targetDict.TryRemove(fleetEntryName, out _);
+                        }
+                    }
+                    // Phase 6: Clean up proactive FSM on dispatch failure (no-op if not yet created)
+                    if (!string.IsNullOrEmpty(fleetEntryName))
+                        _followerBrackets.TryRemove(fleetEntryName, out _);
+
+                    dispatchLog.AppendLine($"[DISPATCH] [X] FAILED on {acct.Name}: {ex.Message}");
+                }
+            }
+
+            return rmaCount;
+        }
+
+        private void Dispatch_FinalizeAndReport(Stopwatch sw, long t0Ticks, long tLoopStartTicks, StringBuilder dispatchLog)
+        {
+            // V14.2 FIX-F7: Pump prime checks BOTH ring and legacy queue
+            if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
+                try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+                catch (Exception ex)
+                {
+                    if (_diagFleet)
+                        Print("[FLEET_CATCH] ExecuteSmartDispatchEntry pump prime failed: " + ex.Message);
+                }
+
+            // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) -- stop clock, flush forensic report.
+            sw.Stop();
+            long tFinalTicks = sw.ElapsedTicks;
+            double totalMs  = tFinalTicks        * 1000.0 / Stopwatch.Frequency;
+            double setupMs  = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
+            double loopMs   = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
+
+            var report = new StringBuilder(1024);
+            report.AppendLine("+==============================================================+");
+            report.AppendLine("|          (+/-)  FORENSIC PULSE REPORT  Phase 7.2 Latency       |");
+            report.AppendLine("+==============================================================+");
+            report.AppendLine("|  TYPE | ACCOUNT                       | ORDER TYPE   |   RTT  |");
+            report.AppendLine("+==============================================================+");
+            report.Append(dispatchLog.ToString());
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine("|  TIMING SUMMARY                                              |");
+            report.AppendLine("+--------------------------------------------------------------+");
+            report.AppendLine(string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs));
+            report.AppendLine(string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs));
+            report.AppendLine("+==============================================================+");
+            Print(report.ToString().TrimEnd());
         }
 
 
