@@ -138,9 +138,9 @@ execution-complexity methods, or single-action handlers. See `docs/brain/forensi
 | PR-1 | Open PR: feature/phase7-sprint5-extraction -> main | ✅ COMPLETE (2026-05-15) |
 | PR-2 | GitHub audit (DNA compliance, diff limit, ASCII gate) | ✅ COMPLETE -- 35 threads resolved, advisory-only failures |
 | PR-3 | PR closure / merge on audit pass | ✅ MERGED squash #102 -> main (2026-05-15) |
-| T-W1-Perf | ShouldSkipFleet_RunHealthCheck: LINQ -> for-loop (2 enumerator allocs) | 🔵 IN PROGRESS |
-| GAP-5 | CRC16 -> debug sequence counter on Photon ring slots | NEXT |
-| GAP-2 | SPSC Ring Buffer full integration (3-4 Bob CLI tickets) | QUEUED -- Director approved |
+| T-W1-Perf | ShouldSkipFleet_RunHealthCheck: LINQ -> for-loop (3 allocs eliminated) | ✅ COMPLETE -- commit 93c0720, F5 PASS 2026-05-15 |
+| GAP-5 | CRC16 -> debug sequence counter on Photon ring slots | 🔵 NEXT (implement alongside GAP-2 scoping) |
+| GAP-2 | SPSC Ring Buffer full integration (3-4 Bob CLI tickets) | ⏳ SCOPING -- Director approved |
 | JS-IMPL-5 | PositionInfo struct conversion | ❌ DEFERRED -- <10 trades/session, GC impact immeasurable |
 
 ### Phase 7 UI Epic Ticket Queue
