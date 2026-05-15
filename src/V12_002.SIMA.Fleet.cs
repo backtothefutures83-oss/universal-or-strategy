@@ -379,18 +379,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
-                var brokerPos = acct.Positions.ToArray().FirstOrDefault(p => p.Instrument.FullName == Instrument.FullName);
+                // T-W1-Perf: for-loop replaces FirstOrDefault lambda -- eliminates delegate allocation.
+                Position[] _posSnapshot = acct.Positions.ToArray();
+                Position brokerPos = null;
+                for (int _pi = 0; _pi < _posSnapshot.Length; _pi++)
+                {
+                    if (_posSnapshot[_pi] != null && _posSnapshot[_pi].Instrument.FullName == Instrument.FullName)
+                    { brokerPos = _posSnapshot[_pi]; break; }
+                }
                 bool brokerFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
 
-                bool hasActiveFsmForAcct = _followerBrackets.Values.Any(f =>
-                    f != null
-                    && f.AccountName == acct.Name
-                    && (f.State == FollowerBracketState.Active
-                        || f.State == FollowerBracketState.Accepted
-                        || f.State == FollowerBracketState.Submitted
-                        || f.State == FollowerBracketState.Replacing));
-                bool hasActivePositionForAcct = activePositions.Values.Any(p =>
-                    p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name);
+                // T-W1-Perf: direct foreach over ConcurrentDictionary -- no .Values snapshot, no closure alloc.
+                bool hasActiveFsmForAcct = false;
+                foreach (var _fkvp in _followerBrackets)
+                {
+                    var f = _fkvp.Value;
+                    if (f != null && f.AccountName == acct.Name
+                        && (f.State == FollowerBracketState.Active
+                            || f.State == FollowerBracketState.Accepted
+                            || f.State == FollowerBracketState.Submitted
+                            || f.State == FollowerBracketState.Replacing))
+                    { hasActiveFsmForAcct = true; break; }
+                }
+                bool hasActivePositionForAcct = false;
+                foreach (var _pkvp in activePositions)
+                {
+                    var p = _pkvp.Value;
+                    if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name)
+                    { hasActivePositionForAcct = true; break; }
+                }
                 bool hasDispatchPending = _dispatchSyncPendingExpKeys.ContainsKey(ExpKey(acct.Name));
 
                 if (brokerFlat && !hasActiveFsmForAcct && !hasActivePositionForAcct && !hasDispatchPending)
