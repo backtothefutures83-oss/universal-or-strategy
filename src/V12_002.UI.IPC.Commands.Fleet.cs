@@ -146,62 +146,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.13c: Only cancels pending entry orders (stops/targets on active positions are preserved)
             if (EnableSIMA)
             {
-                int cancelled = 0;
-
-                // Build 1001: Use broker truth (Account.Positions) for master -- expectedPositions[master]
-                // is not updated on entry fill, making it stale as a liveness gate. Broker truth is authoritative.
-                bool masterHasPosition = Account.Positions
-                    .Any(p => p.Instrument != null && p.Instrument.FullName == Instrument.FullName
-                              && p.MarketPosition != MarketPosition.Flat);
-
-                Account masterBroker996c = Account;
-                foreach (Order order in masterBroker996c.Orders.ToArray())
-                {
-                    if (order == null || order.Instrument?.FullName != Instrument?.FullName) continue;
-                    if (order.OrderState == OrderState.Cancelled       ||
-                        order.OrderState == OrderState.CancelPending   ||
-                        order.OrderState == OrderState.CancelSubmitted ||
-                        order.OrderState == OrderState.Filled          ||
-                        order.OrderState == OrderState.Rejected) continue;
-                    if (masterHasPosition) continue; // Master has live position: preserve all.
-                    CancelOrderOnAccount(order, masterBroker996c);
-                    cancelled++;
-                }
-
-                // Fleet accounts
-                foreach (Account acct in Account.All)
-                {
-                    if (IsFleetAccount(acct))
-                    {
-                        if (acct == this.Account) continue; // already processed above
-                        var acctFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
-                        bool acctHasActiveFsm = acctFsms.Any(f => f.State == FollowerBracketState.Active);
-                        foreach (Order order in acct.Orders)
-                        {
-                            if (order != null && order.Instrument.FullName == Instrument.FullName &&
-                                (order.OrderState == OrderState.Working ||
-                                 order.OrderState == OrderState.Accepted ||
-                                 order.OrderState == OrderState.Submitted ||
-                                 order.OrderState == OrderState.ChangePending ||
-                                 order.OrderState == OrderState.ChangeSubmitted))
-                            {
-                                string oName = order.Name;
-                                if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
-                                    oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
-                                    oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
-                                {
-                                    // Build 1104.1: Preserve brackets ONLY if FSM is active AND Master has position.
-                                    // If Master is FLAT, orphaned follower brackets MUST be swept regardless of FSM state.
-                                    if (acctHasActiveFsm && masterHasPosition) continue;
-                                }
-
-                                CancelOrderOnAccount(order, acct);
-                                cancelled++;
-                            }
-                        }
-                    }
-                }
-                Print($"[SIMA] CANCEL_ALL -> Cancelled {cancelled} orders (Entries + Orphaned Brackets) (local + fleet) [1001]");
+                int masterCancelled = CancelAll_ProcessMasterAccount();
+                int fleetCancelled = CancelAll_ProcessFleetAccounts();
+                int totalCancelled = masterCancelled + fleetCancelled;
+                Print($"[SIMA] CANCEL_ALL -> Cancelled {totalCancelled} orders (Entries + Orphaned Brackets) (local + fleet) [1001]");
             }
             else
             {
@@ -228,6 +176,100 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print($"[V12] CANCEL_ALL -> Cancelled {cancelled} pending entry orders");
             }
 
+            return true;
+        }
+
+        private int CancelAll_ProcessMasterAccount()
+        {
+            int cancelled = 0;
+
+            // Build 1001: Use broker truth (Account.Positions) for master -- expectedPositions[master]
+            // is not updated on entry fill, making it stale as a liveness gate. Broker truth is authoritative.
+            bool masterHasPosition = Account.Positions
+                .Any(p => p.Instrument != null && p.Instrument.FullName == Instrument.FullName
+                          && p.MarketPosition != MarketPosition.Flat);
+
+            Account masterBroker996c = Account;
+            foreach (Order order in masterBroker996c.Orders.ToArray())
+            {
+                if (order == null || order.Instrument?.FullName != Instrument?.FullName) continue;
+                if (order.OrderState == OrderState.Cancelled       ||
+                    order.OrderState == OrderState.CancelPending   ||
+                    order.OrderState == OrderState.CancelSubmitted ||
+                    order.OrderState == OrderState.Filled          ||
+                    order.OrderState == OrderState.Rejected) continue;
+                if (masterHasPosition) continue; // Master has live position: preserve all.
+                CancelOrderOnAccount(order, masterBroker996c);
+                cancelled++;
+            }
+
+            return cancelled;
+        }
+
+        private int CancelAll_ProcessFleetAccounts()
+        {
+            int fleetCancelled = CancelAll_ProcessFleetOrders();
+            CancelAll_CleanupUnfilledPositions();
+            return fleetCancelled;
+        }
+
+        private int CancelAll_ProcessFleetOrders()
+        {
+            int cancelled = 0;
+
+            // Build 1001: Use broker truth for master position check
+            bool masterHasPosition = Account.Positions
+                .Any(p => p.Instrument != null && p.Instrument.FullName == Instrument.FullName
+                          && p.MarketPosition != MarketPosition.Flat);
+
+            // Fleet accounts
+            foreach (Account acct in Account.All)
+            {
+                if (IsFleetAccount(acct))
+                {
+                    if (acct == this.Account) continue; // already processed above
+                    cancelled += CancelAll_ProcessSingleFleetAccount(acct, masterHasPosition);
+                }
+            }
+
+            return cancelled;
+        }
+
+        private int CancelAll_ProcessSingleFleetAccount(Account acct, bool masterHasPosition)
+        {
+            int cancelled = 0;
+            var acctFsms = _followerBrackets.Values.Where(f => f.AccountName == acct.Name).ToList();
+            bool acctHasActiveFsm = acctFsms.Any(f => f.State == FollowerBracketState.Active);
+
+            foreach (Order order in acct.Orders)
+            {
+                if (order != null && order.Instrument.FullName == Instrument.FullName &&
+                    (order.OrderState == OrderState.Working ||
+                     order.OrderState == OrderState.Accepted ||
+                     order.OrderState == OrderState.Submitted ||
+                     order.OrderState == OrderState.ChangePending ||
+                     order.OrderState == OrderState.ChangeSubmitted))
+                {
+                    string oName = order.Name;
+                    if (oName.StartsWith("Stop_") || oName.StartsWith("S_") ||
+                        oName.StartsWith("T1_") || oName.StartsWith("T2_") ||
+                        oName.StartsWith("T3_") || oName.StartsWith("T4_") || oName.StartsWith("T5_"))
+                    {
+                        // Build 1104.1: Preserve brackets ONLY if FSM is active AND Master has position.
+                        // If Master is FLAT, orphaned follower brackets MUST be swept regardless of FSM state.
+                        if (acctHasActiveFsm && masterHasPosition) continue;
+                    }
+
+                    CancelOrderOnAccount(order, acct);
+                    cancelled++;
+                }
+            }
+
+            return cancelled;
+        }
+
+        private void CancelAll_CleanupUnfilledPositions()
+        {
             // V1102Z-HARDEN: Ghost Memory Teardown removed (V2 Forensic Fix)
             // We no longer zero expectedPositions immediately upon command launch.
             // State mutation is now reactive to broker confirmation via OnAccountOrderUpdate.
@@ -241,8 +283,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print(string.Format("V12.13b: CANCEL_ALL cleaned unfilled memory entry: {0}", kvp.Key));
                 }
             }
-
-            return true;
         }
 
         private bool TryHandleFleet_ResetMemory(string action)

@@ -38,6 +38,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private System.Windows.Shapes.Rectangle _chartHoverOverlay;
         private Grid _chartOverlayParentGrid;
 
+        // [Phase7-UI T-A] Command Pattern: Pre-allocated dictionary for basic hotkeys (zero allocation on hot path)
+        private Dictionary<Key, Action> _keyCommands;
+
         private void AttachHotkeys()
         {
             if (ChartControl?.OwnerChart != null)
@@ -334,48 +337,70 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print("V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)");
         }
 
+        // [Phase7-UI T-A] OnKeyDown residual dispatcher (CYC 3) - Command Pattern with O(1) lookup
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            // Basic hotkeys
-            if (e.Key == Key.L) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); Enqueue(ctx => ctx.ExecuteLong(orContracts)); e.Handled = true; }
-            else if (e.Key == Key.S) { double orStopDist = CalculateORStopDistance(); int orContracts = CalculatePositionSize(orStopDist); Enqueue(ctx => ctx.ExecuteShort(orContracts)); e.Handled = true; }
-            // V12.1101E [PH5-COLLIDE-01]: Panic hotkey routes through lifecycle-safe flatten pipeline.
-            else if (e.Key == Key.F) { FlattenAll(); e.Handled = true; }
-
-            // v5.12: T1 Actions (1 + letter)
-            else if (Keyboard.IsKeyDown(Key.D1) || Keyboard.IsKeyDown(Key.NumPad1))
+            // Basic hotkeys (no modifiers) - O(1) dictionary lookup
+            if (_keyCommands != null && _keyCommands.TryGetValue(e.Key, out var cmd))
             {
-                if (e.Key == Key.M) { ExecuteTargetAction("T1", "market"); e.Handled = true; }
-                else if (e.Key == Key.O) { ExecuteTargetAction("T1", "1point"); e.Handled = true; }
-                else if (e.Key == Key.W) { ExecuteTargetAction("T1", "2point"); e.Handled = true; }
-                else if (e.Key == Key.K) { ExecuteTargetAction("T1", "marketprice"); e.Handled = true; }
-                else if (e.Key == Key.B) { ExecuteTargetAction("T1", "breakeven"); e.Handled = true; }
-                else if (e.Key == Key.C) { ExecuteTargetAction("T1", "cancel"); e.Handled = true; }
+                cmd();
+                e.Handled = true;
+                return;
             }
 
-            // v5.12: T2 Actions (2 + letter)
-            else if (Keyboard.IsKeyDown(Key.D2) || Keyboard.IsKeyDown(Key.NumPad2))
+            // T1 Actions (1 + letter)
+            if (Keyboard.IsKeyDown(Key.D1) || Keyboard.IsKeyDown(Key.NumPad1))
             {
-                if (e.Key == Key.M) { ExecuteTargetAction("T2", "market"); e.Handled = true; }
-                else if (e.Key == Key.O) { ExecuteTargetAction("T2", "1point"); e.Handled = true; }
-                else if (e.Key == Key.W) { ExecuteTargetAction("T2", "2point"); e.Handled = true; }
-                else if (e.Key == Key.K) { ExecuteTargetAction("T2", "marketprice"); e.Handled = true; }
-                else if (e.Key == Key.B) { ExecuteTargetAction("T2", "breakeven"); e.Handled = true; }
-                else if (e.Key == Key.C) { ExecuteTargetAction("T2", "cancel"); e.Handled = true; }
+                HandleTargetAction("T1", e.Key);
+                e.Handled = true;
+                return;
             }
 
-            // v5.12: Runner Actions (3 + letter)
-            else if (Keyboard.IsKeyDown(Key.D3) || Keyboard.IsKeyDown(Key.NumPad3))
+            // T2 Actions (2 + letter)
+            if (Keyboard.IsKeyDown(Key.D2) || Keyboard.IsKeyDown(Key.NumPad2))
             {
-                if (e.Key == Key.M) { Enqueue(ctx => ctx.ExecuteRunnerAction("market")); e.Handled = true; }
-                else if (e.Key == Key.O) { Enqueue(ctx => ctx.ExecuteRunnerAction("stop1pt")); e.Handled = true; }
-                else if (e.Key == Key.W) { Enqueue(ctx => ctx.ExecuteRunnerAction("stop2pt")); e.Handled = true; }
-                else if (e.Key == Key.B) { Enqueue(ctx => ctx.ExecuteRunnerAction("stopbe")); e.Handled = true; }
-                else if (e.Key == Key.P) { Enqueue(ctx => ctx.ExecuteRunnerAction("lock50")); e.Handled = true; }  // P for Profit
-                else if (e.Key == Key.D) { Enqueue(ctx => ctx.ExecuteRunnerAction("disabletrail")); e.Handled = true; }
+                HandleTargetAction("T2", e.Key);
+                e.Handled = true;
+                return;
+            }
+
+            // Runner Actions (3 + letter)
+            if (Keyboard.IsKeyDown(Key.D3) || Keyboard.IsKeyDown(Key.NumPad3))
+            {
+                HandleRunnerAction(e.Key);
+                e.Handled = true;
+                return;
             }
 
             // RMA uses Shift+Click (R conflicts with NT search, Ctrl conflicts with chart drag)
+        }
+
+        // [Phase7-UI T-A] Helper: Route T1/T2 target actions (CYC 6)
+        private void HandleTargetAction(string target, Key key)
+        {
+            switch (key)
+            {
+                case Key.M: ExecuteTargetAction(target, "market"); break;
+                case Key.O: ExecuteTargetAction(target, "1point"); break;
+                case Key.W: ExecuteTargetAction(target, "2point"); break;
+                case Key.K: ExecuteTargetAction(target, "marketprice"); break;
+                case Key.B: ExecuteTargetAction(target, "breakeven"); break;
+                case Key.C: ExecuteTargetAction(target, "cancel"); break;
+            }
+        }
+
+        // [Phase7-UI T-A] Helper: Route runner actions (CYC 6)
+        private void HandleRunnerAction(Key key)
+        {
+            switch (key)
+            {
+                case Key.M: Enqueue(ctx => ctx.ExecuteRunnerAction("market")); break;
+                case Key.O: Enqueue(ctx => ctx.ExecuteRunnerAction("stop1pt")); break;
+                case Key.W: Enqueue(ctx => ctx.ExecuteRunnerAction("stop2pt")); break;
+                case Key.B: Enqueue(ctx => ctx.ExecuteRunnerAction("stopbe")); break;
+                case Key.P: Enqueue(ctx => ctx.ExecuteRunnerAction("lock50")); break;
+                case Key.D: Enqueue(ctx => ctx.ExecuteRunnerAction("disabletrail")); break;
+            }
         }
 
         #endregion
@@ -395,62 +420,98 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // V8.30: Thread-safe snapshot iteration
-                foreach (var kvp in activePositions.ToArray())
-                {
-                    if (!activePositions.ContainsKey(kvp.Key)) continue;
-                    PositionInfo pos = kvp.Value;
-                    string entryName = kvp.Key;
-
-                    if (!pos.EntryFilled)
-                    {
-                        Print(string.Format("{0} ACTION: Position {1} not filled yet", targetType, entryName));
-                        continue;
-                    }
-
-                    if (!ExecuteTarget_ValidateContext(pos, entryName, targetType, out int targetNumber, out var targetOrders, out int targetContracts))
-                        continue;
-
-                    if (IsRunnerTarget(targetNumber) && action != "market" && action != "cancel")
-                    {
-                        Print(string.Format("{0} ACTION: Target is configured as Runner (trail-only), action {1} skipped for {2}",
-                            targetType, action, entryName));
-                        continue;
-                    }
-
-                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-
-                    switch (action)
-                    {
-                        case "market":
-                            ExecuteTarget_Market(entryName, pos, targetType, targetOrders, targetContracts);
-                            break;
-
-                        case "1point":
-                            ExecuteTarget_OnePoint(entryName, pos, targetType, targetContracts);
-                            break;
-
-                        case "2point":
-                            ExecuteTarget_TwoPoint(entryName, pos, targetType, targetContracts);
-                            break;
-
-                        case "marketprice":
-                            ExecuteTarget_MarketPrice(entryName, pos, targetType, targetContracts, currentPrice);
-                            break;
-
-                        case "breakeven":
-                            ExecuteTarget_Breakeven(entryName, pos, targetType, targetContracts);
-                            break;
-
-                        case "cancel":
-                            ExecuteTarget_Cancel(entryName, pos, targetType, targetOrders, targetContracts);
-                            break;
-                    }
-                }
+                ExecuteTargetActionForPosition(targetType, action);
             }
             catch (Exception ex)
             {
                 Print(string.Format("ERROR ExecuteTargetAction ({0}, {1}): {2}", targetType, action, ex.Message));
+            }
+        }
+
+        private void ExecuteTargetActionForPosition(string targetType, string action)
+        {
+            // V8.30: Thread-safe snapshot iteration
+            foreach (var kvp in activePositions.ToArray())
+            {
+                if (!activePositions.ContainsKey(kvp.Key)) continue;
+                PositionInfo pos = kvp.Value;
+                string entryName = kvp.Key;
+
+                if (!pos.EntryFilled)
+                {
+                    Print(string.Format("{0} ACTION: Position {1} not filled yet", targetType, entryName));
+                    continue;
+                }
+
+                if (!ValidateTargetActionContext(pos, entryName, targetType, action, out int targetNumber, out var targetOrders, out int targetContracts))
+                    continue;
+
+                double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+                RouteTargetActionToHandler(action, entryName, pos, targetType, targetNumber, targetOrders, targetContracts, currentPrice);
+            }
+        }
+
+        private bool ValidateTargetActionContext(
+            PositionInfo pos,
+            string entryName,
+            string targetType,
+            string action,
+            out int targetNumber,
+            out ConcurrentDictionary<string, Order> targetOrders,
+            out int targetContracts)
+        {
+            targetNumber = 0;
+            targetOrders = null;
+            targetContracts = 0;
+
+            if (!ExecuteTarget_ValidateContext(pos, entryName, targetType, out targetNumber, out targetOrders, out targetContracts))
+                return false;
+
+            if (IsRunnerTarget(targetNumber) && action != "market" && action != "cancel")
+            {
+                Print(string.Format("{0} ACTION: Target is configured as Runner (trail-only), action {1} skipped for {2}",
+                    targetType, action, entryName));
+                return false;
+            }
+
+            return true;
+        }
+
+        private void RouteTargetActionToHandler(
+            string action,
+            string entryName,
+            PositionInfo pos,
+            string targetType,
+            int targetNumber,
+            ConcurrentDictionary<string, Order> targetOrders,
+            int targetContracts,
+            double currentPrice)
+        {
+            switch (action)
+            {
+                case "market":
+                    ExecuteTarget_Market(entryName, pos, targetType, targetOrders, targetContracts);
+                    break;
+
+                case "1point":
+                    ExecuteTarget_OnePoint(entryName, pos, targetType, targetContracts);
+                    break;
+
+                case "2point":
+                    ExecuteTarget_TwoPoint(entryName, pos, targetType, targetContracts);
+                    break;
+
+                case "marketprice":
+                    ExecuteTarget_MarketPrice(entryName, pos, targetType, targetContracts, currentPrice);
+                    break;
+
+                case "breakeven":
+                    ExecuteTarget_Breakeven(entryName, pos, targetType, targetContracts);
+                    break;
+
+                case "cancel":
+                    ExecuteTarget_Cancel(entryName, pos, targetType, targetOrders, targetContracts);
+                    break;
             }
         }
 
@@ -777,56 +838,68 @@ namespace NinjaTrader.NinjaScript.Strategies
                 foreach (var kvp in activePositions.ToArray())
                 {
                     if (!activePositions.ContainsKey(kvp.Key)) continue;
-                    PositionInfo pos = kvp.Value;
-                    string entryName = kvp.Key;
 
-                    if (!pos.EntryFilled)
+                    if (ValidateRunnerPosition(kvp.Key, kvp.Value, out int runnerContracts))
                     {
-                        Print(string.Format("RUNNER ACTION: Position {0} not filled yet", entryName));
-                        continue;
-                    }
-
-                    // Calculate runner contracts (remaining after T1 and T2)
-                    int runnerContracts = pos.RemainingContracts;
-                    if (runnerContracts <= 0)
-                    {
-                        Print(string.Format("RUNNER ACTION: No runner contracts for {0}", entryName));
-                        continue;
-                    }
-
-                    double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-
-                    switch (action)
-                    {
-                        case "market":
-                            ExecuteRunner_Market(entryName, pos, runnerContracts);
-                            break;
-
-                        case "stop1pt":
-                            ExecuteRunner_StopOnePoint(entryName, pos);
-                            break;
-
-                        case "stop2pt":
-                            ExecuteRunner_StopTwoPoint(entryName, pos);
-                            break;
-
-                        case "stopbe":
-                            ExecuteRunner_Breakeven(entryName, pos, currentPrice);
-                            break;
-
-                        case "lock50":
-                            ExecuteRunner_Lock50(entryName, pos, currentPrice);
-                            break;
-
-                        case "disabletrail":
-                            ExecuteRunner_DisableTrail(entryName, pos);
-                            break;
+                        DispatchRunnerAction(action, kvp.Key, kvp.Value, runnerContracts);
                     }
                 }
             }
             catch (Exception ex)
             {
                 Print(string.Format("ERROR ExecuteRunnerAction ({0}): {1}", action, ex.Message));
+            }
+        }
+
+        private bool ValidateRunnerPosition(string entryName, PositionInfo pos, out int runnerContracts)
+        {
+            runnerContracts = 0;
+
+            if (!pos.EntryFilled)
+            {
+                Print(string.Format("RUNNER ACTION: Position {0} not filled yet", entryName));
+                return false;
+            }
+
+            runnerContracts = pos.RemainingContracts;
+            if (runnerContracts <= 0)
+            {
+                Print(string.Format("RUNNER ACTION: No runner contracts for {0}", entryName));
+                return false;
+            }
+
+            return true;
+        }
+
+        private void DispatchRunnerAction(string action, string entryName, PositionInfo pos, int runnerContracts)
+        {
+            double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+
+            switch (action)
+            {
+                case "market":
+                    ExecuteRunner_Market(entryName, pos, runnerContracts);
+                    break;
+
+                case "stop1pt":
+                    ExecuteRunner_StopOnePoint(entryName, pos);
+                    break;
+
+                case "stop2pt":
+                    ExecuteRunner_StopTwoPoint(entryName, pos);
+                    break;
+
+                case "stopbe":
+                    ExecuteRunner_Breakeven(entryName, pos, currentPrice);
+                    break;
+
+                case "lock50":
+                    ExecuteRunner_Lock50(entryName, pos, currentPrice);
+                    break;
+
+                case "disabletrail":
+                    ExecuteRunner_DisableTrail(entryName, pos);
+                    break;
             }
         }
 

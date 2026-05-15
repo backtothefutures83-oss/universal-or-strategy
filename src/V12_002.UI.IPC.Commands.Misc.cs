@@ -115,6 +115,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (action != "DIAG_FLEET")
                 return false;
 
+            // T-Q1: Toggle catch logging flag
+            _diagFleet = !_diagFleet;
+            Print("[DIAG_FLEET] Catch logging: " + (_diagFleet ? "ENABLED" : "DISABLED"));
+
             Print("[DIAG] ##################################################");
             Print($"[DIAG] EnableSIMA = {EnableSIMA}");
             Print($"[DIAG] AccountPrefix = \"{AccountPrefix}\"");
@@ -345,88 +349,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ToggleStrategyMode_SetFlags(string action)
         {
-             // V12.20: Atomic flag mutations
-             if (action == "MODE_RMA")
-             {
-                 isRMAModeActive = !isRMAModeActive;
-                 ClearClickTraderBorderIfInactive();
-             }
-             else if (action == "MODE_MOMO")
-             {
-                 isMOMOModeActive = !isMOMOModeActive;
-                 ClearClickTraderBorderIfInactive();
-             }
-             else if (action == "MODE_FFMA")
-             {
-                 isFFMAModeArmed = true;
-                 Print("V12.24: FFMA AUTO armed -- reversal scanner active");
-             }
-             else if (action == "MODE_M")
-             {
-                 Print("V12.24: MODE_M received -- immediate FFMA entry pending");
-             }
-             else if (action == "FFMA_DISARM")
-             {
-                 isFFMAModeArmed = false;
-                 Print("V12.24: FFMA disarmed via panel ResetExecutionMode");
-             }
-             else if (action == "MODE_TREND_RMA")
-             {
-                 isTrendRmaMode = true;
-                 Print("IPC: TREND RMA Mode Enabled");
-             }
-             else if (action == "MODE_TREND_STD")
-             {
-                 isTrendRmaMode = false;
-                 Print("IPC: TREND Standard Mode Enabled");
-             }
-             else if (action == "MODE_RETEST_RMA")
-             {
-                 isRetestRmaMode = true;
-                 Print("IPC: RETEST RMA Mode Enabled");
-             }
-             else if (action == "MODE_RETEST_STD")
-             {
-                 isRetestRmaMode = false;
-                 Print("IPC: RETEST Standard Mode Enabled");
-             }
+            // MP0: Dictionary dispatch (CYC=2)
+            if (_modeSetFlagsDispatch != null && _modeSetFlagsDispatch.TryGetValue(action, out Action handler))
+            {
+                handler();
+            }
         }
 
         private void ToggleStrategyMode_ExecuteModeAction(string action)
         {
-             // Execution calls stay outside lock (they do their own order management)
-             if (action == "EXEC_TREND" || action == "EXEC_TREND_RMA")
-             {
-                 double trendDist   = CalculateTRENDStopDistance();
-                 int trendContracts = CalculatePositionSize(trendDist);
-                 Enqueue(ctx => ctx.ExecuteTRENDEntry(trendContracts));
-             }
-             else if (action == "EXEC_RETEST" || action == "EXEC_RETEST_PLUS" || action == "EXEC_RETEST_MINUS")
-             {
-                 double retestDist   = CalculateRetestStopDistance();
-                 int retestContracts = CalculatePositionSize(retestDist);
-                 Enqueue(ctx => ctx.ExecuteRetestEntry(retestContracts));
-             }
-             else if (action == "EXEC_MOMO")
-             {
-                 double momoStopDist = Math.Min(MOMOStopPoints, MaximumStop);
-                 int momoContracts   = CalculatePositionSize(momoStopDist);
-                 double capturedMomoPrice = lastKnownPrice;
-                 Enqueue(ctx => ctx.ExecuteMOMOEntry(capturedMomoPrice, momoContracts));
-             }
-             else if (action == "MODE_M")
-             {
-                 // V12.24: Immediate market entry using FFMA trade DNA
-                 double currentPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                 double ema9Value = _ema9Val;
-                 MarketPosition direction = currentPrice > ema9Value ? MarketPosition.Short : MarketPosition.Long;
-                 Print(string.Format("V12.24: MODE_M firing -- Price={0:F2} vs EMA9={1:F2} -> {2}", currentPrice, ema9Value, direction));
-                 double stopPrice = direction == MarketPosition.Long ? Low[0] : High[0];
-                 double ffmaStopDist = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
-                 if (ffmaStopDist < tickSize * 2) ffmaStopDist = tickSize * 2;
-                 int ffmaContracts = CalculatePositionSize(ffmaStopDist);
-                 Enqueue(ctx => ctx.ExecuteFFMAEntry(direction, ffmaContracts));
-             }
+            // MP0: Dictionary dispatch (CYC=2)
+            if (_modeExecDispatch != null && _modeExecDispatch.TryGetValue(action, out Action handler))
+            {
+                handler();
+            }
         }
 
         private void ToggleStrategyMode_PublishSnapshot(string action)

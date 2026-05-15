@@ -1,127 +1,271 @@
-# Implementation Plan: Phase 6 T2.A Surgical Hardening
+# Implementation Plan - Phase 7 Sprint 5 (T03)
+**Mission**: Hardening `ExecuteSmartDispatchEntry` via surgical extraction.
+**Target**: `src/V12_002.SIMA.Dispatch.cs`
+**DNA Gate**: CYC < 20, LOC >= 15, Zero-Locks, ASCII-Only.
 
-I have created the following plan after thorough exploration and analysis of the codebase. Follow the below plan verbatim. Trust the files and references. Do not re-verify what's written in the plan. Explore only when absolutely necessary. First implement all the proposed file changes and then I'll review all the changes together at the end.
+## Stage P3.5: Plannotator Surgical Brief
 
-## Observations
+### Target 1: The Limit Branch Extraction
+**Action**: Replace the inlined `else` block in `ExecuteSmartDispatchEntry` with a call to the new helper.
+**Note**: `ocoId` is intentionally dropped from the signature (DEVIATION-T3-A).
 
-- Target file `file:src/V12_002.Orders.Callbacks.Execution.cs` is already heavily decomposed (Phase 5). Only 3 hot pockets remain: the `HandleFlatPosition_SyncExpected` foreach pair (lines 66-117), the `_HandleTargetFill` cleanup tail (lines 401-407), and the `_HandleTrimFill` cleanup tail (lines 444-457).
-- The two cleanup tails are NOT byte-identical: trim has `pendingStopReplacements.TryRemove + Interlocked.Decrement(ref pendingReplacementCount)` while target lacks it. The ticket calls out this parity gap as a deliberate hardening to land in the new helper.
-- `_HandleStopFill` (315-363) is explicitly OUT OF SCOPE per H5/H6 — its immediate-teardown semantics differ (4 dict TryRemoves) and its `OCO: Cancelled X target orders for Y` Print at line 344 must remain verbatim.
-- No `DateTime.Now` occurrences exist within the touched line ranges, so that opportunistic fix is a no-op for this ticket; the grep gate `does NOT increase` is naturally satisfied.
+**TargetContent** (starting around line 156):
+```csharp
+                        else
+                        {
+                            // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
+                            // REAPER runs on a background thread; if it fires between the expectedPositions
+                            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
+                            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
+                            // Registering dicts first guarantees REAPER always finds the blocking entry.
+                            // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
+                            // ConcurrentDictionary single-writes are thread-safe here.
+                            activePositions[fleetEntryName] = fleetPos;
+                            entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
+                            registeredForCleanup = true;
+                            MarkDispatchSyncPending(expectedKey);
+                            syncPending = true;
 
-## Approach
+                            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
+                            if (!_followerBrackets.ContainsKey(fleetEntryName))
+                            {
+                                var proFsm = new FollowerBracketFSM
+                                {
+                                    AccountName = acct.Name,
+                                    EntryName = fleetEntryName,
+                                    State = FollowerBracketState.PendingSubmit,
+                                    RemainingContracts = followerQty,
+                                    EntryOrder = entry,
+                                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                                    LastUpdateUtc = DateTime.UtcNow
+                                };
+                                _followerBrackets.TryAdd(fleetEntryName, proFsm);
+                            }
 
-Apply three surgical, same-file private-method extractions on `V12_002` partial class, plus the deliberate cleanup-parity hardening on `_HandleTargetFill`. Place new helpers adjacent to their callers (predicates after `HandleFlatPosition_SyncExpected`; `_FinalizeFullClose` after `_HandleTrimFill` and before `_RunShadowCheck`). Preserve dispatcher branch ordering, all `Print` literals byte-identical, ASCII-only, no `lock(...)`, zero new allocations. Each replacement is a 1:1 contiguous block move with locals passed explicitly; no DRY-ing across `_HandleStopFill` (H6 firewall).
+                            reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
+                            AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
 
-## Post-Extraction Flow
+                            int _poolSlotIndexLmt = -1;
+                            Order[] _proxyOrdersLmt = null;
+                            {
+                                var _claimedLmt = _photonPool.Claim();
+                                if (_claimedLmt.Orders != null)
+                                {
+                                    _proxyOrdersLmt = _claimedLmt.Orders;
+                                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
+                                }
+                                else
+                                {
+                                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
+                                    _poolSlotIndexLmt = -1;
+                                }
+                            }
+                            _proxyOrdersLmt[0] = entry;
 
-```mermaid
-flowchart TD
-    POEU["ProcessOnExecutionUpdate (unchanged dispatcher)"]
-    POEU -->|Stop_| HSF["_HandleStopFill (UNTOUCHED, immediate teardown)"]
-    POEU -->|T1_..T5_| HTF["_HandleTargetFill"]
-    POEU -->|Trim_| HTRF["_HandleTrimFill"]
-    POEU --> RSC["_RunShadowCheck (UNTOUCHED)"]
-    HTF -->|remainingAfter <= 0| FFC["ProcessOnExecution_FinalizeFullClose (NEW)"]
-    HTRF -->|remainingAfterTrim <= 0| FFC
-    POPU["ProcessOnPositionUpdate"] --> HFP["HandleFlatPositionUpdate"]
-    HFP --> HFPSE["HandleFlatPosition_SyncExpected (slimmed)"]
-    HFPSE --> P1["HasPendingEntryForAcct (NEW)"]
-    HFPSE -->|short-circuit| P2["HasUnfilledActivePositionForAcct (NEW)"]
-    HFPSE --> IDP["IsDispatchSyncPending (existing, kept inline)"]
+                            if (_poolSlotIndexLmt >= 0)
+                            {
+                                _photonSideband[_poolSlotIndexLmt].Account        = acct;
+                                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
+                                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
+                                Thread.MemoryBarrier();
+                            }
+
+                            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
+                            {
+                                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                                StopPrice     = 0,
+                                SignalTicks   = DateTime.UtcNow.Ticks,
+                                PoolSlotIndex = _poolSlotIndexLmt,
+                                OrderCount    = 1,
+                                Quantity      = followerQty,
+                                TargetCount   = 0,
+                                Action        = (int)action,
+                                ReservedDelta = reservedDelta
+                            };
+                            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
+
+                            Interlocked.Increment(ref _pendingFleetDispatchCount);
+
+                            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
+                            {
+                                if (_poolSlotIndexLmt >= 0 && _photonMmioMirror != null)
+                                {
+                                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
+                                }
+                            }
+                            else
+                            {
+                                if (_poolSlotIndexLmt >= 0)
+                                {
+                                    Order[] legacyOrdersLmt = new Order[] { entry };
+                                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
+                                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
+                                    _proxyOrdersLmt = legacyOrdersLmt;
+                                }
+                                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
+                                {
+                                    Account = acct,
+                                    Orders = _proxyOrdersLmt,
+                                    FleetEntryName = fleetEntryName,
+                                    ExpectedKey = expectedKey,
+                                    ReservedDelta = reservedDelta,
+                                    SignalTicks = DateTime.UtcNow.Ticks
+                                });
+                            }
+                            syncPending         = false;
+                            reservedDelta       = 0;
+                            registeredForCleanup = false;
+
+                            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
+                                acct.Name));
+                        }
 ```
 
-## Implementation Steps
+**ReplacementContent**:
+```csharp
+                        else
+                        {
+                            Dispatch_PublishLimitEntryToPhoton(
+                                tradeType, action, quantity, entryPrice, entryOrderType, acct, i, symmetryDispatchId,
+                                fleetPos, entry, fleetEntryName, expectedKey, followerQty, ft1, ft2, ft3, ft4, ft5,
+                                stopPrice, t1TargetPrice, t2TargetPrice, t3TargetPrice, t4TargetPrice, t5TargetPrice,
+                                dispatchTargetCount,
+                                dispatchLog,
+                                ref syncPending,
+                                ref reservedDelta,
+                                ref registeredForCleanup);
+                        }
+```
 
-### 1. Add new helper: `ProcessOnExecution_FinalizeFullClose(string entryName)`
+### Target 2: Insertion of Helper Method
+**Action**: Insert the new helper method at the end of the `Dispatch` region.
 
-- Location: insert immediately AFTER `_HandleTrimFill` (around current line 459) and BEFORE `ProcessOnExecution_RunShadowCheck` in `file:src/V12_002.Orders.Callbacks.Execution.cs`.
-- Signature: `private void ProcessOnExecution_FinalizeFullClose(string entryName)`.
-- Body owns three contiguous statements (the trim superset semantics):
-  1. `RequestStopCancelLifecycleSafe(entryName);`
-  2. `pendingStopReplacements.TryRemove(entryName, out _)` guarded `Interlocked.Decrement(ref pendingReplacementCount);` — wrap the decrement in braces.
-  3. `activePositions.TryGetValue(entryName, out var localPos)` test → if non-null set `localPos.PendingCleanup = true;` else `SymmetryGuardForgetEntry(entryName);` — both branches braced.
-- Add a single-line ASCII XML or `//` comment marking it as Phase 6 T2.A and noting deliberate Target/Trim parity hardening. No emoji, no curly quotes.
-- Acceptance: ≤ 25 LOC, < 10 CYC.
+**Insertion Point**: After the `Dispatch_PublishMarketBracketToPhoton` method (around line 717).
 
-### 2. Replace `_HandleTargetFill` cleanup tail (current lines 401-407)
+**Content**:
+```csharp
+        /// <summary>
+        /// [V12-T03] Extraction of Limit branch for Photon ring dispatch.
+        /// Zero-allocation, thread-safe (DNA Rule 2). Signature drops ocoId (DEVIATION-T3-A).
+        /// </summary>
+        private void Dispatch_PublishLimitEntryToPhoton(
+            string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType,
+            Account acct, int i, string symmetryDispatchId, PositionInfo fleetPos, Order entry,
+            string fleetEntryName, string expectedKey, int followerQty, int ft1, int ft2, int ft3, int ft4, int ft5,
+            double stopPrice, double t1TargetPrice, double t2TargetPrice, double t3TargetPrice, double t4TargetPrice, double t5TargetPrice,
+            int dispatchTargetCount, StringBuilder dispatchLog,
+            ref bool syncPending, ref int reservedDelta, ref bool registeredForCleanup)
+        {
+            // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
+            // REAPER runs on a background thread; if it fires between the expectedPositions
+            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
+            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
+            // Registering dicts first guarantees REAPER always finds the blocking entry.
+            // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
+            // ConcurrentDictionary single-writes are thread-safe here.
+            activePositions[fleetEntryName] = fleetPos;
+            entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
+            registeredForCleanup = true;
+            MarkDispatchSyncPending(expectedKey);
+            syncPending = true;
 
-- Within `ProcessOnExecution_HandleTargetFill`, in the `else` branch entered when `remainingAfter <= 0`, replace the existing 6 statements (`RequestStopCancelLifecycleSafe`, `PositionInfo closedPos`, `if/else` setting `PendingCleanup`/`SymmetryGuardForgetEntry`) with a single call: `ProcessOnExecution_FinalizeFullClose(entryName);`.
-- Do NOT touch the surrounding logic (`bool terminalFill`, `ApplyTargetFill`, the `[1101E GUARD]` Print, the `TARGET FILLED:` Print, `UpdateStopQuantity` call, the post-block `terminalFill` target-dict cleanup at line 410-414).
-- Net behavior change for Target: now also decrements `pendingReplacementCount` on cleanup — call out as deliberate hardening in the PR description.
-- Acceptance: parent ≤ 9 CYC.
+            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
+            if (!_followerBrackets.ContainsKey(fleetEntryName))
+            {
+                var proFsm = new FollowerBracketFSM
+                {
+                    AccountName = acct.Name,
+                    EntryName = fleetEntryName,
+                    State = FollowerBracketState.PendingSubmit,
+                    RemainingContracts = followerQty,
+                    EntryOrder = entry,
+                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                    LastUpdateUtc = DateTime.UtcNow
+                };
+                _followerBrackets.TryAdd(fleetEntryName, proFsm);
+            }
 
-### 3. Replace `_HandleTrimFill` cleanup tail (current lines 444-457)
+            reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
+            AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
 
-- Within `ProcessOnExecution_HandleTrimFill`, in the `else` branch entered when `remainingAfterTrim <= 0`, KEEP the `Print(string.Format("TRIM FLATTEN: Position {0} fully closed. Cancelling stop.", entryName));` line VERBATIM at the top of the else branch.
-- After that Print, replace the next 12 statements with: `ProcessOnExecution_FinalizeFullClose(entryName);`.
-- Do NOT touch `previousQty`, `remainingAfterTrim`, `TRIM EXECUTION:` Print, `STOP INTEGRITY:` Print, `UpdateStopQuantity` call.
-- Acceptance: parent ≤ 9 CYC.
+            int _poolSlotIndexLmt = -1;
+            Order[] _proxyOrdersLmt = null;
+            {
+                var _claimedLmt = _photonPool.Claim();
+                if (_claimedLmt.Orders != null)
+                {
+                    _proxyOrdersLmt = _claimedLmt.Orders;
+                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
+                }
+                else
+                {
+                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
+                    _poolSlotIndexLmt = -1;
+                }
+            }
+            _proxyOrdersLmt[0] = entry;
 
-### 4. Add new predicate: `HasPendingEntryForAcct(string flatAcctName)`
+            if (_poolSlotIndexLmt >= 0)
+            {
+                _photonSideband[_poolSlotIndexLmt].Account        = acct;
+                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
+                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
+                Thread.MemoryBarrier();
+            }
 
-- Location: insert immediately AFTER `HandleFlatPosition_SyncExpected` (around current line 117), keeping it spatially adjacent to its only caller.
-- Signature: `private bool HasPendingEntryForAcct(string flatAcctName)`.
-- Body owns the `foreach (var kvp in entryOrders.ToArray())` scan from current lines 75-87 verbatim: `IsOrderTerminal(ord.OrderState)` negation + `activePositions.TryGetValue` + `pos.ExecutingAccount.Name == flatAcctName` test, returning `true` on first hit, `false` if loop exits.
-- Use the same `var ord = kvp.Value;` local style and same null-guards as today (no semantic change).
-- Acceptance: ≤ 20 LOC, < 5 CYC.
+            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
+            {
+                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                StopPrice     = 0,
+                SignalTicks   = DateTime.UtcNow.Ticks,
+                PoolSlotIndex = _poolSlotIndexLmt,
+                OrderCount    = 1,
+                Quantity      = followerQty,
+                TargetCount   = 0,
+                Action        = (int)action,
+                ReservedDelta = reservedDelta
+            };
+            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
 
-### 5. Add new predicate: `HasUnfilledActivePositionForAcct(string flatAcctName)`
+            Interlocked.Increment(ref _pendingFleetDispatchCount);
 
-- Location: insert immediately after the predicate from Step 4.
-- Signature: `private bool HasUnfilledActivePositionForAcct(string flatAcctName)`.
-- Body owns the `foreach (var kvp in activePositions.ToArray())` scan from current lines 92-101 verbatim: `kvp.Value.ExecutingAccount.Name == flatAcctName && !kvp.Value.EntryFilled` test, returning `true` on first hit, `false` if loop exits.
-- Acceptance: ≤ 20 LOC, < 5 CYC.
+            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
+            {
+                if (_photonMmioMirror != null)
+                {
+                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
+                }
+            }
+            else
+            {
+                if (_poolSlotIndexLmt >= 0)
+                {
+                    Order[] legacyOrdersLmt = new Order[] { entry };
+                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
+                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
+                    _proxyOrdersLmt = legacyOrdersLmt;
+                }
+                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
+                {
+                    Account = acct,
+                    Orders = _proxyOrdersLmt,
+                    FleetEntryName = fleetEntryName,
+                    ExpectedKey = expectedKey,
+                    ReservedDelta = reservedDelta,
+                    SignalTicks = DateTime.UtcNow.Ticks
+                });
+            }
+            syncPending         = false;
+            reservedDelta       = 0;
+            registeredForCleanup = false;
 
-### 6. Slim `HandleFlatPosition_SyncExpected` (lines 66-117)
+            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
+                acct.Name));
+        }
+```
 
-- Keep the outer `if (!string.IsNullOrEmpty(flatAcctName))` guard, the `flatExpKey` derivation, and the `bool hasSyncPending = IsDispatchSyncPending(flatExpKey);` call exactly as today.
-- Replace the two inline `foreach` scans with: `bool hasPendingEntry = HasPendingEntryForAcct(flatAcctName);` followed by `bool hasActivePositionForAcct = false; if (!hasPendingEntry) { hasActivePositionForAcct = HasUnfilledActivePositionForAcct(flatAcctName); }` — preserves the existing short-circuit (don't pay the 2nd scan if the 1st already produced `true`).
-- Keep the decision `if (hasPendingEntry || hasActivePositionForAcct || hasSyncPending)` at the parent.
-- Keep BOTH Print strings byte-identical:
-  - `[OnPositionUpdate] H-14 SKIP: {flatExpKey} broker=Flat but {skipReason} -- not resetting expectedPositions`
-  - `[OnPositionUpdate] expectedPositions cleared for {flatExpKey} (position flat)`
-- Keep `SetExpectedPositionLocked(flatExpKey, 0);` ahead of the second Print.
-- Acceptance: parent ≤ 8 CYC.
-
-### 7. Adjacent fixes (scope-limited to touched lines)
-
-- Brace standardization: ensure every single-line `if`/`else` body inside the three new helpers is wrapped in `{ ... }` (Codacy/StyleCop alignment with Phase 5 T6 precedent). Apply ONLY inside the new helpers and inside the modified else-branches of `_HandleTargetFill`/`_HandleTrimFill`.
-- `DateTime.Now`: none exist in touched lines — no rewrite required; gate is satisfied trivially.
-- Do NOT mutate whitespace, line endings, or formatting outside the contiguous touched ranges (AGENTS.md Whitespace ban + 150 KB diff cap).
-
-### 8. Out-of-scope guardrails (explicit do-not-touch list)
-
-| Symbol / Region | File / Lines | Why |
-| --- | --- | --- |
-| `ProcessOnExecution_HandleStopFill` body | lines 315-363 | H5: `cancelledTargets` counter + gated `OCO: Cancelled` Print; H6: immediate-teardown semantics distinct from Target/Trim |
-| `ProcessOnExecutionUpdate` dispatcher branch order | lines 207-255 | H4/B6: `Dedup -> TrackCompliance -> Stop_/T1-5_/Trim_ -> RunShadowCheck` ordering immutable |
-| `ProcessOnExecution_Dedup` / `_TrackCompliance` / `_ExtractEntryName` / `_RunShadowCheck` | lines 257-313, 461-464 | already < 20 CYC; verify only |
-| `OnPositionUpdate` / `OnExecutionUpdate` thin shells | lines 37-44, 192-205 | NT8 broker thread capture pattern locked |
-| `BroadcastSyncTargetState` | lines 168-188 | already < 20 CYC |
-| `HandleFlatPosition_ReconcileOrphans` / `HandleFlatPosition_CleanupActivePositions` | lines 119-165 | already lean; not flagged |
-| MOVE-SYNC summary doc-comment block | lines 466-475 | unrelated docstring |
-
-### 9. Verification gates (run in order, all must pass)
-
-| Gate | Command | Expected |
-| --- | --- | --- |
-| File hotspot delta | `python scripts/csharp_hotspots.py | findstr Orders.Callbacks.Execution` | new helpers visible; parent CYCs ≤ targets in ticket |
-| Visual diff | `git diff src/V12_002.Orders.Callbacks.Execution.cs` | zero string-literal mutation outside new helpers; no whitespace bleed |
-| Build | `dotnet build .\Linting.csproj` | clean (no new warnings/errors) |
-| ASCII | `python check_ascii.py` on touched file | PASS |
-| Lock scan | `grep -rn "lock(" src/V12_002.Orders.Callbacks.Execution.cs` | zero matches |
-| Print fidelity | `grep -cn "OCO: Cancelled" src/V12_002.Orders.Callbacks.Execution.cs` | == 1 |
-| Helper presence | `grep -cn "FinalizeFullClose" src/V12_002.Orders.Callbacks.Execution.cs` | == 3 (1 decl + 2 callers) |
-| Helper presence | `grep -cn "HasPendingEntryForAcct\|HasUnfilledActivePositionForAcct" src/V12_002.Orders.Callbacks.Execution.cs` | == 4 (2 decls + 2 callers) |
-| Clock drift | `grep -cn "DateTime.Now" src/V12_002.Orders.Callbacks.Execution.cs` | does NOT increase from baseline (0) |
-| Hard-link sync | `powershell -File .\deploy-sync.ps1` | EXIT 0 |
-| Lint regression | `powershell -File .\scripts\lint.ps1` | delta = 0 |
-
-### 10. PR description checklist
-
-- Title: `T2.A — ProcessOnExecutionUpdate cluster: extract FinalizeFullClose + SyncExpected predicates`.
-- Call out **deliberate hardening**: `_HandleTargetFill` now also decrements `pendingReplacementCount` (matching `_HandleTrimFill` superset semantics). State this is intentional, sourced from the ticket guardrail.
-- Reference: Refactoring Analysis §1.2 + risk hotspots H4, H5, H6, H11; Refactoring Approach §3.2 T2.A + invariants B1, B5, B6 + D1, D2, D5.
-- Confirm no changes to `_HandleStopFill`, dispatcher ordering, or any out-of-scope symbol per Step 8.
-- Attach `csharp_hotspots.py` before/after delta showing file-level CYC drop of ~10-15.
+## Stage P5: Verification & Deploy
+1. **CYC Audit**: Run `python scripts/complexity_audit.py` -> Verify CYC < 20.
+2. **MemoryBarrier Count**: Verify exactly 1 `Thread.MemoryBarrier()` in the new helper.
+3. **Hard-Link Sync**: Run `powershell -File .\deploy-sync.ps1`.
+4. **NinjaTrader Gate**: Press F5 and verify `BUILD_TAG` 1111.007.

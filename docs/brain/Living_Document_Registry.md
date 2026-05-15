@@ -29,10 +29,32 @@ Long-term strategic documents governing the codebase and workflow.
 Dynamic documents used for the current implementation cycle.
 
 *   [task.md](task.md) - The current active mission status and ticket tracking.
+*   [T2: ExecuteOnExecutionUpdate_CIT_Repair](phase7_sprint5_t2.md) - COMPLETE
+*   [T3: ExecuteSmartDispatchEntry Extraction](phase7_sprint5_t03_ExecuteSmartDispatchEntry.md) - COMPLETE
+*   [T4: SubmitBracketOrders Extraction](phase7_sprint5_t04_SubmitBracketOrders.md) - COMPLETE
+*   [T5: MoveSpecificTarget CYC Reduction](phase7_sprint5_t05_MoveSpecificTarget.md) - PARKED (superseded by Epic Phase 7 ticket queue)
+*   [T13: SweepBrokerOrders Extraction](phase7_sprint5_t13_SweepBrokerOrders.md) - COMPLETE (CYC 28→15)
+*   [T13: SweepBrokerOrders Acceptance](phase7_sprint5_t13_ACCEPTANCE_REPORT.md) - ACCEPTED
+*   [T14: BuildUiLivePositionSnapshot Extraction](phase7_sprint5_t14_BuildUiLivePositionSnapshot.md) - COMPLETE (CYC 20→2)
+*   [T14: BuildUiLivePositionSnapshot Acceptance](phase7_sprint5_t14_ACCEPTANCE_REPORT.md) - ACCEPTED
+*   [T15: ExecuteWatchdogDirectFallback Extraction](phase7_sprint5_t15_ExecuteWatchdogDirectFallback.md) - COMPLETE (CYC 20→3)
+*   [T15: ExecuteWatchdogDirectFallback Acceptance](phase7_sprint5_t15_ACCEPTANCE_REPORT.md) - ACCEPTED
+*   [T16: CreateNewStopOrder Extraction](phase7_sprint5_t16_CreateNewStopOrder.md) - COMPLETE (CYC 21->6)
 *   [implementation_plan.md](implementation_plan.md) - Surgical implementation steps for the active engineer.
 *   [forensics_report.md](forensics_report.md) - Root cause analysis and technical evidence.
 *   [mini-spec.md](mini-spec.md) - Technical requirements and metabolic design for the active mission.
 *   [walkthrough.md](walkthrough.md) - Step-by-step verification and logic walkthrough for reviewers.
+
+### MP-0: Dictionary Dispatch Conversion (COMPLETE 2026-05-15)
+*   [forensics_mp0_dispatch.md](forensics_mp0_dispatch.md) - Source-verified audit: 14 candidates reviewed, 2 confirmed, 12 disqualified with reasoning.
+*   [mp0_implementation_plan.md](mp0_implementation_plan.md) - Dict dispatch pattern spec (Action delegates, Init_Services init, zero-alloc constraints).
+*   [mp0_completion_report.md](mp0_completion_report.md) - Mission acceptance: CYC 30->6, F5 PASS, BUILD_TAG 1111.007-mphase-mp0.
+
+### MP-1: SIMA Lifecycle Cluster (COMPLETE 2026-05-15)
+*   [mp1_sima_lifecycle_bob_prompt.md](../../../brain/87ca7479-83b5-4a9b-bcb3-ae6327b87852/artifacts/mp1_sima_lifecycle_bob_prompt.md) - Source-verified mission brief: 3 tickets confirmed, 7 disqualified.
+*   Tickets: MP1-A HydrateFSM_LinkBracketOrders (loop consolidation), MP1-B RecoverFSM_LinkRecoveredBrackets (loop consolidation), MP1-C HydrateExpectedPositionsFromBroker (helper extraction).
+*   F5 PASS 2026-05-15 11:58 Eastern | Logic Audit 1-9 PASS | Deploy-sync 29,938 chars.
+
 
 ---
 
@@ -55,4 +77,4 @@ Design decisions and inspiration for the project's evolution.
 
 ---
 **Registry Status**: MAINTAINED
-**Last Update**: 2026-05-09
+**Last Update**: 2026-05-15 (MP-1 SIMA Lifecycle complete; F5 PASS 11:58 Eastern; Logic Audit 1-9 PASS; MP-2 Watch List Cluster 2 queued)

@@ -93,6 +93,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             int leaderLongMaxLevel = 0;
             int leaderShortMaxLevel = 0;
 
+            FleetSync_FindLeaderMaxLevels(positionSnapshot, out leaderLongMaxLevel, out leaderShortMaxLevel);
+
+            // V12.12: Diagnostic -- log leader trail levels for fleet sync visibility
+            if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
+                Print($"[SIMA] Fleet Sync: Leader trail levels -- Long={leaderLongMaxLevel}, Short={leaderShortMaxLevel}");
+
+            // Phase 2: Sync lagging followers UP to the leader's level
+            if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
+            {
+                FleetSync_SyncFollowersToLevel(positionSnapshot, leaderLongMaxLevel, leaderShortMaxLevel);
+            }
+        }
+
+        private void FleetSync_FindLeaderMaxLevels(
+            KeyValuePair<string, PositionInfo>[] positionSnapshot,
+            out int leaderLongMaxLevel,
+            out int leaderShortMaxLevel)
+        {
+            leaderLongMaxLevel = 0;
+            leaderShortMaxLevel = 0;
+
             // Phase 1: Find the highest trail level among leader positions, by direction
             foreach (var kvp in positionSnapshot)
             {
@@ -104,46 +125,44 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else if (ldr.Direction == MarketPosition.Short)
                     leaderShortMaxLevel = Math.Max(leaderShortMaxLevel, ldr.CurrentTrailLevel);
             }
+        }
 
-            // V12.12: Diagnostic -- log leader trail levels for fleet sync visibility
-            if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
-                Print($"[SIMA] Fleet Sync: Leader trail levels -- Long={leaderLongMaxLevel}, Short={leaderShortMaxLevel}");
-
-            // Phase 2: Sync lagging followers UP to the leader's level
-            if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
+        private void FleetSync_SyncFollowersToLevel(
+            KeyValuePair<string, PositionInfo>[] positionSnapshot,
+            int leaderLongMaxLevel,
+            int leaderShortMaxLevel)
+        {
+            foreach (var kvp in positionSnapshot)
             {
-                foreach (var kvp in positionSnapshot)
+                string entryName2 = kvp.Key;
+                PositionInfo fol = kvp.Value;
+
+                if (!fol.IsFollower) continue;
+                if (!fol.EntryFilled || !fol.BracketSubmitted) continue;
+                if (!activePositions.ContainsKey(entryName2)) continue;
+
+                int targetLevel = (fol.Direction == MarketPosition.Long)
+                    ? leaderLongMaxLevel
+                    : leaderShortMaxLevel;
+
+                // V12.12: Guard -- skip if no leader exists for this direction (targetLevel==0)
+                if (targetLevel == 0) continue;
+
+                // Only sync UP -- never regress a follower already at a higher level
+                if (fol.CurrentTrailLevel >= targetLevel) continue;
+
+                double syncStopPrice = CalculateStopForLevel(fol, targetLevel);
+
+                // Only move if it's a more protective stop
+                bool isBetter = (fol.Direction == MarketPosition.Long)
+                    ? syncStopPrice > fol.CurrentStopPrice
+                    : syncStopPrice < fol.CurrentStopPrice;
+
+                if (isBetter)
                 {
-                    string entryName2 = kvp.Key;
-                    PositionInfo fol = kvp.Value;
-
-                    if (!fol.IsFollower) continue;
-                    if (!fol.EntryFilled || !fol.BracketSubmitted) continue;
-                    if (!activePositions.ContainsKey(entryName2)) continue;
-
-                    int targetLevel = (fol.Direction == MarketPosition.Long)
-                        ? leaderLongMaxLevel
-                        : leaderShortMaxLevel;
-
-                    // V12.12: Guard -- skip if no leader exists for this direction (targetLevel==0)
-                    if (targetLevel == 0) continue;
-
-                    // Only sync UP -- never regress a follower already at a higher level
-                    if (fol.CurrentTrailLevel >= targetLevel) continue;
-
-                    double syncStopPrice = CalculateStopForLevel(fol, targetLevel);
-
-                    // Only move if it's a more protective stop
-                    bool isBetter = (fol.Direction == MarketPosition.Long)
-                        ? syncStopPrice > fol.CurrentStopPrice
-                        : syncStopPrice < fol.CurrentStopPrice;
-
-                    if (isBetter)
-                    {
-                        UpdateStopOrder(entryName2, fol, syncStopPrice, targetLevel);
-                        Print(string.Format("FLEET SYNC: {0} synced to Level {1} -> Stop {2:F2} (Leader advanced)",
-                            entryName2, targetLevel, syncStopPrice));
-                    }
+                    UpdateStopOrder(entryName2, fol, syncStopPrice, targetLevel);
+                    Print(string.Format("FLEET SYNC: {0} synced to Level {1} -> Stop {2:F2} (Leader advanced)",
+                        entryName2, targetLevel, syncStopPrice));
                 }
             }
         }
@@ -194,54 +213,45 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // V8.2: TREND Entry 1 - starts with fixed 2pt stop, switches to EMA9 trail when price crosses EMA
             if (pos.IsTRENDTrade && pos.IsTRENDEntry1 && !pos.IsRMATrade)
-            {
-                // V8.2: Use stored ema9 instance
-                double tickPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                double ema9Live = ema9 != null ? ema9[0] : Close[0];
-                double currentPrice = tickPrice;
+                return TrailHandler_TREND_E1(entryName, pos);
 
-                // Check if price has crossed EMA9 in our favor
-                bool priceInFavor = pos.Direction == MarketPosition.Long
-                    ? currentPrice > ema9Live  // LONG: price above EMA9
-                    : currentPrice < ema9Live; // SHORT: price below EMA9
-
-                // If not yet trailing and price crossed EMA in our favor, activate trailing
-                if (!pos.Entry1TrailActivated && priceInFavor)
-                {
-                    pos.Entry1TrailActivated = true;
-                    Print(string.Format("TREND E1: Switching to EMA9 trail (Price={0:F2} crossed EMA9={1:F2})",
-                        currentPrice, ema9Live));
-                }
-
-                // If trailing is activated, manage the EMA9 trail
-                if (pos.Entry1TrailActivated)
-                {
-                    double trendStop = pos.Direction == MarketPosition.Long
-                        ? ema9Live - (currentATR * TRENDEntry1ATRMultiplier)  // V8.31: Uses E1 specific multiplier
-                        : ema9Live + (currentATR * TRENDEntry1ATRMultiplier);
-
-                    bool shouldUpdate = pos.Direction == MarketPosition.Long
-                        ? trendStop > pos.CurrentStopPrice
-                        : trendStop < pos.CurrentStopPrice;
-
-                    if (shouldUpdate)
-                    {
-                        UpdateStopOrder(entryName, pos, trendStop, pos.CurrentTrailLevel);
-                        Print(string.Format("TREND E1 TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
-                        trendStop, ema9Live, TRENDEntry1ATRMultiplier));
-                        }
-                        }
-                        return true;
-                        }
             // V8.2: TREND Entry 2 uses EMA15 trailing stop (1.1x ATR from live EMA15)
             if (pos.IsTRENDTrade && pos.IsTRENDEntry2 && !pos.IsRMATrade)
-            {
-                // V8.2: Use stored ema15 instance
-                double ema15Live = ema15 != null ? ema15[0] : Close[0];
+                return TrailHandler_TREND_E2(entryName, pos);
 
+            // V8.4: RETEST trade - Phase 1: Wait for price to cross 9 EMA, Phase 2: Trail at 9 EMA
+            if (pos.IsRetestTrade && !pos.IsRMATrade)
+                return TrailHandler_RETEST(entryName, pos);
+
+            return false;
+        }
+
+        private bool TrailHandler_TREND_E1(string entryName, PositionInfo pos)
+        {
+            // V8.2: Use stored ema9 instance
+            double tickPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+            double ema9Live = ema9 != null ? ema9[0] : Close[0];
+            double currentPrice = tickPrice;
+
+            // Check if price has crossed EMA9 in our favor
+            bool priceInFavor = pos.Direction == MarketPosition.Long
+                ? currentPrice > ema9Live  // LONG: price above EMA9
+                : currentPrice < ema9Live; // SHORT: price below EMA9
+
+            // If not yet trailing and price crossed EMA in our favor, activate trailing
+            if (!pos.Entry1TrailActivated && priceInFavor)
+            {
+                pos.Entry1TrailActivated = true;
+                Print(string.Format("TREND E1: Switching to EMA9 trail (Price={0:F2} crossed EMA9={1:F2})",
+                    currentPrice, ema9Live));
+            }
+
+            // If trailing is activated, manage the EMA9 trail
+            if (pos.Entry1TrailActivated)
+            {
                 double trendStop = pos.Direction == MarketPosition.Long
-                    ? ema15Live - (currentATR * TRENDEntry2ATRMultiplier)
-                    : ema15Live + (currentATR * TRENDEntry2ATRMultiplier);
+                    ? ema9Live - (currentATR * TRENDEntry1ATRMultiplier)  // V8.31: Uses E1 specific multiplier
+                    : ema9Live + (currentATR * TRENDEntry1ATRMultiplier);
 
                 bool shouldUpdate = pos.Direction == MarketPosition.Long
                     ? trendStop > pos.CurrentStopPrice
@@ -250,56 +260,75 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (shouldUpdate)
                 {
                     UpdateStopOrder(entryName, pos, trendStop, pos.CurrentTrailLevel);
-                    Print(string.Format("TREND E2 TRAIL: Stop moved to {0:F2} (EMA15={1:F2} - {2}xATR)",
-                        trendStop, ema15Live, TRENDEntry2ATRMultiplier));
-                }
-                return true;
-            }
-
-            // V8.4: RETEST trade - Phase 1: Wait for price to cross 9 EMA, Phase 2: Trail at 9 EMA
-            if (pos.IsRetestTrade && !pos.IsRMATrade)
-            {
-                double tickPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
-                double ema9Live = ema9 != null ? ema9[0] : Close[0];
-                double currentPrice = tickPrice;
-
-                // Phase 1: Wait for price to cross EMA9 in our favor
-                if (!pos.RetestTrailActivated)
-                {
-                    bool priceInFavor = pos.Direction == MarketPosition.Long
-                        ? currentPrice > ema9Live  // LONG: price above EMA9
-                        : currentPrice < ema9Live; // SHORT: price below EMA9
-
-                    if (priceInFavor)
-                    {
-                        pos.RetestTrailActivated = true;
-                        Print(string.Format("RETEST: Switching to EMA9 trail (Price={0:F2} crossed EMA9={1:F2})",
-                            currentPrice, ema9Live));
+                    Print(string.Format("TREND E1 TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
+                    trendStop, ema9Live, TRENDEntry1ATRMultiplier));
                     }
-                    // Stay at fixed stop until price crosses EMA
+                    }
                     return true;
-                }
+        }
 
-                // Phase 2: Trail at 9 EMA - 1.1x ATR (locked in, only moves favorably)
-                double retestStop = pos.Direction == MarketPosition.Long
-                    ? ema9Live - (currentATR * RetestATRMultiplier)
-                    : ema9Live + (currentATR * RetestATRMultiplier);
+        private bool TrailHandler_TREND_E2(string entryName, PositionInfo pos)
+        {
+            // V8.2: Use stored ema15 instance
+            double ema15Live = ema15 != null ? ema15[0] : Close[0];
 
-                // Only update if better than current stop
-                bool shouldUpdate = pos.Direction == MarketPosition.Long
-                    ? retestStop > pos.CurrentStopPrice
-                    : retestStop < pos.CurrentStopPrice;
+            double trendStop = pos.Direction == MarketPosition.Long
+                ? ema15Live - (currentATR * TRENDEntry2ATRMultiplier)
+                : ema15Live + (currentATR * TRENDEntry2ATRMultiplier);
 
-                if (shouldUpdate)
+            bool shouldUpdate = pos.Direction == MarketPosition.Long
+                ? trendStop > pos.CurrentStopPrice
+                : trendStop < pos.CurrentStopPrice;
+
+            if (shouldUpdate)
+            {
+                UpdateStopOrder(entryName, pos, trendStop, pos.CurrentTrailLevel);
+                Print(string.Format("TREND E2 TRAIL: Stop moved to {0:F2} (EMA15={1:F2} - {2}xATR)",
+                    trendStop, ema15Live, TRENDEntry2ATRMultiplier));
+            }
+            return true;
+        }
+
+        private bool TrailHandler_RETEST(string entryName, PositionInfo pos)
+        {
+            double tickPrice = lastKnownPrice > 0 ? lastKnownPrice : Close[0];
+            double ema9Live = ema9 != null ? ema9[0] : Close[0];
+            double currentPrice = tickPrice;
+
+            // Phase 1: Wait for price to cross EMA9 in our favor
+            if (!pos.RetestTrailActivated)
+            {
+                bool priceInFavor = pos.Direction == MarketPosition.Long
+                    ? currentPrice > ema9Live  // LONG: price above EMA9
+                    : currentPrice < ema9Live; // SHORT: price below EMA9
+
+                if (priceInFavor)
                 {
-                    UpdateStopOrder(entryName, pos, retestStop, pos.CurrentTrailLevel);
-                    Print(string.Format("RETEST TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
-                        retestStop, ema9Live, RetestATRMultiplier));
+                    pos.RetestTrailActivated = true;
+                    Print(string.Format("RETEST: Switching to EMA9 trail (Price={0:F2} crossed EMA9={1:F2})",
+                        currentPrice, ema9Live));
                 }
+                // Stay at fixed stop until price crosses EMA
                 return true;
             }
 
-            return false;
+            // Phase 2: Trail at 9 EMA - 1.1x ATR (locked in, only moves favorably)
+            double retestStop = pos.Direction == MarketPosition.Long
+                ? ema9Live - (currentATR * RetestATRMultiplier)
+                : ema9Live + (currentATR * RetestATRMultiplier);
+
+            // Only update if better than current stop
+            bool shouldUpdate = pos.Direction == MarketPosition.Long
+                ? retestStop > pos.CurrentStopPrice
+                : retestStop < pos.CurrentStopPrice;
+
+            if (shouldUpdate)
+            {
+                UpdateStopOrder(entryName, pos, retestStop, pos.CurrentTrailLevel);
+                Print(string.Format("RETEST TRAIL: Stop moved to {0:F2} (EMA9={1:F2} - {2}xATR)",
+                    retestStop, ema9Live, RetestATRMultiplier));
+            }
+            return true;
         }
 
         private void ManageTrail_RunPointBasedTrailing(string entryName, PositionInfo pos, ref double newStopPrice, ref int newTrailLevel)

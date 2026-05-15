@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public static class Constants
         {
             public const string StrategyName = "V12_002";
-            public const string Version = "Build 1111.005-v28.0-b984";
+            public const string Version = "Build 1111.007-phase7-tG";
         }
     }
 }

@@ -28,3 +28,16 @@ NEVER use `<<<<<<< REPLACE`, `=======`, or `>>>>>>>` markers inside `write_to_fi
 - Use `replace_file_content` with exact `TargetContent`.
 - Use `apply_diff` only when you are absolutely certain the diff syntax is supported by the specific tool instance.
 - If a tool call fails to modify the file, DO NOT report success. Immediately retry using a different surgical tool.
+
+### 7. Complexity Extraction Standards (Phase 7 Epic)
+All extracted sub-methods must adhere to the following metrics:
+- **Target Complexity**: CYC < 20 per method.
+- **Extraction Floor**: LOC >= 15 lines. (Deviations require explicit justification).
+- **Zero Logic Drift**: Do not optimize or "improve" logic during extraction. Pure structural movement only.
+
+### 8. Empty-Catch Exemption Table (T-Q1)
+When sweeping for empty `catch {}` blocks, the following sites are PERMANENTLY EXEMPT:
+- `src/V12_002.MetadataGuard.cs` -- 6x `catch { return true; }` = intentional fail-open guards on validation predicates.
+- `src/V12_002.Photon.MmioMirror.cs` -- 2x Dispose-pattern catches (best-effort cleanup, no re-throw needed).
+All other empty catches in src/ MUST be logged. Add `catch (Exception ex) { Print("[MODULE] <context>: " + ex.Message); }` with ASCII-only module tag.
+If a new Dispose-pattern site is found, document it with a one-line rationale comment and add to this table -- do NOT silently skip it.
