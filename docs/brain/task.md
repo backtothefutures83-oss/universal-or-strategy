@@ -135,11 +135,13 @@ execution-complexity methods, or single-action handlers. See `docs/brain/forensi
 ## NEXT PIPELINE
 | Step | Task | Status |
 | ---- | ---- | ------ |
-| PR-1 | Open PR: feature/phase7-sprint5-extraction -> main | NEXT |
-| PR-2 | GitHub audit (DNA compliance, diff limit, ASCII gate) | PENDING |
-| PR-3 | PR closure / merge on audit pass | PENDING |
-| PERF | Performance profiling (ShouldSkipFleet_RunHealthCheck hot-path) | PENDING |
-| JS-1 | Jane Street upgrade audit -- identify + implement remaining opportunities | PENDING |
+| PR-1 | Open PR: feature/phase7-sprint5-extraction -> main | ✅ COMPLETE (2026-05-15) |
+| PR-2 | GitHub audit (DNA compliance, diff limit, ASCII gate) | ✅ COMPLETE -- 35 threads resolved, advisory-only failures |
+| PR-3 | PR closure / merge on audit pass | ✅ MERGED squash #102 -> main (2026-05-15) |
+| T-W1-Perf | ShouldSkipFleet_RunHealthCheck: LINQ -> for-loop (2 enumerator allocs) | 🔵 IN PROGRESS |
+| GAP-5 | CRC16 -> debug sequence counter on Photon ring slots | NEXT |
+| GAP-2 | SPSC Ring Buffer full integration (3-4 Bob CLI tickets) | QUEUED -- Director approved |
+| JS-IMPL-5 | PositionInfo struct conversion | ❌ DEFERRED -- <10 trades/session, GC impact immeasurable |
 
 ### Phase 7 UI Epic Ticket Queue
 
