@@ -107,7 +107,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (currentATR <= 0) return;
 
             // V12.45 RETRY COOLDOWN: If a ChangeOrder failed recently, back off for 500ms
-            // This prevents rapid-fire rejections that can cascade into broker throttling
             if ((DateTime.Now - _lastSyncFailureTime).TotalMilliseconds < 500) return;
 
             foreach (var kvp in activePositions.ToArray())
@@ -115,97 +114,133 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PositionInfo pos = kvp.Value;
                 string entryName = kvp.Key;
 
-                // Only sync UNFILLED entries
-                if (pos.EntryFilled) continue;
-
-                // Skip modes that don't use ATR-based stops
-                if (pos.IsFFMATrade || pos.IsMOMOTrade) continue;
-
-                // V1102Q [SOVEREIGN-DRIFT]: Followers skip active ATR-sync. 
-                // They purely follow the master-dispatched quantity.
-                if (pos.IsFollower) continue;
-
-                // Get the entry order
                 Order entryOrder;
                 if (!entryOrders.TryGetValue(entryName, out entryOrder)) continue;
-                if (entryOrder == null) continue;
 
-                // V12.45 ORDER STATE GUARD: Only modify orders in stable states
-                // Accepted = broker acknowledged, waiting for fill
-                // Working  = actively in the order book
-                // ChangePending = a ChangeOrder is already in-flight -- DO NOT send another
-                OrderState currentState = entryOrder.OrderState;
-                if (currentState != OrderState.Accepted && currentState != OrderState.Working)
-                {
-                    if (currentState == OrderState.ChangePending)
-                        Print($"[V12.45 SYNC] SKIP {entryName}: ChangeOrder already in-flight (ChangePending)");
+                if (!ShouldSyncPendingOrder(pos, entryOrder, entryName)) continue;
+
+                if (!CalculateSyncParameters(pos, entryOrder, entryName, out int newQty, out double newStopDist,
+                    out bool needsQtyChange, out int expectedDelta, out string acctName, out string syncLog))
                     continue;
-                }
 
-                // [RACE-05]: Compute sizing math + flicker check + stop-price update atomically under stateLock.
-                // Prevents volatility drift where currentATR changes between math and state mutation.
-                // ChangeOrder broker call is staged outside the lock (broker API must not hold our lock).
-                int    newQty;
-                bool   needsQtyChange;
-                string syncLog;
-                // [M8.2 SIZING-SYNC]: Capture expected-position delta for Live Sync quantity changes.
-                int    expectedDelta = 0;
-                string acctName     = null;
+                ExecuteOrderSync(entryOrder, newQty, needsQtyChange, expectedDelta, acctName, syncLog, entryName);
+            }
+        }
 
-                double atrMult    = GetATRMultiplierForPosition(pos);
-                double newStopDist = CalculateATRStopDistance(atrMult);
-                newQty            = CalculatePositionSize(newStopDist);
+        /// <summary>
+        /// V12.45: Guard logic for SyncPendingOrders -- determines if an order should be synced.
+        /// Returns false if order should be skipped (unfilled, wrong mode, wrong state, etc.)
+        /// </summary>
+        private bool ShouldSyncPendingOrder(PositionInfo pos, Order entryOrder, string entryName)
+        {
+            // Only sync UNFILLED entries
+            if (pos.EntryFilled) return false;
 
-                // V12.45 TICK-AWARE FLICKER CHECK: use tickSize for meaningful comparison
-                double oldCeilingStop = Math.Ceiling(Math.Abs(pos.EntryPrice - pos.CurrentStopPrice));
-                double stopDelta      = Math.Abs(newStopDist - oldCeilingStop);
-                if (stopDelta < tickSize && newQty == pos.TotalContracts)
-                    continue;  // No material change -- skip (releases lock before continuing)
+            // Skip modes that don't use ATR-based stops
+            if (pos.IsFFMATrade || pos.IsMOMOTrade) return false;
 
-                double newStopPrice = pos.Direction == MarketPosition.Long
-                    ? pos.EntryPrice - newStopDist
-                    : pos.EntryPrice + newStopDist;
+            // V1102Q [SOVEREIGN-DRIFT]: Followers skip active ATR-sync.
+            // They purely follow the master-dispatched quantity.
+            if (pos.IsFollower) return false;
 
-                // Stop prices update immediately -- they reflect intent and are safe before broker confirmation.
-                pos.CurrentStopPrice = newStopPrice;
-                pos.InitialStopPrice = newStopPrice;
+            if (entryOrder == null) return false;
 
-                // [VOLATILITY-01]: TotalContracts / distribution are NOT updated here.
-                // They are committed in OnOrderUpdate when broker confirms the ChangeOrder (Accepted state).
-                // This prevents Desync-01 if the broker rejects the size change.
-                needsQtyChange = newQty != entryOrder.Quantity;
+            // V12.45 ORDER STATE GUARD: Only modify orders in stable states
+            // Accepted = broker acknowledged, waiting for fill
+            // Working  = actively in the order book
+            // ChangePending = a ChangeOrder is already in-flight -- DO NOT send another
+            OrderState currentState = entryOrder.OrderState;
+            if (currentState != OrderState.Accepted && currentState != OrderState.Working)
+            {
+                if (currentState == OrderState.ChangePending)
+                    Print($"[V12.45 SYNC] SKIP {entryName}: ChangeOrder already in-flight (ChangePending)");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// V12.45: Calculation logic for SyncPendingOrders -- computes new qty/stop and determines if sync needed.
+        /// Returns false if no material change detected (flicker protection).
+        /// </summary>
+        private bool CalculateSyncParameters(PositionInfo pos, Order entryOrder, string entryName,
+            out int newQty, out double newStopDist, out bool needsQtyChange,
+            out int expectedDelta, out string acctName, out string syncLog)
+        {
+            // [RACE-05]: Compute sizing math + flicker check + stop-price update atomically.
+            // Prevents volatility drift where currentATR changes between math and state mutation.
+            double atrMult = GetATRMultiplierForPosition(pos);
+            newStopDist = CalculateATRStopDistance(atrMult);
+            newQty = CalculatePositionSize(newStopDist);
+
+            // V12.45 TICK-AWARE FLICKER CHECK: use tickSize for meaningful comparison
+            double oldCeilingStop = Math.Ceiling(Math.Abs(pos.EntryPrice - pos.CurrentStopPrice));
+            double stopDelta = Math.Abs(newStopDist - oldCeilingStop);
+            if (stopDelta < tickSize && newQty == pos.TotalContracts)
+            {
+                // No material change -- skip
+                needsQtyChange = false;
+                expectedDelta = 0;
+                acctName = null;
+                syncLog = null;
+                return false;
+            }
+
+            double newStopPrice = pos.Direction == MarketPosition.Long
+                ? pos.EntryPrice - newStopDist
+                : pos.EntryPrice + newStopDist;
+
+            // Stop prices update immediately -- they reflect intent and are safe before broker confirmation.
+            pos.CurrentStopPrice = newStopPrice;
+            pos.InitialStopPrice = newStopPrice;
+
+            // [VOLATILITY-01]: TotalContracts / distribution are NOT updated here.
+            // They are committed in OnOrderUpdate when broker confirms the ChangeOrder (Accepted state).
+            needsQtyChange = newQty != entryOrder.Quantity;
+            expectedDelta = 0;
+            acctName = null;
+
+            if (needsQtyChange)
+            {
+                // [M8.2 SIZING-SYNC]: Mirror the quantity change into expectedPositions so Reaper
+                // sees the updated target size before the fill arrives.
+                int qtyDelta = newQty - entryOrder.Quantity;
+                expectedDelta = pos.Direction == MarketPosition.Long ? qtyDelta : -qtyDelta;
+                acctName = (pos.IsFollower && pos.ExecutingAccount != null)
+                    ? pos.ExecutingAccount.Name : Account.Name;
+            }
+
+            syncLog = $"[V12.45 SYNC] {entryName}: Stop {oldCeilingStop:F0}->{newStopDist:F0}pt | Qty {entryOrder.Quantity}->{newQty} | ATR={currentATR:F2}";
+            return true;
+        }
+
+        /// <summary>
+        /// V12.45: Execution logic for SyncPendingOrders -- performs ChangeOrder broker call with error handling.
+        /// </summary>
+        private void ExecuteOrderSync(Order entryOrder, int newQty, bool needsQtyChange,
+            int expectedDelta, string acctName, string syncLog, string entryName)
+        {
+            // ChangeOrder must be called outside stateLock -- broker API call.
+            try
+            {
                 if (needsQtyChange)
                 {
-                    // [M8.2 SIZING-SYNC]: Mirror the quantity change into expectedPositions so Reaper
-                    // sees the updated target size before the fill arrives.
-                    int qtyDelta    = newQty - entryOrder.Quantity;
-                    expectedDelta   = pos.Direction == MarketPosition.Long ? qtyDelta : -qtyDelta;
-                    acctName        = (pos.IsFollower && pos.ExecutingAccount != null)
-                                        ? pos.ExecutingAccount.Name : Account.Name;
+                    ChangeOrder(entryOrder, newQty, entryOrder.LimitPrice, entryOrder.StopPrice);
+                    // [M8.2 SIZING-SYNC]: Update expectedPositions only after ChangeOrder succeeds.
+                    // A failed ChangeOrder (caught below) will not leave a stale expectedPositions delta.
+                    AddExpectedPositionDeltaLocked(ExpKey(acctName), expectedDelta);
+                    // V12.Phantom-Fix [FIX-3]: Log only when a ChangeOrder is actually sent.
+                    // Unconditional Print on every bar created hundreds of no-op log lines
+                    // while a Limit order sat pending fill on tick/renko charts.
+                    Print(syncLog);
                 }
-                syncLog = $"[V12.45 SYNC] {entryName}: Stop {oldCeilingStop:F0}->{newStopDist:F0}pt | Qty {entryOrder.Quantity}->{newQty} | ATR={currentATR:F2}";
-
-                // ChangeOrder must be called outside stateLock -- broker API call.
-                try
-                {
-                    if (needsQtyChange)
-                    {
-                        ChangeOrder(entryOrder, newQty, entryOrder.LimitPrice, entryOrder.StopPrice);
-                        // [M8.2 SIZING-SYNC]: Update expectedPositions only after ChangeOrder succeeds.
-                        // A failed ChangeOrder (caught below) will not leave a stale expectedPositions delta.
-                        AddExpectedPositionDeltaLocked(ExpKey(acctName), expectedDelta);
-                        // V12.Phantom-Fix [FIX-3]: Log only when a ChangeOrder is actually sent.
-                        // Unconditional Print on every bar created hundreds of no-op log lines
-                        // while a Limit order sat pending fill on tick/renko charts.
-                        Print(syncLog);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // V12.45 RETRY COOLDOWN: Record failure time to prevent hammering
-                    _lastSyncFailureTime = DateTime.Now;
-                    Print($"[V12.45 SYNC] ERROR syncing {entryName}: {ex.Message} -- cooldown 500ms");
-                }
+            }
+            catch (Exception ex)
+            {
+                // V12.45 RETRY COOLDOWN: Record failure time to prevent hammering
+                _lastSyncFailureTime = DateTime.Now;
+                Print($"[V12.45 SYNC] ERROR syncing {entryName}: {ex.Message} -- cooldown 500ms");
             }
         }
 

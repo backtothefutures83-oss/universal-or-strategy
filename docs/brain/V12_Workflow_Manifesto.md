@@ -14,12 +14,14 @@ graph TD
     P0[P0: Forensic Intake] --> P1[P1: Vision & IBM Spec - Bob]
     P1 --> P2[P2: Traycer Epic & Arch Planning]
     P2 --> P3[P3: DNA & PR Audit - Arena AI]
-    P3 --> P4[P4: Recursive Execution - Bob/Codex]
+    P3 --> P3.5[P3.5: Plan Annotation - Plannotator]
+    P3.5 --> P4[P4: Recursive Execution - Bob/Codex]
     P4 --> P5[P5: Verification & Review]
     P5 --> P6[P6: AMAL Vetting]
     P6 --> P7[P7: Sign-off & Deploy]
     
     P3 -- FAIL --> P2
+    P3.5 -- REVISE --> P3
     P5 -- DRIFT --> P4
     P6 -- REGRESSION --> P4
 ```
@@ -29,6 +31,7 @@ graph TD
 *   **P1: Vision & IBM Spec (Bob)**: Using **Bob's Spec Kit** to define technical requirements and the "IBM-Standard Specification" for the mission.
 *   **P2: Traycer Epic & Arch Planning**: Formalizing the spec into a **Traycer Epic** and generating the `implementation_plan.md` (PLAN-ONLY) with the Architect.
 *   **P3: DNA & PR Audit (Arena AI)**: Mandatory adversarial review and consensus using **Arena AI** (Red Team) to verify lock-free, ASCII, and PR health before implementation.
+*   **P3.5: Plan Annotation (Plannotator)**: Annotating the approved `implementation_plan.md` with file-specific logic markers, line-precision targets, and DNA-enforcement triggers for the Engineer CLI.
 *   **P4: Execution**: Surgical implementation using the selected **Engineer CLI**.
 *   **P5: Verification**: Forensic check against the plan.
 *   **P6: AMAL Vetting**: Performance and allocation audit via `scripts/amal_harness.py`.
@@ -44,6 +47,7 @@ We leverage a distributed intelligence model to maximize productivity and effici
 | :--- | :--- | :--- | :--- |
 | **P1: Orchestrator** | Antigravity | Central Switchboard | Context management, tool routing, and mission oversight. |
 | **P3: Architect** | Claude Code | PLAN-ONLY | Structural design and implementation plans. **BANNED from `src/` edits.** |
+| **P3.5: Planner** | **Plannotator** | Plan Integration | Annotating implementation plans with surgical precision metadata. |
 | **P4: Surgical Engineer** | **IBM Bob CLI** | `v12-engineer` | SIMA extractions, God-Function splits, and complex C# refactors. |
 | **P4: Logic Engineer** | Codex CLI | `codex-rescue` | Logic hardening, Lock-free updates, and concurrent state repairs. |
 | **P4: Utility Specialist** | **Gemini CLI** | `yolo` | **Utility Specialist & Research Hub**. Handles non-`src/` tasks (docs, infra, configs), model-agnostic operations, **Official Web Research**, and **Video Synthesis** to conserve specialized tokens. |
@@ -58,7 +62,10 @@ To maintain architectural parity, ALL agents (including **Rovo Dev** and **Curso
 - **jCodemunch-MCP**: Primary suite for codebase navigation and forensic trace.
 - **Context7 CLI**: Specialist tool for deep documentation and API research.
 - **Graphify**: Universal knowledge graph layer.
+- **Plannotator**: High-precision plan annotation and metadata bridge.
 - **Nexus Bridge**: Inter-agent state relay.
+- **MultiCA**: Multi-Agent Control & Audit (Orchestration logic).
+- **Linear / GitHub**: Project management and source of truth.
 
 ### 🛰️ Traycer (Epic & Phase Management)
 *   **Epics**: High-level mission containers (e.g., `Phase 6 Hot Path Extraction`).

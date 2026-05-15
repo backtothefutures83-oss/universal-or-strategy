@@ -1,0 +1,12 @@
+# Bob Configuration - V12 Photon Strategy Safety Net
+# This file ensures Bob defaults to high-performance modes and auto-saves work.
+
+default_mode: advanced  # Use Claude 3.7 (Advanced) by default for v12 missions
+auto_apply: true        # Always save changes to disk (equivalent to --yes)
+checkpointing: true     # Enable automated safety backups before every edit
+
+# V12 Specific Overrides
+v12-engineer:
+  mode: advanced
+  apply: true
+  system_prompt_prefix: "You are in YOLO Engineering Mode. Follow V12 DNA strictly."

@@ -242,21 +242,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Duplicate FlattenAll removed - consolidated into line 4387 version
 
         /// <summary>
-        /// V12 SIMA: RMA Entry V2 - Places limit entry + bracket on the local chart account,
-        /// then iterates Account.All to place the same order on every fleet account matching AccountPrefix.
-        /// CRITICAL: Every account's entry order is registered in entryOrders AND activePositions
-        /// with a unique key (accountName + "_RMA") so ManageCIT can chase the entire fleet.
+        /// V12 SIMA: RMA Entry V2 - Helper 1: Validate all entry guards
         /// </summary>
-        private void ExecuteRMAEntryV2(double price, MarketPosition direction, int contracts)
+        private bool ValidateRMAEntryGuards(double price, int contracts, MarketPosition direction)
         {
-            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
-            if (isFlattenRunning) return;
+            // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten (INV-4.1)
+            if (isFlattenRunning) return false;
 
             // [A1]: Defensive guard -- caller must pre-calculate a valid quantity.
             if (contracts <= 0)
             {
                 Print(string.Format("[RMA] ExecuteRMAEntryV2 received invalid contracts={0}. Aborting entry.", contracts));
-                return;
+                return false;
             }
 
             // [923B-FIX-A]: Zero-price guard -- a Limit order at price=0 is treated as a Market order
@@ -266,7 +263,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (price <= 0)
             {
                 Print(string.Format("[RMA V2] ABORT: price={0:F2} is zero or negative. Refusing to submit Limit @ 0 -- would fill as Market. Ensure lastKnownPrice is valid before dispatching.", price));
-                return;
+                return false;
             }
 
             // Phase 6 [MG-D2]: MetadataGuard -- reject duplicate RMA dispatch signals.
@@ -274,8 +271,281 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (!MetadataGuardDuplicate(rmaSig, "RMA_V2"))
             {
                 Print("[RMA V2] (!) Duplicate dispatch rejected by MetadataGuard");
-                return;
+                return false;
             }
+
+            return true;
+        }
+
+        /// <summary>
+        /// V12 SIMA: RMA Entry V2 - Helper 2: Calculate bracket prices and distribution
+        /// </summary>
+        private struct RMABracketPrices
+        {
+            public double StopPrice;
+            public double T1Price, T2Price, T3Price, T4Price, T5Price;
+            public int Rt1, Rt2, Rt3, Rt4, Rt5;
+        }
+
+        private RMABracketPrices CalculateRMABracketPrices(double price, MarketPosition direction, int qty)
+        {
+            // [LEAK-01]: Use centralized ATR calculator (ceiling + min/max guards, fleet-ready).
+            double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
+            double stopPrice = (direction == MarketPosition.Long) ? price - stopDist : price + stopDist;
+            stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
+
+            // Universal Ladder: T(n)Type dropdown drives all target pricing.
+            double t1Price = CalculateTargetPrice(direction, price, 1);
+            double t2Price = CalculateTargetPrice(direction, price, 2);
+            double t3Price = CalculateTargetPrice(direction, price, 3);
+            double t4Price = CalculateTargetPrice(direction, price, 4);
+            double t5Price = CalculateTargetPrice(direction, price, 5);
+
+            // V12.1101E FLEET PARITY: calculate full 5-target distribution for both Master and Fleet.
+            int rt1, rt2, rt3, rt4, rt5;
+            GetTargetDistribution(qty, out rt1, out rt2, out rt3, out rt4, out rt5);
+
+            return new RMABracketPrices
+            {
+                StopPrice = stopPrice,
+                T1Price = t1Price,
+                T2Price = t2Price,
+                T3Price = t3Price,
+                T4Price = t4Price,
+                T5Price = t5Price,
+                Rt1 = rt1,
+                Rt2 = rt2,
+                Rt3 = rt3,
+                Rt4 = rt4,
+                Rt5 = rt5
+            };
+        }
+
+        /// <summary>
+        /// V12 SIMA: RMA Entry V2 - Helper 3: Submit local account entry (ATOMIC: INV-4.3)
+        /// </summary>
+        private bool SubmitLocalRMAEntry(
+            string baseSignal, OrderAction entryAction, int qty, double price,
+            MarketPosition direction, RMABracketPrices prices, string symmetryDispatchId)
+        {
+            string localKey = baseSignal;
+            Order entryOrder = SubmitOrderUnmanaged(0, entryAction, OrderType.Limit, qty, price, 0, "", localKey);
+            if (entryOrder != null)
+            {
+                SymmetryGuardRegisterMasterEntry(symmetryDispatchId, localKey);
+                // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (L1345).
+                entryOrders[localKey] = entryOrder;
+
+                PositionInfo pos = new PositionInfo
+                {
+                    SignalName = localKey,
+                    Direction = direction,
+                    TotalContracts = qty,
+                    T1Contracts = prices.Rt1,
+                    T2Contracts = prices.Rt2,
+                    T3Contracts = prices.Rt3,
+                    T4Contracts = prices.Rt4,
+                    T5Contracts = prices.Rt5,
+                    RemainingContracts = qty,
+                    EntryPrice = price,
+                    InitialStopPrice = prices.StopPrice,
+                    CurrentStopPrice = prices.StopPrice,
+                    Target1Price = prices.T1Price,
+                    Target2Price = prices.T2Price,
+                    Target3Price = prices.T3Price,
+                    Target4Price = prices.T4Price,
+                    Target5Price = prices.T5Price,
+                    EntryOrderType = OrderType.Limit,
+                    EntryFilled = false,
+                    BracketSubmitted = false, // V12.7: Brackets deferred until entry fills
+                    IsRMATrade = true
+                };
+                // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (L1345).
+                activePositions[localKey] = pos;
+
+                // V12.12: Register Master account in expectedPositions (was missing -- caused false Reaper desyncs)
+                int localDelta = (direction == MarketPosition.Long) ? qty : -qty;
+                AddExpectedPositionDeltaLocked(ExpKey(Account.Name), localDelta);
+                Print(string.Format("[SIMA] Master expectedPositions updated: {0} delta={1}", Account.Name, localDelta));
+
+                // V12.7: Do NOT submit stop/target here -- they will be submitted by
+                // SubmitBracketOrders() when the entry limit fills in OnOrderUpdate.
+                // Submitting them now would cause instant fills on marketable targets.
+
+                Print(string.Format("[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): {0} | Brackets deferred until fill", localKey));
+                return true;
+            }
+            else
+            {
+                Print("[SIMA RMA V2] ERROR: Local entry returned null");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// V12 SIMA: RMA Entry V2 - Helper 4: Process single fleet account (ATOMIC: INV-4.3)
+        /// </summary>
+        private bool ProcessSingleFleetRMAAccount(
+            Account acct, string baseSignal, OrderAction entryAction, int qty, double price,
+            MarketPosition direction, RMABracketPrices prices, string symmetryDispatchId,
+            StringBuilder dispatchLog)
+        {
+            // V12.8: Fleet Manager toggle -- skip if account NOT registered or explicitly disabled
+            if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
+            {
+                dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | Inactive", acct.Name));
+                return false;
+            }
+
+            // Consistency Lock
+            if (EnableConsistencyLock)
+            {
+                double dailyPL = acct.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
+                if (dailyPL >= MaxDailyProfitCap)
+                {
+                    dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | ConsistencyLock ${1:F2}", acct.Name, dailyPL));
+                    return false;
+                }
+            }
+
+            // [923B-FIX-B]: fleetKey declared outside try so catch can access it for dict rollback.
+            string fleetKey = acct.Name + "_RMA_" + baseSignal;
+            string expectedKey = ExpKey(acct.Name);
+            int reservedDelta = 0;
+            bool syncPending = false;
+            try
+            {
+                SymmetryGuardRegisterFollower(symmetryDispatchId, fleetKey);
+                string ocoId = fleetKey;
+
+                // V12.10: Submit ENTRY ONLY -- brackets deferred until fill (unified with leader)
+                Order fEntry = acct.CreateOrder(Instrument, entryAction, OrderType.Limit,
+                    TimeInForce.Gtc, qty, price, 0, ocoId, fleetKey, null);
+
+                // [M8.1 NRE-01]: CreateOrder returns null for disconnected or invalid account/instrument pairs.
+                // Guard before reservation -- expectedPositions not yet incremented, no rollback needed.
+                if (fEntry == null)
+                {
+                    dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | CreateOrder returned null", acct.Name));
+                    return false;
+                }
+
+                // [923B-FIX-B]: Phantom-Fix FIX-1 backport -- register tracking dicts BEFORE
+                // updating expectedPositions. Mirrors the fix already applied to ExecuteSmartDispatchEntry
+                // (SIMA.cs Phantom-Fix comment at ~line 554).
+                //
+                // OLD (broken) order: expectedPositions FIRST -> Submit -> entryOrders/activePositions LAST.
+                // Race: REAPER background thread fires between steps 1 and 3, observes non-zero
+                //       expectedPositions with no entry in entryOrders -> hasWorkingEntry=false
+                //       -> phantom repair queued -> second Limit order submitted at same price
+                //       -> original entry orphaned -> double fill or naked position on price touch.
+                //
+                // FIXED order: build PositionInfo -> register dicts atomically (stateLock) FIRST
+                //              -> expectedPositions SECOND -> Submit LAST.
+                // V12.1101E: Full 5-target distribution mirrors Master exactly.
+                PositionInfo fleetFollowerPos = new PositionInfo
+                {
+                    SignalName = fleetKey,
+                    Direction = direction,
+                    TotalContracts = qty,
+                    RemainingContracts = qty,
+                    EntryPrice = price,
+                    InitialStopPrice = prices.StopPrice,
+                    CurrentStopPrice = prices.StopPrice,
+                    Target1Price = prices.T1Price,
+                    Target2Price = prices.T2Price,
+                    Target3Price = prices.T3Price,
+                    Target4Price = prices.T4Price,
+                    Target5Price = prices.T5Price,
+                    T1Contracts = prices.Rt1,
+                    T2Contracts = prices.Rt2,
+                    T3Contracts = prices.Rt3,
+                    T4Contracts = prices.Rt4,
+                    T5Contracts = prices.Rt5,
+                    EntryOrderType = OrderType.Limit,
+                    EntryFilled = false,
+                    IsRMATrade = true,
+                    IsFollower = true,
+                    ExecutingAccount = acct,
+                    BracketSubmitted = false,   // V12.10: deferred -- OnAccountExecutionUpdate submits on fill
+                    ExtremePriceSinceEntry = price,
+                    CurrentTrailLevel = 0,
+                    // Build 936 [FIX-2]: Deterministic bracket OCO group ID for broker-native stop+target linking.
+                    OcoGroupId = "V12_" + GetStableHash(fleetKey),
+                };
+                // B966: Enqueue NOT applied -- ordering invariant: dicts BEFORE expectedPositions (L1479).
+                activePositions[fleetKey] = fleetFollowerPos; // FIRST: dicts registered atomically
+                entryOrders[fleetKey] = fEntry;               // REAPER hasWorkingEntry check reads these
+
+                MarkDispatchSyncPending(expectedKey);
+                syncPending = true;
+
+                // Phase 6 [FSM-P3]: Proactive FSM for RMA V2 fleet entries.
+                // Entry-only (brackets deferred until fill via SymmetryGuard).
+                // State = Submitted (direct submit, no pump queue).
+                if (!_followerBrackets.ContainsKey(fleetKey))
+                {
+                    var rmaFsm = new FollowerBracketFSM
+                    {
+                        AccountName = acct.Name,
+                        EntryName = fleetKey,
+                        State = FollowerBracketState.Submitted,
+                        RemainingContracts = qty,
+                        EntryOrder = fEntry,
+                        ExpectedEntryPrice = price,
+                        LastUpdateUtc = DateTime.UtcNow
+                    };
+                    _followerBrackets.TryAdd(fleetKey, rmaFsm);
+                }
+
+                reservedDelta = (direction == MarketPosition.Long) ? qty : -qty;
+                AddExpectedPositionDeltaLocked(expectedKey, reservedDelta); // SECOND: expectedPositions
+
+                acct.Submit(new[] { fEntry }); // LAST -- stateLock not held here
+
+                // Phase 6 [FSM-P3]: Register OrderId for O(1) FSM lookup (populated by Submit)
+                if (fEntry != null && !string.IsNullOrEmpty(fEntry.OrderId))
+                    _orderIdToFsmKey[fEntry.OrderId] = fleetKey;
+
+                ClearDispatchSyncPending(expectedKey);
+                syncPending = false;
+                // stopOrders/target1..target5 are set by follower bracket submission on fill
+
+                dispatchLog.AppendLine(string.Format("    OK | {0,-28} | Limit RMA    | submitted", acct.Name));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (syncPending)
+                {
+                    ClearDispatchSyncPending(expectedKey);
+                    syncPending = false;
+                }
+
+                // [923B-FIX-B]: Full rollback -- dicts were registered before expectedPositions,
+                // so both must be cleaned up on Submit failure (mirrors ExecuteSmartDispatchEntry catch).
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                activePositions.TryRemove(fleetKey, out _);
+                entryOrders.TryRemove(fleetKey, out _);
+                // Phase 6: Clean up proactive FSM on dispatch failure
+                _followerBrackets.TryRemove(fleetKey, out _);
+                dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// V12 SIMA: RMA Entry V2 - Places limit entry + bracket on the local chart account,
+        /// then iterates Account.All to place the same order on every fleet account matching AccountPrefix.
+        /// CRITICAL: Every account's entry order is registered in entryOrders AND activePositions
+        /// with a unique key (accountName + "_RMA") so ManageCIT can chase the entire fleet.
+        /// </summary>
+        private void ExecuteRMAEntryV2(double price, MarketPosition direction, int contracts)
+        {
+            // Helper 1: Validate all entry guards
+            if (!ValidateRMAEntryGuards(price, contracts, direction))
+                return;
 
             // [Phase 9 LATENCY] T0: Start after validation guards pass, before setup work.
             var sw = Stopwatch.StartNew();
@@ -283,89 +553,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
-                // Calculate stop and 5 targets using RMA profile.
-                bool useRmaTargetProfile = true;
-                // [LEAK-01]: Use centralized ATR calculator (ceiling + min/max guards, fleet-ready).
-                double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
-                // [A1]: contracts parameter used directly -- CalculatePositionSize removed from this method.
-                // stopDist is retained to compute actual bracket stop price below.
-                int qty = contracts;
-                double stopPrice = (direction == MarketPosition.Long) ? price - stopDist : price + stopDist;
-                stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
-
-                // Universal Ladder: T(n)Type dropdown drives all target pricing.
-                double t1Price = CalculateTargetPrice(direction, price, 1);
-                double t2Price = CalculateTargetPrice(direction, price, 2);
-                double t3Price = CalculateTargetPrice(direction, price, 3);
-                double t4Price = CalculateTargetPrice(direction, price, 4);
-                double t5Price = CalculateTargetPrice(direction, price, 5);
-
-                // V12.1101E FLEET PARITY: calculate full 5-target distribution for both Master and Fleet.
-                int rt1, rt2, rt3, rt4, rt5;
-                GetTargetDistribution(qty, out rt1, out rt2, out rt3, out rt4, out rt5);
+                // Helper 2: Calculate bracket prices and distribution
+                RMABracketPrices prices = CalculateRMABracketPrices(price, direction, contracts);
 
                 string baseSignal = "RMA_" + DateTime.Now.Ticks;
                 OrderAction entryAction = (direction == MarketPosition.Long) ? OrderAction.Buy : OrderAction.SellShort;
-                string symmetryDispatchId = SymmetryGuardBeginDispatch("RMA", entryAction, qty, price);
+                string symmetryDispatchId = SymmetryGuardBeginDispatch("RMA", entryAction, contracts, price);
 
                 // [Phase 9 LATENCY] T_SetupDone: Calculation + metadata guard complete.
                 long tSetupDoneTicks = sw.ElapsedTicks;
 
-                Print($"[SIMA RMA V2] {direction} @ {price} | Stop: {stopPrice} | T1: {t1Price} | T2: {t2Price} | T3: {t3Price} | T4: {t4Price} | T5: {t5Price} | Qty: {qty}");
+                Print(string.Format("[SIMA RMA V2] {0} @ {1} | Stop: {2} | T1: {3} | T2: {4} | T3: {5} | T4: {6} | T5: {7} | Qty: {8}",
+                    direction, price, prices.StopPrice, prices.T1Price, prices.T2Price, prices.T3Price, prices.T4Price, prices.T5Price, contracts));
 
                 // =======================================================
                 // 1. LOCAL ACCOUNT: SubmitOrderUnmanaged (chart-visible)
                 // =======================================================
-                string localKey = baseSignal;
-                Order entryOrder = SubmitOrderUnmanaged(0, entryAction, OrderType.Limit, qty, price, 0, "", localKey);
-                if (entryOrder != null)
-                {
-                    SymmetryGuardRegisterMasterEntry(symmetryDispatchId, localKey);
-                    // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (L1345).
-                    entryOrders[localKey] = entryOrder;
-
-                    PositionInfo pos = new PositionInfo
-                    {
-                        SignalName = localKey,
-                        Direction = direction,
-                        TotalContracts = qty,
-                        T1Contracts = rt1,
-                        T2Contracts = rt2,
-                        T3Contracts = rt3,
-                        T4Contracts = rt4,
-                        T5Contracts = rt5,
-                        RemainingContracts = qty,
-                        EntryPrice = price,
-                        InitialStopPrice = stopPrice,
-                        CurrentStopPrice = stopPrice,
-                        Target1Price = t1Price,
-                        Target2Price = t2Price,
-                        Target3Price = t3Price,
-                        Target4Price = t4Price,
-                        Target5Price = t5Price,
-                        EntryOrderType = OrderType.Limit,
-                        EntryFilled = false,
-                        BracketSubmitted = false, // V12.7: Brackets deferred until entry fills
-                        IsRMATrade = true
-                    };
-                    // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (L1345).
-                    activePositions[localKey] = pos;
-
-                    // V12.12: Register Master account in expectedPositions (was missing -- caused false Reaper desyncs)
-                    int localDelta = (direction == MarketPosition.Long) ? qty : -qty;
-                    AddExpectedPositionDeltaLocked(ExpKey(Account.Name), localDelta);
-                    Print($"[SIMA] Master expectedPositions updated: {Account.Name} delta={localDelta}");
-
-                    // V12.7: Do NOT submit stop/target here -- they will be submitted by
-                    // SubmitBracketOrders() when the entry limit fills in OnOrderUpdate.
-                    // Submitting them now would cause instant fills on marketable targets.
-
-                    Print($"[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): {localKey} | Brackets deferred until fill");
-                }
-                else
-                {
-                    Print("[SIMA RMA V2] ERROR: Local entry returned null");
-                }
+                // Helper 3: Submit local account entry (ATOMIC: INV-4.3)
+                SubmitLocalRMAEntry(baseSignal, entryAction, contracts, price, direction, prices, symmetryDispatchId);
 
                 // =======================================================
                 // 2. SIMA FLEET: Iterate Account.All for followers
@@ -387,149 +592,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (!IsFleetAccount(acct)) continue;
                     if (acct == this.Account) continue; // local already done
 
-                    // V12.8: Fleet Manager toggle -- skip if account NOT registered or explicitly disabled
-                    if (!activeFleetAccounts.TryGetValue(acct.Name, out bool isActive) || !isActive)
+                    // Helper 4: Process single fleet account (ATOMIC: INV-4.3)
+                    if (ProcessSingleFleetRMAAccount(acct, baseSignal, entryAction, contracts, price,
+                        direction, prices, symmetryDispatchId, dispatchLog))
                     {
-                        dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | Inactive", acct.Name));
-                        fleetSkip++;
-                        continue;
-                    }
-
-                    // Consistency Lock
-                    if (EnableConsistencyLock)
-                    {
-                        double dailyPL = acct.Get(AccountItem.RealizedProfitLoss, Currency.UsDollar);
-                        if (dailyPL >= MaxDailyProfitCap)
-                        {
-                            dispatchLog.AppendLine(string.Format("  SKIP | {0,-28} | ConsistencyLock ${1:F2}", acct.Name, dailyPL));
-                            fleetSkip++;
-                            continue;
-                        }
-                    }
-
-                    // [923B-FIX-B]: fleetKey declared outside try so catch can access it for dict rollback.
-                    string fleetKey = acct.Name + "_RMA_" + baseSignal;
-                    string expectedKey = ExpKey(acct.Name);
-                    int reservedDelta = 0;
-                    bool syncPending = false;
-                    try
-                    {
-                        SymmetryGuardRegisterFollower(symmetryDispatchId, fleetKey);
-                        string ocoId = fleetKey;
-
-                        // V12.10: Submit ENTRY ONLY -- brackets deferred until fill (unified with leader)
-                        Order fEntry = acct.CreateOrder(Instrument, entryAction, OrderType.Limit,
-                            TimeInForce.Gtc, qty, price, 0, ocoId, fleetKey, null);
-
-                        // [M8.1 NRE-01]: CreateOrder returns null for disconnected or invalid account/instrument pairs.
-                        // Guard before reservation -- expectedPositions not yet incremented, no rollback needed.
-                        if (fEntry == null)
-                        {
-                            dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | CreateOrder returned null", acct.Name));
-                            continue;
-                        }
-
-                        // [923B-FIX-B]: Phantom-Fix FIX-1 backport -- register tracking dicts BEFORE
-                        // updating expectedPositions. Mirrors the fix already applied to ExecuteSmartDispatchEntry
-                        // (SIMA.cs Phantom-Fix comment at ~line 554).
-                        //
-                        // OLD (broken) order: expectedPositions FIRST -> Submit -> entryOrders/activePositions LAST.
-                        // Race: REAPER background thread fires between steps 1 and 3, observes non-zero
-                        //       expectedPositions with no entry in entryOrders -> hasWorkingEntry=false
-                        //       -> phantom repair queued -> second Limit order submitted at same price
-                        //       -> original entry orphaned -> double fill or naked position on price touch.
-                        //
-                        // FIXED order: build PositionInfo -> register dicts atomically (stateLock) FIRST
-                        //              -> expectedPositions SECOND -> Submit LAST.
-                        // V12.1101E: Full 5-target distribution mirrors Master exactly.
-                        PositionInfo fleetFollowerPos = new PositionInfo
-                        {
-                            SignalName = fleetKey,
-                            Direction = direction,
-                            TotalContracts = qty,
-                            RemainingContracts = qty,
-                            EntryPrice = price,
-                            InitialStopPrice = stopPrice,
-                            CurrentStopPrice = stopPrice,
-                            Target1Price = t1Price,
-                            Target2Price = t2Price,
-                            Target3Price = t3Price,
-                            Target4Price = t4Price,
-                            Target5Price = t5Price,
-                            T1Contracts = rt1,
-                            T2Contracts = rt2,
-                            T3Contracts = rt3,
-                            T4Contracts = rt4,
-                            T5Contracts = rt5,
-                            EntryOrderType = OrderType.Limit,
-                            EntryFilled = false,
-                            IsRMATrade = true,
-                            IsFollower = true,
-                            ExecutingAccount = acct,
-                            BracketSubmitted = false,   // V12.10: deferred -- OnAccountExecutionUpdate submits on fill
-                            ExtremePriceSinceEntry = price,
-                            CurrentTrailLevel = 0,
-                            // Build 936 [FIX-2]: Deterministic bracket OCO group ID for broker-native stop+target linking.
-                            OcoGroupId = "V12_" + GetStableHash(fleetKey),
-                        };
-                        // B966: Enqueue NOT applied -- ordering invariant: dicts BEFORE expectedPositions (L1479).
-                        activePositions[fleetKey] = fleetFollowerPos; // FIRST: dicts registered atomically
-                        entryOrders[fleetKey] = fEntry;               // REAPER hasWorkingEntry check reads these
-
-                        MarkDispatchSyncPending(expectedKey);
-                        syncPending = true;
-
-                        // Phase 6 [FSM-P3]: Proactive FSM for RMA V2 fleet entries.
-                        // Entry-only (brackets deferred until fill via SymmetryGuard).
-                        // State = Submitted (direct submit, no pump queue).
-                        if (!_followerBrackets.ContainsKey(fleetKey))
-                        {
-                            var rmaFsm = new FollowerBracketFSM
-                            {
-                                AccountName = acct.Name,
-                                EntryName = fleetKey,
-                                State = FollowerBracketState.Submitted,
-                                RemainingContracts = qty,
-                                EntryOrder = fEntry,
-                                ExpectedEntryPrice = price,
-                                LastUpdateUtc = DateTime.UtcNow
-                            };
-                            _followerBrackets.TryAdd(fleetKey, rmaFsm);
-                        }
-
-                        reservedDelta = (direction == MarketPosition.Long) ? qty : -qty;
-                        AddExpectedPositionDeltaLocked(expectedKey, reservedDelta); // SECOND: expectedPositions
-
-                        acct.Submit(new[] { fEntry }); // LAST -- stateLock not held here
-
-                        // Phase 6 [FSM-P3]: Register OrderId for O(1) FSM lookup (populated by Submit)
-                        if (fEntry != null && !string.IsNullOrEmpty(fEntry.OrderId))
-                            _orderIdToFsmKey[fEntry.OrderId] = fleetKey;
-
-                        ClearDispatchSyncPending(expectedKey);
-                        syncPending = false;
-                        // stopOrders/target1..target5 are set by follower bracket submission on fill
-
                         fleetOk++;
-                        dispatchLog.AppendLine(string.Format("    OK | {0,-28} | Limit RMA    | submitted", acct.Name));
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        if (syncPending)
-                        {
-                            ClearDispatchSyncPending(expectedKey);
-                            syncPending = false;
-                        }
-
-                        // [923B-FIX-B]: Full rollback -- dicts were registered before expectedPositions,
-                        // so both must be cleaned up on Submit failure (mirrors ExecuteSmartDispatchEntry catch).
-                        if (reservedDelta != 0)
-                            AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-                        activePositions.TryRemove(fleetKey, out _);
-                        entryOrders.TryRemove(fleetKey, out _);
-                        // Phase 6: Clean up proactive FSM on dispatch failure
-                        _followerBrackets.TryRemove(fleetKey, out _);
-                        dispatchLog.AppendLine(string.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
+                        fleetSkip++;
                     }
                 }
 
@@ -560,7 +631,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print($"[SIMA RMA V2] ERROR: {ex.Message}");
+                Print(string.Format("[SIMA RMA V2] ERROR: {0}", ex.Message));
             }
         }
 

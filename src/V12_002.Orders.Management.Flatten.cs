@@ -170,171 +170,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             isFlattenRunning = true; // V12.13b: Suppress stop re-submit during flatten
             try
             {
-                // V10 GHOST FIX: Scan for actual live position even if activePositions is empty
-                int liveQty = 0;
-                MarketPosition liveDir = MarketPosition.Flat;
-                if (Position != null)
-                {
-                    liveQty = Position.Quantity;
-                    liveDir = Position.MarketPosition;
-                }
-
-                if (activePositions.Count == 0 && liveQty > 0)
-                {
-                     Print(string.Format("FLATTEN GHOST: Closing ORPHANED position of {0} contracts", liveQty));
-                     if (liveDir == MarketPosition.Long)
-                         SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, liveQty, 0, 0, "", "Flatten_Ghost");
-                     else
-                         SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, liveQty, 0, 0, "", "Flatten_Ghost");
-
-                     return;
-                }
-
+                HandleGhostPositionCleanup();
+                
                 if (activePositions.Count == 0 && Position.MarketPosition == MarketPosition.Flat)
                 {
                     Print("FLATTEN: No active positions to close");
-                    // Still run SIMA flatten just in case of desync
-                    if (EnableSIMA)
-                    {
-                        // V1101E HOT-PATCH: Keep flatten guard asserted across nested SIMA flatten call.
-                        isFlattenRunning = true;
-                        FlattenAllApexAccounts();
-                        isFlattenRunning = true;
-                    }
+                    if (EnableSIMA) DispatchFleetFlatten();
                     return;
                 }
 
                 Print("FLATTEN: Closing all positions...");
-
-                // V12.13b: Removed ExitLong/ExitShort block (managed-mode methods incompatible with IsUnmanaged=true)
-                // Unmanaged flatten via SubmitOrderUnmanaged is handled below at the per-position level
-
-                // 2. Clear all tracked pending entry orders using account-aware routing
-                foreach (var entryOrder in entryOrders.Values)
-                {
-                    if (entryOrder != null
-                        && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted)
-                        && (entryOrder.Account == null || entryOrder.Account == Account))
-                        CancelOrderOnAccount(entryOrder, entryOrder.Account);
-                }
-
-                // 3. Flatten SIMA Fleet
-                if (EnableSIMA)
-                {
-                    // V1101E HOT-PATCH: Keep flatten guard asserted across nested SIMA flatten call.
-                    isFlattenRunning = true;
-                    FlattenAllApexAccounts();
-                    isFlattenRunning = true;
-                }
-
-                // V12.2: Reset Sync State
-                isLongArmed = false;
-                isShortArmed = false;
-
-                // V1102Q [RUNNER-LEAK]: Explicit follower sweep. 
-                // Purge all follower metadata from memory to prevent ghost entries.
-                foreach (var kvp in activePositions.ToArray())
-                {
-                    if (kvp.Value.IsFollower)
-                    {
-                        activePositions.TryRemove(kvp.Key, out _);
-                        entryOrders.TryRemove(kvp.Key, out _);
-                        Print($"[V1102Q] Follower Sweep: Purged {kvp.Key} from memory");
-                    }
-                }
-
-                // V8.30: Thread-safe snapshot iteration (Master/Main entries)
-                foreach (var kvp in activePositions.ToArray())
-                {
-                    if (!activePositions.ContainsKey(kvp.Key)) continue;
-                    PositionInfo pos = kvp.Value;
-                    string entryName = kvp.Key;
-
-                    if (pos.EntryFilled)
-                    {
-                        Print(string.Format("FLATTEN: Closing filled {0} position",
-                            pos.Direction == MarketPosition.Long ? "LONG" : "SHORT"));
-
-                        // V12.1101E [PH5-COLLIDE-01]: Lifecycle-safe stop cancellation.
-                        // Keep stop dictionary refs until broker-confirmed terminal state.
-                        RequestStopCancelLifecycleSafe(entryName);
-                        Print(string.Format("FLATTEN: Requested stop lifecycle cancel for {0}", entryName));
-
-                        // V8.31: Also clear any pending stop replacements to prevent orphaned stops
-                        if (pendingStopReplacements.TryRemove(entryName, out _))
-                        {
-                            Interlocked.Decrement(ref pendingReplacementCount);
-                            Print(string.Format("V8.31: Cleared pending stop replacement for {0}", entryName));
-                        }
-
-                        // Cancel all target orders (T1-T5)
-                        for (int tNum = 1; tNum <= 5; tNum++)
-                        {
-                            var tDict = GetTargetOrdersDictionary(tNum);
-                            if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
-                            {
-                                if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
-                                    CancelOrderSafe(tOrder, pos);
-                            }
-                        }
-
-                        // V8.28 FIX: Use LIVE position quantity instead of cached RemainingContracts
-                        int livePositionQty = 0;
-                        try
-                        {
-                            if (Position != null && Position.MarketPosition != MarketPosition.Flat)
-                                livePositionQty = Position.Quantity;
-                        }
-                        catch (Exception pEx) { Print("Flatten Error reading Position: " + pEx.Message); }
-
-                        // Use the smaller of cached and live to avoid overselling
-                        // V10 DIAGNOSTIC: Print values
-                        Print(string.Format("FLATTEN DIAGNOSTIC: Entry={0} Cached={1} Live={2}", entryName, pos.RemainingContracts, livePositionQty));
-
-                        // V10 FLATTEN FIX: Trust cached contracts if live is 0 (latency protection)
-                        // If cached says we have contracts, we close them.
-                        int flattenQty = pos.RemainingContracts;
-
-                        if (livePositionQty > 0)
-                        {
-                             // If NinjaTrader agrees we have a position, use the smaller to act safe?
-                             // No, if real position is smaller, we might be over-closing.
-                             // But if real is larger, we under-close.
-                             // Let's stick to closing what we know we opened.
-                             flattenQty = pos.RemainingContracts;
-                        }
-
-                        // Submit market order to close position
-                        if (flattenQty > 0)
-                        {
-                            Order flattenOrder = pos.Direction == MarketPosition.Long
-                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName)
-                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName);
-
-                            if (flattenOrder == null) Print("FLATTEN ERROR: SubmitOrderUnmanaged returned NULL");
-                            else Print(string.Format("FLATTEN SENT: {0} {1} contracts", pos.Direction == MarketPosition.Long ? "SELL" : "BUY", flattenQty));
-                        }
-                        else
-                        {
-                             Print("FLATTEN SKIPPED: Qty is 0");
-                        }
-
-                    }
-                    else
-                    {
-                        // Cancel pending entry order
-                        if (entryOrders.ContainsKey(entryName))
-                        {
-                            Order entryOrder = entryOrders[entryName];
-                            if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
-                            {
-                                CancelOrderSafe(entryOrder, pos);
-                                Print(string.Format("FLATTEN: Cancelled pending {0} entry order @ {1:F2}",
-                                    pos.Direction == MarketPosition.Long ? "LONG" : "SHORT", pos.EntryPrice));
-                            }
-                        }
-                    }
-                }
+                CancelMasterEntryOrders();
+                if (EnableSIMA) DispatchFleetFlatten();
+                ResetSyncStateAndPurgeFollowers();
+                FlattenFilledMasterPositions();
+                CancelUnfilledMasterEntries();
             }
             catch (Exception ex)
             {
@@ -347,83 +197,257 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        private void HandleGhostPositionCleanup()
+        {
+            // V10 GHOST FIX: Scan for actual live position even if activePositions is empty
+            int liveQty = 0;
+            MarketPosition liveDir = MarketPosition.Flat;
+            if (Position != null)
+            {
+                liveQty = Position.Quantity;
+                liveDir = Position.MarketPosition;
+            }
+
+            if (activePositions.Count == 0 && liveQty > 0)
+            {
+                Print(string.Format("FLATTEN GHOST: Closing ORPHANED position of {0} contracts", liveQty));
+                if (liveDir == MarketPosition.Long)
+                    SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, liveQty, 0, 0, "", "Flatten_Ghost");
+                else
+                    SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, liveQty, 0, 0, "", "Flatten_Ghost");
+            }
+        }
+
+        private void CancelMasterEntryOrders()
+        {
+            // V12.13b: Removed ExitLong/ExitShort block (managed-mode methods incompatible with IsUnmanaged=true)
+            // Unmanaged flatten via SubmitOrderUnmanaged is handled below at the per-position level
+
+            // Clear all tracked pending entry orders using account-aware routing
+            foreach (var entryOrder in entryOrders.Values)
+            {
+                if (entryOrder != null
+                    && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted)
+                    && (entryOrder.Account == null || entryOrder.Account == Account))
+                    CancelOrderOnAccount(entryOrder, entryOrder.Account);
+            }
+        }
+
+        private void DispatchFleetFlatten()
+        {
+            // V1101E HOT-PATCH: Keep flatten guard asserted across nested SIMA flatten call.
+            isFlattenRunning = true;
+            FlattenAllApexAccounts();
+            isFlattenRunning = true;
+        }
+
+        private void ResetSyncStateAndPurgeFollowers()
+        {
+            // V12.2: Reset Sync State
+            isLongArmed = false;
+            isShortArmed = false;
+
+            // V1102Q [RUNNER-LEAK]: Explicit follower sweep.
+            // Purge all follower metadata from memory to prevent ghost entries.
+            foreach (var kvp in activePositions.ToArray())
+            {
+                if (kvp.Value.IsFollower)
+                {
+                    activePositions.TryRemove(kvp.Key, out _);
+                    entryOrders.TryRemove(kvp.Key, out _);
+                    Print($"[V1102Q] Follower Sweep: Purged {kvp.Key} from memory");
+                }
+            }
+        }
+
+        private void FlattenFilledMasterPositions()
+        {
+            // V8.30: Thread-safe snapshot iteration (Master/Main entries)
+            foreach (var kvp in activePositions.ToArray())
+            {
+                if (!activePositions.ContainsKey(kvp.Key)) continue;
+                PositionInfo pos = kvp.Value;
+                string entryName = kvp.Key;
+
+                if (!pos.EntryFilled) continue;
+
+                FlattenSinglePosition(entryName, pos);
+            }
+        }
+
+        private void FlattenSinglePosition(string entryName, PositionInfo pos)
+        {
+            Print(string.Format("FLATTEN: Closing filled {0} position",
+                pos.Direction == MarketPosition.Long ? "LONG" : "SHORT"));
+
+            // V12.1101E [PH5-COLLIDE-01]: Lifecycle-safe stop cancellation.
+            // Keep stop dictionary refs until broker-confirmed terminal state.
+            RequestStopCancelLifecycleSafe(entryName);
+            Print(string.Format("FLATTEN: Requested stop lifecycle cancel for {0}", entryName));
+
+            // V8.31: Also clear any pending stop replacements to prevent orphaned stops
+            if (pendingStopReplacements.TryRemove(entryName, out _))
+            {
+                Interlocked.Decrement(ref pendingReplacementCount);
+                Print(string.Format("V8.31: Cleared pending stop replacement for {0}", entryName));
+            }
+
+            // Cancel all target orders (T1-T5)
+            for (int tNum = 1; tNum <= 5; tNum++)
+            {
+                var tDict = GetTargetOrdersDictionary(tNum);
+                if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
+                {
+                    if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
+                        CancelOrderSafe(tOrder, pos);
+                }
+            }
+
+            // V8.28 FIX: Use LIVE position quantity instead of cached RemainingContracts
+            int livePositionQty = 0;
+            try
+            {
+                if (Position != null && Position.MarketPosition != MarketPosition.Flat)
+                    livePositionQty = Position.Quantity;
+            }
+            catch (Exception pEx) { Print("Flatten Error reading Position: " + pEx.Message); }
+
+            // Use the smaller of cached and live to avoid overselling
+            // V10 DIAGNOSTIC: Print values
+            Print(string.Format("FLATTEN DIAGNOSTIC: Entry={0} Cached={1} Live={2}", entryName, pos.RemainingContracts, livePositionQty));
+
+            // V10 FLATTEN FIX: Trust cached contracts if live is 0 (latency protection)
+            // If cached says we have contracts, we close them.
+            int flattenQty = pos.RemainingContracts;
+
+            if (livePositionQty > 0)
+            {
+                // If NinjaTrader agrees we have a position, use the smaller to act safe?
+                // No, if real position is smaller, we might be over-closing.
+                // But if real is larger, we under-close.
+                // Let's stick to closing what we know we opened.
+                flattenQty = pos.RemainingContracts;
+            }
+
+            // Submit market order to close position
+            if (flattenQty > 0)
+            {
+                Order flattenOrder = pos.Direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName)
+                    : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName);
+
+                if (flattenOrder == null) Print("FLATTEN ERROR: SubmitOrderUnmanaged returned NULL");
+                else Print(string.Format("FLATTEN SENT: {0} {1} contracts", pos.Direction == MarketPosition.Long ? "SELL" : "BUY", flattenQty));
+            }
+            else
+            {
+                Print("FLATTEN SKIPPED: Qty is 0");
+            }
+        }
+
+        private void CancelUnfilledMasterEntries()
+        {
+            // V8.30: Thread-safe snapshot iteration (Master/Main entries)
+            foreach (var kvp in activePositions.ToArray())
+            {
+                if (!activePositions.ContainsKey(kvp.Key)) continue;
+                PositionInfo pos = kvp.Value;
+                string entryName = kvp.Key;
+
+                if (pos.EntryFilled) continue;
+
+                // Cancel pending entry order
+                if (entryOrders.ContainsKey(entryName))
+                {
+                    Order entryOrder = entryOrders[entryName];
+                    if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
+                    {
+                        CancelOrderSafe(entryOrder, pos);
+                        Print(string.Format("FLATTEN: Cancelled pending {0} entry order @ {1:F2}",
+                            pos.Direction == MarketPosition.Long ? "LONG" : "SHORT", pos.EntryPrice));
+                    }
+                }
+            }
+        }
+
         private void FlattenPositionByName(string entryName)
         {
             if (!activePositions.TryGetValue(entryName, out var pos)) return;
+            if (!pos.EntryFilled || pos.RemainingContracts <= 0) return;
 
-            if (pos.EntryFilled && pos.RemainingContracts > 0)
+            Print(string.Format("(!) EMERGENCY FLATTEN: Closing {0} position due to stop order failure", entryName));
+
+            CancelAllBracketOrdersForPosition(entryName, pos);
+
+            if (pendingStopReplacements.TryRemove(entryName, out _))
+                Interlocked.Decrement(ref pendingReplacementCount);
+
+            SubmitEmergencyFlattenOrder(entryName, pos);
+        }
+
+        private void CancelAllBracketOrdersForPosition(string entryName, PositionInfo pos)
+        {
+            if (stopOrders.TryGetValue(entryName, out var stopOrder) && stopOrder != null)
             {
-                Print(string.Format("(!) EMERGENCY FLATTEN: Closing {0} position due to stop order failure", entryName));
-
-                // V12.3: Determine if this is a fleet follower or local position
-                bool isFleetFollower = pos.IsFollower && pos.ExecutingAccount != null;
-
-                // V8.31: Cancel ALL bracket orders first to prevent race conditions
-                // V12.3: Use Account.Cancel for fleet followers, CancelOrder for local
-                if (stopOrders.TryGetValue(entryName, out var stopOrder) && stopOrder != null)
+                if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted)
                 {
-                    if (stopOrder.OrderState == OrderState.Working || stopOrder.OrderState == OrderState.Accepted)
+                    CancelOrderSafe(stopOrder, pos);
+                }
+            }
+
+            for (int tNum = 1; tNum <= 5; tNum++)
+            {
+                var tDict = GetTargetOrdersDictionary(tNum);
+                if (tDict != null && tDict.TryGetValue(entryName, out var tOrder) && tOrder != null)
+                {
+                    if (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted)
                     {
-                        CancelOrderSafe(stopOrder, pos);
+                        CancelOrderSafe(tOrder, pos);
                     }
                 }
-                // Cancel all target orders (T1-T5)
-                for (int tNum = 1; tNum <= 5; tNum++)
-                {
-                    var tDict = GetTargetOrdersDictionary(tNum);
-                    if (tDict != null && tDict.TryGetValue(entryName, out var tOrder) && tOrder != null)
-                    {
-                        if (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted)
-                        {
-                            CancelOrderSafe(tOrder, pos);
-                        }
-                    }
-                }
+            }
+        }
 
-                // V8.31: Clear pending replacements
-                if (pendingStopReplacements.TryRemove(entryName, out _)) Interlocked.Decrement(ref pendingReplacementCount);
+        private void SubmitEmergencyFlattenOrder(string entryName, PositionInfo pos)
+        {
+            bool isFleetFollower = pos.IsFollower && pos.ExecutingAccount != null;
+            int flattenQty = pos.RemainingContracts;
+            OrderAction flattenAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
 
-                int flattenQty = pos.RemainingContracts;
-                OrderAction flattenAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+            Order flattenOrder = null;
+            if (isFleetFollower)
+            {
+                string sigName = "EF_" + entryName;
+                if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                flattenOrder = pos.ExecutingAccount.CreateOrder(Instrument, flattenAction,
+                    OrderType.Market, TimeInForce.Gtc, flattenQty, 0, 0, "", sigName, null);
+                pos.ExecutingAccount.Submit(new[] { flattenOrder });
+            }
+            else
+            {
+                try
+                {
+                    if (Position != null && Position.MarketPosition != MarketPosition.Flat)
+                        flattenQty = Math.Max(flattenQty, Position.Quantity);
+                }
+                catch { }
 
-                // V12.3: Route flatten order to correct account
-                Order flattenOrder = null;
-                if (isFleetFollower)
-                {
-                    // Fleet follower: flatten on the follower's own account
-                    string sigName = "EF_" + entryName;
-                    if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
-                    flattenOrder = pos.ExecutingAccount.CreateOrder(Instrument, flattenAction,
-                        OrderType.Market, TimeInForce.Gtc, flattenQty, 0, 0, "", sigName, null);
-                    pos.ExecutingAccount.Submit(new[] { flattenOrder });
-                }
-                else
-                {
-                    // Local: use SubmitOrderUnmanaged (use live position qty for accuracy)
-                    try
-                    {
-                        if (Position != null && Position.MarketPosition != MarketPosition.Flat)
-                            flattenQty = Math.Max(flattenQty, Position.Quantity);
-                    }
-                    catch { }
+                string sigName = "EF_" + entryName;
+                if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                flattenOrder = SubmitOrderUnmanaged(0, flattenAction, OrderType.Market, flattenQty, 0, 0, "", sigName);
+            }
 
-                    string sigName = "EF_" + entryName;
-                    if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
-                    flattenOrder = SubmitOrderUnmanaged(0, flattenAction, OrderType.Market, flattenQty, 0, 0, "", sigName);
-                }
-
-                if (flattenOrder != null)
-                {
-                    Print(string.Format("Emergency flatten order submitted on {0}: {1} {2} contracts at MARKET",
-                        isFleetFollower ? pos.ExecutingAccount.Name : "LOCAL",
-                        pos.Direction == MarketPosition.Long ? "SELL" : "BUY",
-                        flattenQty));
-                }
-                else
-                {
-                    Print(string.Format("(!) CRITICAL: Emergency flatten order FAILED for {0}!", entryName));
-                    Print("(!) MANUAL INTERVENTION REQUIRED - Close position manually in NinjaTrader!");
-                }
+            if (flattenOrder != null)
+            {
+                Print(string.Format("Emergency flatten order submitted on {0}: {1} {2} contracts at MARKET",
+                    isFleetFollower ? pos.ExecutingAccount.Name : "LOCAL",
+                    pos.Direction == MarketPosition.Long ? "SELL" : "BUY",
+                    flattenQty));
+            }
+            else
+            {
+                Print(string.Format("(!) CRITICAL: Emergency flatten order FAILED for {0}!", entryName));
+                Print("(!) MANUAL INTERVENTION REQUIRED - Close position manually in NinjaTrader!");
             }
         }
 

@@ -1,5 +1,6 @@
 // Build 1105: V12_001 panel port -- handlers rewired through PanelCommand
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Windows;
@@ -12,18 +13,73 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002
     {
+        #region Panel Handler Structs
+
+        private struct TargetConfig
+        {
+            public string T1Type, T2Type, T3Type, T4Type, T5Type;
+            public string T1Val, T2Val, T3Val, T4Val, T5Val;
+            public string Str, Max, Cit;
+            public bool TrendRma, RetestRma;
+            public int Count;
+        }
+
+        #endregion
+
         #region Panel Handlers
 
         private void AttachPanelHandlers()
         {
-            if (floatingAnchor != null) floatingAnchor.Click += ToggleLayout_Click;
+            InitKeyCommandRegistry();
+            AttachMiscellaneousHandlers();
+            AttachExecutionPanelHandlers();
+            AttachTargetButtonHandlers();
+            AttachActionButtonHandlers();
+            AttachSyncButtonHandlers();
+            AttachConfigModeHandlers();
+            AttachTargetCountHandlers();
+            AttachLiveTargetHandlers();
+        }
 
+        // [Phase7-UI T-A] Initialize command registry for basic hotkeys (CYC 3)
+        // NOTE: Lambda closures allocate on heap. Acceptable as existing pattern.
+        // If profiling shows impact, consider method references (e.g., [Key.L] = ExecuteLongHotkey).
+        private void InitKeyCommandRegistry()
+        {
+            _keyCommands = new Dictionary<Key, Action>
+            {
+                // Basic hotkeys (no modifiers)
+                [Key.L] = () =>
+                {
+                    double orStopDist = CalculateORStopDistance();
+                    int orContracts = CalculatePositionSize(orStopDist);
+                    Enqueue(ctx => ctx.ExecuteLong(orContracts));
+                },
+                [Key.S] = () =>
+                {
+                    double orStopDist = CalculateORStopDistance();
+                    int orContracts = CalculatePositionSize(orStopDist);
+                    Enqueue(ctx => ctx.ExecuteShort(orContracts));
+                },
+                // V12.1101E [PH5-COLLIDE-01]: Panic hotkey routes through lifecycle-safe flatten pipeline
+                [Key.F] = () => FlattenAll()
+            };
+        }
+
+        private void AttachMiscellaneousHandlers()
+        {
+            if (floatingAnchor != null) floatingAnchor.Click += ToggleLayout_Click;
+            
             if (fleetSelectButton != null) fleetSelectButton.Click += (s, e) =>
             {
                 if (fleetPopup != null) fleetPopup.IsOpen = !fleetPopup.IsOpen;
             };
+            
             if (submitButton != null) submitButton.Click += OnSubmitClick;
+        }
 
+        private void AttachExecutionPanelHandlers()
+        {
             if (orLongButton != null) orLongButton.Click += (s, e) =>
                 { PanelCommand("OR_LONG"); ResetExecutionMode(); TriggerGlow(CyanAccent); };
             if (orShortButton != null) orShortButton.Click += (s, e) =>
@@ -41,12 +97,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 { PanelCommand("MODE_M"); TriggerGlow(OrangeFg); };
             if (trendButton != null) trendButton.Click += OnTrendClick;
             if (trendRmaToggle != null) trendRmaToggle.Click += OnTrendRmaToggleClick;
+        }
 
+        private void AttachTargetButtonHandlers()
+        {
             if (t1Button != null) AttachTargetDropdown(t1Button, 1, GreenFg);
             if (t2Button != null) AttachTargetDropdown(t2Button, 2, YellowFg);
             if (t3Button != null) AttachTargetDropdown(t3Button, 3, OrangeFg);
             if (t4Button != null) AttachTargetDropdown(t4Button, 4, RedFg);
             if (t5Button != null) AttachTargetDropdown(t5Button, 5, PinkFg);
+        }
+
+        private void AttachActionButtonHandlers()
+        {
             if (trim50Button != null) trim50Button.Click += (s, e) =>
                 { PanelCommand("TRIM_50"); TriggerGlow(OrangeFg); };
             if (beButton != null) beButton.Click += OnBeClick;
@@ -55,25 +118,32 @@ namespace NinjaTrader.NinjaScript.Strategies
                 { PanelCommand("CANCEL_ALL"); TriggerGlow(RedFg); };
             if (flattenButton != null) flattenButton.Click += (s, e) =>
                 { PanelCommand("FLATTEN_ONLY"); TriggerGlow(RedFg); };
+        }
 
+        private void AttachSyncButtonHandlers()
+        {
             if (mktSyncButton != null) mktSyncButton.Click += (s, e) =>
                 PanelCommand("MKT_SYNC");
+            if (syncAllButton != null) syncAllButton.Click += OnSyncAllClick;
+        }
 
+        private void AttachConfigModeHandlers()
+        {
             if (modeOrbButton != null) modeOrbButton.Click += (s, e) => SelectConfigMode("ORB", modeOrbButton);
             if (modeRmaButton != null) modeRmaButton.Click += (s, e) => SelectConfigMode("RMA", modeRmaButton);
             if (modeRetestButton != null) modeRetestButton.Click += (s, e) => SelectConfigMode("RETEST", modeRetestButton);
             if (modeMomoButton != null) modeMomoButton.Click += (s, e) => SelectConfigMode("MOMO", modeMomoButton);
             if (modeFfmaButton != null) modeFfmaButton.Click += (s, e) => SelectConfigMode("FFMA", modeFfmaButton);
             if (modeTrendButton != null) modeTrendButton.Click += (s, e) => SelectConfigMode("TREND", modeTrendButton);
+        }
 
+        private void AttachTargetCountHandlers()
+        {
             if (cnt1 != null) cnt1.Click += (s, e) => SelectTargetCount(1, cnt1);
             if (cnt2 != null) cnt2.Click += (s, e) => SelectTargetCount(2, cnt2);
             if (cnt3 != null) cnt3.Click += (s, e) => SelectTargetCount(3, cnt3);
             if (cnt4 != null) cnt4.Click += (s, e) => SelectTargetCount(4, cnt4);
             if (cnt5 != null) cnt5.Click += (s, e) => SelectTargetCount(5, cnt5);
-
-            if (syncAllButton != null) syncAllButton.Click += OnSyncAllClick;
-            AttachLiveTargetHandlers();
         }
 
         private void DetachPanelHandlers()
@@ -237,39 +307,72 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void OnSyncAllClick(object sender, RoutedEventArgs e)
         {
+            string mode = ResolveEffectiveSyncMode();
+            TargetConfig config = ExtractTargetConfiguration();
+            string configString = BuildConfigString(mode, config);
+            
+            PanelCommand(configString);
+            Print("V12 PANEL: SYNC ALL -> " + mode + " / count " + config.Count);
+        }
+
+        private string ResolveEffectiveSyncMode()
+        {
             string mode = _panelLastSyncedMode;
             if (string.IsNullOrEmpty(mode))
                 mode = GetCurrentConfigMode();
             if (string.Equals(mode, "OR", StringComparison.OrdinalIgnoreCase))
                 mode = "ORB";
+            return mode;
+        }
 
-            string t1Type = (svT1Type != null && svT1Type.SelectedItem is ComboBoxItem t1Item) ? (t1Item.Content as string ?? "ATR") : "ATR";
-            string t2Type = (svT2Type != null && svT2Type.SelectedItem is ComboBoxItem t2Item) ? (t2Item.Content as string ?? "ATR") : "ATR";
-            string t3Type = (svT3Type != null && svT3Type.SelectedItem is ComboBoxItem t3Item) ? (t3Item.Content as string ?? "ATR") : "ATR";
-            string t4Type = (svT4Type != null && svT4Type.SelectedItem is ComboBoxItem t4Item) ? (t4Item.Content as string ?? "ATR") : "ATR";
-            string t5Type = (svT5Type != null && svT5Type.SelectedItem is ComboBoxItem t5Item) ? (t5Item.Content as string ?? "ATR") : "ATR";
+        private TargetConfig ExtractTargetConfiguration()
+        {
+            var config = new TargetConfig();
+            
+            config.T1Type = (svT1Type != null && svT1Type.SelectedItem is ComboBoxItem t1Item) ? (t1Item.Content as string ?? "ATR") : "ATR";
+            config.T2Type = (svT2Type != null && svT2Type.SelectedItem is ComboBoxItem t2Item) ? (t2Item.Content as string ?? "ATR") : "ATR";
+            config.T3Type = (svT3Type != null && svT3Type.SelectedItem is ComboBoxItem t3Item) ? (t3Item.Content as string ?? "ATR") : "ATR";
+            config.T4Type = (svT4Type != null && svT4Type.SelectedItem is ComboBoxItem t4Item) ? (t4Item.Content as string ?? "ATR") : "ATR";
+            config.T5Type = (svT5Type != null && svT5Type.SelectedItem is ComboBoxItem t5Item) ? (t5Item.Content as string ?? "ATR") : "ATR";
+            
+            config.T1Val = svT1Val != null ? svT1Val.Text : "0";
+            config.T2Val = svT2Val != null ? svT2Val.Text : "0";
+            config.T3Val = svT3Val != null ? svT3Val.Text : "0";
+            config.T4Val = svT4Val != null ? svT4Val.Text : "0";
+            config.T5Val = svT5Val != null ? svT5Val.Text : "0";
+            
+            config.Str = strVal != null ? strVal.Text : "0";
+            config.Cit = citVal != null ? citVal.Text : "0";
+            
             string maxText = maxVal != null ? maxVal.Text : string.Empty;
             if (maxText == null) maxText = string.Empty;
-            maxText = maxText.Replace("$", string.Empty).Replace(" ", string.Empty);
+            config.Max = maxText.Replace("$", string.Empty).Replace(" ", string.Empty);
+            
+            config.TrendRma = isTrendRmaMode;
+            config.RetestRma = isRetestRmaMode;
+            config.Count = Math.Max(1, Math.Min(5, _panelLastSyncedTargetCount > 0 ? _panelLastSyncedTargetCount : activeTargetCount));
+            
+            return config;
+        }
 
+        private string BuildConfigString(string mode, TargetConfig config)
+        {
             StringBuilder sb = new StringBuilder();
             sb.Append("CONFIG|");
             sb.Append(string.Equals(mode, "ORB", StringComparison.OrdinalIgnoreCase) ? "OR" : mode);
             sb.Append("|");
-            sb.Append("COUNT:").Append(Math.Max(1, Math.Min(5, _panelLastSyncedTargetCount > 0 ? _panelLastSyncedTargetCount : activeTargetCount))).Append(";");
-            sb.Append("T1:").Append(svT1Val != null ? svT1Val.Text : "0").Append(";T1TYPE:").Append(t1Type).Append(";");
-            sb.Append("T2:").Append(svT2Val != null ? svT2Val.Text : "0").Append(";T2TYPE:").Append(t2Type).Append(";");
-            sb.Append("T3:").Append(svT3Val != null ? svT3Val.Text : "0").Append(";T3TYPE:").Append(t3Type).Append(";");
-            sb.Append("T4:").Append(svT4Val != null ? svT4Val.Text : "0").Append(";T4TYPE:").Append(t4Type).Append(";");
-            sb.Append("T5:").Append(svT5Val != null ? svT5Val.Text : "0").Append(";T5TYPE:").Append(t5Type).Append(";");
-            sb.Append("STR:").Append(strVal != null ? strVal.Text : "0").Append(";");
-            sb.Append("MAX:").Append(maxText).Append(";");
-            sb.Append("CIT:").Append(citVal != null ? citVal.Text : "0").Append(";");
-            sb.Append("TRMA:").Append(isTrendRmaMode ? "1" : "0").Append(";");
-            sb.Append("RRMA:").Append(isRetestRmaMode ? "1" : "0").Append(";");
-
-            PanelCommand(sb.ToString());
-            Print("V12 PANEL: SYNC ALL -> " + mode + " / count " + (_panelLastSyncedTargetCount > 0 ? _panelLastSyncedTargetCount : activeTargetCount));
+            sb.Append("COUNT:").Append(config.Count).Append(";");
+            sb.Append("T1:").Append(config.T1Val).Append(";T1TYPE:").Append(config.T1Type).Append(";");
+            sb.Append("T2:").Append(config.T2Val).Append(";T2TYPE:").Append(config.T2Type).Append(";");
+            sb.Append("T3:").Append(config.T3Val).Append(";T3TYPE:").Append(config.T3Type).Append(";");
+            sb.Append("T4:").Append(config.T4Val).Append(";T4TYPE:").Append(config.T4Type).Append(";");
+            sb.Append("T5:").Append(config.T5Val).Append(";T5TYPE:").Append(config.T5Type).Append(";");
+            sb.Append("STR:").Append(config.Str).Append(";");
+            sb.Append("MAX:").Append(config.Max).Append(";");
+            sb.Append("CIT:").Append(config.Cit).Append(";");
+            sb.Append("TRMA:").Append(config.TrendRma ? "1" : "0").Append(";");
+            sb.Append("RRMA:").Append(config.RetestRma ? "1" : "0").Append(";");
+            return sb.ToString();
         }
 
         private void AttachTargetDropdown(Button btn, int targetNum, SolidColorBrush glowColor)
@@ -429,7 +532,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             string upperMode = string.Equals(mode, "OR", StringComparison.OrdinalIgnoreCase)
                 ? "ORB"
                 : (mode ?? "ORB").ToUpperInvariant();
+            
+            CollapseAllExecutionControls();
+            ShowModeSpecificControls(upperMode);
+            PopulateDirectionCombo(upperMode);
+        }
 
+        private void CollapseAllExecutionControls()
+        {
             if (execRetestRow != null) execRetestRow.Visibility = Visibility.Collapsed;
             if (execTrendRow != null) execTrendRow.Visibility = Visibility.Collapsed;
             if (rmaButton != null) rmaButton.Visibility = Visibility.Collapsed;
@@ -440,8 +550,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (orLongButton != null) orLongButton.Visibility = Visibility.Collapsed;
             if (orShortButton != null) orShortButton.Visibility = Visibility.Collapsed;
             if (manualEntryRow != null) manualEntryRow.Visibility = Visibility.Visible;
+        }
 
-            switch (upperMode)
+        private void ShowModeSpecificControls(string mode)
+        {
+            switch (mode)
             {
                 case "ORB":
                     if (orLongButton != null) orLongButton.Visibility = Visibility.Visible;
@@ -472,22 +585,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (orShortButton != null) orShortButton.Visibility = Visibility.Visible;
                     break;
             }
+        }
 
-            if (directionCombo != null)
+        private void PopulateDirectionCombo(string mode)
+        {
+            if (directionCombo == null) return;
+            
+            directionCombo.Items.Clear();
+            if (mode == "ORB")
             {
-                directionCombo.Items.Clear();
-                if (upperMode == "ORB")
-                {
-                    directionCombo.Items.Add(new ComboBoxItem { Content = "OR LONG", Foreground = TextPrimary });
-                    directionCombo.Items.Add(new ComboBoxItem { Content = "OR SHORT", Foreground = TextPrimary });
-                }
-                else
-                {
-                    directionCombo.Items.Add(new ComboBoxItem { Content = "LONG", Foreground = TextPrimary });
-                    directionCombo.Items.Add(new ComboBoxItem { Content = "SHORT", Foreground = TextPrimary });
-                }
-                directionCombo.SelectedIndex = 0;
+                directionCombo.Items.Add(new ComboBoxItem { Content = "OR LONG", Foreground = TextPrimary });
+                directionCombo.Items.Add(new ComboBoxItem { Content = "OR SHORT", Foreground = TextPrimary });
             }
+            else
+            {
+                directionCombo.Items.Add(new ComboBoxItem { Content = "LONG", Foreground = TextPrimary });
+                directionCombo.Items.Add(new ComboBoxItem { Content = "SHORT", Foreground = TextPrimary });
+            }
+            directionCombo.SelectedIndex = 0;
         }
 
         public void UpdateTargetVisibility(int count)

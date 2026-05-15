@@ -70,13 +70,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Propagates a leader stop price to all followers tracking the same master entry.
-        /// Uses symmetry dispatch context to find the followers linked to this leader entry.
+        /// Validates leader entry key and retrieves associated dispatch context.
         /// </summary>
-        private bool ShadowMoveFollowerStops(string leaderEntryKey, double newStopPrice)
+        private bool ShadowValidateDispatchContext(string leaderEntryKey, out SymmetryDispatchContext ctx)
         {
+            ctx = null;
             string dispatchId;
-            SymmetryDispatchContext ctx;
             if (string.IsNullOrEmpty(leaderEntryKey)
                 || !symmetryMasterEntryToDispatch.TryGetValue(leaderEntryKey, out dispatchId)
                 || !symmetryDispatchById.TryGetValue(dispatchId, out ctx)
@@ -84,10 +83,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 return false;
             }
+            return true;
+        }
 
+        /// <summary>
+        /// Builds complete list of follower entries linked to the dispatch context.
+        /// ADR-019: Uses Volatile.Read snapshot for lock-free access.
+        /// </summary>
+        private System.Collections.Generic.List<string> ShadowBuildFollowerEntryList(
+            SymmetryDispatchContext ctx, string dispatchId)
+        {
             // ADR-019: snapshot via Volatile.Read on immutable string[] -- zero-alloc, lock-free.
             string[] followerSnapshot = ctx.Followers;
             var followerEntryNames = new System.Collections.Generic.List<string>(followerSnapshot.Length);
+            
             foreach (string followerEntryName in followerSnapshot)
             {
                 if (string.IsNullOrEmpty(followerEntryName))
@@ -109,40 +118,77 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 followerEntryNames.Add(kvp.Key);
             }
+            
+            return followerEntryNames;
+        }
+
+        /// <summary>
+        /// Processes stop update for a single follower entry.
+        /// Returns true if follower found, sets waitingOnFollower if not ready.
+        /// </summary>
+        private bool ShadowProcessFollowerStopUpdate(
+            string followerEntryName, double newStopPrice, out bool waitingOnFollower)
+        {
+            waitingOnFollower = false;
+            
+            FollowerBracketFSM fsm;
+            bool hasFsm = _followerBrackets.TryGetValue(followerEntryName, out fsm) && fsm != null;
+            PositionInfo followerPos;
+            bool hasFollowerPos = activePositions.TryGetValue(followerEntryName, out followerPos) && followerPos != null;
+
+            if (!hasFsm && !hasFollowerPos)
+                return false;
+
+            if (!hasFollowerPos || !followerPos.EntryFilled || !followerPos.BracketSubmitted)
+            {
+                waitingOnFollower = true;
+                return true;
+            }
+
+            if (!hasFsm || fsm.State != FollowerBracketState.Active || fsm.StopOrder == null)
+            {
+                waitingOnFollower = true;
+                return true;
+            }
+
+            // Skip if follower stop is already at the target price
+            if (Math.Abs(fsm.StopOrder.StopPrice - newStopPrice) < tickSize * 0.5)
+                return true;
+
+            // Use existing stop update infrastructure (two-phase Replace FSM)
+            Print(string.Format("[SHADOW] Propagating stop {0:F2} -> {1} on {2}",
+                newStopPrice, followerEntryName, fsm.AccountName));
+            UpdateStopOrder(followerEntryName, followerPos, newStopPrice, followerPos.CurrentTrailLevel);
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Propagates a leader stop price to all followers tracking the same master entry.
+        /// Uses symmetry dispatch context to find the followers linked to this leader entry.
+        /// </summary>
+        private bool ShadowMoveFollowerStops(string leaderEntryKey, double newStopPrice)
+        {
+            SymmetryDispatchContext ctx;
+            if (!ShadowValidateDispatchContext(leaderEntryKey, out ctx))
+                return false;
+
+            string dispatchId;
+            symmetryMasterEntryToDispatch.TryGetValue(leaderEntryKey, out dispatchId);
+            
+            var followerEntryNames = ShadowBuildFollowerEntryList(ctx, dispatchId);
 
             bool foundAnyFollower = false;
             bool waitingOnFollower = false;
             foreach (string followerEntryName in followerEntryNames)
             {
-                foundAnyFollower = true;
-
-                FollowerBracketFSM fsm;
-                bool hasFsm = _followerBrackets.TryGetValue(followerEntryName, out fsm) && fsm != null;
-                PositionInfo followerPos;
-                bool hasFollowerPos = activePositions.TryGetValue(followerEntryName, out followerPos) && followerPos != null;
-
-                if (!hasFsm && !hasFollowerPos)
-                    continue;
-
-                if (!hasFollowerPos || !followerPos.EntryFilled || !followerPos.BracketSubmitted)
+                bool waitingOnThis;
+                if (ShadowProcessFollowerStopUpdate(followerEntryName, newStopPrice, out waitingOnThis))
                 {
-                    waitingOnFollower = true;
-                    continue;
+                    foundAnyFollower = true;
+                    if (waitingOnThis)
+                        waitingOnFollower = true;
                 }
-
-                if (!hasFsm || fsm.State != FollowerBracketState.Active || fsm.StopOrder == null)
-                {
-                    waitingOnFollower = true;
-                    continue;
-                }
-
-                // Skip if follower stop is already at the target price
-                if (Math.Abs(fsm.StopOrder.StopPrice - newStopPrice) < tickSize * 0.5) continue;
-
-                // Use existing stop update infrastructure (two-phase Replace FSM)
-                Print(string.Format("[SHADOW] Propagating stop {0:F2} -> {1} on {2}",
-                    newStopPrice, followerEntryName, fsm.AccountName));
-                UpdateStopOrder(followerEntryName, followerPos, newStopPrice, followerPos.CurrentTrailLevel);
             }
 
             return foundAnyFollower && !waitingOnFollower;

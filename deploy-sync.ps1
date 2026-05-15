@@ -92,10 +92,9 @@ Write-Host "`n--- ASCII GATE: Scanning source files ---" -ForegroundColor Yellow
 $srcDir = Join-Path $RepoRoot "src"
 $gatePass = $true
 foreach ($csFile in (Get-ChildItem $srcDir -Filter "*.cs" -Recurse)) {
-    $bytes = [System.IO.File]::ReadAllBytes($csFile.FullName)
-    $badBytes = $bytes | Where-Object { $_ -gt 127 }
-    if ($badBytes.Count -gt 0) {
-        Write-Host "ASCII GATE FAIL: $($csFile.Name) has $($badBytes.Count) non-ASCII bytes" -ForegroundColor Red
+    $text = [System.IO.File]::ReadAllText($csFile.FullName)
+    if ($text -match '[^\x00-\x7F]') {
+        Write-Host "ASCII GATE FAIL: $($csFile.Name) has non-ASCII characters" -ForegroundColor Red
         Write-Host "  Fix: python C:\tmp\byte_purge.py  then re-run deploy-sync.ps1" -ForegroundColor Red
         $gatePass = $false
     }

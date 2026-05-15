@@ -118,80 +118,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // Step 1: Cancel all working orders for this instrument
-                List<Order> ordersToCancel = new List<Order>();
-                foreach (Order order in acct.Orders.ToArray())
-                {
-                    if (order == null || order.Instrument == null) continue;
-                    if (order.Instrument.FullName != Instrument.FullName) continue;
+                ProcessFlattenWorkItem_CancelOrders(item, acct);
 
-                    bool isTerminal = order.OrderState == OrderState.Cancelled
-                        || order.OrderState == OrderState.CancelPending
-                        || order.OrderState == OrderState.CancelSubmitted
-                        || order.OrderState == OrderState.Filled
-                        || order.OrderState == OrderState.Rejected;
-                    if (isTerminal) continue;
-
-                    if (item.ZombieSweepOnly)
-                    {
-                        // ClosePositionsOnly: Only sweep EMERGENCY_STOP_ and T1_-T5_ (zombie targets)
-                        bool isZombieTarget =
-                            order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase) ||
-                            order.Name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
-                            order.Name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
-                            order.Name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
-                            order.Name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
-                            order.Name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase);
-                        if (!isZombieTarget) continue;
-                    }
-
-                    ordersToCancel.Add(order);
-                }
-
-                if (ordersToCancel.Count > 0)
-                {
-                    acct.Cancel(ordersToCancel);
-                    Print(string.Format("[FLATTEN_PUMP] {0}: Cancelled {1} order(s) [{2}]",
-                        acct.Name, ordersToCancel.Count, item.Source));
-                }
-
-                // Step 2: Submit market close for each open position (skip if CancelOnly with no close intent)
                 if (!item.CancelOnly)
                 {
-                    int closedCount = 0;
-                    foreach (Position position in acct.Positions)
-                    {
-                        if (position.Instrument.FullName != Instrument.FullName) continue;
-                        if (position.MarketPosition == MarketPosition.Flat) continue;
-
-                        int qty = position.Quantity;
-                        OrderAction closeAction = position.MarketPosition == MarketPosition.Long
-                            ? OrderAction.Sell : OrderAction.BuyToCover;
-
-                        if (item.IsMaster)
-                        {
-                            string sigName = position.MarketPosition == MarketPosition.Long
-                                ? "Flatten_MasterLong" : "Flatten_MasterShort";
-                            Order masterClose = position.MarketPosition == MarketPosition.Long
-                                ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qty, 0, 0, "", sigName)
-                                : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", sigName);
-                            if (masterClose != null) closedCount++;
-                            else Print(string.Format("[FLATTEN_PUMP] Master close FAILED (null): {0} {1}",
-                                position.MarketPosition, qty));
-                        }
-                        else
-                        {
-                            string sigName = "Flatten_" + position.MarketPosition.ToString();
-                            Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market,
-                                TimeInForce.Gtc, qty, 0, 0, "", sigName, null);
-                            acct.Submit(new[] { closeOrder });
-                            closedCount++;
-                        }
-                    }
-
-                    if (closedCount > 0)
-                        Print(string.Format("[FLATTEN_PUMP] {0}: Closed {1} position(s) [{2}]",
-                            acct.Name, closedCount, item.Source));
+                    ProcessFlattenWorkItem_ClosePositions(item, acct);
                 }
 
                 SetExpectedPositionLocked(ExpKey(acct.Name), 0);
@@ -203,21 +134,113 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
-                // Chain to next account or release guard
-                if (!_pendingFlattenOps.IsEmpty)
+                ChainNextFlattenOp();
+            }
+        }
+
+        /// <summary>
+        /// Cancel working orders for the flatten work item.
+        /// Handles ZombieSweepOnly filtering for ClosePositionsOnly mode.
+        /// </summary>
+        private void ProcessFlattenWorkItem_CancelOrders(FlattenWorkItem item, Account acct)
+        {
+            List<Order> ordersToCancel = new List<Order>();
+            foreach (Order order in acct.Orders.ToArray())
+            {
+                if (order == null || order.Instrument == null) continue;
+                if (order.Instrument.FullName != Instrument.FullName) continue;
+
+                bool isTerminal = order.OrderState == OrderState.Cancelled
+                    || order.OrderState == OrderState.CancelPending
+                    || order.OrderState == OrderState.CancelSubmitted
+                    || order.OrderState == OrderState.Filled
+                    || order.OrderState == OrderState.Rejected;
+                if (isTerminal) continue;
+
+                if (item.ZombieSweepOnly)
                 {
-                    try { TriggerCustomEvent(o => PumpFlattenOps(), null); }
-                    catch (Exception ex)
-                    {
-                        isFlattenRunning = false;
-                        LogException("SIMA.Flatten", "PumpFlattenOps.TriggerCustomEvent", ex);
-                    }
+                    bool isZombieTarget =
+                        order.Name.StartsWith("EMERGENCY_STOP_", StringComparison.OrdinalIgnoreCase) ||
+                        order.Name.StartsWith("T1_", StringComparison.OrdinalIgnoreCase) ||
+                        order.Name.StartsWith("T2_", StringComparison.OrdinalIgnoreCase) ||
+                        order.Name.StartsWith("T3_", StringComparison.OrdinalIgnoreCase) ||
+                        order.Name.StartsWith("T4_", StringComparison.OrdinalIgnoreCase) ||
+                        order.Name.StartsWith("T5_", StringComparison.OrdinalIgnoreCase);
+                    if (!isZombieTarget) continue;
+                }
+
+                ordersToCancel.Add(order);
+            }
+
+            if (ordersToCancel.Count > 0)
+            {
+                acct.Cancel(ordersToCancel);
+                Print(string.Format("[FLATTEN_PUMP] {0}: Cancelled {1} order(s) [{2}]",
+                    acct.Name, ordersToCancel.Count, item.Source));
+            }
+        }
+
+        /// <summary>
+        /// Submit market close orders for open positions.
+        /// Routes to Master (SubmitOrderUnmanaged) or Fleet (Account.Submit) based on IsMaster flag.
+        /// </summary>
+        private void ProcessFlattenWorkItem_ClosePositions(FlattenWorkItem item, Account acct)
+        {
+            int closedCount = 0;
+            foreach (Position position in acct.Positions)
+            {
+                if (position.Instrument.FullName != Instrument.FullName) continue;
+                if (position.MarketPosition == MarketPosition.Flat) continue;
+
+                int qty = position.Quantity;
+                OrderAction closeAction = position.MarketPosition == MarketPosition.Long
+                    ? OrderAction.Sell : OrderAction.BuyToCover;
+
+                if (item.IsMaster)
+                {
+                    string sigName = position.MarketPosition == MarketPosition.Long
+                        ? "Flatten_MasterLong" : "Flatten_MasterShort";
+                    Order masterClose = position.MarketPosition == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, qty, 0, 0, "", sigName)
+                        : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, qty, 0, 0, "", sigName);
+                    if (masterClose != null) closedCount++;
+                    else Print(string.Format("[FLATTEN_PUMP] Master close FAILED (null): {0} {1}",
+                        position.MarketPosition, qty));
                 }
                 else
                 {
-                    isFlattenRunning = false;
-                    Print("[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======");
+                    string sigName = "Flatten_" + position.MarketPosition.ToString();
+                    Order closeOrder = acct.CreateOrder(Instrument, closeAction, OrderType.Market,
+                        TimeInForce.Gtc, qty, 0, 0, "", sigName, null);
+                    acct.Submit(new[] { closeOrder });
+                    closedCount++;
                 }
+            }
+
+            if (closedCount > 0)
+                Print(string.Format("[FLATTEN_PUMP] {0}: Closed {1} position(s) [{2}]",
+                    acct.Name, closedCount, item.Source));
+        }
+
+        /// <summary>
+        /// Chain to next flatten operation or release isFlattenRunning guard.
+        /// Handles TriggerCustomEvent recursion and exception recovery.
+        /// </summary>
+        private void ChainNextFlattenOp()
+        {
+            if (!_pendingFlattenOps.IsEmpty)
+            {
+                try { TriggerCustomEvent(o => PumpFlattenOps(), null); }
+                catch (Exception ex)
+                {
+                    isFlattenRunning = false;
+                    LogException("SIMA.Flatten", "PumpFlattenOps.TriggerCustomEvent", ex);
+                }
+            }
+            else
+            {
+                isFlattenRunning = false;
+                Print("[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======");
             }
         }
 

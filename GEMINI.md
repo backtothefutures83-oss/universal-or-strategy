@@ -23,12 +23,14 @@
 - **ORCHESTRATOR (Antigravity)**: P1 Central Switchboard. BANNED from manual coding.
 - **BACKUP ENGINEER (Gemini CLI)**: Hot standby. Permitted for manual coding when acting as Backup Engineer.
 - **FORENSICS (Codex)**: P2 Diagnosis & Proof of Failure.
-- **ARCHITECT (Claude Code)**: P3 Design & Strategic Planning. PLAN-ONLY by default.
+- **ARCHITECT + ENGINEER (P3/P4/P5) -- src/ tasks**: **Bob CLI** (`v12-engineer`) is the unified Architect-Engineer for all `src/` work. Bob handles design gates, God-function splitting, and full surgical implementation in a single session. No separate Claude P3 handoff required for `src/` tickets.
+  - **Bob CLI** (`v12-engineer`): Primary. Design + implementation for extraction, refactoring, complexity reduction.
+  - **Codex CLI** (`codex-rescue`): Secondary. Surgical logic hardening and lock-free kernel updates.
+- **ARCHITECT (P3) -- escalation only**: **Claude Code** reserved for (a) non-src architectural review, (b) $battlezip AMAL sessions, (c) cross-subgraph decisions spanning >3 files outside Bob's context. PLAN-ONLY when invoked.
 - **ADJUDICATOR (Arena AI)**: **P4 Vetting Gate**. Adversarial consensus and **PR Audit** required BEFORE surgery.
-- **ENGINEER (P5)**: Surgical Execution. Target selection is mandatory:
-  - **Bob CLI** (`v12-engineer`): Extraction specialist.
-  - **Codex CLI** (`codex-rescue`): Logic hardening specialist.
-  - **Gemini CLI** (`yolo`): **Utility Specialist & Research Hub**. Handles non-`src/` tasks (docs, infra, configs), model-agnostic operations, **Official Web Research**, and **Video Synthesis** (YouTube/Visual context). **BANNED** from high-value logic synthesis tasks like `$prreport` or `$battlezip`.
+- **ENGINEER (P4/P5) -- non-src tasks**:
+  - **Jules AI**: Primary for GitHub-based workflows.
+  - **Gemini CLI** (`yolo`): Secondary for local file access and visual context tasks. **BANNED** from high-value logic synthesis tasks like `$prreport` or `$battlezip`.
 - **VALIDATOR (Rider / AMAL)**: **P6 Post-Surgery Performance**. ASCII Gate & Allocation checks.
 - **SENTINEL (GitHub / Sentry)**: **P7 Infrastructure & Security**. Supply chain & environmental health.
 
@@ -38,7 +40,7 @@
 
 ### 2. OPERATIONAL WORKFLOW
 
-- **Plan Approval**: Every code change requires `docs/brain/implementation_plan.md` authored by Claude (ARCHITECT). Claude is BANNED from writing to `src/` -- the `.claude/hooks/pre_tool_src_guard.py` hook auto-blocks any attempt.
+- **Plan Approval**: Every `src/` code change requires a plan. For `src/` tasks, **Bob CLI** (`v12-engineer`) authors the plan inline during its design phase -- no separate Claude handoff required. For cross-subgraph escalations, Claude (ARCHITECT) authors `docs/brain/implementation_plan.md`. The UltraThink & UltraPlan ALWAYS mandate (Build 981+) applies to Bob's planning phase equally.
 - **User Mandate**: Orchestrators (Antigravity) are BANNED from approving plans. Only the USER (The Director) can authorize implementation.
 - **Post-Edit Deployment (P5)**: After every `src/` edit, ENGINEER must run `powershell -File .\deploy-sync.ps1`, then tell Director to press F5. Verify BUILD_TAG banner.
 - **Engineer Self-Audit (P5)**: Before handing off for Architectural Audit, the ENGINEER must:
@@ -132,6 +134,14 @@ Bias toward caution over speed. For trivial tasks, use judgment.
   3. [Step] -> verify: [check]
 - Define "done" before starting. Strong criteria let you loop independently.
 - Weak criteria ("make it work") require constant clarification -- avoid them.
+
+## Section 13: Autonomous Skill Creation & Self-Improvement (MANDATORY PILLAR)
+
+**All agents MUST perform a post-use audit after every skill or tool use:**
+1. Check if any instruction was ambiguous or produced an unexpected result.
+2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
+3. State `skill(name): no gaps identified` if no gap is found.
+4. Skipping the post-use audit is a protocol violation.
 
 ## Section 14: $claudecloud Protocol Hardening (Permanent Standard)
 

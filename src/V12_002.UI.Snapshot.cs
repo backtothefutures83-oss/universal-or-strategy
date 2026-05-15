@@ -88,11 +88,29 @@ namespace NinjaTrader.NinjaScript.Strategies
         private UILivePositionSnapshot BuildUiLivePositionSnapshot()
         {
             UILivePositionSnapshot live = new UILivePositionSnapshot();
-            if (activePositions == null || activePositions.Count == 0)
+
+            PositionInfo masterPos;
+            string entryName;
+            if (!FindMasterPosition(out masterPos, out entryName))
                 return live;
 
-            PositionInfo masterPos = null;
-            string entryName = null;
+            live.HasLivePosition = true;
+            live.EntryName = entryName;
+            live.Direction = masterPos.Direction;
+
+            PopulateTargetSnapshots(live, masterPos, entryName);
+            PopulateStopSnapshot(live, masterPos, entryName);
+
+            return live;
+        }
+
+        private bool FindMasterPosition(out PositionInfo masterPos, out string entryName)
+        {
+            masterPos = null;
+            entryName = null;
+
+            if (activePositions == null || activePositions.Count == 0)
+                return false;
 
             foreach (var kvp in activePositions.ToArray())
             {
@@ -104,16 +122,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 masterPos = candidate;
                 entryName = kvp.Key;
-                break;
+                return true;
             }
 
-            if (masterPos == null)
-                return live;
+            return false;
+        }
 
-            live.HasLivePosition = true;
-            live.EntryName = entryName;
-            live.Direction = masterPos.Direction;
-
+        private void PopulateTargetSnapshots(UILivePositionSnapshot live, PositionInfo masterPos, string entryName)
+        {
             for (int targetNum = 1; targetNum <= 5; targetNum++)
             {
                 UILiveTargetSnapshot target = live.Targets[targetNum - 1];
@@ -138,7 +154,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 target.IsWorking = targetOrder != null
                     && (targetOrder.OrderState == OrderState.Working || targetOrder.OrderState == OrderState.Accepted);
             }
+        }
 
+        private void PopulateStopSnapshot(UILivePositionSnapshot live, PositionInfo masterPos, string entryName)
+        {
             Order stopOrder = null;
             if (stopOrders != null)
                 stopOrders.TryGetValue(entryName, out stopOrder);
@@ -146,8 +165,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             live.StopPrice = masterPos.CurrentStopPrice;
             if (stopOrder != null && stopOrder.StopPrice > 0)
                 live.StopPrice = stopOrder.StopPrice;
-
-            return live;
         }
 
         private string BuildUiStatusMessage(UIStateSnapshot snapshot)

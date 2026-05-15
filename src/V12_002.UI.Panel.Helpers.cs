@@ -56,7 +56,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
         }
 
+        // Phase 7 Sprint 5 T09: CYC reduction (26 -> <20) via sub-helper extraction
         private TextBox CreateTextBox(string defaultText, double width)
+        {
+            var tb = CreateTextBoxBase(defaultText, width);
+            ApplyTextBoxKeyboardHandlers(tb);
+            return tb;
+        }
+
+        private TextBox CreateTextBoxBase(string defaultText, double width)
         {
             var tb = new TextBox
             {
@@ -73,59 +81,115 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
             if (width > 0)
                 tb.Width = width;
-            // Phase 7 [KB-R1]: Manual Text Pipeline -- soaks chart-level keyboard hijack
-            // while explicitly managing TextBox content (port from V12_001 baseline).
-            tb.PreviewKeyDown += (s, e) =>
+            return tb;
+        }
+
+        private void HandleTextBoxKeyInput(TextBox textBox, KeyEventArgs e)
+        {
+            // Navigation keys bubble to parent (no e.Handled)
+            if (TryHandleNavigationKey(e.Key))
+                return;
+
+            // Stop event from bubbling to NinjaTrader chart - prevents symbol search
+            e.Handled = true;
+
+            // Null safety
+            if (textBox == null) return;
+
+            // Deletion operations (modify TextBox directly)
+            if (TryHandleBackspace(textBox, e.Key)) return;
+            if (TryHandleDelete(textBox, e.Key)) return;
+
+            // Character mapping (numeric, special, space)
+            string keyChar;
+            if (TryMapNumericKey(e.Key, out keyChar) ||
+                TryMapSpecialCharacter(e.Key, out keyChar))
             {
-                // Let Tab/Enter/Escape bubble for navigation
-                if (e.Key == Key.Tab || e.Key == Key.Enter || e.Key == Key.Escape)
-                    return;
-
-                // Stop event from bubbling to NinjaTrader chart - prevents symbol search
-                e.Handled = true;
-
-                // Manually handle the key input for the TextBox
-                TextBox textBox = s as TextBox;
-                if (textBox == null) return;
-
-                string keyChar = "";
-                if (e.Key >= Key.D0 && e.Key <= Key.D9)
-                    keyChar = ((char)('0' + (e.Key - Key.D0))).ToString();
-                else if (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9)
-                    keyChar = ((char)('0' + (e.Key - Key.NumPad0))).ToString();
-                else if (e.Key == Key.Back && textBox.Text.Length > 0 && textBox.SelectionStart > 0)
-                {
-                    int pos = textBox.SelectionStart;
-                    textBox.Text = textBox.Text.Remove(pos - 1, 1);
-                    textBox.SelectionStart = pos - 1;
-                    return;
-                }
-                else if (e.Key == Key.Delete && textBox.SelectionStart < textBox.Text.Length)
-                {
-                    int pos = textBox.SelectionStart;
-                    textBox.Text = textBox.Text.Remove(pos, 1);
-                    textBox.SelectionStart = pos;
-                    return;
-                }
-                else if (e.Key == Key.OemPeriod || e.Key == Key.Decimal)
-                    keyChar = ".";
-                else if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
-                    keyChar = "-";
-                else if (e.Key == Key.Space)
-                    keyChar = " ";
-                else
-                    return;  // Ignore other keys
-
                 int caret = textBox.SelectionStart;
                 textBox.Text = textBox.Text.Insert(caret, keyChar);
                 textBox.SelectionStart = caret + 1;
-            };
+                return;
+            }
+
+            // All other keys ignored (no-op)
+        }
+
+        private static bool TryHandleNavigationKey(Key key)
+        {
+            return key == Key.Tab || key == Key.Enter || key == Key.Escape;
+        }
+
+        private static bool TryMapNumericKey(Key key, out string keyChar)
+        {
+            if (key >= Key.D0 && key <= Key.D9)
+            {
+                keyChar = ((char)('0' + (key - Key.D0))).ToString();
+                return true;
+            }
+            if (key >= Key.NumPad0 && key <= Key.NumPad9)
+            {
+                keyChar = ((char)('0' + (key - Key.NumPad0))).ToString();
+                return true;
+            }
+            keyChar = null;
+            return false;
+        }
+
+        private static bool TryHandleBackspace(TextBox textBox, Key key)
+        {
+            if (key == Key.Back && textBox.Text.Length > 0 && textBox.SelectionStart > 0)
+            {
+                int pos = textBox.SelectionStart;
+                textBox.Text = textBox.Text.Remove(pos - 1, 1);
+                textBox.SelectionStart = pos - 1;
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TryHandleDelete(TextBox textBox, Key key)
+        {
+            if (key == Key.Delete && textBox.SelectionStart < textBox.Text.Length)
+            {
+                int pos = textBox.SelectionStart;
+                textBox.Text = textBox.Text.Remove(pos, 1);
+                textBox.SelectionStart = pos;
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TryMapSpecialCharacter(Key key, out string keyChar)
+        {
+            if (key == Key.OemPeriod || key == Key.Decimal)
+            {
+                keyChar = ".";
+                return true;
+            }
+            if (key == Key.OemMinus || key == Key.Subtract)
+            {
+                keyChar = "-";
+                return true;
+            }
+            if (key == Key.Space)
+            {
+                keyChar = " ";
+                return true;
+            }
+            keyChar = null;
+            return false;
+        }
+
+        private void ApplyTextBoxKeyboardHandlers(TextBox tb)
+        {
+            // Phase 7 [KB-R1]: Manual Text Pipeline -- soaks chart-level keyboard hijack
+            // while explicitly managing TextBox content (port from V12_001 baseline).
+            tb.PreviewKeyDown += (s, e) => HandleTextBoxKeyInput(s as TextBox, e);
             tb.GotKeyboardFocus += (s, e) =>
             {
                 // Stop bubbling to prevent NT8 chart keyboard shortcuts
                 e.Handled = true;
             };
-            return tb;
         }
 
         private ComboBox CreateCombo(double width, params string[] items)

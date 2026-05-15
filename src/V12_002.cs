@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.006-phase-6-complete";  // PR76 confirmed: D1 drain overflow log, D2 ExpKey null guard, D3 semaphore finally, D6 reconnect catch
+        public const string BUILD_TAG = "1111.007-mphase-mp0";  // MP-0 COMPLETE: Dictionary dispatch conversion
 
         public class UILiveTargetSnapshot
         {
@@ -247,6 +247,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile bool isTrendRmaMode = false; // False = STD (All-in), True = RMA (9/15 Split)
         private volatile bool isRetestRmaMode = false; // V12: RETEST RMA toggle state
 
+        // MP0: Dictionary dispatch tables for IPC command routing
+        private Dictionary<string, Action> _modeSetFlagsDispatch;
+        private Dictionary<string, Action> _modeExecDispatch;
+
         // V12.2 Hybrid Sync: Logic State
         private volatile bool isTosSyncMode = false;
         private bool isLongArmed = false;
@@ -336,6 +340,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private volatile bool _configureComplete = false;
         private volatile bool _dataLoadedComplete = false;
         private int _startupReadinessLogEmitted = 0;
+        private volatile bool _diagFleet;  // T-Q1: Fleet dispatch + account queue catch logging
+        private volatile bool _diagIpc;    // T-Q1: MMIO mirror publish catch logging
         protected void Enqueue(Action<V12_002> action) {
             if (action == null) return;
             _cmdQueue.Enqueue(new DelegateCommand(action));
@@ -532,12 +538,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly HashSet<string> _subscribedAccountNames = new HashSet<string>();
 
 
-        // V12.Phase7 [H-10]: Mutex guard for SIMA enable/disable transitions -- prevents partial state
+        // V12.Phase7 [H-10]: Lock-free gate for SIMA enable/disable transitions -- prevents partial state
         // if two enable/disable calls interleave (e.g. IPC toggle while UI toggle in progress).
-        private readonly SemaphoreSlim _simaToggleSem = new SemaphoreSlim(1, 1);
-        // V12.Audit [H-10]: Tracks a toggle that could not complete due to semaphore timeout.
+        // 0=idle, 1=busy (Interlocked.CompareExchange acquire, Interlocked.Exchange release in finally)
+        private int _simaToggleState = 0;
+        // V12.Audit [H-10]: Tracks a toggle that could not complete due to gate contention.
         // ApplySimaState retries the pending toggle at the top of its next invocation.
-        private volatile bool _simaTogglePending = false;
+        // 0=no retry, 1=retry pending (Volatile.Read/Write)
+        private int _simaTogglePending = 0;
         private volatile int _accountOrderPumpScheduled = 0;
         private volatile int _accountOrderPumpDeferredWhileFlatten = 0;
         private volatile int _accountExecutionPumpScheduled = 0;

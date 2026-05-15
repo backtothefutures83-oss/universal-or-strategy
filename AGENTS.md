@@ -1,16 +1,18 @@
-﻿# AGENTS.md - Sovereign Agent Protocol
+# AGENTS.md - Sovereign Agent Protocol
 
 Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repository. This environment is optimized for autonomous multi-agent development under the **Sovereign Droid Protocol (SDP)**.
 
 ## 1. Agent Hierarchy (The Director's Gate)
 
 - **ORCHESTRATOR (P1)**: Central Switchboard (Antigravity / Gemini CLI). Controls context and cross-agent routing.
-- **ARCHITECT (P3)**: Strategic Design (**Claude Opus 4.7**). **PLAN-ONLY**. Authored plans reside in `docs/brain/implementation_plan.md`.
+- **ARCHITECT + ENGINEER (P3/P4/P5) — src/ tasks**: **Bob CLI** (`v12-engineer`) is the unified Architect-Engineer for all `src/` work. Bob handles design (planning), extraction, refactoring, and surgical implementation in a single Orchestrator session. No separate P3 handoff to Claude is required for `src/` tickets.
+  - **Bob CLI** (`v12-engineer`): Primary. Handles design-only gates, God-function splitting, and full implementation.
+  - **Codex CLI** (`codex-rescue`): Secondary. Specialist for surgical logic hardening and lock-free kernel updates when Bob delegates.
+- **ARCHITECT (P3) — escalation only**: **Claude Opus 4.7** is reserved for (a) non-src architectural review, (b) $battlezip compound intelligence sessions, and (c) cross-subgraph design decisions that span >3 files outside Bob's current context. Claude remains PLAN-ONLY when invoked.
 - **ADJUDICATOR (Arena AI)**: **P4 Vetting Gate**. Adversarial consensus and **PR Audit** required BEFORE surgery.
-- **ENGINEER (P4/P5)**: Surgical Implementation. Executes approved plans. Target selection is mandatory:
-    - **Bob CLI** (`v12-engineer`): Specialist for SIMA extraction, god-function splitting, and high-performance repairs.
-    - **Codex CLI** (`codex-rescue`): Specialist for logic hardening, lock-free kernel updates, and forensic repairs.
-    - **Gemini CLI** (`yolo`): **Utility Specialist & Research Hub**. Handles non-`src/` tasks (docs, infra, configs), model-agnostic operations, **Official Web Research**, and **Video Synthesis** (YouTube/Visual context).
+- **ENGINEER (P4/P5) — non-src tasks**: Target selection follows strict routing logic:
+    - **Jules AI**: Primary non-src engineer for GitHub-based workflows.
+    - **Gemini CLI** (`yolo`): Secondary non-src local engineer for tasks requiring local file access or visual context.
 - **FORENSICS (P2/P6)**: Diagnosis (P2) and Adversarial Audit (P6).
 
 ## 2. Architectural Mandates (THE PLATINUM STANDARD)
@@ -68,6 +70,14 @@ Bias toward caution over speed. For trivial tasks, use judgment.
   1. [Step] -> verify: [check]
   2. [Step] -> verify: [check]
 - Strong success criteria let you loop independently. "Make it work" is not a criterion.
+
+## 6. Autonomous Skill Creation & Self-Improvement (MANDATORY PILLAR)
+
+**All agents MUST perform a post-use audit after every skill or tool use:**
+1. Check if any instruction was ambiguous or produced an unexpected result.
+2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
+3. State `skill(name): no gaps identified` if no gap is found.
+4. Skipping the post-use audit is a protocol violation.
 
 ## Graphify Protocols (Universal Knowledge Layer)
 
@@ -159,12 +169,12 @@ This protocol governs the **SIMA Subgraph Extraction** and all complex refactori
 - **Output**: Forensic report in `docs/brain/forensics_report.md`.
 
 ### Stage 1: Vision/Spec (Architect)
-- **Agent**: Traycer (Frontier Mode)
+- **Agent**: Bob CLI (`v12-engineer`)
 - **Goal**: Dialogue with Director to generate `mini-spec.md`.
 - **Constraint**: Must verify logic against V12 DNA.
 
 ### Stage 2: Arch Planning (Architect)
-- **Agent**: Traycer (Frontier Mode)
+- **Agent**: Bob CLI (`v12-engineer`)
 - **Goal**: Generate `implementation_plan.md` + Mermaid diagrams.
 - **Audit**: Triple-Agent UltraThink audit required.
 
@@ -174,7 +184,7 @@ This protocol governs the **SIMA Subgraph Extraction** and all complex refactori
 - **Gate**: PASS/FAIL. Fail triggers Stage 2 rework.
 
 ### Stage 4: Recursive Execution (Engineer Selection)
-- **Action**: Hand off to the selected Engineer via Traycer Handoff Menu.
+- **Action**: Hand off to the selected Engineer via the Bob CLI Orchestrator session.
 - **Targets**: 
   - **Bob CLI** for extraction/splitting (P5 Surgical).
   - **Codex CLI** for logic hardening (P5 Logic).
@@ -182,7 +192,7 @@ This protocol governs the **SIMA Subgraph Extraction** and all complex refactori
 - **Safety**: Mandatory checkpointing enabled.
 
 ### Stage 5: Verification/Review (Forensics)
-- **Agent**: Traycer (Re-verify cycle) + Orchestrator
+- **Agent**: Bob CLI (verify cycle) + Orchestrator
 - **Goal**: Compare implementation against `implementation_plan.md`.
 - **Loop**: Automated "Fix-all" loop if logic drifts.
 

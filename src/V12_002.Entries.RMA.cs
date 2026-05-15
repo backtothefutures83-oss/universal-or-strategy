@@ -58,122 +58,177 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
-                // Logic: EMA 9 vs EMA 15 alignment determines trend direction.
-                double e9 = Instrument.MasterInstrument.RoundToTickSize(ema9[0]);
-                double e15 = Instrument.MasterInstrument.RoundToTickSize(ema15[0]);
-                bool isLongTrend = e9 > e15;
-                MarketPosition direction = isLongTrend ? MarketPosition.Long : MarketPosition.Short;
-                OrderAction entryAction = isLongTrend ? OrderAction.Buy : OrderAction.SellShort;
-
-                // TREND_RMA is risk-sized from MaxRiskAmount (default $200), then split across EMA9/EMA15.
-                // V12.1101E [B-1]: Decouple per-leg multipliers -- mirror the standard TREND entry logic.
-                // E1 (EMA9 leg) uses TRENDEntry1ATRMultiplier; E2 (EMA15 leg) uses TRENDEntry2ATRMultiplier.
-                // When isTrendRmaMode is ON, both legs fall back to RMAStopATRMultiplier (same as standard TREND).
-                double e1Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
-                double e2Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
-                double stop9Dist  = CalculateATRStopDistance(e1Mult);  // EMA9 leg stop distance
-                double stop15Dist = CalculateATRStopDistance(e2Mult);  // EMA15 leg stop distance
-                double weightedStopDist = (stop9Dist * (1.0 / 3.0)) + (stop15Dist * (2.0 / 3.0));
-
-                // totalQty extracted directly from passed in parameter (contracts) rather than dynamic calculation
-                int totalQty = contracts;
-                // TREND-SPLIT-FIX: Strict floor -- EMA9 gets ?Total/3?, EMA15 gets remainder.
-                // Matches the (1/3, 2/3) weights in weightedStopDist; prevents risk budget overrun.
-                int qty9  = Math.Max(1, totalQty / 3);
-                int qty15 = Math.Max(0, totalQty - qty9);
-                if (totalQty >= 2 && qty15 < 1) { qty15 = 1; qty9 = Math.Max(1, totalQty - qty15); }
-
-                int finalTotalQty = qty9 + qty15;
-                string timestamp = DateTime.Now.ToString("HHmmssffff");
-                string trendGroupId = "TRMA_" + timestamp;
-                string entry1Name = trendGroupId + "_E1";
-                string entry2Name = trendGroupId + "_E2";
-
-                double stop1Price = Instrument.MasterInstrument.RoundToTickSize(
-                    direction == MarketPosition.Long ? e9 - stop9Dist : e9 + stop9Dist);
-                PositionInfo pos1 = CreateTRENDPosition(entry1Name, direction, e9, stop1Price, qty9, true, trendGroupId, true);
-
-                List<string> masterEntryNames = new List<string> { entry1Name };
-
-                int masterDeltaE1 = (direction == MarketPosition.Long) ? qty9 : -qty9;
-                { var _aek966 = ExpKey(Account.Name); var _aed966 = (masterDeltaE1); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
-
-                Order entryOrder1 = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, qty9, e9, 0, "", entry1Name)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, qty9, e9, 0, "", entry1Name);
-
-                // A1-1/A2-1: Null-abort + stateLock wrap for E1 (Build 960 audit fix)
-                if (entryOrder1 == null)
-                {
-                    { var _aek966 = ExpKey(Account.Name); var _aed966 = (-masterDeltaE1); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
-                    Print("[ENTRY_ABORT] TrendSplit E1 SubmitOrderUnmanaged returned null for " + entry1Name + ". Rolling back.");
-                    return;
-                }
-                { var _en966 = entry1Name; var _p966 = pos1; var _eo966 = entryOrder1;
-                Enqueue(ctx => { ctx.activePositions[_en966] = _p966; ctx.entryOrders[_en966] = _eo966; }); }
-
-                if (qty15 > 0)
-                {
-                    double stop2Price = Instrument.MasterInstrument.RoundToTickSize(
-                        direction == MarketPosition.Long ? e15 - stop15Dist : e15 + stop15Dist);
-                    PositionInfo pos2 = CreateTRENDPosition(entry2Name, direction, e15, stop2Price, qty15, false, trendGroupId, true);
-
-                    linkedTRENDEntries[entry1Name] = entry2Name;
-                    linkedTRENDEntries[entry2Name] = entry1Name;
-
-                    int masterDeltaE2 = (direction == MarketPosition.Long) ? qty15 : -qty15;
-                    { var _aek966 = ExpKey(Account.Name); var _aed966 = (masterDeltaE2); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
-
-                    Order entryOrder2 = direction == MarketPosition.Long
-                        ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, qty15, e15, 0, "", entry2Name)
-                        : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, qty15, e15, 0, "", entry2Name);
-
-                    // A1-1/A2-1: Null-abort + stateLock wrap for E2 (Build 960 audit fix)
-                    if (entryOrder2 == null)
-                    {
-                        { var _aek966 = ExpKey(Account.Name); var _aed966 = (-masterDeltaE2); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
-                        // Remove partnership references; HandleOrderCancelled will teardown E1 state naturally.
-                        string removedPartner;
-                        linkedTRENDEntries.TryRemove(entry1Name, out removedPartner);
-                        linkedTRENDEntries.TryRemove(entry2Name, out removedPartner);
-                        if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState)) CancelOrderSafe(entryOrder1, null);
-                        Print("[ENTRY_ABORT] TrendSplit E2 NULL -- E1 cancel issued for " + entry1Name + "; teardown deferred to cancel callback.");
-                        return;
-                    }
-                    { var _en966 = entry2Name; var _p966 = pos2; var _eo966 = entryOrder2;
-                    Enqueue(ctx => { ctx.activePositions[_en966] = _p966; ctx.entryOrders[_en966] = _eo966; }); }
-                    masterEntryNames.Add(entry2Name);
-                }
-
-                double weightedEntryPrice = ((e9 * qty9) + (e15 * qty15)) / Math.Max(1, finalTotalQty);
-                weightedEntryPrice = Instrument.MasterInstrument.RoundToTickSize(weightedEntryPrice);
-
-                Print(string.Format("TREND RMA SPLIT: {0} | Qty={1} (EMA9={2}, EMA15={3}) | EMA9={4:F2} EMA15={5:F2} | Anchor={6:F2}",
-                    direction == MarketPosition.Long ? "LONG" : "SHORT",
-                    finalTotalQty,
-                    qty9,
-                    qty15,
-                    e9,
-                    e15,
-                    weightedEntryPrice));
-
-                if (EnableSIMA)
-                {
-                    ExecuteSmartDispatchEntry(
-                        "TREND_RMA",
-                        entryAction,
-                        finalTotalQty,
-                        weightedEntryPrice,
-                        OrderType.Limit,
-                        masterEntryNames.ToArray());
-                }
-
-                DeactivateTRENDMode();
+                // M1-B: Orchestrator pattern - delegates to focused helpers (CYC 31 -> <=5)
+                var levels = CalculateTrendSplitLevels(contracts);
+                var brackets = SubmitTrendSplitBrackets(levels);
+                if (brackets == null) return; // Null-abort from bracket submission
+                FinalizeTrendSplitEntry(levels, brackets);
             }
             catch (Exception ex)
             {
                 Print("ERROR ExecuteTrendSplitEntry: " + ex.Message);
             }
+        }
+
+        // M1-B Helper: Calculate EMA9/EMA15 split levels and quantities
+        private TrendSplitLevels CalculateTrendSplitLevels(int contracts)
+        {
+            // Logic: EMA 9 vs EMA 15 alignment determines trend direction.
+            double e9 = Instrument.MasterInstrument.RoundToTickSize(ema9[0]);
+            double e15 = Instrument.MasterInstrument.RoundToTickSize(ema15[0]);
+            bool isLongTrend = e9 > e15;
+            MarketPosition direction = isLongTrend ? MarketPosition.Long : MarketPosition.Short;
+            OrderAction entryAction = isLongTrend ? OrderAction.Buy : OrderAction.SellShort;
+
+            // TREND_RMA is risk-sized from MaxRiskAmount (default $200), then split across EMA9/EMA15.
+            // V12.1101E [B-1]: Decouple per-leg multipliers -- mirror the standard TREND entry logic.
+            // E1 (EMA9 leg) uses TRENDEntry1ATRMultiplier; E2 (EMA15 leg) uses TRENDEntry2ATRMultiplier.
+            // When isTrendRmaMode is ON, both legs fall back to RMAStopATRMultiplier (same as standard TREND).
+            double e1Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
+            double e2Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
+            double stop9Dist  = CalculateATRStopDistance(e1Mult);  // EMA9 leg stop distance
+            double stop15Dist = CalculateATRStopDistance(e2Mult);  // EMA15 leg stop distance
+
+            // totalQty extracted directly from passed in parameter (contracts) rather than dynamic calculation
+            int totalQty = contracts;
+            // TREND-SPLIT-FIX: Strict floor -- EMA9 gets ?Total/3?, EMA15 gets remainder.
+            // Matches the (1/3, 2/3) weights in weightedStopDist; prevents risk budget overrun.
+            int qty9  = Math.Max(1, totalQty / 3);
+            int qty15 = Math.Max(0, totalQty - qty9);
+            if (totalQty >= 2 && qty15 < 1) { qty15 = 1; qty9 = Math.Max(1, totalQty - qty15); }
+
+            int finalTotalQty = qty9 + qty15;
+            string timestamp = DateTime.Now.ToString("HHmmssffff");
+            string trendGroupId = "TRMA_" + timestamp;
+
+            return new TrendSplitLevels
+            {
+                E9 = e9,
+                E15 = e15,
+                Direction = direction,
+                EntryAction = entryAction,
+                Stop9Dist = stop9Dist,
+                Stop15Dist = stop15Dist,
+                Qty9 = qty9,
+                Qty15 = qty15,
+                FinalTotalQty = finalTotalQty,
+                TrendGroupId = trendGroupId,
+                Entry1Name = trendGroupId + "_E1",
+                Entry2Name = trendGroupId + "_E2"
+            };
+        }
+
+        // M1-B Helper: Submit both bracket legs (Build 981 Protocol: direct stopOrders writes preserved)
+        private TrendSplitBrackets SubmitTrendSplitBrackets(TrendSplitLevels levels)
+        {
+            double stop1Price = Instrument.MasterInstrument.RoundToTickSize(
+                levels.Direction == MarketPosition.Long ? levels.E9 - levels.Stop9Dist : levels.E9 + levels.Stop9Dist);
+            PositionInfo pos1 = CreateTRENDPosition(levels.Entry1Name, levels.Direction, levels.E9, stop1Price, levels.Qty9, true, levels.TrendGroupId, true);
+
+            List<string> masterEntryNames = new List<string> { levels.Entry1Name };
+
+            int masterDeltaE1 = (levels.Direction == MarketPosition.Long) ? levels.Qty9 : -levels.Qty9;
+            { var _aek966 = ExpKey(Account.Name); var _aed966 = (masterDeltaE1); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+
+            Order entryOrder1 = levels.Direction == MarketPosition.Long
+                ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, levels.Qty9, levels.E9, 0, "", levels.Entry1Name)
+                : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, levels.Qty9, levels.E9, 0, "", levels.Entry1Name);
+
+            // A1-1/A2-1: Null-abort + stateLock wrap for E1 (Build 960 audit fix)
+            if (entryOrder1 == null)
+            {
+                { var _aek966 = ExpKey(Account.Name); var _aed966 = (-masterDeltaE1); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+                Print("[ENTRY_ABORT] TrendSplit E1 SubmitOrderUnmanaged returned null for " + levels.Entry1Name + ". Rolling back.");
+                return null;
+            }
+            { var _en966 = levels.Entry1Name; var _p966 = pos1; var _eo966 = entryOrder1;
+            Enqueue(ctx => { ctx.activePositions[_en966] = _p966; ctx.entryOrders[_en966] = _eo966; }); }
+
+            if (levels.Qty15 > 0)
+            {
+                double stop2Price = Instrument.MasterInstrument.RoundToTickSize(
+                    levels.Direction == MarketPosition.Long ? levels.E15 - levels.Stop15Dist : levels.E15 + levels.Stop15Dist);
+                PositionInfo pos2 = CreateTRENDPosition(levels.Entry2Name, levels.Direction, levels.E15, stop2Price, levels.Qty15, false, levels.TrendGroupId, true);
+
+                linkedTRENDEntries[levels.Entry1Name] = levels.Entry2Name;
+                linkedTRENDEntries[levels.Entry2Name] = levels.Entry1Name;
+
+                int masterDeltaE2 = (levels.Direction == MarketPosition.Long) ? levels.Qty15 : -levels.Qty15;
+                { var _aek966 = ExpKey(Account.Name); var _aed966 = (masterDeltaE2); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+
+                Order entryOrder2 = levels.Direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, levels.Qty15, levels.E15, 0, "", levels.Entry2Name)
+                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, levels.Qty15, levels.E15, 0, "", levels.Entry2Name);
+
+                // A1-1/A2-1: Null-abort + stateLock wrap for E2 (Build 960 audit fix)
+                if (entryOrder2 == null)
+                {
+                    { var _aek966 = ExpKey(Account.Name); var _aed966 = (-masterDeltaE2); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+                    // Remove partnership references; HandleOrderCancelled will teardown E1 state naturally.
+                    string removedPartner;
+                    linkedTRENDEntries.TryRemove(levels.Entry1Name, out removedPartner);
+                    linkedTRENDEntries.TryRemove(levels.Entry2Name, out removedPartner);
+                    if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState)) CancelOrderSafe(entryOrder1, null);
+                    Print("[ENTRY_ABORT] TrendSplit E2 NULL -- E1 cancel issued for " + levels.Entry1Name + "; teardown deferred to cancel callback.");
+                    return null;
+                }
+                { var _en966 = levels.Entry2Name; var _p966 = pos2; var _eo966 = entryOrder2;
+                Enqueue(ctx => { ctx.activePositions[_en966] = _p966; ctx.entryOrders[_en966] = _eo966; }); }
+                masterEntryNames.Add(levels.Entry2Name);
+            }
+
+            return new TrendSplitBrackets { MasterEntryNames = masterEntryNames };
+        }
+
+        // M1-B Helper: Finalize entry with weighted calculation, logging, SIMA dispatch, and mode deactivation
+        private void FinalizeTrendSplitEntry(TrendSplitLevels levels, TrendSplitBrackets brackets)
+        {
+            double weightedEntryPrice = ((levels.E9 * levels.Qty9) + (levels.E15 * levels.Qty15)) / Math.Max(1, levels.FinalTotalQty);
+            weightedEntryPrice = Instrument.MasterInstrument.RoundToTickSize(weightedEntryPrice);
+
+            Print(string.Format("TREND RMA SPLIT: {0} | Qty={1} (EMA9={2}, EMA15={3}) | EMA9={4:F2} EMA15={5:F2} | Anchor={6:F2}",
+                levels.Direction == MarketPosition.Long ? "LONG" : "SHORT",
+                levels.FinalTotalQty,
+                levels.Qty9,
+                levels.Qty15,
+                levels.E9,
+                levels.E15,
+                weightedEntryPrice));
+
+            if (EnableSIMA)
+            {
+                ExecuteSmartDispatchEntry(
+                    "TREND_RMA",
+                    levels.EntryAction,
+                    levels.FinalTotalQty,
+                    weightedEntryPrice,
+                    OrderType.Limit,
+                    brackets.MasterEntryNames.ToArray());
+            }
+
+            DeactivateTRENDMode();
+        }
+
+        // M1-B: Data transfer objects for helper methods
+        private class TrendSplitLevels
+        {
+            public double E9;
+            public double E15;
+            public MarketPosition Direction;
+            public OrderAction EntryAction;
+            public double Stop9Dist;
+            public double Stop15Dist;
+            public int Qty9;
+            public int Qty15;
+            public int FinalTotalQty;
+            public string TrendGroupId;
+            public string Entry1Name;
+            public string Entry2Name;
+        }
+
+        private class TrendSplitBrackets
+        {
+            public List<string> MasterEntryNames;
         }
 
         #endregion
