@@ -1050,6 +1050,161 @@ namespace V12.Sima.Tests
                           "Out-of-order fill handled");
         }
 
+        /// <summary>
+        /// T10: Stop Fill Contract Decrement.
+        /// Tests that stop fills properly decrement RemainingContracts.
+        /// </summary>
+        [Fact]
+        public void T10_StopFill_Decrements_RemainingContracts()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Active,
+                RemainingContracts = 2,
+                StopOrder = new MockOrder("ORD002", "Stop_Fleet_Apex_1",
+                                          OrderAction.Sell, 2)
+            };
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            _mockFsm.MapOrderId("ORD002", "Fleet_Apex_1", fsm.Generation);
+
+            // Act: Stop fills completely
+            var stopFill = CreateFilledEvent("ORD002", "Stop_Fleet_Apex_1",
+                                            2, 4480.0);
+            _mockFsm.EnqueueEvent(stopFill);
+            _mockFsm.DrainMailbox();
+
+            // Assert
+            AssertFsmState(fsm, FollowerBracketState.Filled, "Stop filled");
+            AssertRemainingContracts(fsm, 0);
+        }
+
+        /// <summary>
+        /// T11: T1 Target Detection.
+        /// Tests that T1 target fills are detected and contracts decremented.
+        /// </summary>
+        [Fact]
+        public void T11_T1_Target_Detection_And_Decrement()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Active,
+                RemainingContracts = 5
+            };
+            fsm.Targets[0] = new MockOrder("ORD003", "T1_Fleet_Apex_1",
+                                           OrderAction.Sell, 1);
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            _mockFsm.MapOrderId("ORD003", "Fleet_Apex_1", fsm.Generation);
+
+            // Act: T1 fills (1 contract)
+            var t1Fill = CreateFilledEvent("ORD003", "T1_Fleet_Apex_1",
+                                          1, 4520.0);
+            _mockFsm.EnqueueEvent(t1Fill);
+            _mockFsm.DrainMailbox();
+
+            // Assert: Still active with 4 contracts
+            AssertFsmState(fsm, FollowerBracketState.Active, "T1 filled");
+            AssertRemainingContracts(fsm, 4);
+        }
+
+        /// <summary>
+        /// T12: Multi-Target Scaling.
+        /// Tests that multiple target fills (T1+T2+T3) properly decrement contracts.
+        /// </summary>
+        [Fact]
+        public void T12_MultiTarget_Scaling_T1_T2_T3()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Active,
+                RemainingContracts = 5
+            };
+
+            // Setup T1, T2, T3 targets
+            fsm.Targets[0] = new MockOrder("ORD003", "T1_Fleet_Apex_1",
+                                           OrderAction.Sell, 1);
+            fsm.Targets[1] = new MockOrder("ORD004", "T2_Fleet_Apex_1",
+                                           OrderAction.Sell, 1);
+            fsm.Targets[2] = new MockOrder("ORD005", "T3_Fleet_Apex_1",
+                                           OrderAction.Sell, 1);
+
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            _mockFsm.MapOrderId("ORD003", "Fleet_Apex_1", fsm.Generation);
+            _mockFsm.MapOrderId("ORD004", "Fleet_Apex_1", fsm.Generation);
+            _mockFsm.MapOrderId("ORD005", "Fleet_Apex_1", fsm.Generation);
+
+            // Act: T1 fills
+            var t1Fill = CreateFilledEvent("ORD003", "T1_Fleet_Apex_1",
+                                          1, 4520.0);
+            _mockFsm.EnqueueEvent(t1Fill);
+            _mockFsm.DrainMailbox();
+            AssertRemainingContracts(fsm, 4);
+
+            // Act: T2 fills
+            var t2Fill = CreateFilledEvent("ORD004", "T2_Fleet_Apex_1",
+                                          1, 4530.0);
+            _mockFsm.EnqueueEvent(t2Fill);
+            _mockFsm.DrainMailbox();
+            AssertRemainingContracts(fsm, 3);
+
+            // Act: T3 fills
+            var t3Fill = CreateFilledEvent("ORD005", "T3_Fleet_Apex_1",
+                                          1, 4540.0);
+            _mockFsm.EnqueueEvent(t3Fill);
+            _mockFsm.DrainMailbox();
+
+            // Assert: Still active with 2 contracts remaining
+            AssertFsmState(fsm, FollowerBracketState.Active, "T1+T2+T3 filled");
+            AssertRemainingContracts(fsm, 2);
+        }
+
+        /// <summary>
+        /// T13: Zero Contracts Terminal State.
+        /// Tests that reaching zero contracts transitions to Filled state.
+        /// </summary>
+        [Fact]
+        public void T13_ZeroContracts_Transitions_To_Filled()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Active,
+                RemainingContracts = 1,
+                StopOrder = new MockOrder("ORD002", "Stop_Fleet_Apex_1",
+                                          OrderAction.Sell, 1)
+            };
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            _mockFsm.MapOrderId("ORD002", "Fleet_Apex_1", fsm.Generation);
+
+            // Act: Final contract fills
+            var finalFill = CreateFilledEvent("ORD002", "Stop_Fleet_Apex_1",
+                                             1, 4480.0);
+            _mockFsm.EnqueueEvent(finalFill);
+            _mockFsm.DrainMailbox();
+
+            // Assert: Terminal state reached
+            AssertFsmState(fsm, FollowerBracketState.Filled,
+                          "Zero contracts = Filled");
+            AssertRemainingContracts(fsm, 0);
+        }
 
         #endregion
     }
