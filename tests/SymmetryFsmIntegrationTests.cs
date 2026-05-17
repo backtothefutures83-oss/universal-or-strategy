@@ -1315,6 +1315,218 @@ namespace V12.Sima.Tests
             AssertFsmState(fsm, FollowerBracketState.Rejected, "Invalid transition blocked");
         }
         #endregion
+
+        #region Phase 5: Integration (T18-T20)
+        /// <summary>
+        /// T18: REAPER Integration - GetFsmExpectedPosition aggregates multiple FSMs.
+        /// </summary>
+        [Fact]
+        public void T18_REAPER_GetFsmExpectedPosition_Aggregates()
+    {
+        // Arrange: Multiple FSMs for same account
+        _time = new MockTime(1000000L);
+        _mockFsm = new MockSymmetryFsm(_time);
+        
+        var fsm1 = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_1",
+            State = FollowerBracketState.Active,
+            RemainingContracts = 2,
+            EntryOrder = new MockOrder("ORD001", "Entry_Fleet_Apex_1", OrderAction.Buy, 2)
+        };
+        
+        var fsm2 = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_2",
+            State = FollowerBracketState.Active,
+            RemainingContracts = 3,
+            EntryOrder = new MockOrder("ORD002", "Entry_Fleet_Apex_2", OrderAction.Buy, 3)
+        };
+        
+        _mockFsm.AddBracket("Fleet_Apex_1", fsm1);
+        _mockFsm.AddBracket("Fleet_Apex_2", fsm2);
+        
+        // Act: Calculate expected position
+        int expectedPos = _mockFsm.GetFsmExpectedPosition("Sim101");
+        
+        // Assert: Aggregates both FSMs (2 + 3 = 5)
+        Assert.Equal(5, expectedPos);
+    }
+
+    /// <summary>
+    /// T18: REAPER Integration - Short position handling.
+    /// </summary>
+    [Fact]
+    public void T18_REAPER_GetFsmExpectedPosition_Short_Position()
+    {
+        // Arrange: Short position
+        _time = new MockTime(1000000L);
+        _mockFsm = new MockSymmetryFsm(_time);
+        
+        var fsm = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_1",
+            State = FollowerBracketState.Active,
+            RemainingContracts = -2,
+            EntryOrder = new MockOrder("ORD001", "Entry_Fleet_Apex_1", OrderAction.SellShort, 2)
+        };
+        
+        _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+        
+        // Act
+        int expectedPos = _mockFsm.GetFsmExpectedPosition("Sim101");
+        
+        // Assert: Negative for short (-2)
+        Assert.Equal(-2, expectedPos);
+    }
+
+    /// <summary>
+    /// T18: REAPER Integration - Terminal states excluded from position calculation.
+    /// </summary>
+    [Fact]
+    public void T18_REAPER_GetFsmExpectedPosition_Terminal_States_Excluded()
+    {
+        // Arrange: Mix of active and terminal FSMs
+        _time = new MockTime(1000000L);
+        _mockFsm = new MockSymmetryFsm(_time);
+        
+        var fsm1 = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_1",
+            State = FollowerBracketState.Active,
+            RemainingContracts = 2,
+            EntryOrder = new MockOrder("ORD001", "Entry_Fleet_Apex_1", OrderAction.Buy, 2)
+        };
+        
+        var fsm2 = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_2",
+            State = FollowerBracketState.Filled, // Terminal
+            RemainingContracts = 0,
+            EntryOrder = new MockOrder("ORD002", "Entry_Fleet_Apex_2", OrderAction.Buy, 3)
+        };
+        
+        _mockFsm.AddBracket("Fleet_Apex_1", fsm1);
+        _mockFsm.AddBracket("Fleet_Apex_2", fsm2);
+        
+        // Act
+        int expectedPos = _mockFsm.GetFsmExpectedPosition("Sim101");
+        
+        // Assert: Only active FSM counted (2, not 5)
+        Assert.Equal(2, expectedPos);
+    }
+
+    /// <summary>
+    /// T19: SIMA Integration - FSM creation and removal.
+    /// </summary>
+    [Fact]
+    public void T19_SIMA_FSM_Creation_And_Removal()
+    {
+        // Arrange
+        _time = new MockTime(1000000L);
+        _mockFsm = new MockSymmetryFsm(_time);
+        
+        // Act: Create FSM
+        var fsm = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_1",
+            State = FollowerBracketState.PendingSubmit
+        };
+        _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+        
+        // Assert: FSM exists
+        var retrieved = _mockFsm.GetBracket("Fleet_Apex_1");
+        AssertFsmNotNull(retrieved, "FSM created");
+        
+        // Act: Remove FSM
+        bool removed = _mockFsm.RemoveBracket("Fleet_Apex_1");
+        
+        // Assert: FSM removed
+        Assert.True(removed, "FSM removed");
+        var afterRemoval = _mockFsm.GetBracket("Fleet_Apex_1");
+        AssertFsmNull(afterRemoval, "FSM no longer exists");
+    }
+
+    /// <summary>
+    /// T19: SIMA Integration - OrderId mappings cleaned on FSM removal.
+    /// </summary>
+    [Fact]
+    public void T19_SIMA_FSM_OrderId_Mappings_Cleaned()
+    {
+        // Arrange
+        _time = new MockTime(1000000L);
+        _mockFsm = new MockSymmetryFsm(_time);
+        var fsm = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_1",
+            EntryOrder = new MockOrder("ORD001", "Entry_Fleet_Apex_1", OrderAction.Buy, 2),
+            StopOrder = new MockOrder("ORD002", "Stop_Fleet_Apex_1", OrderAction.Sell, 2)
+        };
+        
+        _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+        _mockFsm.MapOrderId("ORD001", "Fleet_Apex_1", fsm.Generation);
+        _mockFsm.MapOrderId("ORD002", "Fleet_Apex_1", fsm.Generation);
+        
+        // Act: Remove FSM
+        _mockFsm.RemoveBracket("Fleet_Apex_1");
+        
+        // Assert: OrderId mappings cleaned
+        var resolved1 = _mockFsm.ResolveFsm_ByOrderId("ORD001");
+        var resolved2 = _mockFsm.ResolveFsm_ByOrderId("ORD002");
+        AssertFsmNull(resolved1, "Entry mapping cleaned");
+        AssertFsmNull(resolved2, "Stop mapping cleaned");
+    }
+
+    /// <summary>
+    /// T20: Orders Integration - Two-phase replace with Replacing state.
+    /// </summary>
+    [Fact]
+    public void T20_Orders_TwoPhase_Replace_Replacing_State()
+    {
+        // Arrange
+        _time = new MockTime(1000000L);
+        _mockFsm = new MockSymmetryFsm(_time);
+        var fsm = new MockFollowerBracketFSM
+        {
+            AccountName = "Sim101",
+            EntryName = "Fleet_Apex_1",
+            State = FollowerBracketState.Active,
+            StopOrder = new MockOrder("ORD002", "Stop_Fleet_Apex_1", OrderAction.Sell, 2)
+        };
+        _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+        _mockFsm.MapOrderId("ORD002", "Fleet_Apex_1", fsm.Generation);
+        
+        // Act: Phase 1 - Cancel old stop (enter Replacing state)
+        _mockFsm.SetFsmReplacing("Fleet_Apex_1", "ORD002");
+        AssertFsmState(fsm, FollowerBracketState.Replacing, "Phase 1: Replacing");
+        Assert.Equal("ORD002", fsm.ReplacingCancelOrderId);
+        
+        // Act: Phase 2 - Cancel confirmed
+        var cancelEvent = CreateCancelledEvent("ORD002", "Stop_Fleet_Apex_1");
+        _mockFsm.EnqueueEvent(cancelEvent);
+        _mockFsm.DrainMailbox();
+        
+        // Assert: Still in Replacing (cancel absorbed)
+        AssertFsmState(fsm, FollowerBracketState.Replacing, "Cancel absorbed, stays Replacing");
+        
+        // Act: Phase 3 - New stop submitted and accepted
+        fsm.StopOrder = new MockOrder("ORD003", "Stop_Fleet_Apex_1", OrderAction.Sell, 2);
+        _mockFsm.MapOrderId("ORD003", "Fleet_Apex_1", fsm.Generation);
+        fsm.State = FollowerBracketState.Active;
+        fsm.ReplacingCancelOrderId = null;
+        
+        // Assert: Back to Active with new stop
+        AssertFsmState(fsm, FollowerBracketState.Active, "Replace complete");
+        Assert.Equal("ORD003", fsm.StopOrder.OrderId);
+        }
+        #endregion
     }
 }
 
