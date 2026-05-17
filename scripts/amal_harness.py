@@ -117,6 +117,7 @@ def normalize_body(e_body, d_body):
         r'Slots\[idx\]\s*=\s*payload;': 'Slots[idx].Value = payload;',
         r'payload\s*=\s*Slots\[idx\];': 'payload = Slots[idx].Value;',
         r'ulong\s+': 'long ',
+        r'\*\(ulong\*\)': '*(long*)',
         r'uint\s+idx\b': 'int idx',
         r'long\s+idx\b': 'int idx',
         r'long\s+head\b': 'int head',
@@ -150,16 +151,12 @@ def normalize_body(e_body, d_body):
         r'Volatile\.Write\(ref Slots\[pos\]\.Sequence, \w+ \+ 1\);': 'Volatile.Write(ref Slots[pos].Sequence, pos + 1); return true;',
         r'Volatile\.Write\(ref Slots\[pos\]\.Sequence, \w+ \+ _mask\);': 'Volatile.Write(ref Slots[pos].Sequence, pos + _mask); return true;',
         # V25 MPMC _meta flat-field remappings
-        r'region': '((byte*)Slots)',
-        r'capacity': '_capacity',
-        r'mask': '_mask',
-        r'slotSize': 'sizeof(CoreLane)',
-        r'shadowLength': '0',
-        r'SHADOW_SALT': '0',
-        r'shadowOffset\s*[\^+\-]=\s*.*?;': '',
-        r'shadowOffset': '0',
-        r'XorShadow\.Compute\(.*?\)': '0',
-        r'XorShadow\.Validate\(.*?\)': 'true',
+        r'\b_?shadowLength\b': '0',
+        r'\b_?SHADOW_SALT\b': '0',
+        r'\b_?shadowOffset\b\s*[\^+\-]=\s*.*?;': '',
+        r'\b_?shadowOffset\b': '0',
+        r'XorShadow\.Compute\(.*?\)(?=\s*;)': '0',
+        r'XorShadow\.Validate\(.*?\)(?=\s*\))': 'true',
         r'payload\s*=\s*default\b.*?': 'payload = 0.0;',
         r'payload\s*=\s*(?!0\.0)(.*?);': r'payload = Slots[0].Value;',
         r'Unsafe\.CopyBlockUnaligned\(.*?\);': r'Slots[0].Value = payload;',
@@ -168,12 +165,13 @@ def normalize_body(e_body, d_body):
         r'Volatile\.Read\(ref \*\(\w+\*\)\(region \+ 64\)\)': '_consumerIndex',
         r'Volatile\.Write\(ref \*\(\w+\*\)region, prod \+ 1\);': '_producerIndex = (int)(prod + 1);',
         r'Volatile\.Write\(ref \*\(\w+\*\)\(region \+ 64\), cons \+ 1\);': '_consumerIndex = (int)(cons + 1);',
-        r'\*(long\*)region': '(int)_producerIndex',
-        r'\*(long\*)\(region \+ 64\)': '(int)_consumerIndex',
-        r'Unsafe\.AsPointer\(ref Unsafe\.AsRef\(in payload\)\)': 'null',
-        r'Unsafe\.AsPointer\(ref payload\)': 'null',
-        r'Unsafe\.AsRef\(in payload\)': 'payload',
-        r'Unsafe\.AsRef\(payload\)': 'payload',
+        r'\*(long\*)_?region\b': '(int)_producerIndex',
+        r'\*(long\*)\(_?region \+ 64\)': '(int)_consumerIndex',
+        r'\b_?region\b': '((byte*)Slots)',
+        r'\b_?capacity\b': '_capacity',
+        r'\b_?mask\b': '_mask',
+        r'\b_?slotSize\b': 'sizeof(CoreLane)',
+        r'\bref var\b': 'ref var',
         r'Volatile\.Read\(ref _producerIndex\)': '_producerIndex',
         r'Volatile\.Read\(ref _consumerIndex\)': '_consumerIndex',
         r'_meta\.WriteReservation': '_producerIndex',
@@ -274,8 +272,12 @@ def main():
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     file_content = f.read()
                 if ext == '.html':
-                    # Strip tags, unescape entities
-                    file_content = _html.unescape(re.sub(r'<[^>]+>', ' ', file_content))
+                    # Extract C# from <script type="text/x-csharp"> if present, otherwise strip tags
+                    csharp_match = re.search(r'<script[^>]*type="text/x-csharp"[^>]*>(.*?)</script>', file_content, flags=re.S | re.I)
+                    if csharp_match:
+                        file_content = _html.unescape(csharp_match.group(1))
+                    else:
+                        file_content = _html.unescape(re.sub(r'<[^>]+>', ' ', file_content))
                 # ASCII Gate (pre-extraction): strip non-ASCII (box-drawing, em-dash, arrows) 
                 # before method extraction so they cannot survive into injected C# code.
                 file_content = file_content.encode('ascii', errors='ignore').decode('ascii')

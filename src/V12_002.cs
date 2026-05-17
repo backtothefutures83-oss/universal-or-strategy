@@ -677,9 +677,276 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentQueue<AccountEvent>
             _accountMailbox = new ConcurrentQueue<AccountEvent>();
 
-        // Phase 3: O(1) lookup for FSM events
-        private readonly ConcurrentDictionary<string, string>
-            _orderIdToFsmKey = new ConcurrentDictionary<string, string>();
+        // Ticket-02: Pre-submit OrderId -> FSM registration map (lock-free with ABA protection)
+        private ZeroAllocOrderIdMap _orderIdToFsmMap;
+
+        // Ticket-04: Global submit circuit breaker
+        private SubmitCircuitBreaker _submitCircuitBreaker;
+
+        // V12 Phase 8: Zero-Allocation OrderId -> FSM Map
+        private struct OrderIdMapEntry
+        {
+            public long OrderIdHash;   // FNV-1a 64-bit hash (0 = empty)
+            public int FsmKeyIndex;    // Index into _fsmKeyPool
+            public long Generation;    // FSM generation at registration
+        }
+
+        private sealed class ZeroAllocOrderIdMap
+        {
+            private readonly OrderIdMapEntry[] _table;
+            private readonly string[] _fsmKeyPool;  // Pre-allocated FSM key strings
+            private readonly int _mask;
+            private int _fsmKeyPoolIndex;
+            
+            public ZeroAllocOrderIdMap(int capacity)
+            {
+                if ((capacity & (capacity - 1)) != 0)
+                    throw new ArgumentException("Capacity must be power of 2");
+                
+                _table = new OrderIdMapEntry[capacity];
+                _fsmKeyPool = new string[capacity];
+                _mask = capacity - 1;
+                _fsmKeyPoolIndex = 0;
+            }
+            
+            public bool TryAdd(string orderId, string fsmKey, long generation)
+            {
+                long hash = FnvHash64(orderId);
+                if (hash == 0) return false;  // Invalid hash
+                
+                int idx = (int)(hash & _mask);
+                int probeCount = 0;
+                
+                while (probeCount < _table.Length)
+                {
+                    long currentHash = Volatile.Read(ref _table[idx].OrderIdHash);
+                    
+                    if (currentHash == 0)  // Empty slot
+                    {
+                        // Claim FSM key pool slot
+                        int keyIdx = Interlocked.Increment(ref _fsmKeyPoolIndex) - 1;
+                        if (keyIdx >= _fsmKeyPool.Length)
+                        {
+                            Interlocked.Decrement(ref _fsmKeyPoolIndex);
+                            return false;  // Pool exhausted
+                        }
+                        
+                        _fsmKeyPool[keyIdx] = fsmKey;
+                        
+                        // Publish entry atomically
+                        var entry = new OrderIdMapEntry
+                        {
+                            OrderIdHash = hash,
+                            FsmKeyIndex = keyIdx,
+                            Generation = generation
+                        };
+                        
+                        // CAS on OrderIdHash field (acts as lock)
+                        if (Interlocked.CompareExchange(ref _table[idx].OrderIdHash, hash, 0) == 0)
+                        {
+                            _table[idx].FsmKeyIndex = entry.FsmKeyIndex;
+                            _table[idx].Generation = entry.Generation;
+                            return true;
+                        }
+                    }
+                    
+                    idx = (idx + 1) & _mask;  // Linear probe
+                    probeCount++;
+                }
+                
+                return false;  // Table full
+            }
+            
+            public bool TryGet(string orderId, out string fsmKey, out long generation)
+            {
+                long hash = FnvHash64(orderId);
+                int idx = (int)(hash & _mask);
+                int probeCount = 0;
+                
+                while (probeCount < _table.Length)
+                {
+                    long currentHash = Volatile.Read(ref _table[idx].OrderIdHash);
+                    
+                    if (currentHash == 0)
+                    {
+                        fsmKey = null;
+                        generation = 0;
+                        return false;  // Not found
+                    }
+                    
+                    if (currentHash == hash)
+                    {
+                        int keyIdx = _table[idx].FsmKeyIndex;
+                        fsmKey = _fsmKeyPool[keyIdx];
+                        generation = _table[idx].Generation;
+                        return true;
+                    }
+                    
+                    idx = (idx + 1) & _mask;
+                    probeCount++;
+                }
+                
+                fsmKey = null;
+                generation = 0;
+                return false;
+            }
+            
+            public void Remove(string orderId)
+            {
+                long hash = FnvHash64(orderId);
+                int idx = (int)(hash & _mask);
+                int probeCount = 0;
+                
+                while (probeCount < _table.Length)
+                {
+                    long currentHash = Volatile.Read(ref _table[idx].OrderIdHash);
+                    
+                    if (currentHash == hash)
+                    {
+                        // Zero out entry (atomic write)
+                        Interlocked.Exchange(ref _table[idx].OrderIdHash, 0);
+                        return;
+                    }
+                    
+                    if (currentHash == 0) return;  // Not found
+                    
+                    idx = (idx + 1) & _mask;
+                    probeCount++;
+                }
+            }
+            
+            // FNV-1a 64-bit hash (zero-allocation)
+            private static long FnvHash64(string str)
+            {
+                if (string.IsNullOrEmpty(str)) return 0;
+                
+                const long FnvPrime = 0x100000001b3;
+                const long FnvOffsetBasis = unchecked((long)0xcbf29ce484222325);
+                
+                long hash = FnvOffsetBasis;
+                for (int i = 0; i < str.Length; i++)
+                {
+                    hash ^= str[i];
+                    hash *= FnvPrime;
+                }
+                
+                return hash == 0 ? 1 : hash;  // Avoid 0 (reserved for empty)
+            }
+        }
+
+        // V12 Phase 8: Global Submit Circuit Breaker
+        private sealed class SubmitCircuitBreaker
+        {
+            private long _state;  // Packed: [State: 2 bits][FailureCount: 62 bits]
+            private const int StateShift = 62;
+            private const long FailureMask = (1L << 62) - 1;
+            
+            private const int STATE_CLOSED = 0;
+            private const int STATE_HALF_OPEN = 1;
+            private const int STATE_OPEN = 2;
+            
+            private long _openUntilTicks;
+            private const int FailureThreshold = 5;
+            private const long CooldownTicks = 30L * TimeSpan.TicksPerSecond;  // 30 seconds
+            
+            public bool AllowSubmit()
+            {
+                long snapshot = Interlocked.Read(ref _state);
+                int state = (int)((ulong)snapshot >> StateShift);
+                long failures = snapshot & FailureMask;
+                long nowTicks = DateTime.UtcNow.Ticks;
+                
+                if (state == STATE_OPEN)
+                {
+                    long openUntil = Volatile.Read(ref _openUntilTicks);
+                    if (nowTicks < openUntil)
+                        return false;
+                    
+                    return TryHalfOpen(snapshot);
+                }
+                
+                if (state == STATE_HALF_OPEN && failures > 0)
+                    return false;
+                
+                return true;
+            }
+            
+            public void RecordSuccess()
+            {
+                long snapshot;
+                do
+                {
+                    snapshot = Interlocked.Read(ref _state);
+                    int state = (int)((ulong)snapshot >> StateShift);
+                    
+                    if (state == STATE_HALF_OPEN)
+                    {
+                        long next = ((long)STATE_CLOSED << StateShift) | 0L;
+                        if (Interlocked.CompareExchange(ref _state, next, snapshot) == snapshot)
+                            return;
+                    }
+                    else if (state == STATE_CLOSED)
+                    {
+                        long next = ((long)STATE_CLOSED << StateShift) | 0L;
+                        if (Interlocked.CompareExchange(ref _state, next, snapshot) == snapshot)
+                            return;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                while (true);
+            }
+            
+            public void RecordFailure()
+            {
+                long snapshot;
+                do
+                {
+                    snapshot = Interlocked.Read(ref _state);
+                    int state = (int)((ulong)snapshot >> StateShift);
+                    long failures = (snapshot & FailureMask) + 1;
+                    
+                    int nextState = state;
+                    if (failures >= FailureThreshold)
+                    {
+                        nextState = STATE_OPEN;
+                        Volatile.Write(ref _openUntilTicks, 
+                            DateTime.UtcNow.Ticks + CooldownTicks);
+                    }
+                    else if (state == STATE_HALF_OPEN)
+                    {
+                        nextState = STATE_OPEN;
+                        Volatile.Write(ref _openUntilTicks, 
+                            DateTime.UtcNow.Ticks + CooldownTicks);
+                    }
+                    
+                    long next = ((long)nextState << StateShift) | failures;
+                    if (Interlocked.CompareExchange(ref _state, next, snapshot) == snapshot)
+                        return;
+                }
+                while (true);
+            }
+            
+            private bool TryHalfOpen(long snapshot)
+            {
+                long next = ((long)STATE_HALF_OPEN << StateShift) | 0L;
+                return Interlocked.CompareExchange(ref _state, next, snapshot) == snapshot;
+            }
+            
+            public string GetDiagnostics()
+            {
+                long snapshot = Interlocked.Read(ref _state);
+                int state = (int)((ulong)snapshot >> StateShift);
+                long failures = snapshot & FailureMask;
+                
+                string stateName = state == STATE_CLOSED ? "Closed" :
+                                  state == STATE_HALF_OPEN ? "HalfOpen" : "Open";
+                
+                return string.Format("CircuitBreaker: {0} (failures={1})", stateName, failures);
+            }
+        }
 
         // [BUILD 949] CIT one-shot guard: tracks keys that have already been nudged.
         // Prevents re-nudging on subsequent bars after the first limit move.

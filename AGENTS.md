@@ -14,6 +14,7 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
     - **Jules AI**: Primary non-src engineer for GitHub-based workflows.
     - **Gemini CLI** (`yolo`): Secondary non-src local engineer for tasks requiring local file access or visual context.
 - **FORENSICS (P2/P6)**: Diagnosis (P2) and Adversarial Audit (P6).
+- **TRAYCER AI**: Agentic Code Review & Deep Exploration. Used for comprehensive implementation analysis and hot-path audit.
 
 ## 2. Architectural Mandates (THE PLATINUM STANDARD)
 
@@ -28,6 +29,7 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 - **Lint Audit** (Style Pillar): `powershell -File .\scripts\lint.ps1`
 - **Stress Test** (Testing Pillar): `powershell -File .\scripts\test_stress.ps1`
 - **Sovereign Audit**: `droid /review` (Focus on P0-P3 severity findings).
+- **Bob Review**: `/review` (AI-powered check of uncommitted changes).
 - **Readiness Check**: `droid /readiness-report` (Maintain Level 2+).
 - **Forensic Scan**: `grep -r "lock(" src/` (Zero-match requirement).
 

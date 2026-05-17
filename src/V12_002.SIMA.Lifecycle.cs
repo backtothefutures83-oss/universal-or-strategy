@@ -637,7 +637,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Phase 5: Rebuilds _followerBrackets and _orderIdToFsmKey from already-adopted
+        /// Phase 5: Rebuilds _followerBrackets and _orderIdToFsmMap from already-adopted
         /// working orders. Called from HydrateWorkingOrdersFromBroker() before the
         /// adoption-complete gate is set. Idempotent -- safe to call on every reconnect.
         /// </summary>
@@ -704,7 +704,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 fsm.StopOrder = stopOrd;
                 if (!string.IsNullOrEmpty(stopOrd.OrderId))
                 {
-                    _orderIdToFsmKey[stopOrd.OrderId] = entryKey;
+                    _orderIdToFsmMap.TryAdd(stopOrd.OrderId, entryKey, fsm.Generation);
                     ordersIndexed++;
                 }
             }
@@ -722,7 +722,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     fsm.Targets[i] = targetOrd;
                     if (!string.IsNullOrEmpty(targetOrd.OrderId))
                     {
-                        _orderIdToFsmKey[targetOrd.OrderId] = entryKey;
+                        _orderIdToFsmMap.TryAdd(targetOrd.OrderId, entryKey, fsm.Generation);
                         ordersIndexed++;
                     }
                 }
@@ -821,7 +821,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Index stop order ID
             if (recoveredStop != null && !string.IsNullOrEmpty(recoveredStop.OrderId))
             {
-                _orderIdToFsmKey[recoveredStop.OrderId] = recoveredKey;
+                _orderIdToFsmMap.TryAdd(recoveredStop.OrderId, recoveredKey, fsm.Generation);
                 ordersIndexed++;
             }
 
@@ -838,7 +838,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     fsm.Targets[i] = tOrd;
                     if (!string.IsNullOrEmpty(tOrd.OrderId))
                     {
-                        _orderIdToFsmKey[tOrd.OrderId] = recoveredKey;
+                        _orderIdToFsmMap.TryAdd(tOrd.OrderId, recoveredKey, fsm.Generation);
                         ordersIndexed++;
                     }
                 }
@@ -943,7 +943,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (!string.IsNullOrEmpty(entryOrder.OrderId))
                 {
-                    _orderIdToFsmKey[entryOrder.OrderId] = entryKey;
+                    _orderIdToFsmMap.TryAdd(entryOrder.OrderId, entryKey, fsm.Generation);
                     ordersIndexed++;
                 }
 

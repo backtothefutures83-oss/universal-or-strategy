@@ -11,23 +11,24 @@
   },
   {
     "id": "mmiospscring-kernel-documentation (1)",
+    "status": "PASS",
+    "latency": 17.581,
+    "alloc": "0 B"
+  },
+  {
+    "id": "mmiospscring-kernel-documentation-page",
     "status": "FAIL",
     "error": "Benchmark failed"
   },
   {
-    "id": "mmiospscring-kernel-documentation-page",
-    "status": "SKIP",
-    "error": "Incomplete code"
-  },
-  {
     "id": "mmiospscring-kernel-documentation-page (1)",
-    "status": "SKIP",
-    "error": "Incomplete code"
+    "status": "FAIL",
+    "error": "Benchmark failed"
   },
   {
     "id": "mmiospscring-kernel-documentation-page (2)",
-    "status": "SKIP",
-    "error": "Incomplete code"
+    "status": "FAIL",
+    "error": "Benchmark failed"
   },
   {
     "id": "mmiospscring-kernel-documentation-page (3)",
@@ -41,23 +42,27 @@
   },
   {
     "id": "mmiospscring-kernel-reference-page (1)",
-    "status": "FAIL",
-    "error": "Benchmark failed"
+    "status": "PASS",
+    "latency": 16.604,
+    "alloc": "0 B"
   },
   {
     "id": "mmiospscring-kernel-reference-page (10)",
-    "status": "FAIL",
-    "error": "Benchmark failed"
+    "status": "PASS",
+    "latency": 18.274,
+    "alloc": "0 B"
   },
   {
     "id": "mmiospscring-kernel-reference-page (11)",
-    "status": "FAIL",
-    "error": "Benchmark failed"
+    "status": "PASS",
+    "latency": 18.433,
+    "alloc": "0 B"
   },
   {
     "id": "mmiospscring-kernel-reference-page (12)",
-    "status": "FAIL",
-    "error": "Benchmark failed"
+    "status": "PASS",
+    "latency": 18.191,
+    "alloc": "0 B"
   },
   {
     "id": "mmiospscring-kernel-reference-page (13)",
@@ -66,8 +71,9 @@
   },
   {
     "id": "mmiospscring-kernel-reference-page (2)",
-    "status": "FAIL",
-    "error": "Benchmark failed"
+    "status": "PASS",
+    "latency": 15.465,
+    "alloc": "0 B"
   },
   {
     "id": "mmiospscring-kernel-reference-page (3)",
@@ -76,13 +82,14 @@
   },
   {
     "id": "mmiospscring-kernel-reference-page (4)",
-    "status": "FAIL",
-    "error": "Benchmark failed"
+    "status": "PASS",
+    "latency": 22.532,
+    "alloc": "0 B"
   },
   {
     "id": "mmiospscring-kernel-reference-page (5)",
-    "status": "SKIP",
-    "error": "Incomplete code"
+    "status": "FAIL",
+    "error": "Benchmark failed"
   },
   {
     "id": "mmiospscring-kernel-reference-page (6)",
@@ -91,17 +98,19 @@
   },
   {
     "id": "mmiospscring-kernel-reference-page (7)",
-    "status": "SKIP",
-    "error": "Incomplete code"
-  },
-  {
-    "id": "mmiospscring-kernel-reference-page (8)",
     "status": "FAIL",
     "error": "Benchmark failed"
   },
   {
+    "id": "mmiospscring-kernel-reference-page (8)",
+    "status": "PASS",
+    "latency": 17.126,
+    "alloc": "0 B"
+  },
+  {
     "id": "mmiospscring-kernel-reference-page (9)",
-    "status": "SKIP",
-    "error": "Incomplete code"
+    "status": "PASS",
+    "latency": 41.686,
+    "alloc": "0 B"
   }
 ]

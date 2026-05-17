@@ -51,6 +51,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public Account Account;
             public string  FleetEntryName;
             public string  ExpectedKey;
+            public long FsmGeneration;  // Matches FSM generation at enqueue time
         }
 
         private FleetDispatchSideband[] _photonSideband;

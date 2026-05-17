@@ -9,23 +9,23 @@ flowchart TD
     %% V12 PHOTON KERNEL PLANE
     subgraph V12_KERNEL ["V12 PHOTON KERNEL (Upper Plane - NinjaTrader 8)"]
 
-        subgraph S3_UI_IO ["S3: UI & Photon IO (~329 CYC)"]
-            UI_Call["V12_002.UI.Callbacks.cs <br/>(48 CYC)"]
-            UI_Comp["V12_002.UI.Compliance.cs <br/>(21 CYC)"]
-            UI_IPC_Core["V12_002.UI.IPC.cs <br/>(38 CYC)"]
-            UI_IPC_Cfg["V12_002.UI.IPC.Commands.Config.cs <br/>(17 CYC)"]
-            UI_IPC_Fleet["V12_002.UI.IPC.Commands.Fleet.cs <br/>(19 CYC)"]
-            UI_IPC_Misc["V12_002.UI.IPC.Commands.Misc.cs <br/>(18 CYC)"]
+        subgraph S3_UI_IO ["S3: UI & Photon IO (< 100 CYC)"]
+            UI_Call["V12_002.UI.Callbacks.cs <br/>(< 20 CYC)"]
+            UI_Comp["V12_002.UI.Compliance.cs <br/>(< 20 CYC)"]
+            UI_IPC_Core["V12_002.UI.IPC.cs <br/>(< 20 CYC)"]
+            UI_IPC_Cfg["V12_002.UI.IPC.Commands.Config.cs <br/>(< 20 CYC)"]
+            UI_IPC_Fleet["V12_002.UI.IPC.Commands.Fleet.cs <br/>(< 20 CYC)"]
+            UI_IPC_Misc["V12_002.UI.IPC.Commands.Misc.cs <br/>(< 20 CYC)"]
             UI_IPC_Mode["V12_002.UI.IPC.Commands.Mode.cs <br/>(< 15 CYC)"]
             UI_IPC_Serv["V12_002.UI.IPC.Server.cs <br/>(< 15 CYC)"]
-            UI_Panel_Const["V12_002.UI.Panel.Construction.cs <br/>(16 CYC)"]
-            UI_Panel_Hand["V12_002.UI.Panel.Handlers.cs <br/>(39 CYC)"]
-            UI_Panel_Help["V12_002.UI.Panel.Helpers.cs <br/>(25 CYC)"]
+            UI_Panel_Const["V12_002.UI.Panel.Construction.cs <br/>(< 20 CYC)"]
+            UI_Panel_Hand["V12_002.UI.Panel.Handlers.cs <br/>(20 CYC)"]
+            UI_Panel_Help["V12_002.UI.Panel.Helpers.cs <br/>(20 CYC)"]
             UI_Panel_LC["V12_002.UI.Panel.Lifecycle.cs <br/>(< 15 CYC)"]
-            UI_Panel_Sync["V12_002.UI.Panel.StateSync.cs <br/>(16 CYC)"]
-            UI_Sizing["V12_002.UI.Sizing.cs <br/>(19 CYC)"]
-            UI_Snap["V12_002.UI.Snapshot.cs <br/>(9 CYC)"]
-            UI_Brushes["V12_002.UI.Panel.Brushes.cs <br/>(2 CYC)"]
+            UI_Panel_Sync["V12_002.UI.Panel.StateSync.cs <br/>(< 20 CYC)"]
+            UI_Sizing["V12_002.UI.Sizing.cs <br/>(< 20 CYC)"]
+            UI_Snap["V12_002.UI.Snapshot.cs <br/>(< 15 CYC)"]
+            UI_Brushes["V12_002.UI.Panel.Brushes.cs <br/>(< 15 CYC)"]
 
             %% 8x2 Grid via Columns
             UI_Call ~~~ UI_Panel_Const
@@ -38,13 +38,13 @@ flowchart TD
             UI_IPC_Serv ~~~ UI_Brushes
         end
 
-        subgraph S1_SIMA ["S1: SIMA Core (~143 CYC)"]
+        subgraph S1_SIMA ["S1: SIMA Core (< 150 CYC)"]
             SIMA_Main["V12_002.SIMA.cs <br/>(< 15 CYC)"]
-            SIMA_LC["V12_002.SIMA.Lifecycle.cs <br/>(19 CYC)"]
-            SIMA_Disp["V12_002.SIMA.Dispatch.cs <br/>(24 CYC)"]
-            SIMA_Fleet["V12_002.SIMA.Fleet.cs <br/>(20 CYC)"]
+            SIMA_LC["V12_002.SIMA.Lifecycle.cs <br/>(< 20 CYC)"]
+            SIMA_Disp["V12_002.SIMA.Dispatch.cs <br/>(20 CYC)"]
+            SIMA_Fleet["V12_002.SIMA.Fleet.cs <br/>(28 CYC)"]
             SIMA_Exec["V12_002.SIMA.Execution.cs <br/>(< 15 CYC)"]
-            SIMA_Flat["V12_002.SIMA.Flatten.cs <br/>(18 CYC)"]
+            SIMA_Flat["V12_002.SIMA.Flatten.cs <br/>(< 20 CYC)"]
             SIMA_Shad["V12_002.SIMA.Shadow.cs <br/>(20 CYC)"]
             SIMA_Init["V12_002.SIMA.Init.cs <br/>(< 15 CYC)"]
             SIMA_Const["V12_002.SIMA.Constants.cs <br/>(0 CYC)"]
@@ -57,25 +57,25 @@ flowchart TD
             SIMA_Const
         end
 
-        subgraph S2_EXECUTION ["S2: Execution Engine (~280 CYC)"]
-            Exec_Logic["V12_002.Orders.Callbacks.Execution.cs <br/>(17 CYC)"]
-            Exec_Account["V12_002.Orders.Callbacks.AccountOrders.cs <br/>(16 CYC)"]
-            Exec_Prop["V12_002.Orders.Callbacks.Propagation.cs <br/>(18 CYC)"]
-            Trailing_Main["V12_002.Trailing.cs <br/>(20 CYC)"]
-            Trailing_BE["V12_002.Trailing.Breakeven.cs <br/>(18 CYC)"]
-            Trailing_Stop["V12_002.Trailing.StopUpdate.cs <br/>(19 CYC)"]
+        subgraph S2_EXECUTION ["S2: Execution Engine (< 250 CYC)"]
+            Exec_Logic["V12_002.Orders.Callbacks.Execution.cs <br/>(< 20 CYC)"]
+            Exec_Account["V12_002.Orders.Callbacks.AccountOrders.cs <br/>(< 20 CYC)"]
+            Exec_Prop["V12_002.Orders.Callbacks.Propagation.cs <br/>(< 20 CYC)"]
+            Trailing_Main["V12_002.Trailing.cs <br/>(< 15 CYC)"]
+            Trailing_BE["V12_002.Trailing.Breakeven.cs <br/>(< 15 CYC)"]
+            Trailing_Stop["V12_002.Trailing.StopUpdate.cs <br/>(< 15 CYC)"]
             Sym_Main["V12_002.Symmetry.cs <br/>(< 15 CYC)"]
-            Sym_FSM["V12_002.Symmetry.BracketFSM.cs <br/>(22 CYC)"]
+            Sym_FSM["V12_002.Symmetry.BracketFSM.cs <br/>(< 15 CYC)"]
             Sym_Follow["V12_002.Symmetry.Follower.cs <br/>(< 15 CYC)"]
-            Sym_Rep["V12_002.Symmetry.Replace.cs <br/>(18 CYC)"]
+            Sym_Rep["V12_002.Symmetry.Replace.cs <br/>(< 20 CYC)"]
             Order_Meta["V12_002.Orders.Metadata.cs <br/>(< 15 CYC)"]
             Order_Utils["V12_002.Orders.Utils.cs <br/>(< 15 CYC)"]
-            Order_Base["V12_002.Orders.Callbacks.cs <br/>(< 15 CYC)"]
+            Order_Base["V12_002.Orders.Callbacks.cs <br/>(< 20 CYC)"]
             Order_Cancel["V12_002.Orders.CancelGateway.cs <br/>(< 15 CYC)"]
-            Orders_Mgmt["V12_002.Orders.Management.cs <br/>(21 CYC)"]
-            Orders_Cleanup["V12_002.Orders.Management.Cleanup.cs <br/>(19 CYC)"]
-            Orders_Flat["V12_002.Orders.Management.Flatten.cs <br/>(19 CYC)"]
-            Orders_StopSync["V12_002.Orders.Management.StopSync.cs <br/>(17 CYC)"]
+            Orders_Mgmt["V12_002.Orders.Management.cs <br/>(< 15 CYC)"]
+            Orders_Cleanup["V12_002.Orders.Management.Cleanup.cs <br/>(< 20 CYC)"]
+            Orders_Flat["V12_002.Orders.Management.Flatten.cs <br/>(< 20 CYC)"]
+            Orders_StopSync["V12_002.Orders.Management.StopSync.cs <br/>(< 20 CYC)"]
 
             %% Strict 2-Column Grid
             Exec_Logic ~~~ Exec_Account
@@ -89,10 +89,10 @@ flowchart TD
             Orders_Flat ~~~ Orders_StopSync
         end
 
-        subgraph S7_INFRA ["S7: Kernel Infrastructure (~45 CYC)"]
+        subgraph S7_INFRA ["S7: Kernel Infrastructure (< 50 CYC)"]
             V12_Main["V12_002.cs <br/>(< 15 CYC)"]
             Kernel_Const["V12_002.Constants.cs <br/>(0 CYC)"]
-            Logic_Audit["V12_002.LogicAudit.cs <br/>(15 CYC)"]
+            Logic_Audit["V12_002.LogicAudit.cs <br/>(< 15 CYC)"]
             Drawing_Help["V12_002.DrawingHelpers.cs <br/>(< 15 CYC)"]
             Account_Upd["V12_002.AccountUpdate.cs <br/>(< 15 CYC)"]
             Bar_Upd["V12_002.BarUpdate.cs <br/>(< 15 CYC)"]
@@ -123,8 +123,8 @@ flowchart TD
             Mmio_Mirror ~~~ Metadata_Guard
         end
 
-        subgraph S4_REAPER ["S4: REAPER Defense (~99 CYC)"]
-            REAPER_Audit["V12_002.REAPER.Audit.cs <br/>(15 CYC)"]
+        subgraph S4_REAPER ["S4: REAPER Defense (< 100 CYC)"]
+            REAPER_Audit["V12_002.REAPER.Audit.cs <br/>(< 20 CYC)"]
             REAPER_Repair["V12_002.REAPER.Repair.cs <br/>(< 15 CYC)"]
             REAPER_Main["V12_002.REAPER.cs <br/>(< 15 CYC)"]
             REAPER_Naked["V12_002.REAPER.NakedStop.cs <br/>(< 15 CYC)"]
@@ -139,8 +139,8 @@ flowchart TD
             Safety_Limits
         end
 
-        subgraph S5_KERNEL ["S5: Kernel State (~72 CYC)"]
-            StickyState["V12_002.StickyState.cs <br/>(16 CYC)"]
+        subgraph S5_KERNEL ["S5: Kernel State (< 100 CYC)"]
+            StickyState["V12_002.StickyState.cs <br/>(< 20 CYC)"]
             Base_LC["V12_002.Lifecycle.cs <br/>(< 15 CYC)"]
             Telemetry["V12_002.Telemetry.cs <br/>(< 15 CYC)"]
             StructuredLog["V12_002.StructuredLog.cs <br/>(< 15 CYC)"]
@@ -156,11 +156,11 @@ flowchart TD
             Base_Methods ~~~ Base_Vars
         end
 
-        subgraph S6_SIGNALS ["S6: Signals & Entries (~131 CYC)"]
+        subgraph S6_SIGNALS ["S6: Signals & Entries (< 150 CYC)"]
             Trend_Main["V12_002.Entries.Trend.cs <br/>(< 15 CYC)"]
             OR_Main["V12_002.Entries.OR.cs <br/>(< 15 CYC)"]
-            RMA_Core["V12_002.Entries.RMA.cs <br/>(17 CYC)"]
-            FFMA_Core["V12_002.Entries.FFMA.cs <br/>(16 CYC)"]
+            RMA_Core["V12_002.Entries.RMA.cs <br/>(< 20 CYC)"]
+            FFMA_Core["V12_002.Entries.FFMA.cs <br/>(< 20 CYC)"]
             OR_Retest["V12_002.Entries.Retest.cs <br/>(< 15 CYC)"]
             OR_MOMO["V12_002.Entries.MOMO.cs <br/>(< 15 CYC)"]
             Sig_Indicators["V12_002.Signals.Indicators.cs <br/>(< 15 CYC)"]
@@ -210,8 +210,9 @@ flowchart TD
     classDef ultraComplexity fill:#f33,stroke:#333,stroke-width:4px,color:#fff,font-size:256px;
     classDef stable fill:#9f9,stroke:#333,stroke-width:1px,font-size:256px;
 
-    class UI_Call,UI_Panel_Hand,UI_IPC_Core ultraComplexity
-    class SIMA_Disp,Sym_FSM,UI_Panel_Help,UI_Comp,SIMA_Fleet,Trailing_Main,SIMA_Shad,Orders_Mgmt highComplexity
+    class UI_Call,UI_IPC_Core,UI_Comp,Trailing_Main,Orders_Mgmt,Sym_FSM,SIMA_LC,SIMA_Flat stable
+    class SIMA_Disp,SIMA_Shad,UI_Panel_Hand,UI_Panel_Help highComplexity
+    class SIMA_Fleet ultraComplexity
     class Trend_Main,REAPER_Repair,Telemetry,StructuredLog,V12_Main,Ring_Buffer stable
 ```
 
@@ -232,10 +233,10 @@ flowchart TD
 | -- | `HydrateWorkingOrdersFromBroker` | `V12_002.SIMA.Lifecycle.cs` | **96→3** | 🟢 **OPTIMIZED** (Phase 7) |
 | -- | `ProcessIpcCommand` | `V12_002.UI.IPC.cs` | **~30→6** | 🟢 **OPTIMIZED** (Phase 7) |
 | -- | `HydrateFSM_LinkBracketOrders` | `V12_002.Symmetry.BracketFSM.cs` | **47 LOC→18 LOC** | 🟢 **OPTIMIZED** (Phase 7) |
-| 1 | `OnKeyDown` | `V12_002.UI.Callbacks.cs` | 48 | 🔴 **CRITICAL** (UI Epic) |
-| 2 | `AttachPanelHandlers` | `V12_002.UI.Panel.Handlers.cs` | 39 | 🔴 **CRITICAL** (UI Epic) |
-| 3 | `ProcessIpc_MatchSymbol` | `V12_002.UI.IPC.cs` | 38 | 🔴 **CRITICAL** (UI Epic) |
-| 4 | `UpdateContextualUI` | `V12_002.UI.Panel.Handlers.cs` | 32 | 🔴 **CRITICAL** (UI Epic) |
+| -- | `OnKeyDown` | `V12_002.UI.Callbacks.cs` | **48→17** | 🟢 **OPTIMIZED** (UI Epic) |
+| -- | `AttachPanelHandlers` | `V12_002.UI.Panel.Handlers.cs` | **39→12** | 🟢 **OPTIMIZED** (UI Epic) |
+| -- | `ProcessIpc_MatchSymbol` | `V12_002.UI.IPC.cs` | **38→7** | 🟢 **OPTIMIZED** (UI Epic) |
+| -- | `UpdateContextualUI` | `V12_002.UI.Panel.Handlers.cs` | **32→7** | 🟢 **OPTIMIZED** (UI Epic) |
 
 ## 🛡️ Sovereign Hardening Status
 

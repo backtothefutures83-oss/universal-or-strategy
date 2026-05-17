@@ -609,14 +609,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 if (!string.IsNullOrEmpty(fsm966.ReplacingCancelOrderId))
-                    ctx._orderIdToFsmKey.TryRemove(fsm966.ReplacingCancelOrderId, out _);
+                    ctx._orderIdToFsmMap.Remove(fsm966.ReplacingCancelOrderId);
 
                 fsm966.EntryOrder = _ne966;
                 fsm966.State = FollowerBracketState.Submitted;
                 fsm966.ReplacingCancelOrderId = null;
                 fsm966.LastUpdateUtc = DateTime.UtcNow;
                 if (!string.IsNullOrEmpty(_ne966.OrderId))
-                    ctx._orderIdToFsmKey[_ne966.OrderId] = _fsn966;
+                    ctx._orderIdToFsmMap.TryAdd(_ne966.OrderId, _fsn966, fsm966.Generation);
 
                 // [QTY-SYNC]: Sync PositionInfo to new size so SubmitBracketOrders sum-assertion passes.
                 PositionInfo pos966;

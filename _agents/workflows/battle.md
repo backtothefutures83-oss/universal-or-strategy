@@ -54,6 +54,7 @@ These phrases have been confirmed to trigger content filters on 2+ Arena models 
    - Section 2: **Mandatory Verdict Task** — instruct agents to adjudicate any open ADR.
    - Section 3: **3-Point Design Challenge** — exactly 3 engineering problems, no more.
    - Section 4: **Mandatory Output Format** — agent name/version, verdict, design name, mechanism, latency estimate.
+   - Section 5: **Copy Button Requirement (MANDATORY)** — The prompt must be output directly in the main chat interface within a standard Markdown code block to allow the user to easily click the "Copy" button. NEVER bury prompts inside an artifact.
 
 4. **Opus-Safe Rules** (MANDATORY):
    - NO theater language ("Billionaire's Tax", "Nexus", "Platinum", "Ultrathink")

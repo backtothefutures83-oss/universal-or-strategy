@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.Strategies;
@@ -12,6 +13,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
+
+        // V12 Phase 8: Atomic FSM State (64-bit packing)
+        // Layout: [State: 8 bits][Pending: 1 bit][Generation: 55 bits]
+        private struct FsmPackedState
+        {
+            private const int StateShift = 56;
+            private const int PendingShift = 55;
+            private const long PendingMask = 1L << PendingShift;
+            private const long GenerationMask = (1L << 55) - 1;
+
+            public static long Pack(byte state, bool pending, long generation)
+            {
+                var gen = generation & GenerationMask;
+                var pend = pending ? PendingMask : 0;
+                return ((long)state << StateShift) | pend | gen;
+            }
+
+            public static void Unpack(long value, out byte state, out bool pending, out long generation)
+            {
+                state = (byte)(value >> StateShift);
+                pending = (value & PendingMask) != 0;
+                generation = value & GenerationMask;
+            }
+        }
         #region BracketFSM Definitions
 
         /// <summary>
@@ -42,10 +67,60 @@ namespace NinjaTrader.NinjaScript.Strategies
             public string AccountName;
             public string EntryName;         // Links to Master Position key (fleetEntryName)
             public string OcoGroupId;        // Shared ID for broker OCO
-            public FollowerBracketState State = FollowerBracketState.None;
+            private long _packedState;  // Atomic state + pending + generation
             public int RemainingContracts;
             public string ReplacingCancelOrderId;
             public DateTime LastUpdateUtc = DateTime.UtcNow;
+            
+            public FollowerBracketState State
+            {
+                get
+                {
+                    FsmPackedState.Unpack(Interlocked.Read(ref _packedState),
+                        out byte state, out _, out _);
+                    return (FollowerBracketState)state;
+                }
+                set
+                {
+                    // Atomic state update preserving generation
+                    long current = Interlocked.Read(ref _packedState);
+                    FsmPackedState.Unpack(current, out _, out bool pending, out long gen);
+                    long newPacked = FsmPackedState.Pack((byte)value, pending, gen);
+                    Interlocked.Exchange(ref _packedState, newPacked);
+                }
+            }
+
+            public long Generation
+            {
+                get
+                {
+                    FsmPackedState.Unpack(Interlocked.Read(ref _packedState),
+                        out _, out _, out long gen);
+                    return gen;
+                }
+            }
+
+            /// <summary>
+            /// Ticket-02: Atomic state transition with Pending flag control.
+            /// Sets Pending=true before transition, caller must clear after broker ack.
+            /// </summary>
+            public bool TryTransition(FollowerBracketState newState, bool setPending)
+            {
+                long current, newPacked;
+                do
+                {
+                    current = Interlocked.Read(ref _packedState);
+                    FsmPackedState.Unpack(current, out byte oldState, out _, out long gen);
+                    
+                    // Validate transition (basic guard - can be extended)
+                    if ((FollowerBracketState)oldState == newState)
+                        return false; // No-op if already in target state
+                    
+                    newPacked = FsmPackedState.Pack((byte)newState, setPending, gen);
+                } while (Interlocked.CompareExchange(ref _packedState, newPacked, current) != current);
+                
+                return true;
+            }
 
             public Order EntryOrder;
             public Order StopOrder;
@@ -104,20 +179,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (fsm == null) return;
 
             if (fsm.EntryOrder != null && !string.IsNullOrEmpty(fsm.EntryOrder.OrderId))
-                _orderIdToFsmKey.TryRemove(fsm.EntryOrder.OrderId, out _);
+                _orderIdToFsmMap.Remove(fsm.EntryOrder.OrderId);
 
             if (!string.IsNullOrEmpty(fsm.ReplacingCancelOrderId))
-                _orderIdToFsmKey.TryRemove(fsm.ReplacingCancelOrderId, out _);
+                _orderIdToFsmMap.Remove(fsm.ReplacingCancelOrderId);
 
             if (fsm.StopOrder != null && !string.IsNullOrEmpty(fsm.StopOrder.OrderId))
-                _orderIdToFsmKey.TryRemove(fsm.StopOrder.OrderId, out _);
+                _orderIdToFsmMap.Remove(fsm.StopOrder.OrderId);
 
             if (fsm.Targets == null) return;
 
             foreach (Order target in fsm.Targets)
             {
                 if (target != null && !string.IsNullOrEmpty(target.OrderId))
-                    _orderIdToFsmKey.TryRemove(target.OrderId, out _);
+                    _orderIdToFsmMap.Remove(target.OrderId);
             }
         }
 
@@ -158,10 +233,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (string.IsNullOrEmpty(orderId)) return null;
             
-            if (_orderIdToFsmKey.TryGetValue(orderId, out var entryName))
+            string entryName;
+            long generation;
+            if (_orderIdToFsmMap.TryGet(orderId, out entryName, out generation))
             {
-                _followerBrackets.TryGetValue(entryName, out var fsm);
-                return fsm;
+                if (_followerBrackets.TryGetValue(entryName, out var fsm))
+                {
+                    // Verify generation matches (ABA protection)
+                    if (fsm.Generation == generation)
+                    {
+                        return fsm;
+                    }
+                    else
+                    {
+                        // Stale mapping (slot was freed and reused)
+                        if (_diagFleet)
+                            Print(string.Format("[FSM] Stale OrderId mapping for {0} (gen mismatch)", orderId));
+                        return null;
+                    }
+                }
             }
             
             return null;
@@ -184,7 +274,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // Back-fill the OrderId map if we found it via signal
                     if (!string.IsNullOrEmpty(orderId))
-                        _orderIdToFsmKey[orderId] = fleetEntryName;
+                        _orderIdToFsmMap.TryAdd(orderId, fleetEntryName, fsm.Generation);
                     
                     return fsm;
                 }
@@ -207,7 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 
                 if (f.StopOrder != null && f.StopOrder.OrderId == orderId)
                 {
-                    _orderIdToFsmKey[orderId] = f.EntryName;
+                    _orderIdToFsmMap.TryAdd(orderId, f.EntryName, f.Generation);
                     return f;
                 }
                 
@@ -216,7 +306,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (f.Targets[i] != null && f.Targets[i].OrderId == orderId)
                     {
-                        _orderIdToFsmKey[orderId] = f.EntryName;
+                        _orderIdToFsmMap.TryAdd(orderId, f.EntryName, f.Generation);
                         foundT = true;
                         return f;
                     }
@@ -225,7 +315,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 
                 if (f.EntryOrder != null && f.EntryOrder.OrderId == orderId)
                 {
-                    _orderIdToFsmKey[orderId] = f.EntryName;
+                    _orderIdToFsmMap.TryAdd(orderId, f.EntryName, f.Generation);
                     return f;
                 }
             }

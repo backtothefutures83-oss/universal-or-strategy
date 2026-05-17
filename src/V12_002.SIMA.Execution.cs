@@ -505,7 +505,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // Phase 6 [FSM-P3]: Register OrderId for O(1) FSM lookup (populated by Submit)
                 if (fEntry != null && !string.IsNullOrEmpty(fEntry.OrderId))
-                    _orderIdToFsmKey[fEntry.OrderId] = fleetKey;
+                {
+                    if (_followerBrackets.TryGetValue(fleetKey, out var fsm))
+                        _orderIdToFsmMap.TryAdd(fEntry.OrderId, fleetKey, fsm.Generation);
+                }
 
                 ClearDispatchSyncPending(expectedKey);
                 syncPending = false;

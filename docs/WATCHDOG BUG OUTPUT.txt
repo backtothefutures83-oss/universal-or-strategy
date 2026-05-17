@@ -1,0 +1,1029 @@
+[WATCHDOG] Stopped
+[SHUTDOWN] GTC sweep: cancelling 0 tracked + broker-scanned orders
+[BUILD 984] GTC sweep: cancelled 0 tracked + 0 broker-scanned orders
+[SHUTDOWN] Draining queues...
+[SHUTDOWN] Drained 0 IPC cmds, 0 Actor cmds. Overflow discarded: 0.
+------------------------------------------------
+[1111.007-mphase-mp0] SESSION METRICS REPORT
+  FSM Transitions   : 0
+  SIMA Dispatches   : 0
+  Reaper Audits     : 0
+  Symmetry Replaces : 0
+  Order Submissions : 0
+  IPC Commands      : 0
+------------------------------------------------
+[REAPER] Audit timer STOPPED
+Disabling NinjaScript strategy 'V12_002/382220965'
+[PHOTON MMIO] mirror online: V12_FleetDispatch_7940_45FDDF3F9AE43A47
+[PHOTON MMIO] mirror online: V12_FleetDispatch_7940_9CCC2CB20EE192A7
+EMA INIT DEBUG: ema9.Period=9 ema15.Period=15
+UniversalORStrategy 1111.007-mphase-mp0 | MES | Tick: 0.25 | PV: $5
+Session: 09:30 - 16:00 Eastern | OR: 5 min
+Targets: T1=2(Points) T2=0.5(ATR) T3=1(ATR) T4=4(ATR) T5=5(Runner) | Stop=0.75xOR
+RMA: Enabled=True ATR(14) Stop=0.75xATR
+TREND: Enabled=True E1Stop=1.1xATR E2Trail=1.1xATR
+FFMA: Enabled=True Distance=10pt RSI=20/80
+V12 SIMA: ENABLED - Fleet mode | AccountPrefix: "Apex"
+[TRACE:00001][LogicAudit][INFO] span-start
+----------------------------------------------------------------
+1111.007-mphase-mp0 RISK LOGIC AUDIT (The Testing Rig)
+Date: 2026-05-15 13:31:56
+----------------------------------------------------------------
+[AUDIT] CASE 1: ATR STOP ROUNDING STRESS TEST (100 SAMPLES)
+  Sample 10: ATR 2.00 -> RoundUp: 3pt
+  Sample 20: ATR 3.00 -> RoundUp: 4pt
+  Sample 30: ATR 4.00 -> RoundUp: 5pt
+  Sample 40: ATR 5.00 -> RoundUp: 6pt
+  Sample 50: ATR 6.00 -> RoundUp: 7pt
+  Sample 60: ATR 7.00 -> RoundUp: 8pt
+  Sample 70: ATR 8.00 -> RoundUp: 9pt
+  Sample 80: ATR 9.00 -> RoundUp: 10pt
+  Sample 90: ATR 10.00 -> RoundUp: 11pt
+  Sample 100: ATR 11.00 -> RoundUp: 13pt
+
+[AUDIT] CASE 2: CONTRACT SIZING STRESS TEST (100 SAMPLES)
+  Sample 10: Stop 3.0pt -> Qty: 13 (Cost: $195)
+  Sample 20: Stop 5.0pt -> Qty: 8 (Cost: $200)
+  Sample 30: Stop 7.0pt -> Qty: 5 (Cost: $175)
+  Sample 40: Stop 9.0pt -> Qty: 4 (Cost: $180)
+  Sample 50: Stop 11.0pt -> Qty: 3 (Cost: $165)
+  Sample 60: Stop 13.0pt -> Qty: 3 (Cost: $195)
+  Sample 70: Stop 15.0pt -> Qty: 2 (Cost: $150)
+  Sample 80: Stop 17.0pt -> Qty: 2 (Cost: $170)
+  Sample 90: Stop 19.0pt -> Qty: 2 (Cost: $190)
+  Sample 100: Stop 21.0pt -> Qty: 1 (Cost: $105)
+
+[AUDIT] CASE 3: TARGET DISTRIBUTION (ALL COUNT SCENARIOS)
+  --- Count=1 targets ---
+    1 contr -> T1:1 T2:0 T3:0 T4:0 T5:0
+    2 contr -> T1:2 T2:0 T3:0 T4:0 T5:0
+    3 contr -> T1:3 T2:0 T3:0 T4:0 T5:0
+    5 contr -> T1:5 T2:0 T3:0 T4:0 T5:0
+    10 contr -> T1:10 T2:0 T3:0 T4:0 T5:0
+  --- Count=2 targets ---
+    1 contr -> T1:1 T2:0 T3:0 T4:0 T5:0
+    2 contr -> T1:1 T2:1 T3:0 T4:0 T5:0
+    3 contr -> T1:2 T2:1 T3:0 T4:0 T5:0
+    5 contr -> T1:3 T2:2 T3:0 T4:0 T5:0
+    10 contr -> T1:5 T2:5 T3:0 T4:0 T5:0
+  --- Count=3 targets ---
+    1 contr -> T1:1 T2:0 T3:0 T4:0 T5:0
+    2 contr -> T1:1 T2:1 T3:0 T4:0 T5:0
+    3 contr -> T1:1 T2:1 T3:1 T4:0 T5:0
+    5 contr -> T1:2 T2:2 T3:1 T4:0 T5:0
+    10 contr -> T1:4 T2:3 T3:3 T4:0 T5:0
+  --- Count=4 targets ---
+    1 contr -> T1:1 T2:0 T3:0 T4:0 T5:0
+    2 contr -> T1:1 T2:1 T3:0 T4:0 T5:0
+    3 contr -> T1:1 T2:1 T3:1 T4:0 T5:0
+    5 contr -> T1:2 T2:1 T3:1 T4:1 T5:0
+    10 contr -> T1:3 T2:3 T3:2 T4:2 T5:0
+  --- Count=5 targets ---
+    1 contr -> T1:1 T2:0 T3:0 T4:0 T5:0
+    2 contr -> T1:1 T2:1 T3:0 T4:0 T5:0
+    3 contr -> T1:1 T2:1 T3:1 T4:0 T5:0
+    5 contr -> T1:1 T2:1 T3:1 T4:1 T5:1
+    10 contr -> T1:2 T2:2 T3:2 T4:2 T5:2
+
+
+[AUDIT] CASE 4: SYMMETRY GUARD SLIPPAGE TEST
+  Master: 5000.00 | Fleet: 5000.00 | Slip: 0.0 ticks | Status: PASS (ANCHORED)
+  Master: 5000.00 | Fleet: 5000.50 | Slip: 2.0 ticks | Status: PASS (ANCHORED)
+  Master: 5000.00 | Fleet: 5001.25 | Slip: 5.0 ticks | Status: !!! BREACH (SKIP) !!!
+
+[AUDIT] CASE 5: TREND RMA 9/15 SPLIT SYMMETRY STRESS
+  TrendSplit: Risk=$200 | Stop=2pt | Qty=20 -> EMA9:7 EMA15:13 | Anchor=5001.00
+  TREND_RMA Master: 5001.00 | Fleet: 5001.00 | Slip: 0.0 ticks | Status: PASS (ANCHORED)
+  TREND_RMA Master: 5001.00 | Fleet: 5001.50 | Slip: 2.0 ticks | Status: PASS (ANCHORED)
+  TREND_RMA Master: 5001.00 | Fleet: 5002.25 | Slip: 5.0 ticks | Status: !!! BREACH (SKIP) !!!
+
+[AUDIT] CASE 6: RETEST OR-BOUND LIMIT SYMMETRY STRESS
+  RETEST LONG Master(OR High): 5010.00 | Fleet: 5010.00 | Slip: 0.0 ticks | Status: PASS (ANCHORED)
+  RETEST LONG Master(OR High): 5010.00 | Fleet: 5010.75 | Slip: 3.0 ticks | Status: PASS (ANCHORED)
+  RETEST LONG Master(OR High): 5010.00 | Fleet: 5011.25 | Slip: 5.0 ticks | Status: !!! BREACH (SKIP) !!!
+  RETEST SHORT Master(OR Low): 4990.00 | Fleet: 4990.00 | Slip: 0.0 ticks | Status: PASS (ANCHORED)
+  RETEST SHORT Master(OR Low): 4990.00 | Fleet: 4989.50 | Slip: 2.0 ticks | Status: PASS (ANCHORED)
+  RETEST SHORT Master(OR Low): 4990.00 | Fleet: 4988.50 | Slip: 6.0 ticks | Status: !!! BREACH (SKIP) !!!
+
+[AUDIT] CASE 7: SIMA BROADCAST COLLISION SIMULATION
+  Simulating 20 simultaneous multi-account fills...
+  Collision Point 5: Queue Marshaling Verified (TriggerCustomEvent)
+  Collision Point 10: Queue Marshaling Verified (TriggerCustomEvent)
+  Collision Point 15: Queue Marshaling Verified (TriggerCustomEvent)
+  Collision Point 20: Queue Marshaling Verified (TriggerCustomEvent)
+  Status: PASS (Cross-thread marshaling uses TriggerCustomEvent to ensure Strategy-Thread isolation)
+
+[AUDIT] CASE 8: ZERO-TRUST STOP LOSS COVERAGE AUDIT
+  No active positions to audit. [SKIPPING - IDLE]
+
+[AUDIT] CASE 9: REAPER DESYNC CHALLENGE
+  No live accounts in expectedPositions. [SKIPPING - IDLE]
+  To run live: enter a trade then re-trigger ExecuteRiskLogicAudit from hotkey.
+
+----------------------------------------------------------------
+V12.1107.002-H AUDIT COMPLETE - LOGIC IS ISOLATED AND VERIFIED
+----------------------------------------------------------------
+[TRACE:00001][LogicAudit][SPAN] elapsed=11ms
+[SHUTDOWN] GTC sweep: cancelling 0 tracked + broker-scanned orders
+[BUILD 984] GTC sweep: cancelled 0 tracked + 0 broker-scanned orders
+[SHUTDOWN] Draining queues...
+[SHUTDOWN] Drained 0 IPC cmds, 0 Actor cmds. Overflow discarded: 0.
+------------------------------------------------
+[1111.007-mphase-mp0] SESSION METRICS REPORT
+  FSM Transitions   : 0
+  SIMA Dispatches   : 0
+  Reaper Audits     : 0
+  Symmetry Replaces : 0
+  Order Submissions : 0
+  IPC Commands      : 0
+------------------------------------------------
+[STICKY] MODE on disk was RMA -- forced to OR (safety gate)
+IPC SET ANCHOR: EMA65
+[STICKY] Loaded 103 settings from StickyState_MES.v12state
+[STICKY] Persisted state hydrated -- GET_LAYOUT will serve last-synced config
+IPC SERVER SUCCESS: Listening on 127.0.0.1:5001 (Multi-Client)
+Session Reset: 5/10/2026 at 18:30:00 Eastern
+Session Reset: 5/11/2026 at 09:30:00 Eastern
+OR WINDOW START: 05/11/2026 09:35:00 (Bar time in Eastern)
+OR Start tracked - Bar 186
+OR COMPLETE at 09:35:00: H=7424.75 L=7410.25 M=7417.50 R=14.50
+OR Targets: T1=2(Points) T2=0.5(ATR) Stop=-4.00
+Session Reset: 5/12/2026 at 09:30:00 Eastern
+OR WINDOW START: 05/12/2026 09:35:00 (Bar time in Eastern)
+OR Start tracked - Bar 462
+OR COMPLETE at 09:35:00: H=7417.50 L=7406.75 M=7412.13 R=10.75
+OR Targets: T1=2(Points) T2=0.5(ATR) Stop=-4.00
+Session Reset: 5/13/2026 at 09:30:00 Eastern
+OR WINDOW START: 05/13/2026 09:35:00 (Bar time in Eastern)
+OR Start tracked - Bar 738
+OR COMPLETE at 09:35:00: H=7429.50 L=7416.75 M=7423.13 R=12.75
+OR Targets: T1=2(Points) T2=0.5(ATR) Stop=-4.00
+Session Reset: 5/14/2026 at 09:30:00 Eastern
+OR WINDOW START: 05/14/2026 09:35:00 (Bar time in Eastern)
+OR Start tracked - Bar 1014
+OR COMPLETE at 09:35:00: H=7492.75 L=7479.75 M=7486.25 R=13.00
+OR Targets: T1=2(Points) T2=0.5(ATR) Stop=-4.00
+Session Reset: 5/15/2026 at 09:30:00 Eastern
+OR WINDOW START: 05/15/2026 09:35:00 (Bar time in Eastern)
+OR Start tracked - Bar 1290
+OR COMPLETE at 09:35:00: H=7460.75 L=7434.00 M=7447.38 R=26.75
+OR Targets: T1=2(Points) T2=0.5(ATR) Stop=-6.00
+Enabling NinjaScript strategy 'V12_002/382220965' : On starting a real-time strategy - StartBehavior=ImmediatelySubmit EntryHandling=Unique entries EntriesPerDirection=10 StopTargetHandling=Per entry execution ErrorHandling=Stop strategy, cancel orders, close positions ExitOnSessionClose=False SetOrderQuantityBy=Strategy ConnectionLossHandling=Recalculate DisconnectDelaySeconds=10 CancelEntriesOnStrategyDisable=False CancelExitsOnStrategyDisable=False Calculate=On price change IsUnmanaged=True MaxRestarts=4 in 5 minutes
+--------------------------------------------------------------
+[OK] BMad HARDENED DEPLOYMENT PROTOCOL ACTIVE
+Build: 1111.007-mphase-mp0 | Sync: ONE SOURCE OF TRUTH
+--------------------------------------------------------------
+[WATCHDOG] Started (interval=2000ms, timeout=5s)
+[SIMA] ===================================================
+[SIMA] V12.12 - Fleet Symmetry & Safety Hardening Initializing
+[SIMA] Account Prefix Filter: "Apex"
+[SIMA] ---------------------------------------------------
+[SIMA] [OK] PA-APEX-422136-05 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-09 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-08 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-07 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-04 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-03 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-02 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-11 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-01 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-17 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-16 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-15 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-06 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-07 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] SimApexSim_02 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-08 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] APEX-422136-18 | COMPLIANCE MONITORING ACTIVE
+[SIMA] [OK] PA-APEX-422136-09 | COMPLIANCE MONITORING ACTIVE
+[SIMA] ---------------------------------------------------
+[SIMA] TOTAL ACCOUNTS DETECTED: 18 | ALL INACTIVE by default
+[SIMA] FLEET INACTIVE - MANUAL ENABLE REQUIRED
+[SIMA] ===================================================
+[STICKY] Applied 18/18 persisted fleet toggles
+[SIMA] Phase 5 FSM Hydration (Position Pass): 0 Active FSMs created from open positions.
+[SIMA] Phase 5 FSM Hydration: 0 FSMs created, 0 order IDs indexed.
+[SIMA HYDRATE] No working orders to adopt -- adoption complete.
+[REAPER] Audit timer STARTED - interval: 1000ms (Strategy Thread)
+[BUILD 984] Reconnected -- scheduling working order re-adoption.
+[SIMA] Phase 5 FSM Hydration (Position Pass): 0 Active FSMs created from open positions.
+[SIMA] Phase 5 FSM Hydration: 0 FSMs created, 0 order IDs indexed.
+[SIMA HYDRATE] No working orders to adopt -- adoption complete.
+=== V12 VISUAL TREE DUMP (ChartControl -> Window) ===
+  [0] ChartControl Name=chartControl W=1058 H=673 Vis=Visible Cols=3 Rows=2 Children=15
+      Col[0]: Width=Auto Actual=0
+      Col[1]: Width=* Actual=985
+      Col[2]: Width=Auto Actual=73
+      ** Trader child at index 13: NinjaTrader.Gui.Chart.ChartTraderQuantityUpDown
+  [1] Grid Name=grdChartTab W=1058 H=688 Vis=Visible Cols=0 Rows=2 Children=3
+  [2] ContentPresenter Name= W=1058 H=688 Vis=Visible
+  [3] Border Name= W=1058 H=688 Vis=Visible
+  [4] ChartTab Name= W=1058 H=688 Vis=Visible
+  [5] ContentPresenter Name=PART_SelectedContentHost W=1058 H=688 Vis=Visible
+  [6] Grid Name= W=1058 H=688 Vis=Visible Cols=0 Rows=0 Children=4
+  [7] Border Name=p1 W=1060 H=690 Vis=Visible
+  [8] Grid Name= W=1060 H=714 Vis=Visible Cols=0 Rows=2 Children=2
+  [9] TabControl Name=tabControl W=1060 H=714 Vis=Visible
+  [10] Grid Name=grdChart W=1266 H=714 Vis=Visible Cols=3 Rows=0 Children=3
+      Col[0]: Width=* Actual=1060
+      Col[1]: Width=6 Actual=6
+      Col[2]: Width=200 Actual=200
+      ** Trader child at index 1: NinjaTrader.Gui.Chart.ChartTrader
+  [11] ContentPresenter Name=mainContent W=1266 H=714 Vis=Visible
+  [12] Grid Name= W=1278 H=726 Vis=Visible Cols=0 Rows=0 Children=2
+  [13] Border Name=ClientAreaBackground W=1278 H=727 Vis=Visible
+  [14] Grid Name=outerGrid W=1280 H=752 Vis=Visible Cols=0 Rows=2 Children=8
+  [15] ContentControl Name=PART_CustomFrame W=1280 H=752 Vis=Visible
+  [16] Grid Name= W=1280 H=752 Vis=Visible Cols=0 Rows=0 Children=3
+  [17] Border Name=PART_MaximizedBorder W=1280 H=752 Vis=Visible
+  [18] Chart Name= W=1280 H=752 Vis=Visible
+=== END VISUAL TREE DUMP ===
+V12 PANEL: Strategy 0 found NinjaTrader.Gui.Chart.ChartTraderQuantityUpDown Vis=Collapsed
+V12 PANEL: Strategy 0 -- ChartTrader not Visible, skipping
+V12 PANEL: Strategy 1 -- ChartTab found (ChartTab) but no ChartTrader property/field/child
+V12 PANEL: FindChartTrader Strategy 2 (sibling search) -> ChartTrader
+V12 PANEL: Hijacked Chart Trader slot (Col=1, Row=0)
+REALTIME - Hotkeys: L=Long, S=Short, Shift+Click=RMA, F=Flatten
+[REAPER] Heartbeat: All 19 accounts flat.
+V12 PANEL: Dispatch -> SET_MODE
+[STICKY] Mode switch OR -> RMA: hydrated profile (count=3)
+V12.25: SET_MODE = RMA | RMA=True RETEST=False TREND=False MOMO=False FFMA=False (no CONFIG echo)
+[REAPER] Heartbeat: All 19 accounts flat.
+RMA v12.4 CLICK: x=856.0, y=379.3, w=1478.0, h=959.0, ratio=0.593, price=7419.04 (Market=7419.75)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SIMA RMA V2] Long @ 7419 | Stop: 7413 | T1: 7421 | T2: 7422.75 | T3: 7426.5 | T4: 7449 | T5: 7419 | Qty: 6
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected: 0 -> 6
+[SIMA] Master expectedPositions updated: Sim101 delta=6
+[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): RMA_639144487510497450 | Brackets deferred until fill
+[ACCOUNT_SYNC] SimApexSim_02_MES JUN26 expected: 0 -> 6
++==============================================================+
+|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |
++==============================================================+
+|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |
++==============================================================+
+  SKIP | PA-APEX-422136-05            | Inactive
+  SKIP | APEX-422136-09               | Inactive
+  SKIP | APEX-422136-08               | Inactive
+  SKIP | APEX-422136-07               | Inactive
+  SKIP | PA-APEX-422136-04            | Inactive
+  SKIP | PA-APEX-422136-03            | Inactive
+  SKIP | PA-APEX-422136-02            | Inactive
+  SKIP | APEX-422136-11               | Inactive
+  SKIP | PA-APEX-422136-01            | Inactive
+  SKIP | APEX-422136-17               | Inactive
+  SKIP | APEX-422136-16               | Inactive
+  SKIP | APEX-422136-15               | Inactive
+  SKIP | PA-APEX-422136-06            | Inactive
+  SKIP | PA-APEX-422136-07            | Inactive
+    OK | SimApexSim_02                | Limit RMA    | submitted
+  SKIP | PA-APEX-422136-08            | Inactive
+  SKIP | APEX-422136-18               | Inactive
+  SKIP | PA-APEX-422136-09            | Inactive
++--------------------------------------------------------------+
+|  FLEET: 1 dispatched, 17 skipped
++--------------------------------------------------------------+
+|  TIMING SUMMARY (4-phase)                                    |
++--------------------------------------------------------------+
+|  Setup+Calc:      0.034 ms  |  Local Acct:    40.307 ms       |
+|  Fleet Loop:     34.133 ms  |  Total:         74.475 ms       |
++==============================================================+
+[ACTOR_BUDGET] cycle=5 reason=time elapsedMs=74 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144487510497450 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144487510497450
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[REAPER] SimApexSim_02: Expected=6, Actual=0
+[REAPER] Sim101 (Master): Expected=6, Actual=0
+[REAPER] Sim101 (Master) is Flat (Target/Stop hit). Expected was 6.
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade=RMA | Anchor=7419.00 | FillQty=6
+[LADDER_GUARD] T5=7419.0000 is inside T4=7449.2500 for RMA_639144487510497450. Pushing T5 to 7449.5000.
+[LADDER_GUARD] Ladder corrected for RMA_639144487510497450: T1=7421.0000 T2=7422.7500 T3=7426.5000 T4=7449.2500 T5=7449.5000
+RMA ENTRY FILLED: Long 6 @ 7419.00
+[FORENSIC] T1 RMA_639144487510497450: qty=2 price=7421.00 submitting limit
+[FORENSIC] T2 RMA_639144487510497450: qty=2 price=7422.75 submitting limit
+[FORENSIC] T3 RMA_639144487510497450: qty=2 price=7426.50 submitting limit
+[STOP_AUDIT] OK RMA_639144487510497450: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+RMA BRACKET V12.1101E: Stop@7413.25 | T1:2@7421.00 | T2:2@7422.75 | T3:2@7426.50
+[ACTOR_BUDGET] cycle=117 reason=time elapsedMs=282 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[ACTOR_BUDGET] cycle=118 reason=time elapsedMs=53 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ANCHOR-01] Pre-applying master anchor 7419.00 for SimApexSim_02_RMA_RMA_639144487510497450 -- bracket will use master fill price
+[SYMMETRY STOP_AUDIT] OK SimApexSim_02_RMA_RMA_639144487510497450: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+[ANCHOR-02] Bracket already anchor-aligned for SimApexSim_02_RMA_RMA_639144487510497450 (prior=7419.00 anchor=7419.00) -- retarget skipped
+[SYMMETRY_GUARD] ANCHORED | SimApexSim_02_RMA_RMA_639144487510497450 | Master=7419.00 Fleet=7419.00 Slip=0.0 ticks ($0.00/ct) | Scalp Anchor T1=7421.00 | Runner Targets=Trail
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144487510497450 Transition: Submitted -> Active | Event=Filled | Order=SimApexSim_02_RMA_RMA_639144487510497450
+[ACTOR_BUDGET] cycle=121 reason=time elapsedMs=15 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[REAPER] SimApexSim_02: Expected=6, Actual=6
+[REAPER] Sim101 (Master): Expected=6, Actual=6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=6, Actual=6
+[REAPER] Sim101 (Master): Expected=6, Actual=6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=6, Actual=6
+[REAPER] Sim101 (Master): Expected=6, Actual=6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[!] CRITICAL: DEADLOCK DETECTED (TIMEOUT > 5S)
+[WATCHDOG] Cancelled 4 master order(s) on strategy thread.
+[WATCHDOG] Strategy-thread master close submitted: 6 on Sim101
+[ACTOR_BUDGET] cycle=225 reason=time elapsedMs=103 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[WATCHDOG] Enqueued lead account emergency flatten.
+[ACTOR_BUDGET] cycle=229 reason=time elapsedMs=12 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[OnPositionUpdate] expectedPositions cleared for Sim101_MES JUN26 (position flat)
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+CLEANUP SUMMARY for RMA_639144487510497450: Stops=1 Targets=3 Entries=0
+CLEANUP SUMMARY for SimApexSim_02_RMA_RMA_639144487510497450: Stops=1 Targets=3 Entries=0
+[META-GUARD] SimApexSim_02_RMA_RMA_639144487510497450: Broker is flat but expectedPositions=6. Retaining activePositions metadata for Repair Hook. Will purge after repair completes.
+[FSM-C1] Terminated FSM for SimApexSim_02_RMA_RMA_639144487510497450 (was Active)
+Cleanup complete - Strategy still running, ready for new entries.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[ACTOR_BUDGET] cycle=231 reason=time elapsedMs=23 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[REAPER][NAKED_POSITION] SimApexSim_02: 6ct naked -- starting 5s grace window.
+[GHOST-AUDIT] OnAccountOrderUpdate: T3_SimApexSim_02_RMA_RMA_639144487510497 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T3_SimApexSim_02_RMA_RMA_639144487510497 on SimApexSim_02 (CANCELLED) | Id=9a727097acfe47178e7d2d1b09693ab8
+[GHOST_FIX] Order T3_SimApexSim_02_RMA_RMA_639144487510497450 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=9a727097acfe47178e7d2d1b09693ab8)
+[GHOST-AUDIT] OnAccountOrderUpdate: T2_SimApexSim_02_RMA_RMA_639144487510497 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T2_SimApexSim_02_RMA_RMA_639144487510497 on SimApexSim_02 (CANCELLED) | Id=9beb35e458c948b69b7fafdc7b0171fd
+[GHOST_FIX] Order T2_SimApexSim_02_RMA_RMA_639144487510497450 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=9beb35e458c948b69b7fafdc7b0171fd)
+[GHOST-AUDIT] OnAccountOrderUpdate: T1_SimApexSim_02_RMA_RMA_639144487510497 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T1_SimApexSim_02_RMA_RMA_639144487510497 on SimApexSim_02 (CANCELLED) | Id=1acb307e25cb4c698a25cacede3682f0
+[GHOST_FIX] Order T1_SimApexSim_02_RMA_RMA_639144487510497450 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=1acb307e25cb4c698a25cacede3682f0)
+[GHOST-AUDIT] OnAccountOrderUpdate: Stop_SimApexSim_02_RMA_RMA_6391444875104 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: Stop_SimApexSim_02_RMA_RMA_6391444875104 on SimApexSim_02 (CANCELLED) | Id=3b6b1e6307224d6aa9e90a9a8c7366fe
+[GHOST_FIX] Order STOP_SimApexSim_02_RMA_RMA_639144487510497450 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=3b6b1e6307224d6aa9e90a9a8c7366fe)
+V12.17: WARNING UNPROTECTED POSITION: SimApexSim_02_RMA_RMA_639144487510497450 has 6 contracts with NO STOP after CANCELLED. Manual intervention may be required.
+[REAPER][NAKED_POSITION] SimApexSim_02: 6ct CONFIRMED naked after 5.0s grace. Queuing emergency hard stop.
+[REAPER][EMERGENCY_STOP] Submitted StopMarket for SimApexSim_02: Sell 6ct @ 7413.00 (Dist=6.00)
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+[!] CRITICAL: DEADLOCK DETECTED (TIMEOUT > 5S)
+[WATCHDOG] Cancelled 4 master order(s) on strategy thread.
+[WATCHDOG] Enqueued lead account emergency flatten.
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=0, Actual=6
+[REAPER] * CRITICAL DESYNC on SimApexSim_02: Expected=0, Actual=6
+[REAPER] Heartbeat: 1/19 accounts with positions.
+V12 PANEL: Dispatch -> CANCEL_ALL
+[SIMA] CANCEL_ALL -> Cancelled 5 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+[REAPER][NAKED_POSITION] SimApexSim_02: 6ct naked -- starting 5s grace window.
+[GHOST-AUDIT] OnAccountOrderUpdate: EMERGENCY_STOP_SimApexSim_02 | State=CANCELLED | Acct=SimApexSim_02
+V12 PANEL: Dispatch -> CANCEL_ALL
+[SIMA] CANCEL_ALL -> Cancelled 4 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+V12 PANEL: Dispatch -> FLATTEN_ONLY
+[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)
+[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======
+[SIMA] Enqueued 18 account(s) for chunked close
+[FLATTEN_PUMP] SimApexSim_02: Closed 1 position(s) [ClosePositionsOnly]
+[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======
+[ACTOR_BUDGET] cycle=541 reason=time elapsedMs=40 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[COMPLIANCE] Execution Update received for account.
+[REAPER] Heartbeat: All 19 accounts flat.
+V12 PANEL: Dispatch -> CANCEL_ALL
+[SIMA] CANCEL_ALL -> Cancelled 0 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+V12 PANEL: Dispatch -> FLATTEN_ONLY
+[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)
+[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======
+[SIMA] Enqueued 18 account(s) for chunked close
+[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======
+V12 PANEL: Dispatch -> SET_MODE
+[STICKY] Mode switch OR -> RMA: hydrated profile (count=3)
+V12.25: SET_MODE = RMA | RMA=True RETEST=False TREND=False MOMO=False FFMA=False (no CONFIG echo)
+RMA v12.4 CLICK: x=808.7, y=582.7, w=1478.0, h=959.0, ratio=0.911, price=7405.89 (Market=7419.00)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SIMA RMA V2] Long @ 7406 | Stop: 7400 | T1: 7408 | T2: 7409.5 | T3: 7413.25 | T4: 7434.75 | T5: 7406 | Qty: 6
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected: 0 -> 6
+[SIMA] Master expectedPositions updated: Sim101 delta=6
+[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): RMA_639144491244771073 | Brackets deferred until fill
+[ACCOUNT_SYNC] SimApexSim_02_MES JUN26 expected: 0 -> 6
++==============================================================+
+|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |
++==============================================================+
+|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |
++==============================================================+
+  SKIP | PA-APEX-422136-05            | Inactive
+  SKIP | APEX-422136-09               | Inactive
+  SKIP | APEX-422136-08               | Inactive
+  SKIP | APEX-422136-07               | Inactive
+  SKIP | PA-APEX-422136-04            | Inactive
+  SKIP | PA-APEX-422136-03            | Inactive
+  SKIP | PA-APEX-422136-02            | Inactive
+  SKIP | APEX-422136-11               | Inactive
+  SKIP | PA-APEX-422136-01            | Inactive
+  SKIP | APEX-422136-17               | Inactive
+  SKIP | APEX-422136-16               | Inactive
+  SKIP | APEX-422136-15               | Inactive
+  SKIP | PA-APEX-422136-06            | Inactive
+  SKIP | PA-APEX-422136-07            | Inactive
+    OK | SimApexSim_02                | Limit RMA    | submitted
+  SKIP | PA-APEX-422136-08            | Inactive
+  SKIP | APEX-422136-18               | Inactive
+  SKIP | PA-APEX-422136-09            | Inactive
++--------------------------------------------------------------+
+|  FLEET: 1 dispatched, 17 skipped
++--------------------------------------------------------------+
+|  TIMING SUMMARY (4-phase)                                    |
++--------------------------------------------------------------+
+|  Setup+Calc:      0.449 ms  |  Local Acct:    22.447 ms       |
+|  Fleet Loop:     16.714 ms  |  Total:         39.610 ms       |
++==============================================================+
+[ACTOR_BUDGET] cycle=569 reason=time elapsedMs=39 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)
+[MOVE-SYNC] Entry move: SimApexSim_02_RMA_RMA_639144491244771073 on SimApexSim_02: 7406.00 -> 7414.50 x6
+[FSM-C2] SimApexSim_02_RMA_RMA_639144491244771073 -> Replacing (cancelId=f627edee9a684ecf91ff6e348ca17a98)
+[FSM] Cancel sent for SimApexSim_02_RMA_RMA_639144491244771073 OrderId=f627edee9a684ecf91ff6e348ca17a98
+V12: Entry order MOVED: RMA_639144491244771073 to 7414.50
+[GHOST-AUDIT] OnAccountOrderUpdate: SimApexSim_02_RMA_RMA_639144491244771073 | State=CANCELLED | Acct=SimApexSim_02
+[META-PURGE GUARD] Rescuing PendingCancel spec SimApexSim_02_RMA_RMA_639144491244771073 despite no active FSM. Delegating to resubmit path.
+[FSM] Replacement submitted: SimApexSim_02_RMA_RMA_639144491244771073 @ 7414.5 x6
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491244771073 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144491244771073
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+RMA v12.4 CLICK: x=573.3, y=508.7, w=1478.0, h=959.0, ratio=0.795, price=7420.55 (Market=7419.25)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SIMA RMA V2] Short @ 7420.5 | Stop: 7426.5 | T1: 7418.5 | T2: 7417 | T3: 7413.25 | T4: 7391.75 | T5: 7420.5 | Qty: 6
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected: 6 -> 0
+[SIMA] Master expectedPositions updated: Sim101 delta=-6
+[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): RMA_639144491331036479 | Brackets deferred until fill
+[ACCOUNT_SYNC] SimApexSim_02_MES JUN26 expected: 6 -> 0
++==============================================================+
+|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |
++==============================================================+
+|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |
++==============================================================+
+  SKIP | PA-APEX-422136-05            | Inactive
+  SKIP | APEX-422136-09               | Inactive
+  SKIP | APEX-422136-08               | Inactive
+  SKIP | APEX-422136-07               | Inactive
+  SKIP | PA-APEX-422136-04            | Inactive
+  SKIP | PA-APEX-422136-03            | Inactive
+  SKIP | PA-APEX-422136-02            | Inactive
+  SKIP | APEX-422136-11               | Inactive
+  SKIP | PA-APEX-422136-01            | Inactive
+  SKIP | APEX-422136-17               | Inactive
+  SKIP | APEX-422136-16               | Inactive
+  SKIP | APEX-422136-15               | Inactive
+  SKIP | PA-APEX-422136-06            | Inactive
+  SKIP | PA-APEX-422136-07            | Inactive
+    OK | SimApexSim_02                | Limit RMA    | submitted
+  SKIP | PA-APEX-422136-08            | Inactive
+  SKIP | APEX-422136-18               | Inactive
+  SKIP | PA-APEX-422136-09            | Inactive
++--------------------------------------------------------------+
+|  FLEET: 1 dispatched, 17 skipped
++--------------------------------------------------------------+
+|  TIMING SUMMARY (4-phase)                                    |
++--------------------------------------------------------------+
+|  Setup+Calc:      0.016 ms  |  Local Acct:    16.515 ms       |
+|  Fleet Loop:     22.246 ms  |  Total:         38.777 ms       |
++==============================================================+
+[ACTOR_BUDGET] cycle=580 reason=time elapsedMs=38 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491331036479 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144491331036479
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[REAPER] Heartbeat: All 19 accounts flat.
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+V12 PANEL: Dispatch -> CANCEL_ALL
+CLEANUP SUMMARY for SimApexSim_02_RMA_RMA_639144491331036479: Stops=0 Targets=0 Entries=1
+[FSM-C1] Terminated FSM for SimApexSim_02_RMA_RMA_639144491331036479 (was Accepted)
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: SimApexSim_02_RMA_RMA_639144491331036479
+CLEANUP SUMMARY for RMA_639144491244771073: Stops=0 Targets=0 Entries=1
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: RMA_639144491244771073
+CLEANUP SUMMARY for RMA_639144491331036479: Stops=0 Targets=0 Entries=1
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: RMA_639144491331036479
+CLEANUP SUMMARY for SimApexSim_02_RMA_RMA_639144491244771073: Stops=0 Targets=0 Entries=1
+[FSM-C1] Terminated FSM for SimApexSim_02_RMA_RMA_639144491244771073 (was Accepted)
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: SimApexSim_02_RMA_RMA_639144491244771073
+[SIMA] CANCEL_ALL -> Cancelled 4 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+[ACTOR_BUDGET] cycle=596 reason=time elapsedMs=13 brokerCalls=0 remainingActorQueue=4 detail=post-command state=actorQueue=4 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[CASCADE] Master RMA_639144491244771073 cancelled -- terminating 1 linked follower(s).
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected delta: 0 + (-6) = -6
+[GHOST-AUDIT] OnAccountOrderUpdate: SimApexSim_02_RMA_RMA_639144491244771073 | State=CANCELLED | Acct=SimApexSim_02
+[CASCADE] Master RMA_639144491331036479 cancelled -- terminating 1 linked follower(s).
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected delta: -6 + (6) = 0
+[GHOST-AUDIT] OnAccountOrderUpdate: SimApexSim_02_RMA_RMA_639144491331036479 | State=CANCELLED | Acct=SimApexSim_02
+V12 PANEL: Dispatch -> SET_MODE
+[STICKY] Mode switch OR -> RMA: hydrated profile (count=3)
+V12.25: SET_MODE = RMA | RMA=True RETEST=False TREND=False MOMO=False FFMA=False (no CONFIG echo)
+RMA v12.4 CLICK: x=932.7, y=481.3, w=1478.0, h=959.0, ratio=0.752, price=7418.43 (Market=7419.00)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SYMMETRY] Duplicate dispatch suppressed: RMA Long -- reusing SG_639144743244771073_RMA_0
+[SIMA RMA V2] Long @ 7418.5 | Stop: 7412.5 | T1: 7420.5 | T2: 7422 | T3: 7425.75 | T4: 7447.25 | T5: 7418.5 | Qty: 6
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected: 0 -> 6
+[SIMA] Master expectedPositions updated: Sim101 delta=6
+[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): RMA_639144491486049397 | Brackets deferred until fill
+[ACCOUNT_SYNC] SimApexSim_02_MES JUN26 expected: 0 -> 6
++==============================================================+
+|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |
++==============================================================+
+|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |
++==============================================================+
+  SKIP | PA-APEX-422136-05            | Inactive
+  SKIP | APEX-422136-09               | Inactive
+  SKIP | APEX-422136-08               | Inactive
+  SKIP | APEX-422136-07               | Inactive
+  SKIP | PA-APEX-422136-04            | Inactive
+  SKIP | PA-APEX-422136-03            | Inactive
+  SKIP | PA-APEX-422136-02            | Inactive
+  SKIP | APEX-422136-11               | Inactive
+  SKIP | PA-APEX-422136-01            | Inactive
+  SKIP | APEX-422136-17               | Inactive
+  SKIP | APEX-422136-16               | Inactive
+  SKIP | APEX-422136-15               | Inactive
+  SKIP | PA-APEX-422136-06            | Inactive
+  SKIP | PA-APEX-422136-07            | Inactive
+    OK | SimApexSim_02                | Limit RMA    | submitted
+  SKIP | PA-APEX-422136-08            | Inactive
+  SKIP | APEX-422136-18               | Inactive
+  SKIP | PA-APEX-422136-09            | Inactive
++--------------------------------------------------------------+
+|  FLEET: 1 dispatched, 17 skipped
++--------------------------------------------------------------+
+|  TIMING SUMMARY (4-phase)                                    |
++--------------------------------------------------------------+
+|  Setup+Calc:      0.014 ms  |  Local Acct:    15.080 ms       |
+|  Fleet Loop:     15.582 ms  |  Total:         30.676 ms       |
++==============================================================+
+[ACTOR_BUDGET] cycle=603 reason=time elapsedMs=30 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491486049397 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144491486049397
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade=RMA | Anchor=7418.50 | FillQty=6
+[LADDER_GUARD] T5=7418.5000 is inside T4=7447.2500 for RMA_639144491486049397. Pushing T5 to 7447.5000.
+[LADDER_GUARD] Ladder corrected for RMA_639144491486049397: T1=7420.5000 T2=7422.0000 T3=7425.7500 T4=7447.2500 T5=7447.5000
+RMA ENTRY FILLED: Long 6 @ 7418.50
+[FORENSIC] T1 RMA_639144491486049397: qty=2 price=7420.50 submitting limit
+[FORENSIC] T2 RMA_639144491486049397: qty=2 price=7422.00 submitting limit
+[FORENSIC] T3 RMA_639144491486049397: qty=2 price=7425.75 submitting limit
+[STOP_AUDIT] OK RMA_639144491486049397: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+RMA BRACKET V12.1101E: Stop@7413.00 | T1:2@7420.50 | T2:2@7422.00 | T3:2@7425.75
+[ACTOR_BUDGET] cycle=611 reason=time elapsedMs=72 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ANCHOR-01] Pre-applying master anchor 7418.50 for SimApexSim_02_RMA_RMA_639144491486049397 -- bracket will use master fill price
+[SYMMETRY STOP_AUDIT] OK SimApexSim_02_RMA_RMA_639144491486049397: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+[ANCHOR-02] Bracket already anchor-aligned for SimApexSim_02_RMA_RMA_639144491486049397 (prior=7418.50 anchor=7418.50) -- retarget skipped
+[SYMMETRY_GUARD] ANCHORED | SimApexSim_02_RMA_RMA_639144491486049397 | Master=7418.50 Fleet=7418.50 Slip=0.0 ticks ($0.00/ct) | Scalp Anchor T1=7420.50 | Runner Targets=Trail
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491486049397 Transition: Submitted -> Active | Event=Filled | Order=SimApexSim_02_RMA_RMA_639144491486049397
+[REAPER] SimApexSim_02: Expected=6, Actual=6
+[REAPER] Sim101 (Master): Expected=6, Actual=6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+V12 PANEL: Dispatch -> CANCEL_ALL
+[META-GUARD] SimApexSim_02_RMA_RMA_639144491331036479: Broker is flat but expectedPositions=6. Retaining activePositions metadata for Repair Hook. Will purge after repair completes.
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: SimApexSim_02_RMA_RMA_639144491331036479
+[META-GUARD] SimApexSim_02_RMA_RMA_639144491244771073: Broker is flat but expectedPositions=6. Retaining activePositions metadata for Repair Hook. Will purge after repair completes.
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: SimApexSim_02_RMA_RMA_639144491244771073
+[SIMA] CANCEL_ALL -> Cancelled 0 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+V12 PANEL: Dispatch -> FLATTEN_ONLY
+[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)
+[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======
+[SIMA] Enqueued 19 account(s) for chunked close
+[FLATTEN_PUMP] SimApexSim_02: Cancelled 3 order(s) [ClosePositionsOnly]
+[FLATTEN_PUMP] SimApexSim_02: Closed 1 position(s) [ClosePositionsOnly]
+[FLATTEN_PUMP] Sim101: Cancelled 3 order(s) [ClosePositionsOnly_Master]
+[FLATTEN_PUMP] Sim101: Closed 1 position(s) [ClosePositionsOnly_Master]
+[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======
+[ACTOR_BUDGET] cycle=646 reason=time elapsedMs=61 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[GHOST-AUDIT] OnAccountOrderUpdate: T3_SimApexSim_02_RMA_RMA_639144491486049 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T3_SimApexSim_02_RMA_RMA_639144491486049 on SimApexSim_02 (CANCELLED) | Id=0f6b97848e494cc5b52cd4a362f28a60
+[GHOST_FIX] Order T3_SimApexSim_02_RMA_RMA_639144491486049397 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=0f6b97848e494cc5b52cd4a362f28a60)
+[GHOST-AUDIT] OnAccountOrderUpdate: T2_SimApexSim_02_RMA_RMA_639144491486049 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T2_SimApexSim_02_RMA_RMA_639144491486049 on SimApexSim_02 (CANCELLED) | Id=7afe0d08fd594fac8fd2266f37b2bf9f
+[GHOST_FIX] Order T2_SimApexSim_02_RMA_RMA_639144491486049397 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=7afe0d08fd594fac8fd2266f37b2bf9f)
+[GHOST-AUDIT] OnAccountOrderUpdate: Stop_SimApexSim_02_RMA_RMA_6391444914860 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: Stop_SimApexSim_02_RMA_RMA_6391444914860 on SimApexSim_02 (CANCELLED) | Id=cdda767077f04c5fbca2c591d892c1a2
+[GHOST_FIX] Order STOP_SimApexSim_02_RMA_RMA_639144491486049397 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=cdda767077f04c5fbca2c591d892c1a2)
+V12.17: WARNING UNPROTECTED POSITION: SimApexSim_02_RMA_RMA_639144491486049397 has 6 contracts with NO STOP after CANCELLED. Manual intervention may be required.
+[GHOST-AUDIT] OnAccountOrderUpdate: T1_SimApexSim_02_RMA_RMA_639144491486049 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T1_SimApexSim_02_RMA_RMA_639144491486049 on SimApexSim_02 (CANCELLED) | Id=98741a0033b848438efe8a0a23cdf5fc
+[GHOST_FIX] Order T1_SimApexSim_02_RMA_RMA_639144491486049397 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=98741a0033b848438efe8a0a23cdf5fc)
+[COMPLIANCE] Execution Update received for account.
+[OnPositionUpdate] expectedPositions cleared for Sim101_MES JUN26 (position flat)
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+[FSM-C1] Terminated FSM for SimApexSim_02_RMA_RMA_639144491486049397 (was Active)
+CLEANUP SUMMARY for RMA_639144491486049397: Stops=1 Targets=0 Entries=0
+Cleanup complete - Strategy still running, ready for new entries.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+V12 PANEL: Dispatch -> SET_MODE
+[STICKY] Mode switch OR -> RMA: hydrated profile (count=3)
+V12.25: SET_MODE = RMA | RMA=True RETEST=False TREND=False MOMO=False FFMA=False (no CONFIG echo)
+RMA v12.4 CLICK: x=896.0, y=578.0, w=1478.0, h=959.0, ratio=0.904, price=7416.99 (Market=7418.25)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SIMA RMA V2] Long @ 7417 | Stop: 7411 | T1: 7419 | T2: 7420.25 | T3: 7423.75 | T4: 7443.75 | T5: 7417 | Qty: 6
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected: 0 -> 6
+[SIMA] Master expectedPositions updated: Sim101 delta=6
+[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): RMA_639144491994760681 | Brackets deferred until fill
+[ACCOUNT_SYNC] SimApexSim_02_MES JUN26 expected: 0 -> 6
++==============================================================+
+|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |
++==============================================================+
+|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |
++==============================================================+
+  SKIP | PA-APEX-422136-05            | Inactive
+  SKIP | APEX-422136-09               | Inactive
+  SKIP | APEX-422136-08               | Inactive
+  SKIP | APEX-422136-07               | Inactive
+  SKIP | PA-APEX-422136-04            | Inactive
+  SKIP | PA-APEX-422136-03            | Inactive
+  SKIP | PA-APEX-422136-02            | Inactive
+  SKIP | APEX-422136-11               | Inactive
+  SKIP | PA-APEX-422136-01            | Inactive
+  SKIP | APEX-422136-17               | Inactive
+  SKIP | APEX-422136-16               | Inactive
+  SKIP | APEX-422136-15               | Inactive
+  SKIP | PA-APEX-422136-06            | Inactive
+  SKIP | PA-APEX-422136-07            | Inactive
+    OK | SimApexSim_02                | Limit RMA    | submitted
+  SKIP | PA-APEX-422136-08            | Inactive
+  SKIP | APEX-422136-18               | Inactive
+  SKIP | PA-APEX-422136-09            | Inactive
++--------------------------------------------------------------+
+|  FLEET: 1 dispatched, 17 skipped
++--------------------------------------------------------------+
+|  TIMING SUMMARY (4-phase)                                    |
++--------------------------------------------------------------+
+|  Setup+Calc:      0.013 ms  |  Local Acct:    18.840 ms       |
+|  Fleet Loop:     14.569 ms  |  Total:         33.422 ms       |
++==============================================================+
+[ACTOR_BUDGET] cycle=670 reason=time elapsedMs=33 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[REAPER] SimApexSim_02: Expected=6, Actual=0
+[REAPER] SimApexSim_02: repair deferred (fill grace active) while expected=6, actual=0.
+[REAPER] Sim101 (Master): Expected=6, Actual=0
+[REAPER] Sim101 (Master) is Flat (Target/Stop hit). Expected was 6.
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491994760681 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144491994760681
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[REAPER] SimApexSim_02: Expected=6, Actual=0
+[REAPER] Sim101 (Master): Expected=6, Actual=0
+[REAPER] Sim101 (Master) is Flat (Target/Stop hit). Expected was 6.
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[REAPER] SimApexSim_02: Expected=6, Actual=0
+[REAPER] Sim101 (Master): Expected=6, Actual=0
+[REAPER] Sim101 (Master) is Flat (Target/Stop hit). Expected was 6.
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[MOVE-SYNC] Entry move: SimApexSim_02_RMA_RMA_639144491994760681 on SimApexSim_02: 7417.00 -> 7417.75 x6
+[FSM-C2] SimApexSim_02_RMA_RMA_639144491994760681 -> Replacing (cancelId=8759593b687d4b59b981df45389873c9)
+[FSM] Cancel sent for SimApexSim_02_RMA_RMA_639144491994760681 OrderId=8759593b687d4b59b981df45389873c9
+V12: Entry order MOVED: RMA_639144491994760681 to 7417.75
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[GHOST-AUDIT] OnAccountOrderUpdate: SimApexSim_02_RMA_RMA_639144491994760681 | State=CANCELLED | Acct=SimApexSim_02
+[META-PURGE GUARD] Rescuing PendingCancel spec SimApexSim_02_RMA_RMA_639144491994760681 despite no active FSM. Delegating to resubmit path.
+[FSM] Replacement submitted: SimApexSim_02_RMA_RMA_639144491994760681 @ 7417.75 x6
+[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade=RMA | Anchor=7417.75 | FillQty=6
+[LADDER_GUARD] T5=7417.7500 is inside T4=7444.7500 for RMA_639144491994760681. Pushing T5 to 7445.0000.
+[LADDER_GUARD] Ladder corrected for RMA_639144491994760681: T1=7419.7500 T2=7421.2500 T3=7424.5000 T4=7444.7500 T5=7445.0000
+RMA ENTRY FILLED: Long 6 @ 7417.75
+[FORENSIC] T1 RMA_639144491994760681: qty=2 price=7419.75 submitting limit
+[FORENSIC] T2 RMA_639144491994760681: qty=2 price=7421.25 submitting limit
+[FORENSIC] T3 RMA_639144491994760681: qty=2 price=7424.50 submitting limit
+[STOP_AUDIT] OK RMA_639144491994760681: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+RMA BRACKET V12.1101E: Stop@7412.75 | T1:2@7419.75 | T2:2@7421.25 | T3:2@7424.50
+[ACTOR_BUDGET] cycle=802 reason=time elapsedMs=62 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+[REAPER][NAKED_POSITION] SimApexSim_02: 3ct naked -- starting 5s grace window.
+[COMPLIANCE] Execution Update received for account.
+[ANCHOR-01] Pre-applying master anchor 7417.75 for SimApexSim_02_RMA_RMA_639144491994760681 -- bracket will use master fill price
+[SYMMETRY STOP_AUDIT] OK SimApexSim_02_RMA_RMA_639144491994760681: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+[ANCHOR-02] Bracket already anchor-aligned for SimApexSim_02_RMA_RMA_639144491994760681 (prior=7417.75 anchor=7417.75) -- retarget skipped
+[SYMMETRY_GUARD] ANCHORED | SimApexSim_02_RMA_RMA_639144491994760681 | Master=7417.75 Fleet=7417.75 Slip=0.0 ticks ($0.00/ct) | Scalp Anchor T1=7419.75 | Runner Targets=Trail
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491994760681 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144491994760681
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144491994760681 Transition: Accepted -> Active | Event=PartFilled | Order=SimApexSim_02_RMA_RMA_639144491994760681
+[REAPER] SimApexSim_02: Expected=6, Actual=6
+[REAPER] Sim101 (Master): Expected=6, Actual=6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[REAPER] SimApexSim_02: Expected=6, Actual=6
+[REAPER] Sim101 (Master): Expected=6, Actual=6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+V12 PANEL: Dispatch -> FLATTEN_ONLY
+[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)
+[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======
+[SIMA] Enqueued 19 account(s) for chunked close
+[FLATTEN_PUMP] SimApexSim_02: Cancelled 3 order(s) [ClosePositionsOnly]
+[FLATTEN_PUMP] SimApexSim_02: Closed 1 position(s) [ClosePositionsOnly]
+[FLATTEN_PUMP] Sim101: Cancelled 3 order(s) [ClosePositionsOnly_Master]
+[FLATTEN_PUMP] Sim101: Closed 1 position(s) [ClosePositionsOnly_Master]
+[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======
+[ACTOR_BUDGET] cycle=860 reason=time elapsedMs=57 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[GHOST-AUDIT] OnAccountOrderUpdate: T3_SimApexSim_02_RMA_RMA_639144491994760 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T3_SimApexSim_02_RMA_RMA_639144491994760 on SimApexSim_02 (CANCELLED) | Id=5d30a82a8c44462f8dd24f685a4d6a08
+[GHOST_FIX] Order T3_SimApexSim_02_RMA_RMA_639144491994760681 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=5d30a82a8c44462f8dd24f685a4d6a08)
+[GHOST-AUDIT] OnAccountOrderUpdate: T2_SimApexSim_02_RMA_RMA_639144491994760 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T2_SimApexSim_02_RMA_RMA_639144491994760 on SimApexSim_02 (CANCELLED) | Id=57ed4bf345cd4c0daffe8accfff1ef45
+[GHOST_FIX] Order T2_SimApexSim_02_RMA_RMA_639144491994760681 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=57ed4bf345cd4c0daffe8accfff1ef45)
+[GHOST-AUDIT] OnAccountOrderUpdate: Stop_SimApexSim_02_RMA_RMA_6391444919947 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: Stop_SimApexSim_02_RMA_RMA_6391444919947 on SimApexSim_02 (CANCELLED) | Id=5e9cf52423d647de951c6477e1ad3800
+[GHOST_FIX] Order STOP_SimApexSim_02_RMA_RMA_639144491994760681 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=5e9cf52423d647de951c6477e1ad3800)
+V12.17: WARNING UNPROTECTED POSITION: SimApexSim_02_RMA_RMA_639144491994760681 has 6 contracts with NO STOP after CANCELLED. Manual intervention may be required.
+[GHOST-AUDIT] OnAccountOrderUpdate: T1_SimApexSim_02_RMA_RMA_639144491994760 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T1_SimApexSim_02_RMA_RMA_639144491994760 on SimApexSim_02 (CANCELLED) | Id=7ef75c2a32aa4ef789e836ebeb1d8557
+[GHOST_FIX] Order T1_SimApexSim_02_RMA_RMA_639144491994760681 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=7ef75c2a32aa4ef789e836ebeb1d8557)
+[COMPLIANCE] Execution Update received for account.
+[OnPositionUpdate] expectedPositions cleared for Sim101_MES JUN26 (position flat)
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+[FSM-C1] Terminated FSM for SimApexSim_02_RMA_RMA_639144491994760681 (was Active)
+CLEANUP SUMMARY for RMA_639144491994760681: Stops=1 Targets=1 Entries=0
+Cleanup complete - Strategy still running, ready for new entries.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+V12 PANEL: Dispatch -> FLATTEN_ONLY
+[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)
+[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======
+[SIMA] Enqueued 18 account(s) for chunked close
+[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======
+V12 PANEL: Dispatch -> CANCEL_ALL
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: SimApexSim_02_RMA_RMA_639144491331036479
+V12.13b: CANCEL_ALL cleaned unfilled memory entry: SimApexSim_02_RMA_RMA_639144491244771073
+[SIMA] CANCEL_ALL -> Cancelled 1 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+[REAPER] Heartbeat: All 19 accounts flat.
+[REAPER] Heartbeat: All 19 accounts flat.
+[REAPER] Heartbeat: All 19 accounts flat.
+V12 PANEL: Dispatch -> SET_MODE
+[STICKY] Mode switch OR -> RMA: hydrated profile (count=3)
+V12.25: SET_MODE = RMA | RMA=True RETEST=False TREND=False MOMO=False FFMA=False (no CONFIG echo)
+RMA v12.4 CLICK: x=895.3, y=531.3, w=1478.0, h=959.0, ratio=0.831, price=7420.88 (Market=7416.50)
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[SIMA RMA V2] Short @ 7421 | Stop: 7427 | T1: 7419 | T2: 7417.5 | T3: 7414 | T4: 7393.5 | T5: 7421 | Qty: 6
+[ACCOUNT_SYNC] Sim101_MES JUN26 expected: 0 -> -6
+[SIMA] Master expectedPositions updated: Sim101 delta=-6
+[SIMA RMA V2] LOCAL ENTRY ONLY (Limit): RMA_639144494349287462 | Brackets deferred until fill
+[ACCOUNT_SYNC] SimApexSim_02_MES JUN26 expected: 0 -> -6
++==============================================================+
+|       FORENSIC PULSE REPORT  Phase 9 RMA ENTRY V2            |
++==============================================================+
+|  TYPE | ACCOUNT                       | ORDER TYPE   | STATUS |
++==============================================================+
+  SKIP | PA-APEX-422136-05            | Inactive
+  SKIP | APEX-422136-09               | Inactive
+  SKIP | APEX-422136-08               | Inactive
+  SKIP | APEX-422136-07               | Inactive
+  SKIP | PA-APEX-422136-04            | Inactive
+  SKIP | PA-APEX-422136-03            | Inactive
+  SKIP | PA-APEX-422136-02            | Inactive
+  SKIP | APEX-422136-11               | Inactive
+  SKIP | PA-APEX-422136-01            | Inactive
+  SKIP | APEX-422136-17               | Inactive
+  SKIP | APEX-422136-16               | Inactive
+  SKIP | APEX-422136-15               | Inactive
+  SKIP | PA-APEX-422136-06            | Inactive
+  SKIP | PA-APEX-422136-07            | Inactive
+    OK | SimApexSim_02                | Limit RMA    | submitted
+  SKIP | PA-APEX-422136-08            | Inactive
+  SKIP | APEX-422136-18               | Inactive
+  SKIP | PA-APEX-422136-09            | Inactive
++--------------------------------------------------------------+
+|  FLEET: 1 dispatched, 17 skipped
++--------------------------------------------------------------+
+|  TIMING SUMMARY (4-phase)                                    |
++--------------------------------------------------------------+
+|  Setup+Calc:      0.015 ms  |  Local Acct:    18.156 ms       |
+|  Fleet Loop:     15.342 ms  |  Total:         33.512 ms       |
++==============================================================+
+[ACTOR_BUDGET] cycle=996 reason=time elapsedMs=33 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V12.43: RMA auto-deactivated after entry (lightweight signal, no CONFIG clobber)
+[MOVE-SYNC] Entry move: SimApexSim_02_RMA_RMA_639144494349287462 on SimApexSim_02: 7421.00 -> 7417.00 x6
+[FSM-C2] SimApexSim_02_RMA_RMA_639144494349287462 -> Replacing (cancelId=fdf4a8ea1ac749d8be9a0d6b090b717f)
+[FSM] Cancel sent for SimApexSim_02_RMA_RMA_639144494349287462 OrderId=fdf4a8ea1ac749d8be9a0d6b090b717f
+V12: Entry order MOVED: RMA_639144494349287462 to 7417.00
+[GHOST-AUDIT] OnAccountOrderUpdate: SimApexSim_02_RMA_RMA_639144494349287462 | State=CANCELLED | Acct=SimApexSim_02
+[META-PURGE GUARD] Rescuing PendingCancel spec SimApexSim_02_RMA_RMA_639144494349287462 despite no active FSM. Delegating to resubmit path.
+[FSM] Replacement submitted: SimApexSim_02_RMA_RMA_639144494349287462 @ 7417 x6
+[REAPER] SimApexSim_02: Expected=-6, Actual=0
+[REAPER] Sim101 (Master): Expected=-6, Actual=0
+[REAPER] Sim101 (Master) is Flat (Target/Stop hit). Expected was -6.
+[REAPER] Heartbeat: 2/19 accounts with positions.
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144494349287462 Transition: Submitted -> Accepted | Event=Accepted | Order=SimApexSim_02_RMA_RMA_639144494349287462
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+[V12.30 SIZING] RawStop=6.00 -> Ceiling=6pt | Risk=$200 | Qty=6 | Clamp=[1,30]
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade=RMA | Anchor=7417.00 | FillQty=6
+[LADDER_GUARD] T5=7417.0000 is inside T4=7389.5000 for RMA_639144494349287462. Pushing T5 to 7389.2500.
+[LADDER_GUARD] Ladder corrected for RMA_639144494349287462: T1=7415.0000 T2=7413.5000 T3=7410.0000 T4=7389.5000 T5=7389.2500
+RMA ENTRY FILLED: Short 6 @ 7417.00
+[FORENSIC] T1 RMA_639144494349287462: qty=2 price=7415.00 submitting limit
+[FORENSIC] T2 RMA_639144494349287462: qty=2 price=7413.50 submitting limit
+[FORENSIC] T3 RMA_639144494349287462: qty=2 price=7410.00 submitting limit
+[STOP_AUDIT] OK RMA_639144494349287462: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+RMA BRACKET V12.1101E: Stop@7422.25 | T1:2@7415.00 | T2:2@7413.50 | T3:2@7410.00
+[ACTOR_BUDGET] cycle=1023 reason=time elapsedMs=70 brokerCalls=0 remainingActorQueue=0 detail=post-command state=actorQueue=0 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+[COMPLIANCE] Execution Update received for account.
+[ANCHOR-01] Pre-applying master anchor 7417.00 for SimApexSim_02_RMA_RMA_639144494349287462 -- bracket will use master fill price
+[SYMMETRY STOP_AUDIT] OK SimApexSim_02_RMA_RMA_639144494349287462: StopQty=6 NonRunnerLimits=6 RunnerQty=0
+[ANCHOR-02] Bracket already anchor-aligned for SimApexSim_02_RMA_RMA_639144494349287462 (prior=7417.00 anchor=7417.00) -- retarget skipped
+[SYMMETRY_GUARD] ANCHORED | SimApexSim_02_RMA_RMA_639144494349287462 | Master=7417.00 Fleet=7417.00 Slip=0.0 ticks ($0.00/ct) | Scalp Anchor T1=7415.00 | Runner Targets=Trail
+[ProcessQueuedExecution] [1102Y-V4] Entry fill for SimApexSim_02 -- Persistence Gate active, flat-check skipped.
+[FSM-SHADOW] SimApexSim_02_RMA_RMA_639144494349287462 Transition: Submitted -> Active | Event=PartFilled | Order=SimApexSim_02_RMA_RMA_639144494349287462
+[REAPER] SimApexSim_02: Expected=-6, Actual=-6
+[REAPER] Sim101 (Master): Expected=-6, Actual=-6
+[REAPER] Heartbeat: 2/19 accounts with positions.
+V12 PANEL: Dispatch -> FLATTEN_ONLY
+[SIMA] IPC FLATTEN_ONLY -> Closing all open positions (Pending orders preserved)
+[SIMA] ====== GLOBAL POSITIONS CLOSE START (CHUNKED) ======
+[SIMA] Enqueued 19 account(s) for chunked close
+[FLATTEN_PUMP] SimApexSim_02: Cancelled 3 order(s) [ClosePositionsOnly]
+[FLATTEN_PUMP] SimApexSim_02: Closed 1 position(s) [ClosePositionsOnly]
+[FLATTEN_PUMP] Sim101: Cancelled 3 order(s) [ClosePositionsOnly_Master]
+[FLATTEN_PUMP] Sim101: Closed 1 position(s) [ClosePositionsOnly_Master]
+[SIMA] ====== GLOBAL FLATTEN COMPLETE (CHUNKED) ======
+[ACTOR_BUDGET] cycle=1055 reason=time elapsedMs=68 brokerCalls=0 remainingActorQueue=1 detail=post-command state=actorQueue=1 repairQueue=0 flattenQueue=0 nakedStopQueue=0
+[GHOST-AUDIT] OnAccountOrderUpdate: T3_SimApexSim_02_RMA_RMA_639144494349287 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T3_SimApexSim_02_RMA_RMA_639144494349287 on SimApexSim_02 (CANCELLED) | Id=a313b4ad3af44e528f82718d90db0f6c
+[GHOST_FIX] Order T3_SimApexSim_02_RMA_RMA_639144494349287462 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=a313b4ad3af44e528f82718d90db0f6c)
+[GHOST-AUDIT] OnAccountOrderUpdate: T2_SimApexSim_02_RMA_RMA_639144494349287 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T2_SimApexSim_02_RMA_RMA_639144494349287 on SimApexSim_02 (CANCELLED) | Id=0df59bd9413d43b2a827ebd4e8bbc3e1
+[GHOST_FIX] Order T2_SimApexSim_02_RMA_RMA_639144494349287462 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=0df59bd9413d43b2a827ebd4e8bbc3e1)
+[GHOST-AUDIT] OnAccountOrderUpdate: Stop_SimApexSim_02_RMA_RMA_6391444943492 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: Stop_SimApexSim_02_RMA_RMA_6391444943492 on SimApexSim_02 (CANCELLED) | Id=734e74045c9541418c90fa32432a7682
+[GHOST_FIX] Order STOP_SimApexSim_02_RMA_RMA_639144494349287462 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=734e74045c9541418c90fa32432a7682)
+V12.17: WARNING UNPROTECTED POSITION: SimApexSim_02_RMA_RMA_639144494349287462 has 6 contracts with NO STOP after CANCELLED. Manual intervention may be required.
+[GHOST-AUDIT] OnAccountOrderUpdate: T1_SimApexSim_02_RMA_RMA_639144494349287 | State=CANCELLED | Acct=SimApexSim_02
+[SIMA] Follower order terminal: T1_SimApexSim_02_RMA_RMA_639144494349287 on SimApexSim_02 (CANCELLED) | Id=60adc08d370f4244bbc26bc5abdfb5f1
+[GHOST_FIX] Order T1_SimApexSim_02_RMA_RMA_639144494349287462 terminated (CANCELLED). Nullifying reference. (match=REF, OrderId=60adc08d370f4244bbc26bc5abdfb5f1)
+[COMPLIANCE] Execution Update received for account.
+[OnPositionUpdate] expectedPositions cleared for Sim101_MES JUN26 (position flat)
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+EXTERNAL CLOSE DETECTED - Position went flat. Cancelling orphaned orders...
+[FSM-C1] Terminated FSM for SimApexSim_02_RMA_RMA_639144494349287462 (was Active)
+CLEANUP SUMMARY for RMA_639144494349287462: Stops=1 Targets=0 Entries=0
+Cleanup complete - Strategy still running, ready for new entries.
+V14 IPC: Broadcasting SYNC_TARGET_STATE to 0 clients
+V12 PANEL: Dispatch -> CANCEL_ALL
+[SIMA] CANCEL_ALL -> Cancelled 1 orders (Entries + Orphaned Brackets) (local + fleet) [1001]
+[REAPER] Heartbeat: All 19 accounts flat.
+[REAPER] Heartbeat: All 19 accounts flat.
+[WATCHDOG] Stopped
+[SHUTDOWN] GTC sweep: cancelling 1 tracked + broker-scanned orders
+[BUILD 984] GTC sweep: cancelled 0 tracked + 0 broker-scanned orders
+[SHUTDOWN] Draining queues...
+[SHUTDOWN] Drained 0 IPC cmds, 0 Actor cmds. Overflow discarded: 0.
+------------------------------------------------
+[1111.007-mphase-mp0] SESSION METRICS REPORT
+  FSM Transitions   : 0
+  SIMA Dispatches   : 0
+  Reaper Audits     : 0
+  Symmetry Replaces : 0
+  Order Submissions : 0
+  IPC Commands      : 0
+------------------------------------------------
+[REAPER] Audit timer STOPPED
+Disabling NinjaScript strategy 'V12_002/382220965'
+

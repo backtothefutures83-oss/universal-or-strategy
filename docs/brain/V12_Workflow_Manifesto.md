@@ -120,6 +120,7 @@ Click to open the official procedure for each workflow:
 *   [Agent-as-Tool](../../_agents/workflows/agent_as_tool.md) - Stateless single-use tool invocation.
 *   [Architect Intake](../../_agents/workflows/architect_intake.md) - Formalizing P0 forensics into P3 designs.
 *   [Architectural Battle](../../_agents/workflows/battle.md) - Compounding intelligence via Arena AI.
+*   [Automated Hardening SOP](automated_hardening_sop.md) - 4-Tier Automated Code Review Pipeline.
 *   [Coordinator](../../.agent/workflows/coordinator.md) - Hierarchical task decomposition.
 *   [Hardened Adjudication](../../_agents/workflows/hardened_adjudication.md) - Re-auditing plans after logic drift.
 *   [Loop Critic](../../_agents/workflows/loop_critic.md) - Review & Critique loop until sign-off.

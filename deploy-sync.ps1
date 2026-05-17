@@ -131,6 +131,23 @@ if (Get-Command "git" -ErrorAction SilentlyContinue) {
 }
 
 # =============================================================================
+# UNIT TEST & FSM PROPERTY GATE (Build Protocol v4)
+# Blocks deployment to NinjaTrader if any tests fail.
+# =============================================================================
+Write-Host "--- TEST GATE: Running xUnit and FsCheck test suite ---" -ForegroundColor Yellow
+$TestProject = Join-Path $RepoRoot "tests\V12.Sima.Tests.csproj"
+if (Test-Path $TestProject) {
+    dotnet test $TestProject -c Release --nologo --verbosity minimal
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`nDEPLOY ABORTED - Unit/Integration tests failed. Review output above." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "TEST GATE PASS - All tests are green`n" -ForegroundColor Green
+} else {
+    Write-Host "TEST GATE SKIP - Test project not found`n" -ForegroundColor Gray
+}
+
+# =============================================================================
 # SOVEREIGN DROID AUDIT (P5 Red Team)
 # Automated verification of V12 architectural mandates.
 # =============================================================================

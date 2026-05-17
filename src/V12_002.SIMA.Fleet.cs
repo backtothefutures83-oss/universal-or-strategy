@@ -67,17 +67,34 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
+                // CRITICAL ORDERING: Sideband clear BEFORE pool release
                 if (poolSlotIndex >= 0)
+                {
+                    // Step 1: Clear sideband refs (prevents stale retention)
+                    if (poolSlotIndex < _photonSideband.Length)
+                        _photonSideband[poolSlotIndex] = default(FleetDispatchSideband);
+                    
+                    // Step 2: Memory barrier (ensure sideband write visible)
+                    Thread.MemoryBarrier();
+                    
+                    // Step 3: Release pool slot (now safe for reuse)
                     _photonPool.ReleaseByIndex(poolSlotIndex);
+                }
+                
+                // Step 4: Decrement counter
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
+                
+                // Step 5: Pump prime (if queue non-empty)
                 if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty)
                     || !_pendingFleetDispatches.IsEmpty)
+                {
                     try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
                     catch (Exception ex)
                     {
                         if (_diagFleet)
-                            Print("[FLEET_CATCH] ProcessFleetSlot pump prime failed: " + ex.Message);
+                            Print("[FLEET_CATCH] Pump prime failed: " + ex.Message);
                     }
+                }
             }
         }
 
@@ -148,6 +165,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void SubmitAndRegisterFleetOrders(Account acct, Order[] orders, int orderCount,
             string fleetEntryName, string expectedKey, ref bool syncCleared)
         {
+            // Ticket-04: Check circuit breaker BEFORE submit
+            if (!_submitCircuitBreaker.AllowSubmit())
+            {
+                Print("[CIRCUIT_BREAKER] Submit blocked (circuit open)");
+                throw new InvalidOperationException("Circuit breaker open");
+            }
+
             Order[] submitOrders = orders;
             if (orders != null && orderCount > 0 && orderCount < orders.Length)
             {
@@ -155,29 +179,45 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Array.Copy(orders, submitOrders, orderCount);
             }
 
-            acct.Submit(submitOrders);
-            ClearDispatchSyncPending(expectedKey);
-            syncCleared = true;
-
-            FollowerBracketFSM pFsm;
-            if (_followerBrackets.TryGetValue(fleetEntryName, out pFsm)
-                && pFsm != null
-                && pFsm.State == FollowerBracketState.PendingSubmit)
-            {
-                pFsm.State = FollowerBracketState.Submitted;
-                pFsm.LastUpdateUtc = DateTime.UtcNow;
-            }
-
+            // Ticket-02: BEFORE acct.Submit() - Set Pending=true + register OrderIds
             FollowerBracketFSM fsm;
-            if (_followerBrackets.TryGetValue(fleetEntryName, out fsm))
+            if (_followerBrackets.TryGetValue(fleetEntryName, out fsm) && fsm != null)
             {
+                fsm.TryTransition(FollowerBracketState.Submitted, setPending: true);
+                
+                // Pre-register OrderIds in _orderIdToFsmMap for race-free callback routing
                 for (int i = 0; i < orderCount; i++)
                 {
                     var ord = orders[i];
                     if (ord != null && !string.IsNullOrEmpty(ord.OrderId))
-                        _orderIdToFsmKey[ord.OrderId] = fleetEntryName;
+                        _orderIdToFsmMap.TryAdd(ord.OrderId, fleetEntryName, fsm.Generation);
                 }
             }
+
+            // Ticket-04: Wrap submit in try/catch for circuit breaker feedback
+            try
+            {
+                acct.Submit(submitOrders);
+                ClearDispatchSyncPending(expectedKey);
+                syncCleared = true;
+
+                // Ticket-04: Record success after successful submit
+                _submitCircuitBreaker.RecordSuccess();
+            }
+            catch (Exception ex)
+            {
+                // Ticket-04: Record failure on exception
+                _submitCircuitBreaker.RecordFailure();
+                throw;
+            }
+
+            // Ticket-02: AFTER acct.Submit() - Clear Pending=false
+            if (fsm != null)
+            {
+                fsm.TryTransition(FollowerBracketState.Submitted, setPending: false);
+            }
+
+            // Legacy registration removed - now using _orderIdToFsmMap exclusively
 
             Print(string.Format("[PUMP] Submitted {0} orders for {1} | {2}",
                 orderCount, fleetEntryName, acct.Name));

@@ -205,6 +205,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             _configureComplete = false;
             _dataLoadedComplete = false;
             Interlocked.Exchange(ref _startupReadinessLogEmitted, 0);
+            _submitCircuitBreaker = new SubmitCircuitBreaker();
             ResetTelemetry();
             Description = "Universal OR Strategy V12.12 - Build " + BUILD_TAG;
             Name = "V12_002";
@@ -364,6 +365,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // V12 SIMA: Initialize expected positions tracking
             expectedPositions = new ConcurrentDictionary<string, int>(2, 20); // Up to 20 accounts
+
+            // Ticket-02: Initialize pre-submit OrderId -> FSM registration map (capacity 128 = power of 2)
+            _orderIdToFsmMap = new ZeroAllocOrderIdMap(128);
 
             // v28.0 Sovereign Photon [ADR-012 + ADR-016]: pool + ring + sideband + salt + MMIO mirror
             // Capacity 64: 5 concurrent signals x 12 accounts = 60 < 64
