@@ -6,7 +6,10 @@ Use this workflow to conduct a deep, multi-agent review of a subgraph, compound 
 
 ## Phase 1: Subgraph Forensic Review (Arena AI)
 1. **Identify the Subgraph**: Determine the exact boundaries, files, and architectural responsibilities of the subgraph under review.
-2. **Generate the Review Prompt**: Create a prompt for the user to paste into Arena AI. The prompt must task the models with identifying structural vulnerabilities, DNA violations (e.g., locks, allocations), and logic flaws.
+2. **Generate the Review Prompt**: Create a prompt for the user to paste into Arena AI. The prompt must task the models with:
+   - **Pattern-First Synthesis (MANDATORY)**: Identifying repeating structural anti-patterns and V12 DNA violations (e.g., TOCTOU, Bypassing Enqueue, Non-Atomic mutations) *before* listing individual bugs.
+   - Grouping every localized logic flaw or bug under its root-cause architectural constraint failure.
+   - Forcing the output format to include a "Systemic Anti-Patterns" section at the top.
 3. **Copy Button Requirement (MANDATORY)**: 
    - **Internal**: The generated prompt MUST be provided directly in the main chat interface within a Markdown code block (Do NOT use artifacts).
    - **External**: The prompt itself MUST include a requirement for the models to include a "Copy" button on the main page of any UI or template they design.

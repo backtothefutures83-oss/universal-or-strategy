@@ -1,9 +1,9 @@
 ---
-description: Execute a single Phase 7 Complexity Extraction ticket using the full P2-P6 TDD pipeline.
+description: Execute a single complexity extraction ticket using the full P2-P6 TDD Red-Green-Refactor pipeline.
 argument-hint: <traycer-ticket-content>
 ---
-# MISSION: Phase 7 Complexity Extraction Epic -- V12 Photon Kernel (TDD-Enhanced)
-**Spec Ref**: docs/brain/phase7_repeatable_workflow.md
+# MISSION: Bob TDD -- V12 Photon Kernel Complexity Extraction
+**Spec Ref**: docs/brain/bob_tdd_workflow.md
 **Protocol**: V12 Photon Kernel DNA (Lock-Free, ASCII-Only, TDD Red-Green-Refactor)
 
 ---
@@ -38,7 +38,7 @@ Read `graphify-out/GRAPH_REPORT.md` -- confirm caller impact scope.
 Produce a written implementation plan:
 
 ```
-## Phase 7 Plan: [ticket ID] -- [method name]
+## Bob TDD Plan: [ticket ID] -- [method name]
 ### Extraction Design
 | Helper Name | Signature | Lines Extracted | CYC Impact |
 |-------------|-----------|-----------------|------------|
@@ -50,11 +50,11 @@ Produce a written implementation plan:
 | ...         | ...           | ...             |
 
 ### TDD Contract Tests Required
-| Test # | Scenario | Expected Result |
-|--------|----------|-----------------|
-| 1      | Happy path | ... |
-| 2      | Null/guard edge | ... |
-| 3      | Caller invariant | ... |
+| Test # | Scenario        | Expected Result |
+|--------|-----------------|-----------------|
+| 1      | Happy path      | ...             |
+| 2      | Null/guard edge | ...             |
+| 3      | Caller invariant| ...             |
 ```
 
 **Output**: Write `docs/brain/implementation_plan_t[ID].md`
@@ -62,7 +62,7 @@ Produce a written implementation plan:
 ### !!! DIRECTOR APPROVAL GATE !!!
 **STOP HERE. Do NOT proceed to Step 3 until the Director explicitly confirms.**
 
-Output: "[PHASE7-GATE] Plan written to docs/brain/implementation_plan_t[ID].md. Awaiting Director approval."
+Output: "[BOB-TDD-GATE] Plan written to docs/brain/implementation_plan_t[ID].md. Awaiting Director approval."
 
 ---
 
@@ -97,7 +97,7 @@ Required scenarios:
 3. **Caller invariant**: call site behavior is identical before and after extraction
 
 The tests MUST fail at this point (RED). Do NOT proceed if they pass -- that means
-the test is not actually testing the new helper.
+the test is not actually targeting the new helper.
 
 ### GREEN Phase: Extract the Method
 
@@ -156,7 +156,7 @@ powershell -File .\deploy-sync.ps1
 Only after ALL Step 5 audits PASS, output:
 
 ```
-[PHASE7-COMPLETE]
+[BOB-TDD-COMPLETE]
 Ticket: [ID]
 Method: [target method]
 CYC: [before] -> [after]
@@ -181,5 +181,5 @@ Director Post-Ticket Checklist:
 - `Thread.Sleep()` anywhere -- BANNED
 - Unicode / emoji / curly quotes in any string literal -- BANNED
 - Manual copy-paste for extractions > 50 lines -- BANNED (use v12_split.py)
-- Skipping RED phase (writing GREEN without failing test first) -- BANNED
+- Skipping RED phase (writing GREEN without a failing test first) -- BANNED
 - Proceeding past any GATE without explicit Director confirmation -- BANNED

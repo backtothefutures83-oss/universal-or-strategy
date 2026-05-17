@@ -209,6 +209,15 @@ This protocol governs the **SIMA Subgraph Extraction** and all complex refactori
 - **Rules**: Enforced via `.bob/rules-v12-engineer/`
 - **Checkpointing**: Always enabled via `.bob/settings.json`. Restore via `/restore`.
 
+## 9. Token Conservation & Event-Driven Orchestration (MANDATORY LAW)
+
+To prevent catastrophic token waste and quadratic context expansion in multi-agent workflows, all agents MUST adhere to the following event-driven laws:
+
+1. **Banish Active Polling Loops**: No orchestrator or agent may repeatedly prompt, sleep-loop, or poll file paths to wait for a concurrent sub-agent. Busy-waiting is a protocol violation.
+2. **Event-Driven IPC (Dual Output)**: When running complex workflows (like `/bug-bounty` or `/epic-tdd`), utilize Qwen Code's **Dual Output engine** (`--json-file` + `--input-file`). Let the zero-token Node.js sidecar or a local FS watcher orchestrate the state changes. The Orchestrator MUST sleep/yield until the sidecar triggers the input channel.
+3. **Decoupled Script Execution**: For sequential multi-agent operations, the Orchestrator MUST dispatch the entire sweep chain to a single local OS script (e.g. PowerShell / Bash) in one foreground turn. The Orchestrator yields the turn immediately and wakes up exactly ONCE at the end of the entire script run to synthesize findings.
+4. **Physical Milestone Persistence**: Sub-agents MUST persist intermediate progress, draft files, and logs to `docs/brain/` at the end of each stage. If a session crashes or hits usage limits, the next agent recovers instantly using local workspace files and Qwen's `/restore` engine, preventing redundant context retrieval.
+
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.

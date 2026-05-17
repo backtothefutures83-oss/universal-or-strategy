@@ -16,9 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- We only include the PureLogic file to avoid NinjaTrader assembly dependencies in the test runner -->
     <Compile Include="src\V12_002.PureLogic.cs" />
-    <Compile Include="tests\*.cs" />
+    <Compile Include="tests\LogicTests.cs" />
   </ItemGroup>
 
 </Project>

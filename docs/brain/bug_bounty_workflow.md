@@ -76,6 +76,21 @@ Each agent operates in **Plan mode** (read-only, no src/ edits) and must:
 
 ---
 
+## Stage 1.5: Mid-Task Recovery & Checkpointing Protocol
+
+Since the 7-cluster scan can be run sequentially or parallelly in the foreground:
+- **Zero Work Loss**: Each of the 7 cluster agents writes its findings physically to disk (`docs/brain/bug_report_s[1-7].md`) immediately upon completing its single-cluster scan.
+- **Limit Halts**: If Qwen CLI hits a usage limit during the sweep (e.g., at Agent S4):
+  1. The work for S1, S2, and S3 is already fully saved on your disk.
+  2. The next session or backup agent can read the existing reports, see that S1–S3 are complete, and skip them—resuming directly with Agent S4.
+- **Qwen Checkpointing**: When running Qwen Code with `--checkpointing` or setting it to true in global `settings.json`, Qwen automatically saves a shadow Git snapshot and conversation history before tool calls. In case of session disconnection, you can list and recover conversation states using:
+  ```bash
+  /restore
+  /restore <checkpoint_file>
+  ```
+
+---
+
 ## Stage 2: Orchestrator Consolidation
 
 After all 7 agents report back, Bob Orchestrator runs the consolidation phase:

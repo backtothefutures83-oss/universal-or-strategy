@@ -117,6 +117,8 @@ After ANY modification to `src/` files, the Engineer MUST:
 
 ### 🔗 Workflow Registry
 Click to open the official procedure for each workflow:
+*   [Epic TDD Workflow](epic_tdd_workflow.md) - **PRIMARY**: Per-ticket TDD Red-Green-Refactor pipeline (P2-P6). Bob: `/epic-tdd`. All CLIs: `SPEC REF: docs/brain/epic_tdd_workflow.md`. Use for all complexity extraction and cluster testing epics.
+*   [Bug Bounty Workflow](bug_bounty_workflow.md) - **NEXT TASK**: 7-cluster parallel bug hunt. Bob: `/bug-bounty`. Runs AFTER testing setup epic. Feeds repairs into `/epic-tdd`.
 *   [Agent-as-Tool](../../_agents/workflows/agent_as_tool.md) - Stateless single-use tool invocation.
 *   [Architect Intake](../../_agents/workflows/architect_intake.md) - Formalizing P0 forensics into P3 designs.
 *   [Architectural Battle](../../_agents/workflows/battle.md) - Compounding intelligence via Arena AI.

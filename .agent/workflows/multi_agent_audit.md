@@ -12,6 +12,7 @@ Mandatory for any change touching: order submission, position sizing, FSM state 
 
 1. Identify the implementation to audit (file path, diff, or code block).
 2. Define audit criteria:
+   - **Systemic Anti-Patterns (MANDATORY)**: Mandate the grouping of localized flaws under root-cause architectural patterns (e.g., TOCTOU, Bypassing Enqueue, Non-Atomic mutations).
    - **Safety**: ghost orders, naked positions, shutdown races
    - **Correctness**: FSM state coverage, edge cases
    - **DNA compliance**: no locks, correct pattern (Enqueue vs direct-write), ASCII gate
@@ -22,6 +23,8 @@ Mandatory for any change touching: order submission, position sizing, FSM state 
 ## Phase 2: Independent Parallel Audits
 
 Invoke each auditor with IDENTICAL input. They must NOT see each other's output.
+
+**CRITICAL PROMPT INSTRUCTION:** All auditors MUST audit the architectural contracts, not just the execution paths. Do not simply list individual bugs. You must synthesize and group every localized bug under a systemic structural anti-pattern or V12 DNA violation.
 
 | Auditor   | Tool            | Focus                                |
 | --------- | --------------- | ------------------------------------ |
@@ -36,8 +39,12 @@ RED TEAM AUDIT — [Auditor Name] — [Date]
 
 VERDICT: [PASS / FAIL / CONDITIONAL]
 
+Systemic Anti-Patterns:
+1. [Pattern Name]: [Description] (Affects Findings X, Y)
+2. ...
+
 Findings:
-1. [Finding + severity: CRITICAL / WARNING / INFO]
+1. [Finding + severity: CRITICAL / WARNING / INFO] (Maps to Pattern X)
 2. ...
 
 Recommendation: [APPROVE / REVISE / BLOCK]
