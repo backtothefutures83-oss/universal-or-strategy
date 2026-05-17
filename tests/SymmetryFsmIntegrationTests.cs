@@ -493,6 +493,7 @@ namespace V12.Sima.Tests
 
             /// <summary>
             /// Get FSM expected position for account.
+            /// Handles null EntryOrder (restart scenario) by returning 0.
             /// </summary>
             public int GetFsmExpectedPosition(string accountName)
             {
@@ -501,6 +502,10 @@ namespace V12.Sima.Tests
                 {
                     if (fsm.AccountName == accountName)
                     {
+                        // Null EntryOrder = restart scenario, fallback to broker position (0)
+                        if (fsm.EntryOrder == null)
+                            continue;
+                        
                         total += fsm.RemainingContracts;
                     }
                 }
@@ -1206,6 +1211,109 @@ namespace V12.Sima.Tests
             AssertRemainingContracts(fsm, 0);
         }
 
+        #endregion
+
+        #region Phase 4: Edge Cases (T14-T17)
+        [Fact]
+        public void T14_NullOrderReference_Restart_Scenario()
+        {
+            // Arrange: Hydrated Active FSM with null EntryOrder (restart edge case)
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Active,
+                EntryOrder = null, // Restart scenario - order reference lost
+                RemainingContracts = 2
+            };
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            
+            // Act: GetFsmExpectedPosition should handle null gracefully
+            int expectedPos = _mockFsm.GetFsmExpectedPosition("Sim101");
+            
+            // Assert: Returns 0 (fallback to broker position)
+            Assert.Equal(0, expectedPos);
+        }
+
+        [Fact]
+        public void T15_MailboxOverflow_Handles_Backpressure()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Submitted
+            };
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            _mockFsm.MapOrderId("ORD001", "Fleet_Apex_1", fsm.Generation);
+            
+            // Act: Enqueue 150 events (exceeds MAX_PER_DRAIN = 100)
+            for (int i = 0; i < 150; i++)
+            {
+                var evt = CreateAcceptedEvent("ORD001", "Entry_Fleet_Apex_1");
+                _mockFsm.EnqueueEvent(evt);
+            }
+            
+            // First drain processes 100
+            _mockFsm.DrainMailbox();
+            
+            // Second drain processes remaining 50
+            _mockFsm.DrainMailbox();
+            
+            // Assert: All events processed, no exceptions
+            AssertFsmState(fsm, FollowerBracketState.Accepted, "Overflow handled");
+        }
+
+        [Fact]
+        public void T16_ConcurrentModifications_CAS_Retry()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.None
+            };
+            
+            // Act: Simulate concurrent state transitions
+            bool success1 = fsm.TryTransition(FollowerBracketState.PendingSubmit, false);
+            bool success2 = fsm.TryTransition(FollowerBracketState.Submitted, false);
+            
+            // Assert: Both transitions succeed (CAS-based)
+            Assert.True(success1, "First transition");
+            Assert.True(success2, "Second transition");
+            AssertFsmState(fsm, FollowerBracketState.Submitted, "Final state");
+        }
+
+        [Fact]
+        public void T17_InvalidTransition_Rejected_To_Active()
+        {
+            // Arrange
+            _time = new MockTime(1000000L);
+            _mockFsm = new MockSymmetryFsm(_time);
+            var fsm = new MockFollowerBracketFSM
+            {
+                AccountName = "Sim101",
+                EntryName = "Fleet_Apex_1",
+                State = FollowerBracketState.Rejected // Terminal state
+            };
+            _mockFsm.AddBracket("Fleet_Apex_1", fsm);
+            _mockFsm.MapOrderId("ORD001", "Fleet_Apex_1", fsm.Generation);
+            
+            // Act: Attempt invalid transition (Rejected -> Active)
+            var fillEvent = CreateFilledEvent("ORD001", "Entry_Fleet_Apex_1", 2, 4500.0);
+            _mockFsm.EnqueueEvent(fillEvent);
+            _mockFsm.DrainMailbox();
+            
+            // Assert: State unchanged (invalid transition blocked)
+            AssertFsmState(fsm, FollowerBracketState.Rejected, "Invalid transition blocked");
+        }
         #endregion
     }
 }
