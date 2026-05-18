@@ -778,6 +778,51 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
                     }
 
+        // H06: State-agnostic cancellation processor for follower orders.
+        // Processes cancellations BEFORE matched-entry gate to handle stale-state scenarios.
+        // Returns true if cancellation was handled (caller should skip normal flow).
+        private bool ProcessFollowerCancellationUnconditional(Order order, string acctName, string reason)
+        {
+            if (order == null || order.OrderState != OrderState.Cancelled)
+                return false;
+
+            // Check 1: PendingCancel entry replacement FSM
+            foreach (var kvp in _followerReplaceSpecs.ToArray())
+            {
+                FollowerReplaceSpec fsm = kvp.Value;
+                if (fsm != null && fsm.State == FollowerReplaceState.PendingCancel
+                    && fsm.CancellingOrderId == order.OrderId)
+                {
+                    string matchedEntry = kvp.Key;
+                    return HandleMatchedFollower_PendingCancelReplace(matchedEntry, order, acctName);
+                }
+            }
+
+            // Check 2: Target replacement FSM
+            foreach (var tKvp in _followerTargetReplaceSpecs.ToArray())
+            {
+                if (tKvp.Value.CancellingOrderId == order.OrderId)
+                {
+                    return HandleMatchedFollower_TargetReplaceCancel(order);
+                }
+            }
+
+            // Check 3: Stop replacement (follower stops arrive via OnAccountOrderUpdate)
+            if (order.Name.StartsWith("Stop_") || order.Name.StartsWith("S_"))
+            {
+                if (HandleMatchedFollower_StopReplacement(order))
+                    return true;
+
+                // Check 4: PendingCleanup purge for terminal stops
+                HandleMatchedFollower_PendingCleanupPurge(order);
+                Print(string.Format("[SIMA] Follower order terminal: {0} on {1} ({2}) | Id={3}", order.Name, acctName, reason, order.OrderId));
+                RemoveGhostOrderRef(order, reason);
+                return true;
+            }
+
+            return false;
+        }
+
         private void ProcessQueuedAccountOrder(QueuedAccountOrderUpdate item)
         {
             if (item.EventArgs == null || item.EventArgs.Order == null) return;
@@ -787,6 +832,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             string reason = order.OrderState.ToString().ToUpper();
             string acctName = item.Account != null ? item.Account.Name : "UNKNOWN";
             Print(string.Format("[GHOST-AUDIT] OnAccountOrderUpdate: {0} | State={1} | Acct={2}", order.Name, reason, acctName));
+
+            // H06: Process cancellations BEFORE matched-entry gate (state-agnostic path)
+            if (ProcessFollowerCancellationUnconditional(order, acctName, reason))
+                return;
 
             // Build 935 [R-01]: Single snapshot -- reused by both identity search and cascade cleanup,
             // eliminating the second activePositions.ToArray() allocation in the cascade path.
