@@ -329,7 +329,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             MarketPosition direction, RMABracketPrices prices, string symmetryDispatchId)
         {
             string localKey = baseSignal;
-            Order entryOrder = SubmitOrderUnmanaged(0, entryAction, OrderType.Limit, qty, price, 0, "", localKey);
+            Order entryOrder = null;
+            
+            try
+            {
+                entryOrder = SubmitOrderUnmanaged(0, entryAction, OrderType.Limit, qty, price, 0, "", localKey);
+            }
+            catch (Exception ex)
+            {
+                // H01: Roll back symmetry dispatch registration on order submission exception
+                SymmetryGuardRollbackDispatch(symmetryDispatchId);
+                Print(string.Format("[SIMA RMA V2] ORDER SUBMISSION EXCEPTION: {0} - Dispatch rolled back", ex.Message));
+                throw;
+            }
+            
             if (entryOrder != null)
             {
                 SymmetryGuardRegisterMasterEntry(symmetryDispatchId, localKey);

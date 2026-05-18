@@ -32,6 +32,13 @@
 - **$MISSION**: Initialize a new project phase via a Mission Brief artifact.
 - **$AUDIT**: Trigger the `/audit` skill to scan the `src/` directory.
 
+## ðŸš€ Knowledge Hardening (V12.16 Mandate)
+Codex agents MUST ensure their threat models and security tools are indexed for the rest of the fleet.
+
+1. **Threat Model Sync**: After updating `docs/brain/codex_threat_modeling.md`, you MUST run `graphify update .`.
+2. **CLI Veracity**: Ensure `docs/brain/live_codex_help.txt` reflects the current `--sandbox` and `--approval` policies.
+3. **P5 Red-Team Knowledge**: All forensic findings must be pipelined into the `docs/brain/memory/` folder for long-term project recall.
+
 ## Agent Synchronization
 
 - **NO SIMULATION**: AI agents are STRICTLY BANNED from simulating the output of another agent (e.g., imagining an audit report). Every P5 sign-off must cite an authentic, system-generated log or file write.

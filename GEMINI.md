@@ -140,8 +140,18 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 **All agents MUST perform a post-use audit after every skill or tool use:**
 1. Check if any instruction was ambiguous or produced an unexpected result.
 2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
-3. State `skill(name): no gaps identified` if no gap is found.
-4. Skipping the post-use audit is a protocol violation.
+3. **KNOWLEDGE SYNC MANDATE**: Whenever a new agent doc ($doc), help capture, or SOP is created/modified, the agent MUST run `graphify update .` to ensure the project brain is current.
+4. State `skill(name): no gaps identified` if no gap is found.
+5. Skipping the post-use audit is a protocol violation.
+
+## Section 14: Knowledge Hardening Pipeline (MANDATORY -- ALL AGENTS)
+
+**Every Agent (Antigravity, Jules, Codex, Bob, Droid, etc.) is responsible for its own "Live Truth" capture.**
+
+1. **Self-Indexing**: Before completing a major task, agents MUST run `powershell -File .\scripts\sync_agent_knowledge.ps1` if their CLI surface or local SOPs have changed.
+2. **Context Continuity**: Never assume the Orchestrator knows your syntax. Update your `docs/brain/` references immediately upon change.
+3. **Tool Registry**: All agent command surfaces must be registered in `docs/brain/live_[agent]_help.txt` for RAG-based retrieval.
+
 
 ## Section 14: $claudecloud Protocol Hardening (Permanent Standard)
 
