@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "dgSpecHash": "NNc9uRH6qSs=",
+  "success": true,
+  "projectFilePath": "C:\\WSGTA\\universal-or-strategy\\tools\\v12-openai-ops\\V12.OpenAI.Ops.csproj",
+  "expectedPackageFiles": [
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.2\\microsoft.extensions.configuration.abstractions.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.2\\microsoft.extensions.dependencyinjection.abstractions.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.diagnostics.abstractions\\10.0.2\\microsoft.extensions.diagnostics.abstractions.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.fileproviders.abstractions\\10.0.2\\microsoft.extensions.fileproviders.abstractions.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.hosting.abstractions\\10.0.2\\microsoft.extensions.hosting.abstractions.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.2\\microsoft.extensions.logging.abstractions.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.options\\10.0.2\\microsoft.extensions.options.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.extensions.primitives\\10.0.2\\microsoft.extensions.primitives.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\openai\\2.9.1\\openai.2.9.1.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.clientmodel\\1.9.0\\system.clientmodel.1.9.0.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.diagnostics.diagnosticsource\\10.0.2\\system.diagnostics.diagnosticsource.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.io.pipelines\\10.0.1\\system.io.pipelines.10.0.1.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.memory.data\\10.0.1\\system.memory.data.10.0.1.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.net.serversentevents\\10.0.2\\system.net.serversentevents.10.0.2.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.text.encodings.web\\10.0.1\\system.text.encodings.web.10.0.1.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\system.text.json\\10.0.1\\system.text.json.10.0.1.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.25\\microsoft.netcore.app.ref.8.0.25.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.25\\microsoft.windowsdesktop.app.ref.8.0.25.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.25\\microsoft.aspnetcore.app.ref.8.0.25.nupkg.sha512",
+    "C:\\WSGTA\\universal-or-strategy\\.dotnet_cli\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.25\\microsoft.netcore.app.host.win-x64.8.0.25.nupkg.sha512"
+  ],
+  "logs": []
+}

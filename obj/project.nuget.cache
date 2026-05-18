@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "dgSpecHash": "wGR6QMwuZXA=",
+  "success": true,
+  "projectFilePath": "c:\\WSGTA\\universal-or-strategy\\Testing.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\coverlet.msbuild\\6.0.2\\coverlet.msbuild.6.0.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\fscheck\\2.16.6\\fscheck.2.16.6.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\fscheck.nunit\\2.16.6\\fscheck.nunit.2.16.6.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\fscheck.xunit\\2.16.6\\fscheck.xunit.2.16.6.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\fsharp.core\\4.2.3\\fsharp.core.4.2.3.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\microsoft.codecoverage\\17.6.0\\microsoft.codecoverage.17.6.0.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\microsoft.net.test.sdk\\17.6.0\\microsoft.net.test.sdk.17.6.0.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\nunit\\3.13.3\\nunit.3.13.3.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\nunit3testadapter\\4.4.2\\nunit3testadapter.4.4.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\system.valuetuple\\4.5.0\\system.valuetuple.4.5.0.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit\\2.4.2\\xunit.2.4.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.abstractions\\2.0.3\\xunit.abstractions.2.0.3.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.analyzers\\1.0.0\\xunit.analyzers.1.0.0.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.assert\\2.4.2\\xunit.assert.2.4.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.core\\2.4.2\\xunit.core.2.4.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.extensibility.core\\2.4.2\\xunit.extensibility.core.2.4.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.extensibility.execution\\2.4.2\\xunit.extensibility.execution.2.4.2.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\xunit.runner.visualstudio\\2.4.5\\xunit.runner.visualstudio.2.4.5.nupkg.sha512"
+  ],
+  "logs": []
+}

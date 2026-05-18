@@ -1,0 +1,171 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\Morpheus.ControlPlane.csproj": {}
+  },
+  "projects": {
+    "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\Morpheus.ControlPlane.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\Morpheus.ControlPlane.csproj",
+        "projectName": "Morpheus.ControlPlane",
+        "projectPath": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\Morpheus.ControlPlane.csproj",
+        "packagesPath": "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\",
+        "outputPath": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Mohammed Khalid\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {
+              "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\Morpheus.RithmicProvider.csproj": {
+                "projectPath": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\Morpheus.RithmicProvider.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Serilog.AspNetCore": {
+              "target": "Package",
+              "version": "[8.0.1, )"
+            },
+            "Serilog.Settings.Configuration": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Serilog.Sinks.Console": {
+              "target": "Package",
+              "version": "[5.0.1, )"
+            },
+            "Serilog.Sinks.File": {
+              "target": "Package",
+              "version": "[5.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\Morpheus.RithmicProvider.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\Morpheus.RithmicProvider.csproj",
+        "projectName": "Morpheus.RithmicProvider",
+        "projectPath": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\Morpheus.RithmicProvider.csproj",
+        "packagesPath": "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\",
+        "outputPath": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Mohammed Khalid\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

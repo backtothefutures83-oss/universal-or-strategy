@@ -1,0 +1,74 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\WSGTA\\universal-or-strategy\\tests\\V12_002.HybridArena.PlanContract.Tests\\V12_002.HybridArena.PlanContract.Tests.csproj": {}
+  },
+  "projects": {
+    "C:\\WSGTA\\universal-or-strategy\\tests\\V12_002.HybridArena.PlanContract.Tests\\V12_002.HybridArena.PlanContract.Tests.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\WSGTA\\universal-or-strategy\\tests\\V12_002.HybridArena.PlanContract.Tests\\V12_002.HybridArena.PlanContract.Tests.csproj",
+        "projectName": "V12_002.HybridArena.PlanContract.Tests",
+        "projectPath": "C:\\WSGTA\\universal-or-strategy\\tests\\V12_002.HybridArena.PlanContract.Tests\\V12_002.HybridArena.PlanContract.Tests.csproj",
+        "packagesPath": "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\",
+        "outputPath": "C:\\WSGTA\\universal-or-strategy\\tests\\V12_002.HybridArena.PlanContract.Tests\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Mohammed Khalid\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "net48",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.200"
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net48",
+          "dependencies": {
+            "Microsoft.NET.Test.Sdk": {
+              "target": "Package",
+              "version": "[17.10.0, )"
+            },
+            "xunit": {
+              "target": "Package",
+              "version": "[2.5.3, )"
+            },
+            "xunit.runner.visualstudio": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.5.3, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

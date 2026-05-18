@@ -1,0 +1,15 @@
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\bin\Debug\net6.0\Morpheus.ControlPlane.exe
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\bin\Debug\net6.0\Morpheus.ControlPlane.deps.json
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\bin\Debug\net6.0\Morpheus.ControlPlane.runtimeconfig.json
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\bin\Debug\net6.0\Morpheus.ControlPlane.dll
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\bin\Debug\net6.0\Morpheus.ControlPlane.pdb
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.AssemblyInfoInputs.cache
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.AssemblyInfo.cs
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.sourcelink.json
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.dll
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\refint\Morpheus.ControlPlane.dll
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.pdb
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\Morpheus.ControlPlane.genruntimeconfig.cache
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.ControlPlane\obj\Debug\net6.0\ref\Morpheus.ControlPlane.dll

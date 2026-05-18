@@ -1,0 +1,12 @@
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\bin\Debug\net8.0-windows\Morpheus.RithmicProvider.deps.json
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\bin\Debug\net8.0-windows\Morpheus.RithmicProvider.dll
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\bin\Debug\net8.0-windows\Morpheus.RithmicProvider.pdb
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.AssemblyInfoInputs.cache
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.AssemblyInfo.cs
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.sourcelink.json
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.dll
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\refint\Morpheus.RithmicProvider.dll
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\Morpheus.RithmicProvider.pdb
+C:\WSGTA\universal-or-strategy\src\Morpheus_Factory\Morpheus\src\Morpheus.RithmicProvider\obj\Debug\net8.0-windows\ref\Morpheus.RithmicProvider.dll

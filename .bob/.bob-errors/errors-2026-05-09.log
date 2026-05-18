@@ -1,0 +1,246 @@
+
+================================================================================
+ERROR LOGGED: 2026-05-09T22:51:28.434Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: GatewayError
+Error Message: Failed to handle chat completion - HTTP 400: Bad Request - {"error":{"message":"{'error': '/chat/completions: Invalid model name passed in model=v12-engineer. Call `/v1/models` to view available models for your key.'}","type":"None"}}
+
+
+Stack Trace:
+GatewayError: Failed to handle chat completion - HTTP 400: Bad Request - {"error":{"message":"{'error': '/chat/completions: Invalid model name passed in model=v12-engineer. Call `/v1/models` to view available models for your key.'}","type":"None"}}
+
+    at t.fromResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:765:8542)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async t.createChatCompletion (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:777:8820)
+    at async dnt.createChatCompletionWithTokenRenewal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2152:237)
+    at async dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2157:52)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:00:04.735Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:01:47.766Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:02:52.773Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:04:13.503Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:04:52.279Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:06:05.721Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:06:22.983Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:06:39.958Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:07:04.170Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: TypeError
+Error Message: Cannot read properties of undefined (reading 'contextWindow')
+
+Stack Trace:
+TypeError: Cannot read properties of undefined (reading 'contextWindow')
+    at zZe (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:867)
+    at Dve.setToolMeta (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:760:1969)
+    at dnt.convertAccumulatedToolCallsToGemini (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2168:886)
+    at dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2165:415)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+
+
+================================================================================
+ERROR LOGGED: 2026-05-09T23:30:23.449Z
+User ID: mkalhitti@gmail.com
+================================================================================
+Error Name: GatewayError
+Error Message: Failed to handle chat completion - HTTP 400: Bad Request - {"error":{"message":"{'error': '/chat/completions: Invalid model name passed in model=?. Call `/v1/models` to view available models for your key.'}","type":"None"}}
+
+
+Stack Trace:
+GatewayError: Failed to handle chat completion - HTTP 400: Bad Request - {"error":{"message":"{'error': '/chat/completions: Invalid model name passed in model=?. Call `/v1/models` to view available models for your key.'}","type":"None"}}
+
+    at t.fromResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:765:8542)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async t.createChatCompletion (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:777:8820)
+    at async dnt.createChatCompletionWithTokenRenewal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2152:237)
+    at async dnt.generateContentStreamInternal (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2157:52)
+    at async V6.loggingStreamWrapper (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:800:31296)
+    at async gY.processStreamResponse (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:81)
+    at async file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2457:22044
+    at async PQ.run (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2463:3153)
+    at async nwe.sendMessageStream (file:///C:/Users/Mohammed%20Khalid/AppData/Roaming/npm/node_modules/bobshell/bundle/bob.js:2796:511)
+================================================================================
+

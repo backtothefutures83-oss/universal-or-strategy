@@ -1,0 +1,15 @@
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.AssemblyInfoInputs.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.AssemblyInfo.cs
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.sourcelink.json
+C:\WSGTA\universal-or-strategy\benchmarks\bin\Debug\net6.0\SpscRing.Benchmarks.exe
+C:\WSGTA\universal-or-strategy\benchmarks\bin\Debug\net6.0\SpscRing.Benchmarks.deps.json
+C:\WSGTA\universal-or-strategy\benchmarks\bin\Debug\net6.0\SpscRing.Benchmarks.runtimeconfig.json
+C:\WSGTA\universal-or-strategy\benchmarks\bin\Debug\net6.0\SpscRing.Benchmarks.dll
+C:\WSGTA\universal-or-strategy\benchmarks\bin\Debug\net6.0\SpscRing.Benchmarks.pdb
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.dll
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\refint\SpscRing.Benchmarks.dll
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.pdb
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\SpscRing.Benchmarks.genruntimeconfig.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Debug\net6.0\ref\SpscRing.Benchmarks.dll

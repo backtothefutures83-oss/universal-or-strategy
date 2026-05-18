@@ -1,0 +1,13 @@
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\bin\Release\net48\R28_MmioSpscRing.exe.config
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\bin\Release\net48\R28_MmioSpscRing.exe
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\bin\Release\net48\R28_MmioSpscRing.pdb
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\bin\Release\net48\System.Runtime.CompilerServices.Unsafe.dll
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.csproj.AssemblyReference.cache
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.AssemblyInfoInputs.cache
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.AssemblyInfo.cs
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.sourcelink.json
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_Mmio.28CD8C10.Up2Date
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.exe
+C:\WSGTA\universal-or-strategy\sandbox\R28_MmioSpscRing\obj\Release\net48\R28_MmioSpscRing.pdb

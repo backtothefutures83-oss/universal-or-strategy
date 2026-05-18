@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "vmMna4z123U=",
+  "success": true,
+  "projectFilePath": "C:\\WSGTA\\universal-or-strategy\\sandbox\\R28_MmioSpscRing\\R28_MmioSpscRing.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.3\\microsoft.netframework.referenceassemblies.1.0.3.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net48\\1.0.3\\microsoft.netframework.referenceassemblies.net48.1.0.3.nupkg.sha512",
+    "C:\\Users\\Mohammed Khalid\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,583 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "SpscRing.Benchmarks.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\benchmarks\\obj\\Debug\\net48\\SpscRing.Benchmarks.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_benchmarks_obj_debug_net48_spscring_benchmarks_assemblyinfo_cs",
+      "community": 1,
+      "norm_label": "spscring.benchmarks.assemblyinfo.cs"
+    },
+    {
+      "label": "SpscRing.Benchmarks.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\benchmarks\\obj\\Debug\\net6.0\\SpscRing.Benchmarks.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_benchmarks_obj_debug_net6_0_spscring_benchmarks_assemblyinfo_cs",
+      "community": 2,
+      "norm_label": "spscring.benchmarks.assemblyinfo.cs"
+    },
+    {
+      "label": "SpscRing.Benchmarks.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\benchmarks\\obj\\Release\\net48\\SpscRing.Benchmarks.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_benchmarks_obj_release_net48_spscring_benchmarks_assemblyinfo_cs",
+      "community": 3,
+      "norm_label": "spscring.benchmarks.assemblyinfo.cs"
+    },
+    {
+      "label": "SpscRing.Benchmarks.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\benchmarks\\obj\\Release\\net6.0\\SpscRing.Benchmarks.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_benchmarks_obj_release_net6_0_spscring_benchmarks_assemblyinfo_cs",
+      "community": 4,
+      "norm_label": "spscring.benchmarks.assemblyinfo.cs"
+    },
+    {
+      "label": "Testing.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\obj\\Debug\\net48\\Testing.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_obj_debug_net48_testing_assemblyinfo_cs",
+      "community": 5,
+      "norm_label": "testing.assemblyinfo.cs"
+    },
+    {
+      "label": "Sentry.Attributes.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\obj\\Debug\\net8.0-windows\\Sentry.Attributes.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_obj_debug_net8_0_windows_sentry_attributes_cs",
+      "community": 6,
+      "norm_label": "sentry.attributes.cs"
+    },
+    {
+      "label": "Testing.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\obj\\Debug\\net8.0-windows\\Testing.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_obj_debug_net8_0_windows_testing_assemblyinfo_cs",
+      "community": 7,
+      "norm_label": "testing.assemblyinfo.cs"
+    },
+    {
+      "label": "Testing.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\obj\\Release\\net48\\Testing.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_obj_release_net48_testing_assemblyinfo_cs",
+      "community": 8,
+      "norm_label": "testing.assemblyinfo.cs"
+    },
+    {
+      "label": "R28_MmioSpscRing.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\sandbox\\R28_MmioSpscRing\\obj\\Release\\net48\\R28_MmioSpscRing.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_sandbox_r28_mmiospscring_obj_release_net48_r28_mmiospscring_assemblyinfo_cs",
+      "community": 9,
+      "norm_label": "r28_mmiospscring.assemblyinfo.cs"
+    },
+    {
+      "label": "brain_pulse.ps1",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\brain_pulse.ps1",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_scripts_brain_pulse_ps1",
+      "community": 10,
+      "norm_label": "brain_pulse.ps1"
+    },
+    {
+      "label": "ingest_recent_history.py",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\ingest_recent_history.py",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_scripts_ingest_recent_history_py",
+      "community": 0,
+      "norm_label": "ingest_recent_history.py"
+    },
+    {
+      "label": "ingest_history()",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\ingest_recent_history.py",
+      "source_location": "L11",
+      "id": "ingest_recent_history_ingest_history",
+      "community": 0,
+      "norm_label": "ingest_history()"
+    },
+    {
+      "label": "Fetches the most recent agent traces from LangSmith to provide      short-term",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\ingest_recent_history.py",
+      "source_location": "L12",
+      "community": 0,
+      "norm_label": "fetches the most recent agent traces from langsmith to provide      short-term",
+      "id": "ingest_recent_history_rationale_12"
+    },
+    {
+      "label": "Morpheus.ControlPlane.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Debug\\net6.0\\Morpheus.ControlPlane.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_debug_net6_0_morpheus_controlplane_assemblyinfo_cs",
+      "community": 11,
+      "norm_label": "morpheus.controlplane.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Debug\\net6.0\\Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_debug_net6_0_morpheus_controlplane_globalusings_g_cs",
+      "community": 12,
+      "norm_label": "morpheus.controlplane.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Debug\\net8.0\\Morpheus.ControlPlane.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_debug_net8_0_morpheus_controlplane_assemblyinfo_cs",
+      "community": 13,
+      "norm_label": "morpheus.controlplane.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Debug\\net8.0\\Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_debug_net8_0_morpheus_controlplane_globalusings_g_cs",
+      "community": 14,
+      "norm_label": "morpheus.controlplane.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Debug\\net8.0-windows\\Morpheus.ControlPlane.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_debug_net8_0_windows_morpheus_controlplane_assemblyinfo_cs",
+      "community": 15,
+      "norm_label": "morpheus.controlplane.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Debug\\net8.0-windows\\Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_debug_net8_0_windows_morpheus_controlplane_globalusings_g_cs",
+      "community": 16,
+      "norm_label": "morpheus.controlplane.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Release\\net8.0\\Morpheus.ControlPlane.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_release_net8_0_morpheus_controlplane_assemblyinfo_cs",
+      "community": 17,
+      "norm_label": "morpheus.controlplane.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.ControlPlane\\obj\\Release\\net8.0\\Morpheus.ControlPlane.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_controlplane_obj_release_net8_0_morpheus_controlplane_globalusings_g_cs",
+      "community": 18,
+      "norm_label": "morpheus.controlplane.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.RithmicProvider.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\obj\\Debug\\net8.0\\Morpheus.RithmicProvider.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_rithmicprovider_obj_debug_net8_0_morpheus_rithmicprovider_assemblyinfo_cs",
+      "community": 19,
+      "norm_label": "morpheus.rithmicprovider.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.RithmicProvider.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\obj\\Debug\\net8.0\\Morpheus.RithmicProvider.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_rithmicprovider_obj_debug_net8_0_morpheus_rithmicprovider_globalusings_g_cs",
+      "community": 20,
+      "norm_label": "morpheus.rithmicprovider.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.RithmicProvider.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\obj\\Debug\\net8.0-windows\\Morpheus.RithmicProvider.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_rithmicprovider_obj_debug_net8_0_windows_morpheus_rithmicprovider_assemblyinfo_cs",
+      "community": 21,
+      "norm_label": "morpheus.rithmicprovider.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.RithmicProvider.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\src\\Morpheus.RithmicProvider\\obj\\Debug\\net8.0-windows\\Morpheus.RithmicProvider.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_src_morpheus_rithmicprovider_obj_debug_net8_0_windows_morpheus_rithmicprovider_globalusings_g_cs",
+      "community": 22,
+      "norm_label": "morpheus.rithmicprovider.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Debug\\net6.0\\Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_debug_net6_0_morpheus_controlplane_tests_assemblyinfo_cs",
+      "community": 23,
+      "norm_label": "morpheus.controlplane.tests.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Debug\\net6.0\\Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_debug_net6_0_morpheus_controlplane_tests_globalusings_g_cs",
+      "community": 24,
+      "norm_label": "morpheus.controlplane.tests.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Debug\\net8.0\\Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_debug_net8_0_morpheus_controlplane_tests_assemblyinfo_cs",
+      "community": 25,
+      "norm_label": "morpheus.controlplane.tests.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Debug\\net8.0\\Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_debug_net8_0_morpheus_controlplane_tests_globalusings_g_cs",
+      "community": 26,
+      "norm_label": "morpheus.controlplane.tests.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Debug\\net8.0-windows\\Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_debug_net8_0_windows_morpheus_controlplane_tests_assemblyinfo_cs",
+      "community": 27,
+      "norm_label": "morpheus.controlplane.tests.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Debug\\net8.0-windows\\Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_debug_net8_0_windows_morpheus_controlplane_tests_globalusings_g_cs",
+      "community": 28,
+      "norm_label": "morpheus.controlplane.tests.globalusings.g.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Release\\net8.0\\Morpheus.ControlPlane.Tests.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_release_net8_0_morpheus_controlplane_tests_assemblyinfo_cs",
+      "community": 29,
+      "norm_label": "morpheus.controlplane.tests.assemblyinfo.cs"
+    },
+    {
+      "label": "Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\src\\Morpheus_Factory\\Morpheus\\tests\\Morpheus.ControlPlane.Tests\\obj\\Release\\net8.0\\Morpheus.ControlPlane.Tests.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_src_morpheus_factory_morpheus_tests_morpheus_controlplane_tests_obj_release_net8_0_morpheus_controlplane_tests_globalusings_g_cs",
+      "community": 30,
+      "norm_label": "morpheus.controlplane.tests.globalusings.g.cs"
+    },
+    {
+      "label": "V12.Sima.Tests.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\tests\\obj\\Debug\\net8.0\\V12.Sima.Tests.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_tests_obj_debug_net8_0_v12_sima_tests_globalusings_g_cs",
+      "community": 31,
+      "norm_label": "v12.sima.tests.globalusings.g.cs"
+    },
+    {
+      "label": "V12.Sima.Tests.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\tests\\obj\\Release\\net8.0\\V12.Sima.Tests.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_tests_obj_release_net8_0_v12_sima_tests_globalusings_g_cs",
+      "community": 32,
+      "norm_label": "v12.sima.tests.globalusings.g.cs"
+    },
+    {
+      "label": "V12_002.HybridArena.PlanContract.Tests.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\tests\\V12_002.HybridArena.PlanContract.Tests\\obj\\Debug\\net48\\V12_002.HybridArena.PlanContract.Tests.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_tests_v12_002_hybridarena_plancontract_tests_obj_debug_net48_v12_002_hybridarena_plancontract_tests_assemblyinfo_cs",
+      "community": 33,
+      "norm_label": "v12_002.hybridarena.plancontract.tests.assemblyinfo.cs"
+    },
+    {
+      "label": "V12.OpenAI.Ops.AssemblyInfo.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\tools\\v12-openai-ops\\obj\\Debug\\net8.0\\V12.OpenAI.Ops.AssemblyInfo.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_tools_v12_openai_ops_obj_debug_net8_0_v12_openai_ops_assemblyinfo_cs",
+      "community": 34,
+      "norm_label": "v12.openai.ops.assemblyinfo.cs"
+    },
+    {
+      "label": "V12.OpenAI.Ops.GlobalUsings.g.cs",
+      "file_type": "code",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\tools\\v12-openai-ops\\obj\\Debug\\net8.0\\V12.OpenAI.Ops.GlobalUsings.g.cs",
+      "source_location": "L1",
+      "id": "c_wsgta_universal_or_strategy_tools_v12_openai_ops_obj_debug_net8_0_v12_openai_ops_globalusings_g_cs",
+      "community": 35,
+      "norm_label": "v12.openai.ops.globalusings.g.cs"
+    },
+    {
+      "label": "Scan from 'start' (after opening backtick) to matching closing backtick.     Sk",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness.py",
+      "source_location": "L49",
+      "community": 36,
+      "norm_label": "scan from 'start' (after opening backtick) to matching closing backtick.     sk",
+      "id": "amal_harness_rationale_49"
+    },
+    {
+      "label": "Extract bodies of 'export const NAME = `...`' template literals.     Returns li",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness.py",
+      "source_location": "L64",
+      "community": 37,
+      "norm_label": "extract bodies of 'export const name = `...`' template literals.     returns li",
+      "id": "amal_harness_rationale_64"
+    },
+    {
+      "label": "Extract all bare backtick template literals (non-named).     Uses the same esca",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness.py",
+      "source_location": "L81",
+      "community": 38,
+      "norm_label": "extract all bare backtick template literals (non-named).     uses the same esca",
+      "id": "amal_harness_rationale_81"
+    },
+    {
+      "label": "r\"\"\"Remove `{ ... }` blocks whose opening brace has no preceding control-flow ke",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness.py",
+      "source_location": "L199",
+      "community": 39,
+      "norm_label": "r\"\"\"remove `{ ... }` blocks whose opening brace has no preceding control-flow ke",
+      "id": "amal_harness_rationale_199"
+    },
+    {
+      "label": "V25 MPMC AMAL Vetting Gate Extracts the full MpmcPipeline<T> class body and ben",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness_v25.py",
+      "source_location": "L1",
+      "community": 40,
+      "norm_label": "v25 mpmc amal vetting gate extracts the full mpmcpipeline<t> class body and ben",
+      "id": "amal_harness_v25_rationale_1"
+    },
+    {
+      "label": "Extract all classes, structs, enums, etc. and handle orphan methods in tabbed UI",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness_v25.py",
+      "source_location": "L16",
+      "community": 41,
+      "norm_label": "extract all classes, structs, enums, etc. and handle orphan methods in tabbed ui",
+      "id": "amal_harness_v25_rationale_16"
+    },
+    {
+      "label": "Inject class body into V25 template and benchmark.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness_v25.py",
+      "source_location": "L84",
+      "community": 42,
+      "norm_label": "inject class body into v25 template and benchmark.",
+      "id": "amal_harness_v25_rationale_84"
+    },
+    {
+      "label": "V26 MPMC AMAL Vetting Gate Extracts the full MpmcPipeline class body and benchm",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness_v26.py",
+      "source_location": "L1",
+      "community": 43,
+      "norm_label": "v26 mpmc amal vetting gate extracts the full mpmcpipeline class body and benchm",
+      "id": "amal_harness_v26_rationale_1"
+    },
+    {
+      "label": "Extract all C# classes, structs, enums, etc. and handle orphan methods.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness_v26.py",
+      "source_location": "L25",
+      "community": 44,
+      "norm_label": "extract all c# classes, structs, enums, etc. and handle orphan methods.",
+      "id": "amal_harness_v26_rationale_25"
+    },
+    {
+      "label": "Inject class body into the template and benchmark.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness_v26.py",
+      "source_location": "L95",
+      "community": 45,
+      "norm_label": "inject class body into the template and benchmark.",
+      "id": "amal_harness_v26_rationale_95"
+    },
+    {
+      "label": "Estimate CYC by counting decision points.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\complexity_audit.py",
+      "source_location": "L25",
+      "community": 46,
+      "norm_label": "estimate cyc by counting decision points.",
+      "id": "complexity_audit_rationale_25"
+    },
+    {
+      "label": "Detect M5 dispatch candidates: switch/if chains with >= 4 branches     on strin",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\complexity_audit.py",
+      "source_location": "L48",
+      "community": 47,
+      "norm_label": "detect m5 dispatch candidates: switch/if chains with >= 4 branches     on strin",
+      "id": "complexity_audit_rationale_48"
+    },
+    {
+      "label": "Extract all methods from a C# file with metrics.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\complexity_audit.py",
+      "source_location": "L91",
+      "community": 48,
+      "norm_label": "extract all methods from a c# file with metrics.",
+      "id": "complexity_audit_rationale_91"
+    },
+    {
+      "label": "Generate full complexity audit report.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\complexity_audit.py",
+      "source_location": "L202",
+      "community": 49,
+      "norm_label": "generate full complexity audit report.",
+      "id": "complexity_audit_rationale_202"
+    },
+    {
+      "label": "Simulates a JSON-RPC call to the Context7 MCP server over stdin/stdout.     Per",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\context7_cli.py",
+      "source_location": "L14",
+      "community": 50,
+      "norm_label": "simulates a json-rpc call to the context7 mcp server over stdin/stdout.     per",
+      "id": "context7_cli_rationale_14"
+    },
+    {
+      "label": "Unified sink for all agent telemetry (Gemini, Qwen, Jules, Codex, Droid, Bob).",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\emit_fleet_telemetry.py",
+      "source_location": "L13",
+      "community": 51,
+      "norm_label": "unified sink for all agent telemetry (gemini, qwen, jules, codex, droid, bob).",
+      "id": "emit_fleet_telemetry_rationale_13"
+    },
+    {
+      "label": "Traces the handoff between two agents in the Sovereign fleet.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\langsmith_bridge.py",
+      "source_location": "L19",
+      "community": 52,
+      "norm_label": "traces the handoff between two agents in the sovereign fleet.",
+      "id": "langsmith_bridge_rationale_19"
+    },
+    {
+      "label": "Traces an AMAL forensic run and attaches performance metadata.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\langsmith_bridge.py",
+      "source_location": "L33",
+      "community": 53,
+      "norm_label": "traces an amal forensic run and attaches performance metadata.",
+      "id": "langsmith_bridge_rationale_33"
+    },
+    {
+      "label": "Formalizes the handoff to a sub-agent and emits a LangSmith trace.",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\nexus_relay.py",
+      "source_location": "L13",
+      "community": 54,
+      "norm_label": "formalizes the handoff to a sub-agent and emits a langsmith trace.",
+      "id": "nexus_relay_rationale_13"
+    },
+    {
+      "label": "Round 26 stress harness for the sovereign MPMC submission.  This script reads",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\round26_stress_harness.py",
+      "source_location": "L1",
+      "community": 55,
+      "norm_label": "round 26 stress harness for the sovereign mpmc submission.  this script reads",
+      "id": "round26_stress_harness_rationale_1"
+    },
+    {
+      "label": "Extract a method block from source lines.     Returns (method_lines, start_idx,",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\v12_split.py",
+      "source_location": "L14",
+      "community": 56,
+      "norm_label": "extract a method block from source lines.     returns (method_lines, start_idx,",
+      "id": "v12_split_rationale_14"
+    },
+    {
+      "label": "Split a method from source file.     If output_file is None, modifies source_fi",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\v12_split.py",
+      "source_location": "L65",
+      "community": 57,
+      "norm_label": "split a method from source file.     if output_file is none, modifies source_fi",
+      "id": "v12_split_rationale_65"
+    },
+    {
+      "label": "r\"\"\"Remove `{ ... }` blocks whose opening brace has no preceding control-flow ke",
+      "file_type": "rationale",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\amal_harness.py",
+      "source_location": "L197",
+      "community": 58,
+      "norm_label": "r\"\"\"remove `{ ... }` blocks whose opening brace has no preceding control-flow ke",
+      "id": "amal_harness_rationale_197"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\ingest_recent_history.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "c_wsgta_universal_or_strategy_scripts_ingest_recent_history_py",
+      "_tgt": "ingest_recent_history_ingest_history",
+      "source": "c_wsgta_universal_or_strategy_scripts_ingest_recent_history_py",
+      "target": "ingest_recent_history_ingest_history",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "C:\\WSGTA\\universal-or-strategy\\scripts\\ingest_recent_history.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_src": "ingest_recent_history_rationale_12",
+      "_tgt": "ingest_recent_history_ingest_history",
+      "source": "ingest_recent_history_ingest_history",
+      "target": "ingest_recent_history_rationale_12",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}

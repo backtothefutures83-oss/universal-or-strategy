@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Morpheus.RithmicProvider/1.0.0": {
+        "runtime": {
+          "Morpheus.RithmicProvider.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Morpheus.RithmicProvider/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

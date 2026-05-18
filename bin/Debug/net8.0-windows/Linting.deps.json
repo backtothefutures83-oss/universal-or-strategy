@@ -1,0 +1,41 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Linting/1.0.0": {
+        "dependencies": {
+          "Sentry": "6.4.1"
+        },
+        "runtime": {
+          "Linting.dll": {}
+        }
+      },
+      "Sentry/6.4.1": {
+        "runtime": {
+          "lib/net8.0/Sentry.dll": {
+            "assemblyVersion": "6.4.1.0",
+            "fileVersion": "6.4.1.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Linting/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Sentry/6.4.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2Q2ySa5PfCB11S91qQFPJNRqPlRB5rUDtpc1B4DnecvwW5cWO7W9C3+J7K0xGfHKfUZP5pglkYmxrn+alJ7zXA==",
+      "path": "sentry/6.4.1",
+      "hashPath": "sentry.6.4.1.nupkg.sha512"
+    }
+  }
+}

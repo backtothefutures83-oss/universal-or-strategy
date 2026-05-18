@@ -1,0 +1,8 @@
+C:\WSGTA\universal-or-strategy\bin\Debug\net48\Linting.dll
+C:\WSGTA\universal-or-strategy\obj\Debug\net48\Linting.csproj.AssemblyReference.cache
+C:\WSGTA\universal-or-strategy\obj\Debug\net48\Linting.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\obj\Debug\net48\Linting.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\obj\Debug\net48\Linting.sourcelink.json
+C:\WSGTA\universal-or-strategy\obj\Debug\net48\Linting.dll
+C:\WSGTA\universal-or-strategy\bin\Debug\net48\Linting.pdb
+C:\WSGTA\universal-or-strategy\obj\Debug\net48\Linting.pdb

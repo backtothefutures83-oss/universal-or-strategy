@@ -1,0 +1,8 @@
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.csproj.AssemblyReference.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.csproj.SuggestedBindingRedirects.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.exe.config
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.AssemblyInfoInputs.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.AssemblyInfo.cs
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\benchmarks\obj\Release\net48\SpscRing.Benchmarks.sourcelink.json

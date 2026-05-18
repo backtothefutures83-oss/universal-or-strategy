@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Import Project="$(NuGetPackageRoot)microsoft.codeanalysis.metrics\3.3.4\buildTransitive\Microsoft.CodeAnalysis.Metrics.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.codeanalysis.metrics\3.3.4\buildTransitive\Microsoft.CodeAnalysis.Metrics.targets')" />
+  </ImportGroup>
+</Project>

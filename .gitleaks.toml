@@ -1,0 +1,51 @@
+# Gitleaks configuration for V12 Sovereign-Photon
+# Detects secrets and sensitive data in commits
+
+title = "V12 Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey|api[_-]?secret)['"]?\s*[:=]\s*['"]?[a-zA-Z0-9_\-]{20,}'''
+tags = ["key", "API"]
+
+[[rules]]
+id = "private-key"
+description = "Private Key"
+regex = '''-----BEGIN (RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----'''
+tags = ["key", "private"]
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key"
+regex = '''AKIA[0-9A-Z]{16}'''
+tags = ["key", "AWS"]
+
+[[rules]]
+id = "generic-secret"
+description = "Generic Secret"
+regex = '''(?i)(secret|password|passwd|pwd)['"]?\s*[:=]\s*['"]?[a-zA-Z0-9_\-!@#$%^&*()]{8,}'''
+tags = ["secret", "password"]
+
+[allowlist]
+description = "Allowlist for false positives"
+paths = [
+    '''\.md$''',
+    '''\.txt$''',
+    '''\.json\.example$''',
+    '''\.sample$''',
+    '''test.*\.cs$''',
+    '''Tests.*\.cs$''',
+]
+
+regexes = [
+    '''(?i)example''',
+    '''(?i)sample''',
+    '''(?i)dummy''',
+    '''(?i)placeholder''',
+    '''(?i)test[_-]?key''',
+    '''(?i)fake[_-]?secret''',
+]

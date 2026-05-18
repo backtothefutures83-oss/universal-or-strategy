@@ -1,0 +1,12 @@
+C:\WSGTA\universal-or-strategy\bin\Release\net48\Linting.dll
+C:\WSGTA\universal-or-strategy\bin\Release\net48\Linting.pdb
+C:\WSGTA\universal-or-strategy\bin\Release\net48\Microsoft.VisualStudio.CodeCoverage.Shim.dll
+C:\WSGTA\universal-or-strategy\bin\Release\net48\nunit.framework.dll
+C:\WSGTA\universal-or-strategy\bin\Release\net48\System.ValueTuple.dll
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.csproj.AssemblyReference.cache
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.GeneratedMSBuildEditorConfig.editorconfig
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.csproj.CoreCompileInputs.cache
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.sourcelink.json
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.csproj.Up2Date
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.dll
+C:\WSGTA\universal-or-strategy\obj\Release\net48\Linting.pdb
