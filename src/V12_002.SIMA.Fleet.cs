@@ -67,6 +67,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
+                // H02: Clear sideband BEFORE pool release to prevent stale-read race
+                if (poolSlotIndex >= 0 && poolSlotIndex < _photonSideband.Length)
+                {
+                    _photonSideband[poolSlotIndex].Account = null;
+                    _photonSideband[poolSlotIndex].FleetEntryName = string.Empty;
+                    _photonSideband[poolSlotIndex].ExpectedKey = string.Empty;
+                }
+                Thread.MemoryBarrier(); // Enforce write ordering
+                
                 if (poolSlotIndex >= 0)
                     _photonPool.ReleaseByIndex(poolSlotIndex);
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
@@ -259,7 +268,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // H02: Zero sideband FIRST, fence, THEN release pool
                     if (_sbIdx < _photonSideband.Length)
-                        _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    {
+                        _photonSideband[_sbIdx].Account = null;
+                        _photonSideband[_sbIdx].FleetEntryName = string.Empty;
+                        _photonSideband[_sbIdx].ExpectedKey = string.Empty;
+                    }
                     Thread.MemoryBarrier();
                     _photonPool.ReleaseByIndex(_sbIdx);
                 }
@@ -315,7 +328,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     _photonPool.ReleaseByIndex(_sbIdx);
                     if (_sbIdx < _photonSideband.Length)
-                        _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    {
+                        _photonSideband[_sbIdx].Account = null;
+                        _photonSideband[_sbIdx].FleetEntryName = string.Empty;
+                        _photonSideband[_sbIdx].ExpectedKey = string.Empty;
+                    }
                 }
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
                 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
@@ -342,7 +359,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             
             // H02: Zero sideband FIRST, fence, THEN ProcessFleetSlot (which releases pool in finally)
             if (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
-                _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+            {
+                _photonSideband[_sbIdx].Account = null;
+                _photonSideband[_sbIdx].FleetEntryName = string.Empty;
+                _photonSideband[_sbIdx].ExpectedKey = string.Empty;
+            }
             Thread.MemoryBarrier();
             
             ProcessFleetSlot(_sb.Account, ringOrders, _ringSlot.OrderCount,

@@ -17,9 +17,9 @@
     "approvalMode": "yolo"
   },
   "tools": {
-    "context7": "python scripts/context7_cli.py",
+    "context7": "\"C:\\Users\\Mohammed Khalid\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" scripts/context7_cli.py",
     "graphify": "graphify",
     "deploy_sync": "powershell -File .\\deploy-sync.ps1",
-    "nexus_bridge": "python scripts/nexus_relay.py"
+    "nexus_bridge": "\"C:\\Users\\Mohammed Khalid\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" scripts/nexus_relay.py"
   }
 }

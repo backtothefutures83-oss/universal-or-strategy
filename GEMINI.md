@@ -144,13 +144,14 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 4. State `skill(name): no gaps identified` if no gap is found.
 5. Skipping the post-use audit is a protocol violation.
 
-## Section 14: Knowledge Hardening Pipeline (MANDATORY -- ALL AGENTS)
+## Section 15: Mandatory Fleet Tracing (V12.16 Total Observability)
 
-**Every Agent (Antigravity, Jules, Codex, Bob, Droid, etc.) is responsible for its own "Live Truth" capture.**
+**No agent action is valid unless it is traced. ALL agents (Antigravity, Gemini, Qwen, Jules, Codex, Bob, Droid) MUST emit telemetry.**
 
-1. **Self-Indexing**: Before completing a major task, agents MUST run `powershell -File .\scripts\sync_agent_knowledge.ps1` if their CLI surface or local SOPs have changed.
-2. **Context Continuity**: Never assume the Orchestrator knows your syntax. Update your `docs/brain/` references immediately upon change.
-3. **Tool Registry**: All agent command surfaces must be registered in `docs/brain/live_[agent]_help.txt` for RAG-based retrieval.
+1.  **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+2.  **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+3.  **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
+
 
 
 ## Section 14: $claudecloud Protocol Hardening (Permanent Standard)

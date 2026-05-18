@@ -70,5 +70,10 @@
     "Build-984-Source-Hardening": "COMPLETE",
     "Phase-1-Monolith-Partition": "COMPLETE"
   },
-  "nexus_relay_timestamp": "2026-05-07T22:19:00Z"
+  "nexus_relay_timestamp": "2026-05-07T22:19:00Z",
+  "last_relay": {
+    "agent": "TestAgent",
+    "time": "2026-05-18T21:11:17.595115+00:00",
+    "status": "IN_PROGRESS"
+  }
 }
