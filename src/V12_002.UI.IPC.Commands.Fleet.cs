@@ -1,4 +1,5 @@
 // Build 1001: UI.IPC.Commands.Fleet -- TryHandleFleetCommand [Build 1001 Repair V2]
+// H12: Re-entrancy protection for critical commands
 // V12 UI.IPC Module (Extracted)
 using System;
 using System.Collections.Generic;
@@ -33,6 +34,11 @@ namespace NinjaTrader.NinjaScript.Strategies
     public partial class V12_002 : Strategy
     {
         #region IPC Commands Fleet
+
+        // H12: Re-entrancy protection for critical commands
+        private long _lastFlattenTicks = 0;
+        private long _lastCancelAllTicks = 0;
+        private const long ReentrancyCooldownTicks = TimeSpan.TicksPerSecond; // 1 second cooldown
 
         private bool TryHandleFleetCommand(string action, string[] parts, long senderTicks)
         {
@@ -122,15 +128,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!MetadataGuardDuplicate(cmdId, action)) return true;
 
-            // V12 SIMA: Use multi-account flatten when enabled
+            // H12 FIX: Re-entrancy protection using atomic cooldown
+            long nowTicks = DateTime.UtcNow.Ticks;
+            long lastTicks = Interlocked.Read(ref _lastFlattenTicks);
+            long elapsed = nowTicks - lastTicks;
+            
+            if (elapsed < ReentrancyCooldownTicks)
+            {
+                Print($"[H12] FLATTEN rejected: cooldown active ({elapsed / TimeSpan.TicksPerMillisecond}ms since last)");
+                return true;
+            }
+
+            // Atomic update: only proceed if we successfully claim the slot
+            long previousTicks = Interlocked.CompareExchange(ref _lastFlattenTicks, nowTicks, lastTicks);
+            if (previousTicks != lastTicks)
+            {
+                Print("[H12] FLATTEN rejected: concurrent request detected");
+                return true;
+            }
+
+            // H10 FIX: Enqueue to FSM actor model instead of direct call to prevent
+            // button command execution race with strategy thread.
             if (EnableSIMA)
             {
-                Print("[SIMA] IPC FLATTEN -> Broadcasting to all Apex accounts");
-                FlattenAllApexAccounts();
+                Print("[SIMA] IPC FLATTEN -> Enqueuing broadcast to all Apex accounts");
+                Enqueue(ctx => ctx.FlattenAllApexAccounts());
             }
             else
             {
-                FlattenAll();
+                Print("[V12] IPC FLATTEN -> Enqueuing flatten command");
+                Enqueue(ctx => ctx.FlattenAll());
             }
 
             return true;
@@ -143,6 +170,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (!MetadataGuardDuplicate(cmdId, action)) return true;
 
+            // H12 FIX: Re-entrancy protection using atomic cooldown
+            long nowTicks = DateTime.UtcNow.Ticks;
+            long lastTicks = Interlocked.Read(ref _lastCancelAllTicks);
+            long elapsed = nowTicks - lastTicks;
+            
+            if (elapsed < ReentrancyCooldownTicks)
+            {
+                Print($"[H12] CANCEL_ALL rejected: cooldown active ({elapsed / TimeSpan.TicksPerMillisecond}ms since last)");
+                return true;
+            }
+
+            // Atomic update: only proceed if we successfully claim the slot
+            long previousTicks = Interlocked.CompareExchange(ref _lastCancelAllTicks, nowTicks, lastTicks);
+            if (previousTicks != lastTicks)
+            {
+                Print("[H12] CANCEL_ALL rejected: concurrent request detected");
+                return true;
+            }
+
+            // H10 FIX: Enqueue to FSM actor model instead of direct call to prevent
+            // button command execution race with strategy thread.
+            Print("[V12] IPC CANCEL_ALL -> Enqueuing cancel command");
+            Enqueue(ctx => ctx.ExecuteCancelAllOrders());
+
+            return true;
+        }
+
+        /// <summary>
+        /// H10: Actor-safe wrapper for CANCEL_ALL logic.
+        /// Extracted from TryHandleFleet_CancelAll to enable FSM enqueueing.
+        /// </summary>
+        private void ExecuteCancelAllOrders()
+        {
             // V12.13c: Only cancels pending entry orders (stops/targets on active positions are preserved)
             if (EnableSIMA)
             {
@@ -175,8 +235,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 Print($"[V12] CANCEL_ALL -> Cancelled {cancelled} pending entry orders");
             }
-
-            return true;
         }
 
         private int CancelAll_ProcessMasterAccount()
