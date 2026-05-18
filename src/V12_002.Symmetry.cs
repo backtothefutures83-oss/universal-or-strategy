@@ -260,6 +260,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             return best;
         }
 
+        /// <summary>
+        /// V12.H01: Rollback helper for failed RMA dispatch - removes dispatch context to prevent orphaned followers
+        /// </summary>
+        private void SymmetryGuardRollbackDispatch(string dispatchId)
+        {
+            if (string.IsNullOrEmpty(dispatchId))
+                return;
+
+            symmetryDispatchById.TryRemove(dispatchId, out _);
+            Thread.MemoryBarrier();
+        }
+
         #endregion
     }
 }

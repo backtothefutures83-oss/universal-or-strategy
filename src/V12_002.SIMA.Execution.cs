@@ -570,7 +570,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // 1. LOCAL ACCOUNT: SubmitOrderUnmanaged (chart-visible)
                 // =======================================================
                 // Helper 3: Submit local account entry (ATOMIC: INV-4.3)
-                SubmitLocalRMAEntry(baseSignal, entryAction, contracts, price, direction, prices, symmetryDispatchId);
+                try
+                {
+                    SubmitLocalRMAEntry(baseSignal, entryAction, contracts, price, direction, prices, symmetryDispatchId);
+                }
+                catch (Exception localEx)
+                {
+                    // V12.H01: Rollback symmetry dispatch on local entry failure to prevent orphaned followers
+                    SymmetryGuardRollbackDispatch(symmetryDispatchId);
+                    Print(string.Format("[SIMA RMA V2] LOCAL ENTRY FAILED: {0} - Dispatch rolled back", localEx.Message));
+                    return;
+                }
 
                 // =======================================================
                 // 2. SIMA FLEET: Iterate Account.All for followers

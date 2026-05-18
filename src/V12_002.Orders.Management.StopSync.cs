@@ -221,14 +221,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // V12.Hardening [RISK-01]: Atomic update guard
             // Locks stateLock to prevent dirty reads of pos.RemainingContracts while ApplyTargetFill is modifying it
-            if (!stopOrders.ContainsKey(entryName)) return;
+            // TICKET-05 (H07): TryGetValue eliminates TOCTOU race between ContainsKey and indexer access
+            if (!stopOrders.TryGetValue(entryName, out Order currentStop)) return;
             if (pos.RemainingContracts <= 0) return;
             // V12.41: No trailing/updates before entry fill is confirmed
             if (!pos.EntryFilled) return;
 
             try
             {
-                Order currentStop = stopOrders[entryName];
 
                 // V8.11 FIX: Store pending replacement BEFORE cancelling
                 // This ensures we only create a new stop when the old one is confirmed cancelled
@@ -316,8 +316,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                // A1-1: B966 -- Enqueue actor pipeline (was naked stateLock write)
-                { var _en966 = entryName; var _ns966 = newStop; Enqueue(ctx => { ctx.stopOrders[_en966] = _ns966; }); }
+                // [BUILD 981 EXEMPTION]: Synchronous write to stopOrders during bracket submission.
+                // Prevents ghost-order tracking window if flatten occurs before actor drain.
+                // ConcurrentDictionary single-write is thread-safe (no lock required).
+                stopOrders[entryName] = newStop;
 
                 // [LATENCY_AUDIT] Measure OCO turnaround: CreatedTime was stamped in UpdateStopQuantity() when
                 // the target fill triggered the pending stop replacement. The delta = Target Fill -> Stop Cancel

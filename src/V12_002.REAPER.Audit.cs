@@ -107,6 +107,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
+            // [BUILD 981 DIAGNOSTIC]: Detect orphaned FSM positions after grace period.
+            // Orphaned position = activePositions entry exists but broker position is flat.
+            // This is a diagnostic assertion -- logs warning but does NOT trigger flatten.
+            // KEY MAPPING (Director-verified):
+            //   - activePositions uses FSM entryName as key (e.g., "RetestLong_12345678")
+            //   - expectedPositions uses ExpKey(accountName) as key (composite key)
+            foreach (var fsm in accountFsms)
+            {
+                if (actualQty == 0 && activePositions.ContainsKey(fsm.EntryName))
+                {
+                    // Check if grace period has expired (10 seconds)
+                    DateTime firstSeen = _orphanedPositionFirstSeen.GetOrAdd(fsm.EntryName, DateTime.UtcNow);
+                    double graceElapsed = (DateTime.UtcNow - firstSeen).TotalSeconds;
+                    
+                    if (graceElapsed > 10.0)
+                    {
+                        // Grace expired -- log diagnostic warning
+                        Print($"[REAPER][DIAGNOSTIC] Orphaned FSM position detected: {acct.Name} entry={fsm.EntryName}. " +
+                              $"Broker flat but activePositions entry exists after {graceElapsed:F1}s grace. " +
+                              $"This may indicate a TOCTOU race in entry rollback logic.");
+                        
+                        // Clear first-seen timestamp to avoid log spam
+                        _orphanedPositionFirstSeen.TryRemove(fsm.EntryName, out _);
+                    }
+                }
+                else
+                {
+                    // Position is live or activePositions is clean -- clear first-seen timestamp
+                    _orphanedPositionFirstSeen.TryRemove(fsm.EntryName, out _);
+                }
+            }
+
             if (actualQty != 0)
             {
                 AuditFleet_HandleNakedPosition(acct, pos, actualQty, expectedKey, shouldLog);
