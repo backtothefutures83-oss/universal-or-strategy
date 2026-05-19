@@ -260,8 +260,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 newStop = pos.ExecutingAccount.CreateOrder(Instrument, pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover,
                     OrderType.StopMarket, TimeInForce.Gtc, pos.RemainingContracts, 0, validatedStopPrice, "Stop_" + entryName, "Stop_" + entryName, null);
                 pos.ExecutingAccount.Submit(new[] { newStop });
-                // A1-1: B966 -- Enqueue to flow through actor pipeline
-                { var _en966 = entryName; var _ns966 = newStop; Enqueue(ctx => { ctx.stopOrders[_en966] = _ns966; }); }
+                // [BUILD 981 EXEMPTION]: Synchronous write to stopOrders during stop replacement.
+                // Prevents ghost-order tracking window if flatten occurs before actor drain.
+                // ConcurrentDictionary single-write is thread-safe (no lock required).
+                stopOrders[entryName] = newStop;
             }
             else
             {
@@ -272,8 +274,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 OrderAction stopExitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
                 newStop = SubmitOrderUnmanaged(0, stopExitAction, OrderType.StopMarket, pos.RemainingContracts, 0, validatedStopPrice, "", stopSigName);
 
-                // A1-1: B966 -- Enqueue to flow through actor pipeline
-                if (newStop != null) { var _en966 = entryName; var _ns966 = newStop; Enqueue(ctx => { ctx.stopOrders[_en966] = _ns966; }); }
+                // [BUILD 981 EXEMPTION]: Synchronous write to stopOrders during stop replacement.
+                // Prevents ghost-order tracking window if flatten occurs before actor drain.
+                // ConcurrentDictionary single-write is thread-safe (no lock required).
+                if (newStop != null) { stopOrders[entryName] = newStop; }
             }
 
             if (newStop == null)

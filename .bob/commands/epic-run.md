@@ -168,35 +168,79 @@ When v12-engineer outputs [TICKET-GATE] (the written plan), present the plan sum
 **MINI-GATE:**
 > "Ticket plan ready: [2-line summary]. Type APPROVED to execute or FLAG to adjust."
 
-- APPROVED: switch back to v12-engineer and instruct it to execute the plan
+- APPROVED: switch back to v12-engineer with this EXACT override instruction:
+  ```
+  Execute the approved plan now (ticket.md Steps 4 AND 5 -- execution + self-audit).
+  Run your full post-edit DNA audit (ticket.md Step 5: deploy-sync, lock grep,
+  unicode grep, and complexity_audit OR ghost-method grep as appropriate for this
+  epic type).
+  OVERRIDE -- terminal signal only: Do NOT emit [TICKET-COMPLETE].
+  Instead, after ALL Step 5 audits pass, emit exactly:
+    [SELF-AUDIT-DONE] Ticket XX -- self-audit PASS. Awaiting independent verification.
+  If Step 5 reveals a failure: fix the issue, re-run the failing audit, and only
+  emit [SELF-AUDIT-DONE] once all audits are clean.
+  Then HALT. The orchestrator dispatches the independent verification agent.
+  ```
 - FLAG: relay adjustment, switch to v12-engineer to re-plan
 
 **Step C -- Switch to: Advanced mode (verification)**
 
-After v12-engineer confirms execution complete, switch to Advanced mode and hand off:
+Trigger: v12-engineer emits [SELF-AUDIT-DONE]. This confirms the engineer's own
+Step 5 passed. Step C is an INDEPENDENT second pass -- not a substitute.
+Backward-compat: also triggers on legacy [EXECUTION-DONE] or [TICKET-COMPLETE].
+Do NOT proceed to Step C until one of these signals is received.
+
+Purpose of this second pass: the engineer runs in code mode with full file context;
+Advanced mode re-runs the same gates from a clean, isolated context. Two independent
+passes with different failure modes -- the engineer catches compile/syntax errors
+immediately; the agent catches logic drift, missing edits, and cross-file regressions.
+
+Switch to Advanced mode and hand off this task (fill in actual ticket name and
+epic type before sending):
 ```
 VERIFICATION TASK for epic $1, ticket-XX
-Run the following commands in sequence and report each result:
+Run ALL of the following commands in sequence. Report every result. Do not stop
+early even if one passes.
 
-1. powershell -File .\deploy-sync.ps1
-   PASS = exits 0 and ASCII gate shows PASS
-   FAIL = halt, report error to orchestrator
+-- GATE 1: Hard-link sync + ASCII gate (ALL epics) --
+powershell -File .\deploy-sync.ps1
+PASS = exits 0 and ASCII gate line shows PASS
+FAIL = halt immediately, report full error output
 
-2. python scripts/complexity_audit.py
-   PASS = target method CYC now < 20
-   FAIL = halt, report before/after CYC
+-- GATE 2: Lock regression (ALL epics) --
+grep -r "lock(" src/
+PASS = 0 matches
+FAIL = halt, report every file and line number
 
-3. grep -r "lock(" src/
-   PASS = 0 matches
-   FAIL = halt, report file and line
+-- GATE 3: Unicode regression (ALL epics) --
+grep -Prn "[^\x00-\x7F]" src/
+PASS = 0 matches
+FAIL = halt, report every file and line number
 
-Report results as:
-  deploy-sync : PASS / FAIL
-  CYC         : [before] -> [after]
-  lock() audit: CLEAN / FAIL [details]
+-- GATE 4a: CYC verification (CYC-reduction epics ONLY -- skip for concurrency epics) --
+python scripts/complexity_audit.py
+PASS = target method CYC now < 20
+FAIL = halt, report before/after CYC for the target method
+
+-- GATE 4b: Ghost-method audit (concurrency/hardening epics ONLY -- skip for CYC epics) --
+grep -r "ClearAllEventHandlers" src/
+grep -r "_globalState" src/
+grep -r "_inFlightRmaEntries" src/
+PASS = all three return 0 matches
+FAIL = halt, report which ghost identifier was found and in which file
+
+Report results in this EXACT format:
+  deploy-sync  : PASS / FAIL
+  lock() audit : CLEAN / FAIL [file:line]
+  unicode audit: CLEAN / FAIL [file:line]
+  CYC          : [before] -> [after] / SKIPPED (concurrency epic)
+  ghost-method : CLEAN / FAIL [identifier:file] / SKIPPED (CYC epic)
+
+  OVERALL: PASS (all gates green) / FAIL (see above)
 ```
 
-If Advanced mode reports any FAIL: HALT. Report to Director. Do not continue.
+If Advanced mode reports OVERALL: FAIL on any gate: HALT. Report to Director.
+Do not advance to Step D until OVERALL: PASS is confirmed.
 
 **Step D -- F5 Gate (Director's only manual action):**
 Output:

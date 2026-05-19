@@ -140,8 +140,19 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 **All agents MUST perform a post-use audit after every skill or tool use:**
 1. Check if any instruction was ambiguous or produced an unexpected result.
 2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
-3. State `skill(name): no gaps identified` if no gap is found.
-4. Skipping the post-use audit is a protocol violation.
+3. **KNOWLEDGE SYNC MANDATE**: Whenever a new agent doc ($doc), help capture, or SOP is created/modified, the agent MUST run `graphify update .` to ensure the project brain is current.
+4. State `skill(name): no gaps identified` if no gap is found.
+5. Skipping the post-use audit is a protocol violation.
+
+## Section 15: Mandatory Fleet Tracing (V12.16 Total Observability)
+
+**No agent action is valid unless it is traced. ALL agents (Antigravity, Gemini, Qwen, Jules, Codex, Bob, Droid) MUST emit telemetry.**
+
+1.  **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+2.  **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+3.  **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
+
+
 
 ## Section 14: $claudecloud Protocol Hardening (Permanent Standard)
 

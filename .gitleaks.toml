@@ -32,3 +32,11 @@ paths = ['''(^|[\\/])check_ascii\.py$''']
 description = "Allow the redacted Sentry DSN placeholder"
 regexTarget = "line"
 regexes = ['''REDACTED_SENTRY_DSN -- see V12_SENTRY_DSN env var''']
+
+[[allowlists]]
+description = "Allow test mock data and fixtures"
+paths = [
+    '''tests/.*\.cs$''',
+    '''tests/.*Mocks\.cs$''',
+    '''tests/.*Tests\.cs$'''
+]

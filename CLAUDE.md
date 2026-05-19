@@ -19,6 +19,13 @@
 2. **Input Validation**: Never trust incoming network payloads. Use strict UTF-8 decoding and bounded command lengths.
 3. **Fleet Privacy**: Obscure sensitive account names using BMad aliases (`F01`, `F02`, etc.) in all external-facing responses.
 
+## ðŸš€ Knowledge Hardening (V12.16 Mandate)
+Claude agents operate as ARCHITECTS but MUST remain grounded in "Live Truth."
+
+1. **Mandatory Sync**: Before concluding a design session, run `powershell -File .\scripts\sync_agent_knowledge.ps1` if architecture or agent protocols were updated.
+2. **DNA Preservation**: Update `docs/brain/` with any new agent-to-agent interface protocols immediately.
+3. **Graphify Priority**: Always verify the current system-wide dependencies via `graphify-out/GRAPH_REPORT.md` before making design decisions.
+
 ## ðŸ¦ Logic Integrity (FLEET SAFETY)
 
 1. **No Internal Locks**: Legacy `lock(stateLock)` is BANNED for internal execution. Thread-safety should be managed via either the Actor model or direct atomic writes, depending on the mission requirements.

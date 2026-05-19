@@ -18,6 +18,10 @@ def relay_to_agent(to_agent, instructions):
     
     print(f"[*] Relaying Mission to {to_agent}...")
     
+    # [OBSERVABILITY V12.16] Emit Unified Fleet Trace
+    from scripts.emit_fleet_telemetry import emit_agent_telemetry
+    emit_agent_telemetry("Orchestrator", f"Relay to {to_agent}", "IN_PROGRESS", {"instructions_len": len(instructions)})
+    
     # Update Blackboard
     with open(blackboard_path, "r") as f:
         blackboard = json.load(f)
