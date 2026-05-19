@@ -106,8 +106,8 @@ namespace UniversalOrStrategy.Tests
             
             // Assert: Verify sideband is zeroed before slot becomes available
             Assert.Equal(default(FleetDispatchSideband), photonSideband[testSlotIndex]);
-            Assert.Equal(string.Empty, photonSideband[testSlotIndex].FleetEntryName);
-            Assert.Equal(string.Empty, photonSideband[testSlotIndex].ExpectedKey);
+            Assert.Null(photonSideband[testSlotIndex].FleetEntryName);
+            Assert.Null(photonSideband[testSlotIndex].ExpectedKey);
             Assert.Equal(0, photonSideband[testSlotIndex].ReservedDelta);
             Assert.Equal(1, poolAvailability[testSlotIndex]);
         }
