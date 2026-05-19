@@ -1,172 +1,174 @@
 // Epic 2 Visual & Command Pipeline Concurrency Hardening Tests
 // Tests for H09-H12: Visual render race, button command race, stale state, and re-entrancy protection
+// Source-scan assertions verify the actual production code patterns (same model as Build981ComplianceTests.cs)
 using System;
+using System.IO;
+using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace V12_002.Tests
 {
     public class Epic2VisualTests
     {
-        // H09: Dispatch Visual Render Race
+        private static string SrcPath(string file)
+            => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "src", file);
+
+        // ---------------------------------------------------------------
+        // H09 + H11: Panel Refresh Snapshot Isolation & Null Guard
+        // Fix location: V12_002.UI.Panel.StateSync.cs
+        // ---------------------------------------------------------------
+
         [Fact]
-        public void H09_VisualRenderRace_SnapshotIsolation()
+        public void H09_PanelStateSync_UsesThreadMemoryBarrier()
         {
-            // ARRANGE: Simulate concurrent fleet sync during visual render
-            // ACT: Verify that SyncLiveTargetRows uses local snapshot
-            // ASSERT: No collection-modified exceptions occur
-            
-            // Test validates that UpdatePanelState uses Thread.MemoryBarrier()
-            // and SyncLiveTargetRows creates local snapshot before iteration
-            Assert.True(true, "H09: Visual render uses snapshot isolation");
+            // ASSERT: Thread.MemoryBarrier() is present before snapshot read in UpdatePanelState
+            // This prevents stale reads when fleet sync updates state on another thread.
+            string src = File.ReadAllText(SrcPath("V12_002.UI.Panel.StateSync.cs"), Encoding.UTF8);
+            Assert.Contains("Thread.MemoryBarrier()", src);
         }
 
         [Fact]
-        public void H09_MemoryBarrier_BeforeSnapshotRead()
+        public void H09_PanelStateSync_CreatesLocalTargetsSnapshot()
         {
-            // ARRANGE: Multiple threads updating state
-            // ACT: Verify memory barrier ensures fresh read
-            // ASSERT: No stale reads occur
-            
-            Assert.True(true, "H09: Memory barrier prevents stale reads");
-        }
-
-        // H11: Visual Stale State (Chart Trader)
-        [Fact]
-        public void H11_StateSync_NullGuard()
-        {
-            // ARRANGE: GetUiSnapshot() returns null during termination
-            // ACT: UpdatePanelState checks for null before dereferencing
-            // ASSERT: No NullReferenceException
-            
-            Assert.True(true, "H11: Null guard prevents crash on termination");
+            // ASSERT: Local array snapshot taken before iteration to prevent collection-modified exceptions
+            string src = File.ReadAllText(SrcPath("V12_002.UI.Panel.StateSync.cs"), Encoding.UTF8);
+            Assert.Contains("UILiveTargetSnapshot[] targetsSnapshot", src);
         }
 
         [Fact]
-        public void H11_MemoryBarrier_EnsuresFreshSnapshot()
+        public void H11_PanelStateSync_NullGuardsSnapshot()
         {
-            // ARRANGE: Volatile state updates from strategy thread
-            // ACT: UI thread reads with memory barrier
-            // ASSERT: Always sees latest state
-            
-            Assert.True(true, "H11: Memory barrier ensures fresh snapshot");
-        }
-
-        // H10: Button Command Execution Race
-        [Fact]
-        public void H10_FlattenCommand_UsesEnqueue()
-        {
-            // ARRANGE: Button click triggers FLATTEN command
-            // ACT: Verify command is enqueued to FSM actor model
-            // ASSERT: No direct call to FlattenAllApexAccounts()
-            
-            Assert.True(true, "H10: FLATTEN uses Enqueue pattern");
+            // ASSERT: Null guard on snapshot before dereference (crash prevention during termination)
+            string src = File.ReadAllText(SrcPath("V12_002.UI.Panel.StateSync.cs"), Encoding.UTF8);
+            Assert.Contains("if (snapshot == null) return;", src);
         }
 
         [Fact]
-        public void H10_CancelAllCommand_UsesEnqueue()
+        public void H11_PanelStateSync_NullGuardsTargetsArray()
         {
-            // ARRANGE: Button click triggers CANCEL_ALL command
-            // ACT: Verify command is enqueued via ExecuteCancelAllOrders()
-            // ASSERT: No direct order cancellation from IPC thread
-            
-            Assert.True(true, "H10: CANCEL_ALL uses Enqueue pattern");
+            // ASSERT: Null guard on targetsSnapshot to prevent NullReferenceException
+            string src = File.ReadAllText(SrcPath("V12_002.UI.Panel.StateSync.cs"), Encoding.UTF8);
+            Assert.Contains("if (targetsSnapshot == null) return;", src);
+        }
+
+        // ---------------------------------------------------------------
+        // H10: Button Command Execution Race -- Enqueue Pattern
+        // Fix location: V12_002.UI.IPC.Commands.Fleet.cs
+        // ---------------------------------------------------------------
+
+        [Fact]
+        public void H10_FlattenCommand_EnqueuesFlattenAllApexAccounts()
+        {
+            // ASSERT: FLATTEN uses Enqueue to FSM actor, not direct call
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("Enqueue(ctx => ctx.FlattenAllApexAccounts())", src);
         }
 
         [Fact]
-        public void H10_NoDirectStrategyLogicCalls()
+        public void H10_FlattenCommand_EnqueuesFlattenAll()
         {
-            // ARRANGE: IPC command handlers
-            // ACT: Verify all critical commands use Enqueue
-            // ASSERT: No race conditions with strategy thread
-            
-            Assert.True(true, "H10: All button commands use FSM actor model");
-        }
-
-        // H12: IPC Command Re-Entrancy
-        [Fact]
-        public void H12_FlattenCommand_ReentrancyProtection()
-        {
-            // ARRANGE: Rapid double-click on FLATTEN button
-            // ACT: First click succeeds, second is rejected within cooldown
-            // ASSERT: Only one FLATTEN executes
-            
-            Assert.True(true, "H12: FLATTEN has 1-second cooldown");
+            // ASSERT: Master account flatten also enqueued via actor model
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("Enqueue(ctx => ctx.FlattenAll())", src);
         }
 
         [Fact]
-        public void H12_CancelAllCommand_ReentrancyProtection()
+        public void H10_CancelAllCommand_EnqueuesCancelAllOrders()
         {
-            // ARRANGE: Rapid double-click on CANCEL_ALL button
-            // ACT: First click succeeds, second is rejected within cooldown
-            // ASSERT: Only one CANCEL_ALL executes
-            
-            Assert.True(true, "H12: CANCEL_ALL has 1-second cooldown");
+            // ASSERT: CANCEL_ALL enqueued via Enqueue, not direct call
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("Enqueue(ctx => ctx.ExecuteCancelAllOrders())", src);
+        }
+
+        // ---------------------------------------------------------------
+        // H12: IPC Command Re-Entrancy Protection
+        // Fix location: V12_002.UI.IPC.Commands.Fleet.cs
+        // ---------------------------------------------------------------
+
+        [Fact]
+        public void H12_ReentrancyProtection_DeclaresLastFlattenTicks()
+        {
+            // ASSERT: Long field for atomic cooldown tracking declared
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("_lastFlattenTicks", src);
         }
 
         [Fact]
-        public void H12_AtomicCooldown_UsesInterlocked()
+        public void H12_ReentrancyProtection_DeclaresLastCancelAllTicks()
         {
-            // ARRANGE: Concurrent command requests
-            // ACT: Interlocked.CompareExchange ensures atomic update
-            // ASSERT: No race condition in cooldown check
-            
-            Assert.True(true, "H12: Cooldown uses Interlocked.CompareExchange");
+            // ASSERT: Separate cooldown field for CANCEL_ALL
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("_lastCancelAllTicks", src);
         }
 
         [Fact]
-        public void H12_CooldownPeriod_OneSecond()
+        public void H12_ReentrancyProtection_UsesCooldownConstant()
         {
-            // ARRANGE: Command executed at T0
-            // ACT: Second command at T0 + 500ms rejected
-            // ACT: Third command at T0 + 1100ms succeeds
-            // ASSERT: Cooldown is exactly 1 second
-            
-            Assert.True(true, "H12: Cooldown period is 1 second");
-        }
-
-        // Integration Tests
-        [Fact]
-        public void Epic2_NoNewLockStatements()
-        {
-            // ARRANGE: Scan all modified files
-            // ACT: Count lock() statements
-            // ASSERT: Zero new lock() statements added
-            
-            Assert.True(true, "Epic2: Zero new lock() statements");
+            // ASSERT: 1-second cooldown constant defined (TimeSpan.TicksPerSecond)
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("ReentrancyCooldownTicks", src);
+            Assert.Contains("TimeSpan.TicksPerSecond", src);
         }
 
         [Fact]
-        public void Epic2_ThreadMemoryBarrierUsed()
+        public void H12_ReentrancyProtection_UsesInterlockedCompareExchange()
         {
-            // ARRANGE: Check UpdatePanelState implementation
-            // ACT: Verify Thread.MemoryBarrier() is called
-            // ASSERT: Memory barrier present before snapshot read
-            
-            Assert.True(true, "Epic2: Thread.MemoryBarrier() used correctly");
+            // ASSERT: Atomic CAS used for cooldown claim -- prevents race between concurrent requests
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("Interlocked.CompareExchange(ref _lastFlattenTicks", src);
+            Assert.Contains("Interlocked.CompareExchange(ref _lastCancelAllTicks", src);
         }
 
         [Fact]
-        public void Epic2_InterlockedPrimitivesUsed()
+        public void H12_ReentrancyProtection_UsesInterlockedRead()
         {
-            // ARRANGE: Check re-entrancy protection
-            // ACT: Verify Interlocked.Read and CompareExchange usage
-            // ASSERT: Atomic primitives used for cooldown
-            
-            Assert.True(true, "Epic2: Interlocked primitives used for re-entrancy");
+            // ASSERT: Atomic read of ticks (not non-atomic long read which can tear on 32-bit)
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("Interlocked.Read(ref _lastFlattenTicks)", src);
+            Assert.Contains("Interlocked.Read(ref _lastCancelAllTicks)", src);
+        }
+
+        // ---------------------------------------------------------------
+        // DNA Compliance Audits (cross-file)
+        // ---------------------------------------------------------------
+
+        [Fact]
+        public void Epic2_PanelStateSync_NoNewLockStatements()
+        {
+            // ASSERT: Zero C# lock() statements in UI Panel file (DNA: lock-free)
+            // Use " lock(" (space-prefixed) to avoid matching substrings like unlock( or deadlock(
+            string src = File.ReadAllText(SrcPath("V12_002.UI.Panel.StateSync.cs"), Encoding.UTF8);
+            bool hasLockStatement = src.Contains(" lock(") || src.Contains("\tlock(") || src.Contains("\nlock(");
+            Assert.False(hasLockStatement, "Panel.StateSync.cs must not contain C# lock() statements (V12 DNA violation)");
         }
 
         [Fact]
-        public void Epic2_AsciiOnlyCompliance()
+        public void Epic2_IPCCommandsFleet_NoNewLockStatements()
         {
-            // ARRANGE: Scan all modified files
-            // ACT: Check for non-ASCII characters
-            // ASSERT: All string literals are ASCII-only
-            
-            Assert.True(true, "Epic2: ASCII-only compliance maintained");
+            // ASSERT: Zero C# lock() statements in IPC commands file (DNA: lock-free)
+            // Use " lock(" (space-prefixed) to avoid matching substrings like unlock( or deadlock(
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            bool hasLockStatement = src.Contains(" lock(") || src.Contains("\tlock(") || src.Contains("\nlock(");
+            Assert.False(hasLockStatement, "IPC.Commands.Fleet.cs must not contain C# lock() statements (V12 DNA violation)");
+        }
+
+        [Fact]
+        public void Epic2_IPCCommandsFleet_H12CommentPresent()
+        {
+            // ASSERT: H12 fix comment is present (audit trail in source)
+            string src = File.ReadAllText(SrcPath("V12_002.UI.IPC.Commands.Fleet.cs"), Encoding.UTF8);
+            Assert.Contains("H12", src);
+        }
+
+        [Fact]
+        public void Epic2_PanelStateSync_H09CommentPresent()
+        {
+            // ASSERT: H09/H11 fix comment present (audit trail in source)
+            string src = File.ReadAllText(SrcPath("V12_002.UI.Panel.StateSync.cs"), Encoding.UTF8);
+            Assert.Contains("H09", src);
         }
     }
 }
 
-// Made with Bob
+// Made with Bob + Antigravity (Epic 2 test quality pass -- Assert.True stubs replaced)
