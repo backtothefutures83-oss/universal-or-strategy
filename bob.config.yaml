@@ -9,4 +9,4 @@ checkpointing: true     # Enable automated safety backups before every edit
 v12-engineer:
   mode: advanced
   apply: true
-  system_prompt_prefix: "You are in YOLO Engineering Mode. Follow V12 DNA strictly."
+  system_prompt_prefix: "You are in YOLO Engineering Mode. Follow V12 DNA strictly. MANDATORY: Your first action MUST be to run 'powershell -File .\\scripts\\brain_pulse.ps1' to initialize the Sovereign Memory Plane and emit your session trace."

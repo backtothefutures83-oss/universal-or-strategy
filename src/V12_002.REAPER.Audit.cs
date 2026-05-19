@@ -697,8 +697,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // [V12.Phase9] REAPER FIX: Use manual unmanaged close instead of broken targetAcct.Flatten().
             // 1. Cancel all working orders for this instrument
+            // H14-FIX: Snapshot broker orders before iteration to prevent collection-modified exception
+            // during emergency flatten when broker callbacks update order states concurrently.
             List<Order> ordersToCancel = new List<Order>();
-            foreach (Order order in targetAcct.Orders)
+            var accountOrders = targetAcct.Orders.ToArray();
+            foreach (Order order in accountOrders)
             {
                 if (order != null && order.Instrument.FullName == Instrument.FullName &&
                     (order.OrderState == OrderState.Working || order.OrderState == OrderState.Submitted ||
