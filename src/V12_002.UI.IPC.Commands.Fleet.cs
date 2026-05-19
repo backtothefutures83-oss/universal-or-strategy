@@ -371,7 +371,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (isTosSyncMode)
             {
-                bool armed = (action == "LONG") ? isLongArmed : isShortArmed;
+                // H23: Atomic arm state check
+                int currentState = Interlocked.CompareExchange(ref _armState, 0, 0);
+                bool armed = (action == "LONG" && currentState == 1) || (action == "SHORT" && currentState == 2);
                 if (!armed)
                 {
                     Print($"[SYNC] ToS Signal IGNORED: {action} received but {action} is not ARMED locally.");
@@ -380,7 +382,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else
                 {
                     Print($"[SYNC] ToS Handshake Received -> Executing {action} Fleet Entry");
-                    if (action == "LONG") isLongArmed = false; else isShortArmed = false;
+                    // H23: Atomic disarm
+                    Interlocked.Exchange(ref _armState, 0);
                 }
             }
 
@@ -442,12 +445,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (isTosSyncMode)
             {
-                if (isLongArmed)
+                // H23: Atomic check and disarm
+                if (Interlocked.CompareExchange(ref _armState, 0, 1) == 1)
                 {
                     double orStopDist = CalculateORStopDistance();
                     int orContracts   = CalculatePositionSize(orStopDist);
                     Enqueue(ctx => ctx.ExecuteLong(orContracts));
-                    isLongArmed = false;
                 }
             }
             else
@@ -469,12 +472,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (isTosSyncMode)
             {
-                if (isShortArmed)
+                // H23: Atomic check and disarm
+                if (Interlocked.CompareExchange(ref _armState, 0, 2) == 2)
                 {
                     double orStopDist = CalculateORStopDistance();
                     int orContracts   = CalculatePositionSize(orStopDist);
                     Enqueue(ctx => ctx.ExecuteShort(orContracts));
-                    isShortArmed = false;
                 }
             }
             else

@@ -125,11 +125,69 @@ When v12-epic-planner outputs [TICKETS-GATE], present:
 - Dependency order (which tickets must run before others)
 - Estimated CYC reduction per ticket
 
-**GATE 4:**
-> "X tickets ready. [list]. Type RUN to begin execution or ADJUST to modify tickets."
+**GATE 4 (Ticket Inventory):**
+> "X tickets generated. [list]. Spawning bulk ticket review agent before execution."
 
-- RUN: advance to Execution Pipeline
 - ADJUST: switch to v12-epic-planner, relay adjustments, regenerate affected tickets
+- Otherwise: proceed IMMEDIATELY to Phase 4.5 (do NOT ask for RUN — review happens automatically)
+
+---
+
+## PHASE 4.5: MANDATORY BULK TICKET REVIEW (Pre-Execution Gate)
+
+> **This gate is MANDATORY and cannot be skipped.** All tickets must be reviewed in one
+> pass before ANY code is written. Do NOT advance to the Execution Pipeline until
+> this phase outputs [TICKET-REVIEW-PASS].
+
+**Switch to: Advanced mode**
+
+Hand off this exact task (fill in actual epic slug and ticket list before sending):
+```
+BULK TICKET REVIEW for epic $1
+
+Read ALL of the following ticket files in full:
+  @docs/brain/$1/ticket-01-*.md
+  @docs/brain/$1/ticket-02-*.md
+  [... all tickets listed in EXECUTION_GUIDE.md ...]
+
+For EACH ticket, verify:
+1. SCOPE: Does the fix match the bug bounty defect spec exactly? No scope creep?
+2. DNA: Does the repair use lock-free patterns (Interlocked, ConcurrentDictionary, Enqueue)?
+   No new lock() statements?
+3. ASCII: Are all string literals ASCII-only? No emoji, Unicode, curly quotes?
+4. BLAST RADIUS: Does the ticket touch only the files it declares? Any undeclared side effects?
+5. BUILD 981: If touching stopOrders or bracket submissions, is the direct-write exemption documented?
+6. RED TEST: Does each ticket have a named red test case that actually exercises the fix?
+
+Report in this format for each ticket:
+  Ticket XX: [name]
+    Scope    : MATCH / DRIFT [describe]
+    DNA      : CLEAN / VIOLATION [describe]
+    ASCII    : CLEAN / VIOLATION [describe]
+    Blast    : CONTAINED / LEAK [describe]
+    Build981 : N/A / COMPLIANT / VIOLATION [describe]
+    Red Test : PRESENT / MISSING [describe]
+    Verdict  : APPROVED / FLAG [reason]
+
+Final summary:
+  Total tickets  : N
+  APPROVED        : N
+  FLAGGED         : N (list ticket numbers)
+
+If ALL tickets are APPROVED: output [TICKET-REVIEW-PASS]
+If ANY ticket is FLAGGED: output [TICKET-REVIEW-FAIL] and list every flagged ticket with reason.
+Do NOT output [TICKET-REVIEW-PASS] if any ticket is FLAGGED.
+```
+
+**GATE 4.5:**
+
+- [TICKET-REVIEW-PASS]: advance to Execution Pipeline. Tell Director:
+  > "All N tickets reviewed and approved. Type RUN to begin execution."
+  Wait for Director to type RUN before proceeding.
+
+- [TICKET-REVIEW-FAIL]: HALT. Present flagged tickets to Director.
+  Switch back to v12-epic-planner to revise flagged tickets only.
+  Re-run Phase 4.5 review on revised tickets before advancing.
 
 ---
 

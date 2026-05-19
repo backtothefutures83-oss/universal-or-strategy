@@ -253,8 +253,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // V12.2 Hybrid Sync: Logic State
         private volatile bool isTosSyncMode = false;
-        private bool isLongArmed = false;
-        private bool isShortArmed = false;
+        // H23: Atomic arm state (0=disarmed, 1=long, 2=short)
+        private int _armState = 0;
         private DateTime lastArmedTime = DateTime.MinValue;
 
         // V11: RMA Anchor Logic

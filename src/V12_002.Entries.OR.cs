@@ -47,19 +47,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.2 Hybrid Sync: Manual Interception
             if (isTosSyncMode)
             {
-                if (isLongArmed)
+                // H23: Atomic arm state check (1=long armed)
+                int currentState = Interlocked.CompareExchange(ref _armState, 0, 1);
+                if (currentState == 1)
                 {
-                    // DOUBLE-CLICK BYPASS: If already armed, fire immediately
+                    // DOUBLE-CLICK BYPASS: Already armed, fire immediately and disarm
                     Print("[SYNC] Double-Click Bypass Triggered -> Executing LONG immediately (No ToS Handshake)");
-                    isLongArmed = false;
                     // Proceed to entry logic below
+                }
+                else if (currentState == 0)
+                {
+                    // Disarmed -> Arm LONG (0 -> 1)
+                    Interlocked.Exchange(ref _armState, 1);
+                    lastArmedTime = DateTime.Now;
+                    Print("[SYNC] LONG ENTRY ARMED. Waiting for ToS handshake signal...");
+                    return;
                 }
                 else
                 {
-                    isLongArmed = true;
-                    isShortArmed = false; // Mutually exclusive for simplicity
-                    lastArmedTime = DateTime.Now;
-                    Print("[SYNC] LONG ENTRY ARMED. Waiting for ToS handshake signal...");
+                    // currentState == 2 (SHORT armed) -> reject LONG arm request
+                    Print("[SYNC] LONG ARM REJECTED: SHORT already armed (mutual exclusion)");
                     return;
                 }
             }
@@ -90,19 +97,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.2 Hybrid Sync: Manual Interception
             if (isTosSyncMode)
             {
-                if (isShortArmed)
+                // H23: Atomic arm state check (2=short armed)
+                int currentState = Interlocked.CompareExchange(ref _armState, 0, 2);
+                if (currentState == 2)
                 {
-                    // DOUBLE-CLICK BYPASS: If already armed, fire immediately
+                    // DOUBLE-CLICK BYPASS: Already armed, fire immediately and disarm
                     Print("[SYNC] Double-Click Bypass Triggered -> Executing SHORT immediately (No ToS Handshake)");
-                    isShortArmed = false;
                     // Proceed to entry logic below
+                }
+                else if (currentState == 0)
+                {
+                    // Disarmed -> Arm SHORT (0 -> 2)
+                    Interlocked.Exchange(ref _armState, 2);
+                    lastArmedTime = DateTime.Now;
+                    Print("[SYNC] SHORT ENTRY ARMED. Waiting for ToS handshake signal...");
+                    return;
                 }
                 else
                 {
-                    isShortArmed = true;
-                    isLongArmed = false; // Mutually exclusive
-                    lastArmedTime = DateTime.Now;
-                    Print("[SYNC] SHORT ENTRY ARMED. Waiting for ToS handshake signal...");
+                    // currentState == 1 (LONG armed) -> reject SHORT arm request
+                    Print("[SYNC] SHORT ARM REJECTED: LONG already armed (mutual exclusion)");
                     return;
                 }
             }

@@ -244,8 +244,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ResetSyncStateAndPurgeFollowers()
         {
             // V12.2: Reset Sync State
-            isLongArmed = false;
-            isShortArmed = false;
+            // H23: Atomic disarm on flatten
+            Interlocked.Exchange(ref _armState, 0);
 
             // V1102Q [RUNNER-LEAK]: Explicit follower sweep.
             // Purge all follower metadata from memory to prevent ghost entries.
