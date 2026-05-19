@@ -519,7 +519,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (masterActualQty != 0)
             {
-                bool masterHasWorkingStop = Account.Orders.Any(o =>
+                // H13-FIX: Snapshot broker orders before iteration to prevent InvalidOperationException
+                // when NinjaTrader updates Account.Orders collection from UI thread during audit.
+                var masterOrders = Account.Orders.ToArray();
+                bool masterHasWorkingStop = masterOrders.Any(o =>
                     o.Instrument?.FullName == Instrument?.FullName &&
                     (o.OrderState == OrderState.Working || o.OrderState == OrderState.Accepted) &&
                     (o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit) &&

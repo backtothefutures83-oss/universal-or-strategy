@@ -4,7 +4,7 @@
 
 **Last Synced**: 2026-05-18T00:00:00Z
 **Protocol**: V14 Sovereign | **Current Build**: 1111.007-phase7-t1
-**Status**: 🔵 **EPIC 1 IN PROGRESS** (H05/H08/H21/H22 Bob running)
+**Status**: 🔵 **EPIC 1 COMPLETE -- EPIC 2 NEXT** (H09-H12 queued)
 **Active Branch**: `feature/photon-spsc-hardening` | **Last Stable Merge**: #102 -> main (2026-05-15)
 
 ---
@@ -79,10 +79,10 @@
 
 | # | Task | Status |
 | - | ---- | ------ |
-| **1** | Epic 1: H05 + H08 Stop Order Sync (Bob running) | IN PROGRESS |
-| **2** | Epic 1: H21 + H22 Retest Rollback Fix (Bob running) | IN PROGRESS |
-| **3** | Epic 1: REAPER Diagnostic + 5 tests (Ticket 03) | NEXT |
-| **4** | Epic 2: Visual/Command Pipeline H09-H12 | QUEUED |
+| **1** | Epic 1: H05 + H08 Stop Order Sync | COMPLETE (commit da3e34f) |
+| **2** | Epic 1: H21 + H22 Retest Rollback Fix | COMPLETE (commit da3e34f) |
+| **3** | Epic 1: REAPER Diagnostic + 5 tests | COMPLETE (commit da3e34f) |
+| **4** | Epic 2: Visual/Command Pipeline H09-H12 | NEXT |
 | **5** | Epic 3: REAPER & Lifecycle H13-H18, H20 | QUEUED |
 | **6** | Epic 4: Signal & State H21-H24, H26 | QUEUED |
 | **7** | PR -- merge all 24 repairs to main | QUEUED |
