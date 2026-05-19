@@ -119,6 +119,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (target != null && !string.IsNullOrEmpty(target.OrderId))
                     _orderIdToFsmKey.TryRemove(target.OrderId, out _);
             }
+
+            // H26: Clean up follower replace spec if present
+            if (!string.IsNullOrEmpty(fsm.EntryName))
+                _followerReplaceSpecs.TryRemove(fsm.EntryName, out _);
         }
 
         private bool TryTerminateFollowerBracket(string entryName, out FollowerBracketFSM removedFsm)
