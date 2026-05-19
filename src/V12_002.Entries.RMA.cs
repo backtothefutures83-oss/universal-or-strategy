@@ -275,22 +275,47 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double level = pos.EntryPrice;
                 double distTicks = Math.Abs(currentPrice - level) / tickSize;
 
-                // Phase 9.2: Initialize ClosestApproachTicks on first observation.
+                // H24: FSM Enqueue for ClosestApproachTicks initialization
                 if (pos.ClosestApproachTicks <= 0)
-                    pos.ClosestApproachTicks = double.MaxValue;
+                {
+                    string entryKey = kvp.Key;
+                    Enqueue(ctx => {
+                        PositionInfo p;
+                        if (ctx.activePositions.TryGetValue(entryKey, out p))
+                            p.ClosestApproachTicks = double.MaxValue;
+                    });
+                }
 
-                // Phase 9.2: Track closest approach as a monotonic minimum.
+                // H24: FSM Enqueue for ClosestApproachTicks update
                 if (distTicks < pos.ClosestApproachTicks)
-                    pos.ClosestApproachTicks = distTicks;
+                {
+                    string entryKey = kvp.Key;
+                    double newDist = distTicks;
+                    Enqueue(ctx => {
+                        PositionInfo p;
+                        if (ctx.activePositions.TryGetValue(entryKey, out p) && newDist < p.ClosestApproachTicks)
+                            p.ClosestApproachTicks = newDist;
+                    });
+                }
 
                 if (distTicks <= RmaProximityTicks)
                 {
+                    // H24: FSM Enqueue for proximity state transition
                     if (!pos.WasInProximity)
                     {
-                        pos.WasInProximity = true;
-                        pos.ProximityProbeCount++;
-                        Print(string.Format("[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
-                            pos.ProximityProbeCount, kvp.Key, distTicks, level));
+                        string entryKey = kvp.Key;
+                        double dist = distTicks;
+                        double lvl = level;
+                        Enqueue(ctx => {
+                            PositionInfo p;
+                            if (ctx.activePositions.TryGetValue(entryKey, out p) && !p.WasInProximity)
+                            {
+                                p.WasInProximity = true;
+                                p.ProximityProbeCount++;
+                                Print(string.Format("[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
+                                    p.ProximityProbeCount, entryKey, dist, lvl));
+                            }
+                        });
                     }
 
                     // Visual feedback only. Draw state is not logic state.
@@ -302,9 +327,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
+                    // H24: FSM Enqueue for proximity exit
                     if (pos.WasInProximity)
                     {
-                        pos.WasInProximity = false;
+                        string entryKey = kvp.Key;
+                        Enqueue(ctx => {
+                            PositionInfo p;
+                            if (ctx.activePositions.TryGetValue(entryKey, out p) && p.WasInProximity)
+                                p.WasInProximity = false;
+                        });
 
                         if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
                         {
