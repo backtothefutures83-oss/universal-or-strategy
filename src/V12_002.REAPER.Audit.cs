@@ -723,7 +723,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ProcessReaperFlatten_ClosePositions(Account targetAcct, string accountName)
         {
             // 2. Proactively close positions via unmanaged market orders
-            foreach (Position position in targetAcct.Positions)
+            // H15-FIX: Snapshot broker positions before iteration to prevent collection-modified exception
+            // during emergency flatten when broker fill callbacks update positions concurrently.
+            var accountPositions = targetAcct.Positions.ToArray();
+            foreach (Position position in accountPositions)
             {
                 if (position.Instrument.FullName != Instrument.FullName || position.MarketPosition == MarketPosition.Flat)
                 {
