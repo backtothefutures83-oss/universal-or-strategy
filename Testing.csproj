@@ -26,6 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Mocks to satisfy NinjaTrader dependencies on hosted CI -->
     <Compile Include="tests\NinjaTrader.Mocks.cs" />
     
