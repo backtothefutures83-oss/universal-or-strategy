@@ -78,9 +78,52 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     actorDrained++;
                 }
+                // H20-FIX: Trigger CANCEL_ALL on all fleet accounts when overflow detected.
+                // Discarded commands may include follower bracket submissions, leaving followers
+                // with open positions but no protection orders. CANCEL_ALL ensures clean state.
                 StrategyCommand overflowCmd;
                 while (_cmdQueue.TryDequeue(out overflowCmd))
                     actorOverflow++;
+
+                if (actorOverflow > 0)
+                {
+                    Print(string.Format("[SHUTDOWN] Overflow detected: {0} commands discarded. Triggering fleet CANCEL_ALL for safety.", actorOverflow));
+                    
+                    // Enqueue CANCEL_ALL for each fleet account to ensure clean shutdown state
+                    if (EnableSIMA && activeFleetAccounts != null)
+                    {
+                        foreach (var kvp in activeFleetAccounts.ToArray())
+                        {
+                            if (kvp.Value) // Account is enabled
+                            {
+                                try
+                                {
+                                    string accountName = kvp.Key;
+                                    Account fleetAcct = Account.All.FirstOrDefault(a => a.Name == accountName);
+                                    if (fleetAcct != null)
+                                    {
+                                        // Cancel all working orders for this account
+                                        var workingOrders = fleetAcct.Orders.ToArray()
+                                            .Where(o => o != null && o.Instrument?.FullName == Instrument?.FullName &&
+                                                       !IsOrderTerminal(o.OrderState))
+                                            .ToArray();
+                                        
+                                        if (workingOrders.Length > 0)
+                                        {
+                                            fleetAcct.Cancel(workingOrders);
+                                            Print(string.Format("[SHUTDOWN] Overflow cleanup: Cancelled {0} orders on {1}",
+                                                workingOrders.Length, accountName));
+                                        }
+                                    }
+                                }
+                                catch (Exception exCleanup)
+                                {
+                                    Print("[SHUTDOWN] Overflow cleanup failed for " + kvp.Key + ": " + exCleanup.Message);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Print(string.Format("[SHUTDOWN] Drained {0} IPC cmds, {1} Actor cmds. Overflow discarded: {2}.",
                     ipcDrained, actorDrained, actorOverflow));

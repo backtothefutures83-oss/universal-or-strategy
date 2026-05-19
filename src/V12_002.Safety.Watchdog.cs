@@ -96,7 +96,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             string instrumentName = Instrument.FullName;
 
-            foreach (Position position in masterAccount.Positions)
+            // WATCHDOG-FIX: Snapshot positions before iteration to prevent InvalidOperationException
+            // when broker fill callbacks update Positions collection from UI thread during watchdog check.
+            var positions = masterAccount.Positions.ToArray();
+            foreach (Position position in positions)
             {
                 if (position == null || position.Instrument == null)
                     continue;
@@ -164,7 +167,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void FlattenWatchdogPositions(Account masterAccount, string instrumentName)
         {
-            foreach (Position position in masterAccount.Positions)
+            // WATCHDOG-FIX: Snapshot positions before iteration (same pattern as Site 1).
+            var positions = masterAccount.Positions.ToArray();
+            foreach (Position position in positions)
             {
                 if (position == null || position.Instrument == null)
                     continue;
@@ -271,7 +276,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void FlattenDirectFallbackPositions(Account masterAccount, string instrumentName)
         {
-            foreach (Position position in masterAccount.Positions)
+            // WATCHDOG-FIX: Snapshot positions before iteration (same pattern as Sites 1-2).
+            var positions = masterAccount.Positions.ToArray();
+            foreach (Position position in positions)
             {
                 if (position == null || position.Instrument == null)
                     continue;
