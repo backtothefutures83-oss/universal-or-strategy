@@ -332,6 +332,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool EnqueueReaperRepairCandidate(Account acct, bool shouldLog, int expectedQty, List<FollowerBracketFSM> accountFsms, out string repairKey)
         {
+            // H17-GUARD: Prevent new enqueues after shutdown initiated
+            if (_isTerminating)
+            {
+                repairKey = null;
+                return false;
+            }
             repairKey = acct.Name + "_" + Instrument.FullName;
             // H16-FIX: Atomic TryAdd check prevents TOCTOU race where two audit cycles both pass
             // ContainsKey check before either calls TryAdd, causing duplicate repair submissions.
@@ -368,6 +374,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool EnqueueReaperFlattenCandidate(Account acct)
         {
+            // H17-GUARD: Prevent new enqueues after shutdown initiated
+            if (_isTerminating) return false;
             string flattenKey = acct.Name + "_" + Instrument.FullName;
             if (!_reaperFlattenInFlight.TryAdd(flattenKey, 0))
             {
@@ -390,6 +398,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool EnqueueReaperNakedStopCandidate(Account acct, Position pos, int actualQty, string expectedKey, bool shouldLog)
         {
+            // H17-GUARD: Prevent new enqueues after shutdown initiated
+            if (_isTerminating) return false;
             bool hasPendingStopReplace = false;
             foreach (var psr in pendingStopReplacements.Values)
             {
@@ -613,6 +623,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool EnqueueReaperMasterFlatten()
         {
+            // H17-GUARD: Prevent new enqueues after shutdown initiated
+            if (_isTerminating) return false;
             string flattenKey = Account.Name + "_" + Instrument.FullName;
             if (!_reaperFlattenInFlight.TryAdd(flattenKey, 0))
             {
@@ -624,6 +636,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool EnqueueReaperMasterNakedStop(Position masterPos, int masterActualQty, string masterExpectedKey, DateTime masterFirstSeen)
         {
+            // H17-GUARD: Prevent new enqueues after shutdown initiated
+            if (_isTerminating) return false;
             if ((DateTime.UtcNow - masterFirstSeen).TotalSeconds >= ((NakedPositionGraceSec >= 5) ? NakedPositionGraceSec : 5))
             {
                 // H16-FIX: Atomic TryAdd check prevents duplicate master naked stop submissions.

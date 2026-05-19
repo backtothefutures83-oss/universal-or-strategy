@@ -119,22 +119,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 });
             }
 
-            // [BUILD 984] GTC Cancel Sweep -- cancel all tracked/broker V12 orders before teardown.
-            // Must run while dicts are still populated and accounts still subscribed.
-            // force=false: soft terminate, protects brackets for open positions.
-            // B984-F08: Log entry count before sweep for post-mortem tracing.
+            // H17-FIX: Stop intake BEFORE draining queues to prevent new commands from entering.
+            // This ensures DrainQueuesForShutdown processes a bounded set of commands.
+            StopIpcServer();
+            StopReaperAudit();
+
+            // H17-FIX: Drain queues BEFORE cancel sweep so any queued order submissions are executed
+            // and then included in the subsequent cancel sweep. This prevents ghost orders that would
+            // bypass the cancel sweep if submitted after it runs.
+            DrainQueuesForShutdown();
+
+            // [BUILD 984] GTC Cancel Sweep -- cancel all tracked/broker V12 orders after drain.
+            // Now sweeps ALL orders including any submitted during drain.
             Print(string.Format("[SHUTDOWN] GTC sweep: cancelling {0} tracked + broker-scanned orders",
                 (entryOrders?.Count ?? 0) + (stopOrders?.Count ?? 0)));
             CancelAllV12GtcOrders(false);
 
-            DrainQueuesForShutdown();
             EmitMetricsSummary();
-
-            // Stop IPC Server
-            StopIpcServer();
-
-            // V12 SIMA: Stop Reaper audit thread
-            StopReaperAudit();
 
             // V12.7: Always unsubscribe from account updates (subscribed for fleet bracket management)
             // V12.1101E [A-4]: Use shared UnsubscribeFromFleetAccounts() -- unconditional (no EnableSIMA guard)
