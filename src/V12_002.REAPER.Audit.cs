@@ -333,32 +333,37 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool EnqueueReaperRepairCandidate(Account acct, bool shouldLog, int expectedQty, List<FollowerBracketFSM> accountFsms, out string repairKey)
         {
             repairKey = acct.Name + "_" + Instrument.FullName;
-            bool alreadyInFlight;
-            alreadyInFlight = _repairInFlight.ContainsKey(repairKey); // [Build 968]
-
-            if (!alreadyInFlight)
+            // H16-FIX: Atomic TryAdd check prevents TOCTOU race where two audit cycles both pass
+            // ContainsKey check before either calls TryAdd, causing duplicate repair submissions.
+            if (!_repairInFlight.TryAdd(repairKey, 0))
             {
-                // Phase 4: Use FSM to identify working entry
-                bool hasWorkingEntry = accountFsms.Any(f => f.State == FollowerBracketState.Submitted || f.State == FollowerBracketState.Accepted);
-
-                if (!hasWorkingEntry)
+                // Already in flight - skip
+                if (shouldLog)
                 {
-                    if (shouldLog)
-                    {
-                        Print($"[REAPER] * REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
-                    }
-                    // A3-2: Mark in-flight BEFORE TriggerCustomEvent to block double-enqueue in next audit cycle (Build 960 audit fix)
-                    _repairInFlight.TryAdd(repairKey, 0); // [Build 968]
-                    _reaperRepairQueue.Enqueue(acct.Name);
-                    return true;
+                    Print($"[REAPER] {acct.Name} repair already in-flight -- skipping.");
                 }
+                return false;
             }
-            else if (shouldLog)
+    
+            // Phase 4: Use FSM to identify working entry (EXISTING LOGIC - not new)
+            bool hasWorkingEntry = accountFsms.Any(f => f.State == FollowerBracketState.Submitted || f.State == FollowerBracketState.Accepted);
+    
+            if (!hasWorkingEntry)
             {
-                Print($"[REAPER] {acct.Name} repair already in-flight -- skipping.");
+                if (shouldLog)
+                {
+                    Print($"[REAPER] * REPAIR CANDIDATE: {acct.Name} is Flat, expected={expectedQty}. Enqueuing repair.");
+                }
+                _reaperRepairQueue.Enqueue(acct.Name);
+                return true;
             }
-
-            return false;
+            else
+            {
+                // Has working entry - clear in-flight flag since we're not enqueuing.
+                // CRITICAL: Without this TryRemove, the account would be permanently blocked.
+                _repairInFlight.TryRemove(repairKey, out _);
+                return false;
+            }
         }
 
         private bool EnqueueReaperFlattenCandidate(Account acct)
@@ -416,16 +421,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else if ((DateTime.UtcNow - firstSeen).TotalSeconds >= graceSeconds)
                 {
-                    bool alreadyNakedInFlight;
-                    alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(expectedKey); // [Build 968]
-                    if (!alreadyNakedInFlight)
+                    // H16-FIX: Atomic TryAdd check prevents duplicate naked stop submissions.
+                    if (!_reaperNakedStopInFlight.TryAdd(expectedKey, 0))
                     {
-                        _reaperNakedStopInFlight.TryAdd(expectedKey, 0); // [Build 968]
-                        Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
-                            acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
-                        _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
-                        return true;
+                        // Already in flight - skip
+                        return false;
                     }
+                    Print(string.Format("[REAPER][NAKED_POSITION] {0}: {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                        acct.Name, actualQty, (DateTime.UtcNow - firstSeen).TotalSeconds));
+                    _reaperNakedStopQueue.Enqueue((acct.Name, pos.MarketPosition, Math.Abs(actualQty)));
+                    return true;
                 }
             }
 
@@ -621,16 +626,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if ((DateTime.UtcNow - masterFirstSeen).TotalSeconds >= ((NakedPositionGraceSec >= 5) ? NakedPositionGraceSec : 5))
             {
-                bool alreadyNakedInFlight;
-                alreadyNakedInFlight = _reaperNakedStopInFlight.ContainsKey(masterExpectedKey);
-                if (!alreadyNakedInFlight)
+                // H16-FIX: Atomic TryAdd check prevents duplicate master naked stop submissions.
+                if (!_reaperNakedStopInFlight.TryAdd(masterExpectedKey, 0))
                 {
-                    _reaperNakedStopInFlight.TryAdd(masterExpectedKey, 0);
-                    Print(string.Format("[REAPER][NAKED_POSITION] {0} (Master): {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
-                        Account.Name, masterActualQty, (DateTime.UtcNow - masterFirstSeen).TotalSeconds));
-                    _reaperNakedStopQueue.Enqueue((Account.Name, masterPos.MarketPosition, Math.Abs(masterActualQty)));
-                    return true;
+                    // Already in flight - skip
+                    return false;
                 }
+                Print(string.Format("[REAPER][NAKED_POSITION] {0} (Master): {1}ct CONFIRMED naked after {2:F1}s grace. Queuing emergency hard stop.",
+                    Account.Name, masterActualQty, (DateTime.UtcNow - masterFirstSeen).TotalSeconds));
+                _reaperNakedStopQueue.Enqueue((Account.Name, masterPos.MarketPosition, Math.Abs(masterActualQty)));
+                return true;
             }
 
             return false;
