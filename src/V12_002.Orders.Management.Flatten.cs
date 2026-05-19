@@ -357,9 +357,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (pos.EntryFilled) continue;
 
                 // Cancel pending entry order
-                if (entryOrders.ContainsKey(entryName))
+                // TICKET-05 (H07): TryGetValue eliminates TOCTOU race between ContainsKey and indexer access
+                if (entryOrders.TryGetValue(entryName, out Order entryOrder))
                 {
-                    Order entryOrder = entryOrders[entryName];
                     if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
                     {
                         CancelOrderSafe(entryOrder, pos);

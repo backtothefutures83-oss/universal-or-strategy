@@ -16,3 +16,4 @@ STRICT RULE: Verify that any order replacement uses the two-phase Replace FSM pa
 
 [github_action_config]
 auto_review = true
+enable_telemetry = true

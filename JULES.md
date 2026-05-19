@@ -1,4 +1,4 @@
-﻿# NinjaScript V12 Project Standards (Jules CLI Mirror)
+# NinjaScript V12 Project Standards (Jules CLI Mirror)
 
 # Jules CLI = BACKUP ENGINEER #2 (identical twin to Gemini CLI)
 
@@ -35,6 +35,7 @@ Jules CLI is workflow-aware and MUST follow these patterns from `.agent/workflow
 | `/coordinator`       | `.agent/workflows/coordinator.md`       | Antigravity routes to FORENSICS / ARCHITECT / ENGINEER    |
 | `/agent-as-tool`     | `.agent/workflows/agent_as_tool.md`     | Stateless single-use diagnostic or surgical edit          |
 | `/multi-agent-audit` | `.agent/workflows/multi_agent_audit.md` | Red-team multi-agent cross-audit                          |
+| `/bug-bounty`        | `.agent/workflows/bug-bounty.md`        | Parallel 7-agent focused bug hunt, consolidation, and `/epic-tdd` prep |
 
 **Source of truth**: `.agent/workflows/` is the canonical workflow directory. Jules MUST NOT
 deviate from workflow steps without Director authorization.

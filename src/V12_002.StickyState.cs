@@ -37,13 +37,52 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Coalescing gate: only one pending write at a time
             if (Interlocked.CompareExchange(ref _stickyWritePending, 1, 0) == 0)
             {
+                // H18-FIX: Capture snapshot of ALL mutable state on strategy thread BEFORE spawning background task.
+                // This prevents race conditions where background serialization reads state that's being mutated
+                // by IPC commands on the strategy thread. Must snapshot EVERYTHING read by SerializeStickyState().
+                
+                // Snapshot dictionaries and collections
+                var modeProfilesSnapshot = new Dictionary<string, ModeConfigProfile>(_modeProfiles);
+                var activeFleetSnapshot = activeFleetAccounts != null
+                    ? new Dictionary<string, bool>(activeFleetAccounts)
+                    : null;
+                var activePositionsSnapshot = activePositions != null
+                    ? activePositions.ToArray()
+                    : null;
+                
+                // H18-FIX: Snapshot header config properties (CRITICAL - eliminates torn reads)
+                var headerConfigSnapshot = new {
+                    IsRMAModeActive = isRMAModeActive,
+                    IsTRENDModeActive = isTRENDModeActive,
+                    IsRetestModeActive = isRetestModeActive,
+                    IsMOMOModeActive = isMOMOModeActive,
+                    IsFFMAModeArmed = isFFMAModeArmed,
+                    ActiveTargetCount = activeTargetCount,
+                    Target1Value = Target1Value,
+                    T1Type = T1Type,
+                    Target2Value = Target2Value,
+                    T2Type = T2Type,
+                    Target3Value = Target3Value,
+                    T3Type = T3Type,
+                    Target4Value = Target4Value,
+                    T4Type = T4Type,
+                    Target5Value = Target5Value,
+                    T5Type = T5Type,
+                    StopMultiplier = StopMultiplier,
+                    RMAStopATRMultiplier = RMAStopATRMultiplier,
+                    MaxRiskAmount = MaxRiskAmount,
+                    ChaseIfTouchPoints = ChaseIfTouchPoints,
+                    IsTrendRmaMode = isTrendRmaMode,
+                    IsRetestRmaMode = isRetestRmaMode
+                };
+
                 Task.Run(async () =>
                 {
                     try
                     {
                         await Task.Delay(STICKY_DEBOUNCE_MS);
                         _stickyStateDirty = false;
-                        string payload = SerializeStickyState();
+                        string payload = SerializeStickyState(headerConfigSnapshot, modeProfilesSnapshot, activeFleetSnapshot, activePositionsSnapshot);
                         AtomicWriteFile(_stickyStatePath, payload);
                     }
                     catch (Exception ex)
@@ -63,19 +102,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Serializes ALL UI-sourced state into the .v12state INI format.
-        /// Reads volatile fields -- safe because all are atomic-width or volatile.
+        /// H18-FIX: Now accepts snapshots to eliminate race conditions with background serialization.
         /// </summary>
-        private string SerializeStickyState()
+        private string SerializeStickyState(
+            dynamic headerConfigSnapshot,
+            Dictionary<string, ModeConfigProfile> modeProfilesSnapshot,
+            Dictionary<string, bool> activeFleetSnapshot,
+            KeyValuePair<string, PositionInfo>[] activePositionsSnapshot)
         {
             var sb = new StringBuilder(1024);
-            SerializeSticky_WriteHeaderConfig(sb);
-            SerializeSticky_WriteFleetAnchor(sb);
-            SerializeSticky_WriteModeProfiles(sb);
-            SerializeSticky_WritePositions(sb);
+            SerializeSticky_WriteHeaderConfig(sb, headerConfigSnapshot);
+            SerializeSticky_WriteFleetAnchor(sb, activeFleetSnapshot);
+            SerializeSticky_WriteModeProfiles(sb, modeProfilesSnapshot, headerConfigSnapshot);
+            SerializeSticky_WritePositions(sb, activePositionsSnapshot);
             return sb.ToString();
         }
 
-        private void SerializeSticky_WriteHeaderConfig(StringBuilder sb)
+        private void SerializeSticky_WriteHeaderConfig(StringBuilder sb, dynamic headerConfigSnapshot)
         {
             // Header
             sb.AppendLine("# V12 StickyState v1");
@@ -84,43 +127,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine("# Build: " + BUILD_TAG);
             sb.AppendLine();
 
-            // [CONFIG]
+            // [CONFIG] - H18-FIX: Read from snapshot instead of live properties
             sb.AppendLine("[CONFIG]");
             string mode = "OR";
-            if (isRMAModeActive) mode = "RMA";
-            else if (isTRENDModeActive) mode = "TREND";
-            else if (isRetestModeActive) mode = "RETEST";
-            else if (isMOMOModeActive) mode = "MOMO";
-            else if (isFFMAModeArmed) mode = "FFMA";
+            if (headerConfigSnapshot.IsRMAModeActive) mode = "RMA";
+            else if (headerConfigSnapshot.IsTRENDModeActive) mode = "TREND";
+            else if (headerConfigSnapshot.IsRetestModeActive) mode = "RETEST";
+            else if (headerConfigSnapshot.IsMOMOModeActive) mode = "MOMO";
+            else if (headerConfigSnapshot.IsFFMAModeArmed) mode = "FFMA";
             sb.AppendLine("MODE=" + mode);
-            sb.AppendLine("COUNT=" + activeTargetCount.ToString());
-            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T1={0}", Target1Value));
-            sb.AppendLine("T1TYPE=" + T1Type.ToString());
-            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T2={0}", Target2Value));
-            sb.AppendLine("T2TYPE=" + T2Type.ToString());
-            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T3={0}", Target3Value));
-            sb.AppendLine("T3TYPE=" + T3Type.ToString());
-            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T4={0}", Target4Value));
-            sb.AppendLine("T4TYPE=" + T4Type.ToString());
-            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T5={0}", Target5Value));
-            sb.AppendLine("T5TYPE=" + T5Type.ToString());
+            sb.AppendLine("COUNT=" + headerConfigSnapshot.ActiveTargetCount.ToString());
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T1={0}", headerConfigSnapshot.Target1Value));
+            sb.AppendLine("T1TYPE=" + headerConfigSnapshot.T1Type.ToString());
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T2={0}", headerConfigSnapshot.Target2Value));
+            sb.AppendLine("T2TYPE=" + headerConfigSnapshot.T2Type.ToString());
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T3={0}", headerConfigSnapshot.Target3Value));
+            sb.AppendLine("T3TYPE=" + headerConfigSnapshot.T3Type.ToString());
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T4={0}", headerConfigSnapshot.Target4Value));
+            sb.AppendLine("T4TYPE=" + headerConfigSnapshot.T4Type.ToString());
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "T5={0}", headerConfigSnapshot.Target5Value));
+            sb.AppendLine("T5TYPE=" + headerConfigSnapshot.T5Type.ToString());
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "STR={0}",
-                isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier));
-            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "MAX={0}", MaxRiskAmount));
-            sb.AppendLine("CIT=" + (ChaseIfTouchPoints ?? "0"));
-            sb.AppendLine("TRMA=" + (isTrendRmaMode ? "1" : "0"));
-            sb.AppendLine("RRMA=" + (isRetestRmaMode ? "1" : "0"));
+                headerConfigSnapshot.IsRMAModeActive ? headerConfigSnapshot.RMAStopATRMultiplier : headerConfigSnapshot.StopMultiplier));
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "MAX={0}", headerConfigSnapshot.MaxRiskAmount));
+            sb.AppendLine("CIT=" + (headerConfigSnapshot.ChaseIfTouchPoints ?? "0"));
+            sb.AppendLine("TRMA=" + (headerConfigSnapshot.IsTrendRmaMode ? "1" : "0"));
+            sb.AppendLine("RRMA=" + (headerConfigSnapshot.IsRetestRmaMode ? "1" : "0"));
             sb.AppendLine();
         }
 
-        private void SerializeSticky_WriteFleetAnchor(StringBuilder sb)
+        private void SerializeSticky_WriteFleetAnchor(StringBuilder sb, Dictionary<string, bool> activeFleetSnapshot)
         {
-            // [FLEET]
+            // [FLEET] - H18-FIX: Use snapshot instead of live dictionary
             sb.AppendLine("[FLEET]");
             sb.AppendLine("LEADER=" + (_stickyLeaderAccount ?? ""));
-            if (activeFleetAccounts != null)
+            if (activeFleetSnapshot != null)
             {
-                foreach (var kvp in activeFleetAccounts.ToArray())
+                foreach (var kvp in activeFleetSnapshot)
                     sb.AppendLine(kvp.Key + "=" + (kvp.Value ? "1" : "0"));
             }
             sb.AppendLine();
@@ -132,18 +175,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine();
         }
 
-        private void SerializeSticky_WriteModeProfiles(StringBuilder sb)
+        private void SerializeSticky_WriteModeProfiles(StringBuilder sb, Dictionary<string, ModeConfigProfile> modeProfilesSnapshot, dynamic headerConfigSnapshot)
         {
             // Build 1106: [CONFIG_*] -- per-mode profile snapshots
+            // H18-FIX: Use snapshot instead of mutating live _modeProfiles dictionary
             string activeMode = "OR";
-            if (isRMAModeActive) activeMode = "RMA";
-            else if (isTRENDModeActive) activeMode = "TREND";
-            else if (isRetestModeActive) activeMode = "RETEST";
-            else if (isMOMOModeActive) activeMode = "MOMO";
-            else if (isFFMAModeArmed) activeMode = "FFMA";
-            _modeProfiles[activeMode] = SnapshotCurrentConfig();
+            if (headerConfigSnapshot.IsRMAModeActive) activeMode = "RMA";
+            else if (headerConfigSnapshot.IsTRENDModeActive) activeMode = "TREND";
+            else if (headerConfigSnapshot.IsRetestModeActive) activeMode = "RETEST";
+            else if (headerConfigSnapshot.IsMOMOModeActive) activeMode = "MOMO";
+            else if (headerConfigSnapshot.IsFFMAModeArmed) activeMode = "FFMA";
+            
+            // Capture current config into snapshot (not live dictionary)
+            modeProfilesSnapshot[activeMode] = new ModeConfigProfile
+            {
+                TargetCount = headerConfigSnapshot.ActiveTargetCount,
+                T1 = headerConfigSnapshot.Target1Value,
+                T2 = headerConfigSnapshot.Target2Value,
+                T3 = headerConfigSnapshot.Target3Value,
+                T4 = headerConfigSnapshot.Target4Value,
+                T5 = headerConfigSnapshot.Target5Value,
+                T1Type = headerConfigSnapshot.T1Type,
+                T2Type = headerConfigSnapshot.T2Type,
+                T3Type = headerConfigSnapshot.T3Type,
+                T4Type = headerConfigSnapshot.T4Type,
+                T5Type = headerConfigSnapshot.T5Type,
+                StopMult = headerConfigSnapshot.IsRMAModeActive ? headerConfigSnapshot.RMAStopATRMultiplier : headerConfigSnapshot.StopMultiplier,
+                MaxRisk = headerConfigSnapshot.MaxRiskAmount
+            };
 
-            foreach (var kvp in _modeProfiles.ToArray())
+            foreach (var kvp in modeProfilesSnapshot)
             {
                 ModeConfigProfile p = kvp.Value;
                 if (p == null) continue;
@@ -165,14 +226,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void SerializeSticky_WritePositions(StringBuilder sb)
+        private void SerializeSticky_WritePositions(StringBuilder sb, KeyValuePair<string, PositionInfo>[] activePositionsSnapshot)
         {
             // [POSITIONS] -- trailing stop state for active positions
+            // H18-FIX: Use snapshot instead of live dictionary
             sb.AppendLine("[POSITIONS]");
             sb.AppendLine("# key|extremePrice|trailLevel|beArmed|beTriggered|initialTargetCount");
-            if (activePositions != null)
+            if (activePositionsSnapshot != null)
             {
-                foreach (var kvp in activePositions.ToArray())
+                foreach (var kvp in activePositionsSnapshot)
                 {
                     var pi = kvp.Value;
                     if (pi == null || pi.PendingCleanup) continue;
