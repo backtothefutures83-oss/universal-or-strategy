@@ -104,10 +104,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void SyncPendingOrders()
         {
-            if (currentATR <= 0) return;
+            if (currentATR <= 0)
+            {
+                return;
+            }
 
             // V12.45 RETRY COOLDOWN: If a ChangeOrder failed recently, back off for 500ms
-            if ((DateTime.Now - _lastSyncFailureTime).TotalMilliseconds < 500) return;
+            if ((DateTime.Now - _lastSyncFailureTime).TotalMilliseconds < 500)
+            {
+                return;
+            }
 
             foreach (var kvp in activePositions.ToArray())
             {
@@ -115,13 +121,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string entryName = kvp.Key;
 
                 Order entryOrder;
-                if (!entryOrders.TryGetValue(entryName, out entryOrder)) continue;
-
-                if (!ShouldSyncPendingOrder(pos, entryOrder, entryName)) continue;
-
-                if (!CalculateSyncParameters(pos, entryOrder, entryName, out int newQty, out double newStopDist,
-                    out bool needsQtyChange, out int expectedDelta, out string acctName, out string syncLog))
+                if (!entryOrders.TryGetValue(entryName, out entryOrder))
+                {
                     continue;
+                }
+
+                if (!ShouldSyncPendingOrder(pos, entryOrder, entryName))
+                {
+                    continue;
+                }
+
+                if (!CalculateSyncParameters(
+                    pos,
+                    entryOrder,
+                    entryName,
+                    out int newQty,
+                    out double newStopDist,
+                    out bool needsQtyChange,
+                    out int expectedDelta,
+                    out string acctName,
+                    out string syncLog))
+                {
+                    continue;
+                }
 
                 ExecuteOrderSync(entryOrder, newQty, needsQtyChange, expectedDelta, acctName, syncLog, entryName);
             }
@@ -134,16 +156,28 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool ShouldSyncPendingOrder(PositionInfo pos, Order entryOrder, string entryName)
         {
             // Only sync UNFILLED entries
-            if (pos.EntryFilled) return false;
+            if (pos.EntryFilled)
+            {
+                return false;
+            }
 
             // Skip modes that don't use ATR-based stops
-            if (pos.IsFFMATrade || pos.IsMOMOTrade) return false;
+            if (pos.IsFFMATrade || pos.IsMOMOTrade)
+            {
+                return false;
+            }
 
             // V1102Q [SOVEREIGN-DRIFT]: Followers skip active ATR-sync.
             // They purely follow the master-dispatched quantity.
-            if (pos.IsFollower) return false;
+            if (pos.IsFollower)
+            {
+                return false;
+            }
 
-            if (entryOrder == null) return false;
+            if (entryOrder == null)
+            {
+                return false;
+            }
 
             // V12.45 ORDER STATE GUARD: Only modify orders in stable states
             // Accepted = broker acknowledged, waiting for fill
@@ -164,9 +198,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.45: Calculation logic for SyncPendingOrders -- computes new qty/stop and determines if sync needed.
         /// Returns false if no material change detected (flicker protection).
         /// </summary>
-        private bool CalculateSyncParameters(PositionInfo pos, Order entryOrder, string entryName,
-            out int newQty, out double newStopDist, out bool needsQtyChange,
-            out int expectedDelta, out string acctName, out string syncLog)
+        private bool CalculateSyncParameters(
+            PositionInfo pos,
+            Order entryOrder,
+            string entryName,
+            out int newQty,
+            out double newStopDist,
+            out bool needsQtyChange,
+            out int expectedDelta,
+            out string acctName,
+            out string syncLog)
         {
             // [RACE-05]: Compute sizing math + flicker check + stop-price update atomically.
             // Prevents volatility drift where currentATR changes between math and state mutation.
@@ -218,8 +259,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12.45: Execution logic for SyncPendingOrders -- performs ChangeOrder broker call with error handling.
         /// </summary>
-        private void ExecuteOrderSync(Order entryOrder, int newQty, bool needsQtyChange,
-            int expectedDelta, string acctName, string syncLog, string entryName)
+        private void ExecuteOrderSync(
+            Order entryOrder,
+            int newQty,
+            bool needsQtyChange,
+            int expectedDelta,
+            string acctName,
+            string syncLog,
+            string entryName)
         {
             // ChangeOrder must be called outside stateLock -- broker API call.
             try
@@ -250,15 +297,26 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private double GetATRMultiplierForPosition(PositionInfo pos)
         {
-            if (pos.IsRMATrade) return RMAStopATRMultiplier;
+            if (pos.IsRMATrade)
+            {
+                return RMAStopATRMultiplier;
+            }
+
             if (pos.IsTRENDTrade)
             {
                 if (pos.IsTRENDEntry1)
+                {
                     return isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
+                }
+
                 return isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
             }
+
             if (pos.IsRetestTrade)
+            {
                 return isRetestRmaMode ? RMAStopATRMultiplier : RetestATRMultiplier; // V12.Hardening: was isTrendRmaMode (typo)
+            }
+
             return StopMultiplier; // ORB default
         }
 

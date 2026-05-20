@@ -411,13 +411,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (svT5Type != null) SetComboSelection(svT5Type, GetPanelTargetModeText(config.Target5Type));
 
             if (strVal != null)
+            {
                 strVal.Text = FormatPanelDouble(config.StopValue);
+            }
+
             if (maxVal != null)
+            {
                 maxVal.Text = FormatPanelDouble(config.MaxRiskValue);
+            }
+
             if (citVal != null)
+            {
                 citVal.Text = string.IsNullOrEmpty(config.ChaseIfTouchPoints) ? "0" : config.ChaseIfTouchPoints;
+            }
+
             if (svStrType != null)
+            {
                 SetComboSelection(svStrType, string.Equals(snapshot.Mode, "ORB", StringComparison.OrdinalIgnoreCase) ? "OR" : "ATR");
+            }
 
             int count = Math.Max(1, Math.Min(5, snapshot.TargetCount));
             _panelLastSyncedTargetCount = count;

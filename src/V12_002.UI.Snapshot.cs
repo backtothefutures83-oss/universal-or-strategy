@@ -38,7 +38,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 if (indicator == null)
+                {
                     return 0;
+                }
                 return indicator[0];
             }
             catch
@@ -65,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ? RMAStopATRMultiplier
                     : StopMultiplier,
                 MaxRiskValue = MaxRiskAmount,
-                ChaseIfTouchPoints = string.IsNullOrEmpty(ChaseIfTouchPoints) ? "0" : ChaseIfTouchPoints
+                ChaseIfTouchPoints = string.IsNullOrEmpty(ChaseIfTouchPoints) ? "0" : ChaseIfTouchPoints,
             };
         }
 
@@ -81,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 UniqueDays = GetUniqueTradingDays(accountName),
                 MaxDrawdown = accountMaxDrawdown.TryGetValue(accountName, out double maxDd) ? maxDd : 0,
                 PayoutMinProfit = PayoutMinProfit,
-                TrailingDrawdownLimit = TrailingDrawdownLimit
+                TrailingDrawdownLimit = TrailingDrawdownLimit,
             };
         }
 
@@ -92,7 +94,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             PositionInfo masterPos;
             string entryName;
             if (!FindMasterPosition(out masterPos, out entryName))
+            {
                 return live;
+            }
 
             live.HasLivePosition = true;
             live.EntryName = entryName;
@@ -110,15 +114,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             entryName = null;
 
             if (activePositions == null || activePositions.Count == 0)
+            {
                 return false;
+            }
 
             foreach (var kvp in activePositions.ToArray())
             {
                 PositionInfo candidate = kvp.Value;
                 if (candidate == null || candidate.IsFollower || candidate.PendingCleanup)
+                {
                     continue;
+                }
+
                 if (!candidate.EntryFilled || candidate.RemainingContracts <= 0)
+                {
                     continue;
+                }
 
                 masterPos = candidate;
                 entryName = kvp.Key;
@@ -136,16 +147,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool isVisible = targetNum <= masterPos.InitialTargetCount && !IsTargetFilled(masterPos, targetNum);
                 target.IsVisible = isVisible;
                 if (!isVisible)
+                {
                     continue;
+                }
 
                 var targetDict = GetTargetOrdersDictionary(targetNum);
                 Order targetOrder = null;
                 if (targetDict != null)
+                {
                     targetDict.TryGetValue(entryName, out targetOrder);
+                }
 
                 double price = GetTargetPrice(masterPos, targetNum);
                 if (targetOrder != null && targetOrder.LimitPrice > 0)
+                {
                     price = targetOrder.LimitPrice;
+                }
 
                 int contracts = GetTargetContracts(masterPos, targetNum);
                 int filled = GetTargetFilledQuantity(masterPos, targetNum);
@@ -160,17 +177,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             Order stopOrder = null;
             if (stopOrders != null)
+            {
                 stopOrders.TryGetValue(entryName, out stopOrder);
+            }
 
             live.StopPrice = masterPos.CurrentStopPrice;
             if (stopOrder != null && stopOrder.StopPrice > 0)
+            {
                 live.StopPrice = stopOrder.StopPrice;
+            }
         }
 
         private string BuildUiStatusMessage(UIStateSnapshot snapshot)
         {
             if (_isTerminating)
+            {
                 return "Terminating";
+            }
 
             if (snapshot != null && snapshot.LivePosition != null && snapshot.LivePosition.HasLivePosition)
             {
@@ -215,7 +238,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Ema200Value = SafeEmaValue(ema200),
                 Config = BuildUiConfigSnapshot(mode),
                 Compliance = BuildUiComplianceSnapshot(),
-                LivePosition = BuildUiLivePositionSnapshot()
+                LivePosition = BuildUiLivePositionSnapshot(),
             };
 
             snapshot.MasterMarketPosition = snapshot.LivePosition != null && snapshot.LivePosition.HasLivePosition
