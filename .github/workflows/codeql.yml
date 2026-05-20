@@ -3,9 +3,14 @@ name: CodeQL
 on:
   push:
     branches: ["main", "dev"]
+    paths:
+      - 'src/**/*.cs'
+      - 'tests/**/*.cs'
   pull_request:
     # CodeQL runs on ALL PRs regardless of target branch for maximum coverage.
-    # Previously limited to main -- expanded to catch vulnerabilities in feature branches before merge.
+    paths:
+      - 'src/**/*.cs'
+      - 'tests/**/*.cs'
   schedule:
     - cron: "0 6 * * 1"
 

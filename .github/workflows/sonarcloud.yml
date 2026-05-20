@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'src/**/*.cs'
+      - 'tests/**/*.cs'
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**/*.cs'
+      - 'tests/**/*.cs'
 
 jobs:
   sonarcloud:

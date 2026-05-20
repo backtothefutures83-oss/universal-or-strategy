@@ -3,6 +3,9 @@ name: Jules PR Review (Sovereign Auditor)
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**/*.cs'
+      - 'tests/**/*.cs'
   issue_comment:
     types: [created]
 
