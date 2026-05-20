@@ -1,0 +1,3232 @@
+Welcome to Signals and Threads, in-depth
+conversations about every layer of the
+tech stack from Jane Street. I'm Ron
+Minsky. All right, it is my pleasure to
+introduce Will Wilson, who's the
+co-founder and CEO of Antithesis,
+someone who started out studying math
+and then somehow found himself working
+on distributed databases and now running
+a startup that is trying to change how
+we all do testing, hopefully for the
+better. Uh, Gene is actually both a
+customer of antithesis and an investor,
+something I want to talk about a little
+bit further in, but thanks for joining
+me.
+&gt;&gt; Yeah, hopefully for the better, but I
+think it would be hard to make it a
+whole lot worse.
+&gt;&gt; Fair.
+&gt;&gt; So, let's just talk a little bit about
+kind of how you got here. You started
+off studying mathematics. You've done a
+bunch of other things. You're now doing
+a lot of what what seems to me is really
+hardcore systems work.
+&gt;&gt; Um,
+&gt;&gt; tell us a little more about that
+journey.
+&gt;&gt; Sure. So when I got to college, um it
+was, you know, it was the time when
+everybody was super super excited about
+computer science. Like Facebook was new,
+Google was new, everybody was going off
+and joining those companies and, you
+know, making a lot of money and and
+doing really cool stuff. And you know, I
+basically made a a very large mistake,
+which was I got to college and I was
+like, "Wow, that computer science stuff
+seems really cool. Too bad it's over,
+right? Too bad. Too too bad. Too bad all
+the interesting problems have been
+solved already. Like look, somebody's
+already made Google. like what else
+could there be to do? Um, so I basically
+ran kind of in the opposite direction. I
+knew a little bit about how to program.
+I taught myself when I was a kid, but I,
+you know, I basically avoided studying
+computer science at all and ran into
+like the most abstr forms of
+mathematics, which just seemed, you
+know, more intellectually interesting
+and also like nobody was going to run
+out of math anytime soon.
+&gt;&gt; That's true. Although this whole thing
+of like maybe AIS will run us out of
+math, but that's like a
+&gt;&gt; Yeah. Yeah. Well, if I were
+&gt;&gt; if I were making that decision again
+today, I might have I might have picked
+something different that AI is not so
+good at.
+&gt;&gt; So, when you say like obstuse
+mathematics, like what kind of stuff
+were you interested in?
+&gt;&gt; Um, I was, you know, I did a bunch of
+different things. I liked a lot
+something called representation theory,
+which is something very useful in
+mathematical physics. It's basically the
+study of like homorphisms from general
+abstract groups into vector spaces,
+either finite or infinite dimensional.
+Um, it's pretty neat. That was actually
+a little bit too useful. that was a
+little bit too applied. So I also, you
+know, I also got into some like
+mathematical
+&gt;&gt; there like actual matrices there,
+&gt;&gt; right? Well, there's actual matrices and
+you can actually use this to like, you
+know, do particle physics, which, you
+know, I don't know. So I I I also did a
+little bit of set theory. I got into
+something called large cardinal theory,
+which is so abstract it almost sounds
+like a parody, right? It's basically
+what you know what new forms of
+mathematics can we develop if we add
+assumptions that certain very large
+infinite numbers exist and the Wikipedia
+pages on this stuff are a total hoot if
+you want to look at it.
+&gt;&gt; I have I have sadly looked more than a
+little bit at large cardinal theory and
+it is fun and wild and indeed not the
+most practical of all.
+&gt;&gt; This is the only podcast I can imagine
+where the host might say that as a
+response.
+&gt;&gt; All right. So, you had like a promising
+start of a career in mathematics. Why
+did that not go anywhere? Oh, well, you
+know, I basically I got to my senior
+year and I did actually apply to grad
+school and I actually got into grad
+school a few different places and I was
+all set to go off and do my PhD in math
+and then I just looked around and I
+looked at my fellow classmates who were
+going to grad school and I looked at my
+professors and I looked at myself and I
+had a very important moment of
+self-realization which was that I am
+never going to be a world-class
+mathematician because basically I mean
+basically for the same reason that I'm
+never going to dunk, right? I'm never
+going to be a world-class basketball
+player. There's a certain measure of
+natural talent and random variation that
+is just required. And like, yes, you can
+definitely get better at basketball or
+better at math by working very very
+hard, but these are both professions
+with this like incredibly skewed return
+distribution where if you're not in the
+top 0.00001%
+of people, you're just never actually
+going to have a great time. And so, you
+know, I I realized I realized that I
+could spend six years in grad school or
+longer and, you know, eventually get
+some job, you know, teaching somewhere
+as an adjunct or something and, you
+know, or I could not do that and I could
+sort of bail out of this process sooner
+and I just I I realized that was what I
+had to do.
+&gt;&gt; Got it. And then you transitioned into
+what what did you do from there? Well,
+you know, I basically I actually
+initially was off doing a little bit of
+biomedical research. I had uh I had
+interned when I was in college and and
+actually before college at a small
+biotech startup and I'd done a bit of
+that and I'd sort of and then I after
+that I bopped around in a few different
+sort of deadendish jobs and it was at
+one of those that I had this crucial
+realization and the crucial realization
+was that actually my ability to write a
+janky Python script was unbelievably
+economically valuable. Right? Like I was
+sitting at my job and you know my boss
+had assigned me some like enormous pile
+of drudgery and you know I I looked at
+it and I so I wrote a Python script and
+it took me 45 minutes and it automated
+the enormous pile of drudgery and I was
+like okay here I'm done and he looked at
+me with this like expression of dread
+and was like that was supposed to be
+your work for the next 3 months like and
+that was that made me maybe something in
+my head I was like ah interesting maybe
+I should get better at this programming
+thing that seems you know that seems
+like it could be good. So, you know, I
+went and I I I taught myself how to code
+for real and I, you know, did some
+online classes and then I eventually got
+my way into a number of tech startups.
+&gt;&gt; So, how do you actually learn how to
+program? My overall sense of the world
+is that the world is actually very bad
+at teaching people how to program.
+Universities, I feel like, are
+especially bad at it. Uh, they do this
+weird form of performance art where you
+like professors hand out assignments and
+then students fill in and resolve it and
+then it's given back and looked at once
+and then it vanishes like a puff of
+smoke. It's like the eancence is part of
+the art of it all. Um, and real software
+is nothing like that, right? It's a
+thing where you the the kind of
+permanent evolving state of the software
+is like part of what's important about
+it. Part of what you need to like
+optimize for when you're writing
+software are these not like just the
+functional properties of what the
+software does, but the non-functional
+properties around how extensible is it
+and how easy will it be for be for
+people in the future to understand and
+what kind of performance problems are
+you creating in the future and all these
+things that like don't show up in the
+kind of very smallcale fake environments
+where you learn how to code and and you
+need to do very different things to
+learn to be good at it and and what do
+you do?
+&gt;&gt; Yeah. No, that is super super true. And
+so I will I will I I did actually try to
+solve that problem a little bit, but I
+will also qualify my answer by saying
+that my main goal was to get hired at a
+software company, not to become a great
+engineer yet. I think I knew somewhere
+in the back of my head that becoming a
+great engineer would require working
+with other great engineers and you know
+being mentored by them as indeed it did.
+Um but basically what I did was was I I followed two tracks and I was on  
+paternity leave at the time which made
+it easier because I could sort of do
+this nights and weekends and like you
+know basically I I studied a lot of
+academic knowledge right all the stuff
+that I had missed in college. I went and
+learned about complexity theory and I
+learned about the theory of algorithms
+and I learned what a data structure is
+and like all the stuff that everybody
+else learns their sophomore year. Um, so
+I sort of, you know, I jammed all that
+into my head, you know, using a bunch of
+YouTube videos and, you know, online
+resources and and so on, which there's a
+lot of these days. And then I also just
+tried building things and I mostly
+focused on things that were interesting
+to me and things that were hard. And I
+tried to pick a pretty broad set of
+things that would force me to to learn
+different skills. So, you know, I wrote
+my own little ray tracer and it was like
+a classic
+&gt;&gt; pretty crappy ray tracer, but like I did
+learn C++, you know, and I did learn a
+lot about, you know, how to how to do
+object-oriented programming and how to
+do memory management and so on in the
+course of that. Then I wrote a little
+toy compiler, you know, and I, you know,
+I wrote a little computer game and I
+wrote, you know, I wrote like a bunch of
+different I wrote a little graph
+database. Um, you know, I did I did this
+&gt;&gt; precient that was
+&gt;&gt; Yeah, that's right. That's right. Turns
+out turns out that those those well
+those were actually a fad. They never
+really took off.
+&gt;&gt; Sure. Graph databases has not really
+taken off but you know there's a lot of
+database theory.
+&gt;&gt; There's a lot of database theory. That's
+right. Um and that actually is part of
+what got me interested in databases and
+what eventually led me to working at
+Foundation DB which is where I did find
+really great engineers who were able to
+mentor me and and who made me actually
+somewhat competent.
+&gt;&gt; Got it. And then somehow from the work
+at Foundation DB you ended up eventually
+founding antithesis. Mhm.
+&gt;&gt; So tell us about that.
+&gt;&gt; Yeah, so Foundation DB was a magical
+place. Um it was I mean I think in some
+ways a little bit like Jane Street,
+right? Like it's just one of these
+places that you walk into and everybody
+is brilliant and everybody is incredibly
+humble and everybody is incredibly nice
+and good at their jobs and it just hums
+with this extraordinary energy. And one
+of the brilliant things that had
+happened at Foundation DB, it's a thing
+that should happen in more software
+projects, I think. You know, they sat
+down and were like, we're going to build
+a new kind of database. This is a kind
+of database which at the time people
+believed was literally physically
+impossible to build because of a
+misunderstanding of something called the
+CAP theorem. And we we can get into that
+more if you want. Um, but basically they were like, okay, we're  
+going to try and build this new kind of
+database. what do we need to have in
+order to build this database? And they
+realized that in order to build such a
+system, you would be totally foolish to
+do it without a powerful deterministic
+simulation framework that could sort of
+test the database in every possible
+configuration, in every possible mode of
+operation, you know, in all possible
+network conditions and failure
+conditions and so on, you know, with any
+amount of concurrent user activity and
+have that all be replayable
+deterministically. And if you think
+about for a second, it's like, yeah, you
+would be foolish to build a database
+without that. But, you know, they were
+the only people I knew of who had
+actually acted on that insight. And so,
+they built this extraordinary system and
+say like what is a deterministic
+simulation framework,
+&gt;&gt; right?
+&gt;&gt; Right. There's like a few words there,
+deterministic, simulation. I feel like
+understanding how those play out is
+maybe useful.
+&gt;&gt; Right. Right. Right. Sure. So, um,
+basically, let's let's start by talking
+about property based testing in general
+in the abstract. um like you know quick
+check right from Haskell or I think
+Okamel has its own property based
+testing system right
+&gt;&gt; every functional programming language
+has at least three of them
+&gt;&gt; right and then in Python you've got
+hypothesis um so property based testing
+the basic idea of it is I have some
+piece of code rather than sit there and
+write a bunch of unit tests that do like
+particular things that I've thought of
+ahead of time that take particular
+actions I'm going to just tell my
+testing framework what you can do to my
+code like what actions you can take
+right if it's like a little data
+structure it's like maybe I can insert
+an item and I can pop an item and I can
+query for some item or something and
+then you set up a bunch of randomized
+generators which do all these things in
+random orders and then you figure out
+what the invariance of your program are
+right like probably an easy one is it
+shouldn't crash but like maybe a more
+interesting one for a data structure is
+like if I insert five things then
+there's there's five things in it. But
+actually, that's not a great one, right?
+There's a higher order one, which is if
+I insert n things and don't remove
+anything, there's n things there. But
+then we can make that even more abstract
+and be like, if I insert n things and
+then remove m things, so long as n is
+bigger than m, you know, I'll have n
+minus m things in there, right? And so
+you can you can sort of get quite clever
+with these things. And then the magic is
+you now have not a test. You have a
+thing that will produce an infinite
+number of tests like so long as you keep
+running it and it will basically try
+your thing in many many more
+permutations and combinations than you
+would ever have thought of. That's the
+basic idea of property based testing.
+Right.
+&gt;&gt; That's right. And these like classic
+frameworks like quickjack in some sense
+automate the the hardest part of this is
+generating a good probability
+distribution. And you were framing this
+in terms of operations where you have
+like sequences of operations on some
+kind of system and that's already like
+leaning a little more systemsy. I feel
+like the classic functional programming
+version is more like I'm going to test
+my map data structure or whatever. And
+then often like what you're putting in
+is just you know like lists and whatever
+shapes of containers or whatever that
+you want to use for doing
+straightforward things. And often you're
+thinking about it less in terms of
+sequences of operations and just like
+some fairly broad shape of data that you
+might want to put in. and you want nice
+ways of generating good probability
+distributions. The question of what
+counts as a good probability
+distribution is actually quite a
+complicated one.
+&gt;&gt; It is very complicated.
+&gt;&gt; And so in some sense there's like two
+things you need to specify. There's like
+the properties are supposed to be true
+and the probability distributions for
+generating examples. And that's kind of
+the whole bulk,
+&gt;&gt; right? And so then one of the rules of
+all human endeavors is that every good
+idea is like rediscovered 17 different
+times by different people who are in
+slightly different subdomains and so
+they didn't talk to each other and then
+they create their own language and set
+of concepts for it and it's all very
+confusing
+&gt;&gt; and this is also true of property based
+testing which has been reinvented tons
+of times and one of the most common
+other you know one of the most
+well-known other times it was invented
+it was called fuzzing which is a very similar thing conceptually right  
+fuzzing is like more from the security
+world. But if you squint, it's the same
+thing. Like I have a property which is
+my program shouldn't crash, shouldn't
+have memory corruption, shouldn't have
+security vulnerabilities. And then I'm
+going to feed in a distribution and the
+distribution happens to like look like
+stuff to parse maybe that has errors in
+it or has maliciously crafted content.
+And I'm going to have a random generator
+which is my fuzzer which is going to
+like keep sending in stuff until I find
+a failure of the property that I care
+about. And this is like a totally
+separate group of people who like solved
+many very similar problems in some
+different ways and in some similar ways.
+And like the two sides just never talk.
+&gt;&gt; That's right. And like the early
+versions of fuzzing were like very
+simple on the probability distribution
+side. It's just like you know white
+noise basically for throwing into things
+for some of the very early research and
+just like take the Unix utilities and
+throw white noise at them and see what
+happens. Y
+&gt;&gt; uh and the language of properties was
+incredibly impoverished. It was like not
+much better than doesn't crash.
+&gt;&gt; Yep. But the fuzzing people had a clever
+trick which the property based testing
+people did not have. The fuzzing people
+realized that you don't need to make
+this a blackbox process. You can
+actually track things like code coverage
+and you can see what your inputs make
+your code do and then you can use like a
+genetic algorithm or an evolutionary
+algorithm to adapt your input
+distribution as you go to find more and
+more interesting behaviors.
+&gt;&gt; That's right. You basically like have
+these tentacles into the program and you
+feel out where you are in the state
+space and try and explore more of the
+state space of which branches you've
+gone through and all that.
+&gt;&gt; Right. It's definitely like an extra
+idea and and like you know a bunch of
+the property based stuff came out of the
+functional programming world which has
+this oh we're going to derive prob
+probability distributions from types
+totally makes sense from that and this
+like no no we're going to modify the
+compiler and we're going to like do a
+bunch of weird ad hoc stuff to like try
+and exploit the state space it's a very
+different but very good idea
+&gt;&gt; yeah well the interesting thing is like
+you are actually I mean you are trying
+to solve the turn halting problem here
+right we know you cannot do it we know
+that there is no one technique that's
+going to find all the bugs And so I
+actually believe that the correct
+response to that is just to like throw
+everything at the wall and see what
+sticks. like you should try and have
+very clever probability distributions
+and you should try to have you know
+evolutionary algorithms and you should
+have you know constraints and you know
+constraint solvers and like I mean you
+like do everything you can add some ML
+like whatever like this is we're up
+against a very hard problem and the nice
+thing about a basket of tools is that if
+you're careful about how you architect
+them
+no tool can like make the situation that
+much worse But there are certain
+situations where it can make it much
+better. And so by having a broad
+distribution of techniques, you're
+likely to have something that works on a
+larger space of programs.
+&gt;&gt; Right. Particularly because we're doing
+testing, right? It's just like you do an
+extra thing. It takes some time. That's
+right.
+&gt;&gt; But it doesn't break anything. It's just
+like if if it was the worst thing it can
+do is not find any bugs for you.
+&gt;&gt; That's right. And you have to be a
+little bit more careful about that once
+you have like sophisticated evolutionary
+tactics, right? Because it could be that
+some technique you use like pollutes
+your distribution in some way that makes
+it harder to find other bugs. But you
+know that just means you don't have to
+be you have to be not be totally naive.
+&gt;&gt; Got it.
+&gt;&gt; Yeah. So okay. So there's all these
+people doing randomized testing. And
+what's interesting
+is nobody
+until very recently had ever applied any
+technique like this to what I would call
+real software. And this is like not a
+knock on hasll or you know or or or
+small functional data structures.
+Certainly not a knock on parsers written
+in C and C++. What I mean by that is
+like nobody fuzzed or used property
+based testing on a database or on a
+computer game or on a large distributed
+system or on an operating system or a
+kernel like people people have lately
+started to do these things but by and
+large it was not happening until quite
+recently. I feel like it wasn't common,
+but is it really that it wasn't done at
+all? Like I' I've talked to like John
+Hughes about stuff that the quick check
+folk did where they like, you know,
+worked with like auto manufacturers for
+fuzzing their like, you know, super
+weird network inside of the computer
+&gt;&gt; and things like that. So, I feel like
+there is stuff that like I think should
+qualify as real software that's more
+than like the traditional like toys to
+which the stuff is applied. There's at
+least been some commercial applications.
+&gt;&gt; I think I think people did some of it,
+but I would say it was vanishingly rare.
+Um, I mean, all of these techniques
+maybe arguably are like vanishingly
+rare. Like to a first order
+approximation, like 0% of people use
+them,
+&gt;&gt; but but but I think it was especially
+uncommon to try and use it on big stuff.
+&gt;&gt; Yeah. I mean, I think it's felt
+relatively niche. I think that's I think
+there are things that qualify as more
+serious applications of it, but like
+much rarer than they deserve to be
+applied or something.
+&gt;&gt; And and basically, I think that this is
+actually for somewhat good reason. Um,
+so when it when you have big software,
+big complicated software, you sort of
+have and I I I promise I'm getting back
+to your original question, which is what
+is deterministic simulation testing? Um,
+basically when you have big complicated
+software, there's two things that get
+dramatically harder.
+The first thing is the state space of
+the software that you are trying to
+explore is really complicated. And it is
+probably complicated in such a way that
+the fuzzing trick of just you know
+recording code coverage is no longer a
+very good map for where you have gotten
+in the software. Right? Consider
+something like a Python interpreter. If
+you hit 100% code coverage in that you
+have not gotten anywhere close to
+exhausting its behavior. or consider
+something like
+&gt;&gt; and that's and that one is just because
+like the state space is much bigger than
+just like where you are in each branch
+of the code like your code location
+doesn't tell you that much about the
+state space there's like lots of other
+things going on that
+&gt;&gt; what's what's in various variables like
+what's in memory like all this other
+stuff and if you try and like take the
+cartisian product of that with all the
+coverage you're just it's like way too
+big and you're not going to make any
+progress um you know or consider a
+distributed system right where just what
+coverage you have gotten might be less
+important than like what order you have
+encountered coverage across different
+nodes in some distributed algorithm. Um,
+and so basically
+knowing where you are and fully
+exploring the program becomes harder
+both from the fuzzing philosophy of
+we're going to use signals like coverage
+to determine where we are and it also
+gets harder from the like PBT philosophy
+of we're going to have really clever
+intelligent random distributions because
+basically you have to just get lucky so
+many times in a row to get something
+useful happening that you're you you
+just kind of it's intractable to solve
+the problem purely that way.
+&gt;&gt; Right. You more or less probably can't
+do it fully obliviously. Right. That's
+right. The oblivious thing where you
+have the distribution chosen ahead of
+time and you're just throwing things at
+the system like you kind of have to be
+responsive to the state of the system if
+you're going to get the right kind of
+coverage. Although it's worth saying
+like when you say covering the like you
+never actually cover the state space,
+right? The thing that you're doing is
+always weirder and more huristic because
+the actual state space is like highly
+exponential. Yes. And so you will not in
+any reasonable testing budget be able to
+test any appreciable fraction of it. So
+there's some weird question of like
+taste of like which vanishingly small
+subset of the scenarios is it important
+for you to cover.
+&gt;&gt; Yes, totally true. And and we will come
+back to that. That is like there's that
+that's like right you want to cover all
+of the interesting parts of the state
+space and you want to try and do it as
+quickly as you can and and that is a
+whole another dimension along which this
+is hard. Um, okay. So, then there's a
+second problem with these larger
+systems, more quote unquote real
+systems, which is that they don't really
+look they don't really look like the
+kinds of systems that people have
+traditionally applied fuzzing and
+property based testing to in in two kind
+of ways. One is that they tend to be
+interactive, right? They tend to not be
+things that accept an input and then do
+a bunch of computation and then crash or
+don't, right? which is kind of what
+fuzzing is optimized for, right? They
+tend to be things that take a little bit
+of input and then send you a response,
+then get a little more input and then do
+something. Like imagine a web server or
+a computer game. It's like got this
+interactive flow to it. Um, which makes
+the whole fuzzing model of like I'm
+going to come up with what is a good
+input to break the system and send it in
+and see what happens a little bit more
+complicated. Then the second thing which makes the state space exploration  
+problem even harder is that these
+systems are all non-deterministic. And
+this is like this is in some ways I
+think the crux of it because basically
+computers are machines right they're
+like real physical machines in the real
+world and in order to make those
+machines really efficient you know CPU
+designers have done all kinds of evil
+and awful things to make them that that
+have this side effect of making them
+non-deterministic meaning that if you
+try and perform the same computation on
+the same computer twice with all the
+same inputs. Once you have things like
+threads involved, once you have things
+like timers, once you have things that
+need to interact in any way with the
+real world, with network sockets, with
+hard drives, suddenly your computer
+program is not a pure function, right?
+Unless you have written it in Haskell
+and have been very very careful. Um it's g it's a big complicated weird  
+state machine with all kinds of
+co-effects from the environment that can
+mean mean it does something totally
+different each time you run it.
+&gt;&gt; Yep.
+&gt;&gt; Okay.
+&gt;&gt; Although although one of the weird
+paradoxes of this is it is often the
+case that the individual components are
+actually all very close to
+deterministic. It's just that they
+wildly depend on initial conditions
+&gt;&gt; and their behavior is kind of chaotic
+and diverges from predictable things. So
+it's like you know the you know actually
+the thread scheduler is a completely
+deterministic program in some sense
+right except and timers the timers like
+work largely deterministically but like
+your memory you know it doesn't always
+have the same latency there's like a
+cycle where the memory gets refreshed
+and it'll block out for a very little
+piece of time and you know did you start
+your program at exactly the same time in
+the memory refresh cycle the two times
+that you ran it like probably not and
+then like all of these things compound
+and multiply as you have multiple
+systems talking to each other the small
+differences become big differences and
+effectively this nondeterminism kind of
+gets like pulled almost out of nothing.
+&gt;&gt; Yeah, that that is a fantastically
+accurate intuition and we have actually
+we haven't started talking about our
+technology yet but like we have actually
+we we were able to measure that
+intuition like we can empirically tell
+you what the leaponov exponent of your
+software is and like what its chaotic
+doubling time is. And it turns out that
+for Linux it's insanely fast. Like
+basically if you change one bit in the
+memory of a Linux computer, the whole
+state of the system is completely
+different like within tens of
+microsconds. It's it's actually crazy.
+&gt;&gt; That's shocking.
+&gt;&gt; Yeah, it's it's nuts. It I I did not
+believe it. Um but it's true.
+&gt;&gt; Yeah, I'm still not sure I do, but
+&gt;&gt; I I can I can I can show you I can show
+you. Um okay, anyway. So So why is this
+nondetermism so bad? So it's bad for two
+reasons. The more obvious reason is it
+means that if my I yeah you I do my cool
+fuzzing property based testing thing I
+run some fantastically expensive
+computational search I find the bug
+that's going to ruin my life and then
+you know if I don't have exactly the
+right logging in place if I can't just
+look at the source code and oneshot the
+bug I may never make it happen again and
+that is very very frustrating now my
+testing system has just made me feel bad
+right
+it's that's not that's
+&gt;&gt; something is wrong
+&gt;&gt; that's right Good luck.
+&gt;&gt; You'll never know what it is until you
+find out at 3:00 a.m. when your pager
+goes off. Um, so that sucks. Then
+there's a second problem with it, which
+is that it makes the fuzzing trick of
+look at what inputs have made me do
+useful things so far and then try small
+modifications on those inputs break down
+and become much less performant. Because
+if putting the same input into the
+system again might not get me to the
+same point in the state space, then
+putting a slightly tweaked one is extra
+maybe not going to get me to the same
+point in the state space. And so this
+like optimization loop that all of
+fuzzing kind of implicitly depends on
+doesn't work very well. You basically
+need the fact that there's like a kind
+of random input like more or less your
+random number generator and like a
+function from that into the behavior and
+you really want that function to be a
+real function. That's right. Which you
+can always run and get the same answer
+so that you can actually explore that
+space. Whereas if like every time you
+try it there's just like a new version
+of the function that like is spiritually
+similar but like has all the all
+different behavior.
+&gt;&gt; It makes fuzz degrade into random
+guessing. That's right. That's okay. So
+that brings me back to what is
+deterministic simulation testing. And
+the idea here is the somewhat crazy one
+of like we can sidestep all these issues
+if we just make all of the software
+deterministic which sounds a little bit
+insane and maybe like a little bit
+useless like it's it's like you know
+assume you had a can opener. How do you
+make your software deterministic? And
+that's a very fair criticism up until
+the existence of antithesis which I will
+get to later has kind of solved this
+problem for people. But in the absence
+of that, what we did at Foundation DB
+was we wrote our software in such a way
+that it could be run completely
+deterministically. So we could simulate
+an entire interacting network of
+database processes within one physical
+Linux process with deterministic task
+scheduling and execution with fake
+concurrency with mocked implementations
+of communication with networks and with
+disks. Right? we could cause database
+processes to have simulated failures and
+restart. We had to do all this with no
+dependencies whatsoever, right? Because
+as soon as you add a dependency on
+Zookeeper or, you know, Kafka or some other program like you lose this  
+ability to run in this totally
+deterministic mode. But it made us so
+much more productive to be able to test
+our software this way that it was worth
+it to us to not have any dependencies.
+&gt;&gt; So is it fair to say that the key
+enabling technology here is dependency
+injection? Like you have a bunch of APIs
+that let you interact with the world.
+Like most of what you write in a usual
+program are in fact deterministic
+components. Like you know you do some
+computation, the result is
+deterministic. But there are some things
+that you do that aren't. Like you ask
+what time it is. Mhm.
+&gt;&gt; It's like, well, now you're really two
+different pieces of hardware, right?
+There's like a clock and a CPU and
+they're interacting and like, who knows
+what's going to happen when you ask what
+time it is. You send or receive a
+network packet. You ask for something
+from disk. So, the thing you can do is
+you can just like enumerate all of the
+APIs that you have that introduce
+non-determinism and just have them have
+two modes. There's like the regular
+production mode where it hits the real
+world and is non-deterministic. And then
+there's test mode where you just have
+control and you can behind all of those
+calls you can have a simulation that
+does that gives sort of the response to
+the API where you have control over it
+and you can thereby force it to be
+deterministic. Is that like the basic
+trick
+&gt;&gt; right? Well that's the basic trick but
+it you you're left with one really really big problem which is  
+concurrency. Like if your if your
+program you know even if your program
+only runs on one computer you probably
+have threads and then the OS is going to
+schedule them in like god knows what
+order and you know they also by the way
+will take non-deterministic amounts of
+time to execute actions you know thank
+you Intel um you know and thank you
+everything else running on your computer
+right
+&gt;&gt; well I mean thank you Intel because if
+they didn't do that things would be way
+slower
+&gt;&gt; super true um so so that's you know that you know people can people can  
+solve that right like there are
+languages is with sort of cooperative
+multitasking
+um models of concurrent programming uh
+which you know which which you can
+actually plug in a deterministiculer and make that all work.  
+&gt;&gt; But then if you have multiple processes
+running on different computers now
+you're really in trouble. Right now you
+know how long did it take that network
+packet to get from this computer to that
+other one is something that's completely
+outside of your control. And if you want
+to try and run them all on the same
+computer, you need to create some way of
+faking
+processes on different computers running
+on the same computer in some sort of
+cooperative multitasking runtime so that
+you can make it all deterministic. And
+there are people who have done that. You
+know, we did it at Foundation DB. I
+think you guys did it at Jane Street.
+&gt;&gt; That's right. Yeah. One of the reasons I
+sort of know the the bag of tricks is
+that this is more or less exactly what
+we have done and hit the exact kind of
+same set of issues and uh the same basic
+uh commitment to like we will write all
+the code ourselves. We had kind of
+weirdly fallen into by using an obscure
+programming language. to like you know
+we had this whole whole O camel
+ecosystem where we had really deep
+control over the whole thing and so yeah
+a lot of our systems not all of our
+systems but a bunch of our systems are
+built in this way where we have this
+kind of endto-end control and can do
+this kind of deterministic simulation
+and it's absolutely critical for all the
+reasons you said it really helps you go
+faster in many different ways
+&gt;&gt; yeah like I I think I something I
+haven't said yet is this all sounds like
+a lot of work and it is a lot of work
+but it was so gamechanging at foundation
+DB like that company could not have
+existed without this technology. We
+built a thing that everybody thought was
+impossible with a team of like 10 people
+and we did it really really fast and we
+did crazy things that nobody would ever
+dare to do without a testing system like
+this. I mean I'll give you two examples.
+Um one was we deleted all of our
+dependencies, right? And in particular,
+we deleted Apache Zookeeper, which we
+had been using as our implementation of
+consensus, like of Paxos. And like
+nobody writes their own Paxos
+implementation. That's like a that's
+like a thing that insane people do who
+want to like have bugs. And we did it.
+And our new one was less buggy than the
+one the officially good one from
+Zookeeper that everybody uses. Um, you
+know, later we basically deleted and
+completely rewrote from scratch our like
+core database concurrency control and
+conflict checking algorithm to make it
+more parallelizable and more scalable
+and faster which again is just like a
+totally crazy thing to do. Like I don't
+know of other databases that once they
+have gotten that piece working have
+rewritten it, let alone like rewritten
+it to make it more theoretically
+scalable and like cleaner, you know,
+that's just like nuts. But if you have a
+system that can find all the bugs really fast, it frees you to just do  
+crazy stuff like that.
+&gt;&gt; Okay, so this is seems like a great
+idea. We think it's a great idea, which
+is why we've done it. Foundation DB
+thought it was a great idea. It's also
+like totally impractical. totally
+impractical because like the whole thing
+of like we'll just do everything from
+scratch. It's like okay yeah maybe a
+database system should do that and like
+maybe some like crazy trading company
+that made a decision 20 years ago to
+like use a weird tech stack can do that
+for all sorts of weird reasons but like
+it's not like a generalizable tool,
+&gt;&gt; right?
+&gt;&gt; And Antithesis is trying to be a company
+that sells a generalizable tool. So like
+what how do you go from the good idea
+that's totally impractical to like a
+thing people can use,
+&gt;&gt; right? So basically we've talked about
+how there's sort of two key obstacles to
+making a really really powerful
+randomized testing system you know what
+we call an autonomous testing system
+that can find all your bugs really fast. One is need to, you know,  
+actually explore the state space
+extremely quickly and find all the bugs.
+And the other is this determinism issue
+which both impacts the usefulness of
+finding those bugs and also makes it
+just harder to explore the state space.
+And basically what we're trying to do is
+the absolutely insane hubristic goal of
+solving both those problems in full
+generality for every piece of software
+in existence. And so the so the
+basically the the important thing is we
+solve them in the reverse order.
+&gt;&gt; Um so once you solve determinism that
+actually gives you a huge leg up in
+efficient state space exploration for
+all the reasons we've already talked
+about and I can go into more detail
+about how we use that.
+&gt;&gt; Um okay so how do we solve determinism?
+That sounds kind of hard because as
+we've just talked about all kinds of
+things that you want to do on a computer
+are nondeterministic. So there's other
+people who have tried to do this. Um,
+you know, there's people who use
+frameworks, right? Like the one that you
+guys have at Jane Street or like the one
+that we built a Foundation DV. There's
+since been a bunch of open source ones
+built for various programming languages
+and runtimes. Um, that's cool. It only
+helps people who are committed to using
+that framework, willing to write all of
+their software with that framework, not
+use any dependency. It's not in that
+framework. It's not general, right? Yep.
+not a general solution. Can't do it that
+way. There are people who have tried to
+solve this problem with record and
+replay where basically like as I'm
+running my program, I write down the
+result of every single system call in
+the exact moment at which it was
+delivered. And then if I want to run my
+program again, I can just replay all of
+that without actually talking to the
+system. And that works pretty well for a
+thing running on a single node. Doesn't
+work very well for distributed systems.
+It's also just not very scalable. It's
+&gt;&gt; although there's a critical idea that
+you snuck in there which is where you
+said the word sis call, right? So the
+whole like the kind of foundation
+dbjain/ whatever version of doing this
+at the library level is like there are
+particular function calls inside of a
+language that you're going to make
+swappable. But here what you're doing is
+say you know what actually we're going
+to do this at the OS level. Yes. Right.
+at the bottom actually all the
+non-determinism generally comes in from
+the operating system and from
+concurrency and concurrency is somewhat
+mediated by the operating system. So the
+SIS but system calls are anyway one huge
+source of non-determinism. And so the
+idea of these kind of you know record
+replay things are we're just going to do
+the dependency injection at that level.
+And we've already now stepped up a big
+level in generality. Right. I no longer
+have to own your programming language.
+&gt;&gt; Right. Right.
+&gt;&gt; It's gotten better.
+&gt;&gt; It's a big step.
+&gt;&gt; We're not there yet though.
+&gt;&gt; Okay.
+&gt;&gt; So we're not we're not there yet for two
+reasons. One is it's still not fully
+general. Right. This is only going to
+work for the operating systems that
+you've designed this to support. And
+maybe that's okay. Maybe you think it's
+fine because everybody uses Linux, but
+like
+&gt;&gt; weirdly, you know, seem to be true now.
+&gt;&gt; People people run IO write iOS apps,
+man. Like people, you know, people write computer games that mostly  
+run on Windows. There's there's others
+out there.
+&gt;&gt; Um, but I think, you know, also also
+doesn't work great for distributed
+systems, although you can kind of hack
+it and there's a few people who have.
+&gt;&gt; Um,
+&gt;&gt; actually, why doesn't it work great for
+distributed systems? The sys call layer
+gets, you know, it gets you a hook into
+all the distributed like all the
+distributed communication comes again
+through the OS. Yeah.
+&gt;&gt; So why why can't this generalize to
+that?
+&gt;&gt; Ba basically all of the record replay
+systems out there are designed to do
+this for one process.
+&gt;&gt; Got it. So it's not so much a
+fundamental question as an engineering
+question.
+&gt;&gt; Correct. Correct. It's just like the the
+UX is not very good.
+&gt;&gt; Sure.
+&gt;&gt; Um but I think the more fundamental
+limitation of these things is the
+scalability problem, right? Like it is
+just a vast amount of data to write down
+every single SIS call that your thing
+ever did. You're already doing a
+computationally expensive search. You
+really don't want to like hugely
+increase the overhead of that. And it
+doesn't actually get you true
+determinism.
+&gt;&gt; It lets you replay a non-deterministic
+run.
+&gt;&gt; Correct.
+&gt;&gt; But it doesn't let you play a deter It
+doesn't let you play things out a
+deterministic way cuz every time you do
+a thing you haven't previously captured.
+&gt;&gt; Correct.
+&gt;&gt; You just got to do it.
+&gt;&gt; Exactly.
+&gt;&gt; Right. Exactly.
+&gt;&gt; So it's like it's a weird halfway house,
+right?
+&gt;&gt; Exactly. So basically what we decided to
+do was just go another step beyond that
+and say okay we're going to do the
+dependency injection as you put it at an
+even lower level. Let's just get under
+the operating system and let's implement
+a deterministic computer which is a
+thing that you can do these days without
+creating custom silicon because people
+have virtual machines. Hooray. So
+basically we just have to write a
+hypervisor that emulates a fully
+deterministic machine and then we don't
+have to touch your OS at all. We don't
+have to touch anything you do at all.
+You can just run your stuff unmodified.
+Right. And so your your like crazy hard
+thing to do is possible because people
+did a super weird crazy hard thing to do
+years ago. And this was like part of the
+historical failure of the operating
+system where it's like oh we're going to
+use the operating system like back in
+the 60s or 70s where like it's have
+these multi-user operating systems. are
+going to have ways of isolating
+different programs from each other and
+stuff and then like some number of years
+we're going to be like oh yeah none of
+this works actually Unix is like very
+badly designed and doesn't solve any of
+these problems so instead we're going to
+have a new abstraction where we are
+going to like simulate things at the
+level of machines the hypervisor is
+basically the computer on that sort of
+whose upward interface it exposes is a
+fake machine and lets you run different
+virtual machines on that hypervisor
+&gt;&gt; and then once you have the hypervisor in
+some sense the path is clear right
+that's the layer at which like in some
+sense before we said oh all the
+non-determinism comes from the operating
+system
+&gt;&gt; but no it comes from the CPU
+&gt;&gt; it comes from the well
+&gt;&gt; it comes from the hardware from the
+timers right it comes from
+&gt;&gt; all the different pieces of hardware
+introducing that so you got to be like
+oh we just got that's the layer that at
+which the nondeterminism comes and
+that's the layer at which we can instead
+do a deterministic simulation of what a
+machine is
+&gt;&gt; correct and our hypervisor is a little
+bit more ambitious than just being a
+deterministic hypervisor which was
+already kind of hard but in order to
+make this really work well, it also
+needs to be really fast, right? Close to
+native speed or even in some weird cases
+a little faster than native speed for
+most code, which is an interesting thing
+that we have pulled off. But then
+there's another property that's also
+really important, which is we are trying
+to do this huge branching exploration
+through the state space of a computer
+system. And so if we're running down
+multiple branches on the same physical
+host that is running the hypervisor,
+it's really annoying if we have to like
+store a separate copy of the memory for
+each of the guest operating systems
+that's running inside of it. That would
+be a lot of RAM, right? And so what we
+do instead is we dduplicate memory pages
+at the host level using copy on write.
+So that if you know one of the guests is
+doing something and it doesn't affect
+some particular page in memory it just
+inherits a copy of that from its
+ancestor and you know sibling VMs can
+just be addressing the same underlying
+memory on the host system which means
+that we can do this with massive
+concurrency on very big computers and
+you know explore really fast.
+&gt;&gt; Got it. Okay. So this kind of like
+brings into focus like what is the thing
+that antithesis is providing in the end,
+right? It's trying to give like all of
+the upsides you described of having this
+very powerful testing system that can
+efficiently explore lots of different
+behavior.
+&gt;&gt; Um but it does it in a way where the
+amount of work that you have to do to
+use the system is very low.
+&gt;&gt; That's right.
+&gt;&gt; It's just like it's like what is your
+API to antithesis? It's actually what
+you're doing already. like you threw a
+bunch of stuff in a Docker container
+before, you throw a bunch of stuff in
+Docker container, now you're just like
+running a VM somewhere. It's like, yeah,
+you just run a VM somewhere else. You
+run a VM on on antithesis's servers and
+then they can get they they get to like
+use all of this fancy tech to make it
+efficient and be able to do all this
+exploration and like you don't have to
+do anything clever to make your system
+testable. That's right.
+&gt;&gt; It's just like
+&gt;&gt; we magically find all the bugs and
+they're magically reproducible. That's
+right. It's very straightforward and you
+know and and the key there right I said
+we magically find all the bugs that's
+the second really hard thing I mentioned
+right once you've made the system
+deterministic you still need to find all
+the bugs right you still need to do this
+state space exploration and you now need
+to do it because you've enabled
+exploration of way more complicated
+computer programmers than parsers you
+know and little data structures written
+in hasll and so on you now need really smart state space exploration,  
+but because we have determinism, we can
+be smart about it. It doesn't degrade
+the random search. And so we've also
+got, you know, a whole large chunk of
+our company that is like doing
+fundamental research on how to like do
+this data exploration faster and more
+efficiently for wider and wider classes
+of programs. So to jump back for a
+second to like the initial framing of
+like this is all kind of comes out of
+like property based testing in a sense.
+We spent an enormous amount of time
+talking about one half of property based
+testing which is essentially the random
+generation of the the generation
+essentially of the probability
+distributions right how you explore the
+space and a bunch on the mechanics of
+how you run it but very little on the
+properties
+&gt;&gt; right and like you know if you want to
+find all the bugs right you have to know
+what the program's supposed to do in the
+first place. So like how do how do
+properties fit into this story?
+&gt;&gt; Right. So so this is actually a little
+bit easier than people think it is. Um
+and I believe that like I think a lot of
+the problem here actually is that
+property based testing was invented by
+like mathematicians and functional
+programming people who were thinking of
+it in the same you same area as like
+formal methods and stuff like that. You
+know, my colleague David McKver calls
+this the original sin of property based
+testing is that like people were coming
+from this very very mathematical
+background and so they they were
+thinking of it as like you have to
+exhaustively enumerate all of the
+properties of your system. And my belief
+is that you don't actually have to do
+that. And the reason why I don't think
+you have to do that is that computers
+and computer programs are very chaotic
+and they are very good at escalating any
+misbehavior of your program into much
+more obvious and extravagant
+misbehavior. And so you can actually
+catch a very very large number of bugs
+with a partially specified system. So to
+give you a concrete example of this,
+right? Like if I have some memory
+corruption in my C++ program, you know,
+and I don't have asan enabled, so I'm
+not going to find the memory corruption
+directly, that could still manifest in a
+lot of ways. It could manifest as my
+program giving wrong answers. It could
+manifest as like weird garbage or
+glitches, you know, in in some response
+I get. It could manifest as a crash. It
+could manifest as an infinite loop. it
+could manifest as like corruption of
+some other random invariant in my
+program somewhere. And so if I have a
+property that's set up to catch any of
+those things, there's like a decent
+chance that when I shake the box enough,
+I will be able to detect that bug even
+though I haven't thoroughly specified
+every aspect of its behavior. And that
+same that same idea actually it actually
+is true for much broader classes of bug
+than than memory corruption. So I think
+what you're saying is like true for a
+part of the space, but I don't think
+you're going to get all the bugs that
+way, right? There are I think there are
+lots of areas and I think we as as
+computer scientists and really as
+software engineers rely on this kind of
+brittleleness property all over the
+place, right? Where like you know the
+fact that you can like find the bugs
+that you can
+&gt;&gt; it's actually kind of why normal
+non-randomized testing works so well. I
+think
+&gt;&gt; that's right. But I I also think whether
+it works depends on the kind of things
+you're doing and the way that the code
+is structured in important ways. Like
+the most obvious exception to this is
+numerical bugs
+&gt;&gt; where like numerical bugs just don't
+show up this way. Like you get the
+calculation a little bit wrong and then
+like you know your curve doesn't go up
+into the right quite at the speed that
+you want it to but it's often very hard
+to get any kind of bright line
+demonstration that you've done something
+wrong and know where you've done
+something wrong.
+&gt;&gt; That's right.
+&gt;&gt; Um I think there are other properties
+too. I mean from archive if you're if
+you're building a trading system and
+like the trading system might operate
+perfectly well and it never like breaks
+but like it's just like more aggressive
+than it should be. it sends larger
+orders more often or less often or not
+placed quite properly in the book. And I
+think if you don't do a good job of
+specifying the properties, I think those
+kind of systems are very hard to test
+and this kind of coarse grained well
+let's kind of look for like gross
+misbehavior and shake the box a lot is
+just like not going to get those things
+at all.
+&gt;&gt; Yeah. So totally agree with you. What
+I've said so far only covers a subset of
+the bugs. Um, I think that there are a
+lot of other ways to add and refine
+properties incrementally. Like the key
+like I, you know, I am interested in how
+to do this absolutely perfectly because
+I'm a testing fanatic, but I'm also like
+a pragmatic business owner, right? So I
+want to give customers like an easy way
+on which is just, you know, add the most
+basic possible properties that all
+software should have. And then I want to
+give them a nice gentle ramp towards
+more advanced usage. And I think what
+the nice gentle ramp looks like for most
+people who are not sophisticated
+property based testing experts is
+actually others have already done it for
+us. I think it looks like observability
+and alerting like if you think about a
+system like cloudatch or a system like
+data dog or whatever they have already
+built in some sense like the the second
+half of a property based testing system
+right you can specify what you don't
+want to see and then you can define
+alerts on those things hey memory of
+this thing should never exceed this
+number oh my gosh if you ever see this
+log message I want to be alerted right
+away those are all properties
+like they're not very good properties,
+but they're
+and I think the reason the main reason
+they're inadequate is that with
+something like Cloudatch or something
+like Data Dog, you only find out that
+those properties have been violated when
+your customers do. Um, right? If you
+could move that experience, that UX into
+the testing world into before you
+deploy, I think it's actually an amazing
+sort of interactive way of defining and
+then refining your systems properties.
+And I think it's a thing that's like
+actually quite accessible and intuitive
+to quote unquote normal developers.
+I see why you say that, but I worry
+actually that observability style
+approaches will scale very poorly
+because part of what as I understand it,
+the antithesis approach relies on is the
+ability to take the work you're doing,
+the testing work you're doing and run it
+at kind of massive like incomprehensible
+scale. Mhm.
+&gt;&gt; And I think observability rules tend to
+rely on the fact that you know you see
+the things as often as they happen in
+real life and so you can get away with
+like soft properties that aren't quite
+the properties that you care about but
+are like indicators of and predictors of
+the things that you care about. So there
+you know you sort of get to specify
+things to flag you and the key thing is
+to make them not flag you incorrectly
+too often. But I feel like something
+like antithesis depends pretty
+critically on the violations being real
+at a high rate because otherwise you're
+just going to like antithesis is going
+to say, "Oh, we did your run and you
+have like 68 million exceptions. You
+might want to look at which ones are
+real."
+&gt;&gt; Totally. Totally. You should definitely
+not take every single thing that you
+know that you that you would find
+interesting in your observability system
+or whatever and and and turn it into a
+property, right? But I think taking the
+ones that would paid you and turning
+them into properties is a great way to
+get people who have never thought about
+property based testing to start thinking
+about what the properties of their
+system might be. I think the other thing
+that can help here is like a little bit
+of the Socratic method, right? Like a
+thing I found when talking to customers
+is often, you know, if you ask somebody
+like, "What are the properties of your
+system?" They get this like deer in the
+headlights look and they're like, "Oh my
+god, get me out of here." Um, you know,
+and then if you say to them, hey, should
+your system always return an answer if
+two out of three replicas are up?
+They're like, yeah, yeah, totally. And
+if you're like, okay, cool. Like, do you
+expect that answer to come within some
+defined SLA? They're like, oh, yeah,
+obviously. And like, okay, great. And
+it's like, okay, well, should the
+system, you know, should two users ever
+be able to stomp on each other's data?
+Like, no, no, definitely not. Like, and
+so you can kind of tease it out of
+people. And I think that one thing that
+we're very interested in experimenting
+with is like can we automate teasing it
+out of people a little bit?
+&gt;&gt; You need to completely train an LLM to
+like have the dialogue with customers to
+figure out
+&gt;&gt; or to just look at their code and to
+guess at some properties and then
+present them to the user being like,
+hey, are these properties of your
+system? Um, and by the way, even if the
+user says that they're not properties of
+their system, they're often pretty good
+guideposts in the state space
+exploration because they're often the
+kinds of thing that some other developer
+at that company might have mistaken as a
+property of the system, which means that
+if you get it to happen, it might lead
+to a bug later on.
+Do you want to present those
+semi-propies to the like you the person
+who owns the system or do you want to
+present it to antithesis and see whether
+it follows it and then like I feel like
+you want to classify there's the
+properties that are like seem to always
+be followed and like maybe those are
+properties and then there's the ones
+that are not followed at all and like
+those you discard and then there are the
+ones that like are mostly followed and
+maybe those are the interesting ones.
+&gt;&gt; Yeah, this is actually this is so this
+is not an original idea. Um, this is an
+idea that the fuzzing people came up
+with relatively recently, but they did
+come up with it first. Um, I think they
+call it speculative properties. I forget exactly  
+what the term it's. in a paper
+somewhere. But basically the the fuzzing
+spin on this is, you know, I look at a
+function that I've executed a million
+times and if I see that like one of the
+parameters is positive every single time
+that function is executed, I just go
+ahead and add an assertion that that
+parameter will always be positive. And
+often like if I then like often that
+just is a property and then even if it's
+not right it's very likely that if every
+time I execute it the thing is positive
+and then I get it to be negative one
+time that's going to lead to some
+interesting behavior later in the system
+possibly a bug because everybody else
+assumed it was always positive. And so
+the idea is like we can both use it to
+guide exploration and use it as like a
+kind of you know preemptive uh property
+creation.
+So I want to step back for a second.
+Like I think a meta thing I'm observing
+from this whole conversation is I wonder
+how you sell things to customers, right?
+Like there's like I feel like this this
+whole conversation about like what I
+think of as a really compelling and
+important kind of superpower that you
+can give software engineering teams, but
+we've already had like a pretty long and
+complicated story to like explain what's
+actually going on. like to go to the the
+perspective for a second of somebody
+running a business like how do you think
+about convincing people that this is
+like a thing they should be excited
+about and want to pay for?
+&gt;&gt; How do we sell to you? So that's a good
+question actually right uh how did we
+actually get to antithesis um a little
+randomly actually so from our
+perspective like one of our engineers is
+someone who just like followed the
+foundation DB work and kind of knew
+about it and thought it was cool and was
+wondering what those people were doing
+and at some point saw an antithesis web
+page go up and was like oh we have
+testing problems maybe this would be
+good right this was someone who's
+working on our kind of ultra low latency
+team that does a lot of very complicated
+multi-system extremely subtle behavior
+kind of stuff and was like, "Oh, it'd be
+nice to have like deterministic testing
+for this. Maybe that would be good." And
+so we reached out and set up some
+conversations. Um, I got to sit in on a
+couple of them. Um, not not because we
+were like, "Oh, you know, we need like
+the old guy who's been here for a long
+time, but more because I'm like nerdly
+really interested in testing stuff." So,
+I thought it would be interesting. Um,
+and then you know, one of our engineers,
+a guy named Doug Patty, who's actually
+previously been on the show, uh, decided
+to try it out with Arya, which is one of
+our internally developed distributed
+systems that already has a ton of very
+careful work on the testing. Indeed,
+it's one of the one of the places where
+we've done a lot of very careful work
+around deterministic simulation testing.
+&gt;&gt; Um, and yet, we thought there was some
+actual real value ad from Antithesis's
+version of this. Uh and that's basically
+how how we found you guys. Um but it's
+like a very like expert oriented people
+who are already in the tank kind of
+customer acquisition story. It's like
+the people who already built their own
+deterministic simulation framework are
+like you know we'd like a better one.
+&gt;&gt; Yeah. Well, we had a
+&gt;&gt; we're not I don't think we're a big
+audience. No, we we we actually had a
+debate internally um in the early days
+which was would people who have already
+are already doing fuzzing or PBT or
+deterministic simulation would they be
+better customers right because they are
+into this stuff or would they be worse
+customers because they already have one
+and they're not going to pay a lot of
+money for another one and it turned out
+that they're very conclusively better
+customers but as you say there's not
+that many of people like you and so
+you're right we do have to make it we do
+have to make it broader there's there's
+a few arguments that we use and then I
+think there's like a few trends that are
+really really acting in our favor. Um
+and that are giving us actually
+considerable success in selling this to
+normal people. Not saying you're
+abnormal. Um
+&gt;&gt; all good. I wouldn't object if you had.
+&gt;&gt; Um basically that the two main
+arguments, right, are like safety and
+speed, right? And and you can think of
+those things as being on a frontier,
+right? for a given level of programming
+technology and skill and architecture
+and language choices and problem domain
+and whatever there's some like efficient
+frontier between safety like how sure
+you are that your program has no bugs
+and speed which is like how fast can you
+add new features and and solve business
+problems and I think of a tool like
+antithesis as just pushing that frontier
+outward and you can decide to reap the
+benefits in more safety Right? You can
+keep going at the same speed but be
+really really really sure you don't have
+any bugs which might be the right call
+if you're making pacemakers or like
+airplane guidance software or something
+like that. Or you can just keep the same
+level of quality but do everything a lot
+faster because you're not writing as
+many tests because when you do hit bugs
+you're hitting them in your tests rather
+than in production. you're not doing
+some really long slow boring triage
+process with a badly written bug report
+from a customer while you're not
+sleeping and you know so on right you so
+you can just go faster with the same
+level of quality or you can kind of get
+a little bit of both and you know I
+think we have we sort of have all three
+kinds of customers I would say and
+they're all you know they're all getting
+some real benefit from it somewhere on
+that frontier um I think the trend that
+has there's sort of two trends that have
+helped us a lot. One is just that all
+kinds of software is now
+either responsible for very very
+critical stuff that needs to keep
+working or responsible for making lots
+and lots of money and needs to keep
+working and keep getting better at
+making money. And so, you know, a lot of
+people a lot more people care relative
+to 10 or 20 years ago that their
+software works correctly and that
+they're able to continue developing.
+&gt;&gt; There are more critical systems. That's
+right. Um the other trend that I think
+has been really good for us is like AI
+code generation which hugely increases
+the salience of all these issues and you
+know I think moreover just has like
+made everybody realize the liked doll's
+law nature of
+being able to verify that your software
+works correctly like being a critical
+limiting factor in how much software you
+can write. And I believe this was always
+true, right? And it just like wasn't
+obvious enough to people. But now it's
+like really, really, really obvious to
+people, right? I can have 10 clawed
+codes all writing code and it doesn't
+matter. I'm not going to go any faster
+if I can't merge those PRs after
+reviewing them and actually deciding
+they work,
+&gt;&gt; right? And like the two paths towards
+this is one is figure out ways of making
+your software less critical,
+&gt;&gt; right? Right? And if you can find a
+domain where you can like do a lot of
+stuff where the state where you can get
+value out of it but correctness isn't
+incredibly important, you can move at
+lightning speed and that's great. And
+there's all sorts of cases where this is
+true. Like if I am like a software
+developer who wants an analysis tool to
+understand what's going on in my
+program. It's like you know it doesn't
+have to be all that right. It can like
+help me mo some of the time and not
+succeed other time and it's kind of
+fine. It's kind of a throwaway tool that
+I just make and use and like that's
+super great. You can just like vibe code
+that and it's awesome. And by the way, I
+think there will be many successful
+companies built to make it easier to
+have that kind of software. Things like
+zerorust hosting, you know, things like
+very powerful security guarantees around
+a piece of software so it can't do any
+damage. You know, things
+&gt;&gt; security guarantees and I think also
+just like picking the right abstraction
+boundaries. Yes. Figuring out if I want
+to make this whole thing useful, what
+pieces have to be reliable and what
+pieces don't have to be reliable. So
+it's like there's a whole new kind of
+software engineering challenge of how do
+you build these architectures that let
+you leverage less reliable code. So
+that's like one direction to go and the
+other direction is just getting much
+better at verifying.
+&gt;&gt; That's right. That's right. And and
+right now I think that has suddenly
+become suddenly become interesting. It's
+very hot all of a sudden which is kind
+of fun because you know this was like a
+backwater in some ways a deliberately
+chosen backwater for for a long time and
+uh and now there's all this now there's
+all this interest.
+&gt;&gt; What do you mean by a deliberately
+chosen backwater? Oh, if you are like I
+sure so basically if you're trying to
+decide what to make a career in, right?
+I talked before about how you know
+there's a lot of careers where you're
+not going to have worldclass success
+unless you are at an extreme of the of
+the distribution of people
+&gt;&gt; like being a violinist or a
+mathematician.
+&gt;&gt; Correct. One good way to be at the
+extreme of the distribution is to pick
+something where nobody else who is very
+talented is interested in it. And then
+it just is actually much much much
+easier. And it's, you know, it's um
+it's, you know, you have to you you
+can't pick like, you know, making paper
+airplanes or whatever, right? Like
+nobody super talented is interested in
+that because there's not a ton of
+economic benefit in that, not a lot of
+benefit to the world in that. But if you
+can find a sweet spot where something is
+like both really really really important
+but for some reason nobody else has
+noticed it's really really really
+important or people know it but they
+don't want to do it anyway
+&gt;&gt; cuz it's painful
+&gt;&gt; because it's painful or because it sucks
+or because it's low status right like
+that's just like that's actually an
+&gt;&gt; testing is boring an incredible
+arbitrage opportunity and so that was
+actually a lot of why I got interested
+in testing is this is like Jan antorial
+work. All developers hate it. Like you
+know the number of smart people who have
+thought about software testing is very
+low because
+&gt;&gt; although I have to say like so when I
+started at Jane Street like I was like
+super incompetent like I you know what
+did I have? I had a PhD in computer
+science which is like doesn't tell you
+how to be a software engineer and I was
+like not super good at it and I didn't
+know anything about testing. Um, but
+just like over time, over the many years
+of thinking about these systems and
+building them, I've
+&gt;&gt; come to realize that not just testing is
+important, but it's like super
+interesting and fun, like when you do it
+well, right? There's a lot of
+engineering work that it's one of these
+things that if you don't do the work to
+build good systems for it, it's horrible
+and nobody likes to do it. You like, you
+know, there are lots of companies that
+solve this problem by hiring a whole
+different tier of people to be like the
+testers because it's like so low status
+that you can't get like the real
+software engineers to do it. So you get
+like other classes of people to do it
+and you just like make it a different
+class job and it seems like a terrible
+way to run a business.
+&gt;&gt; Yeah. I I I actually believe that the
+world is like fractally full of things
+that are incredibly interesting and
+incredibly ignored by the entire world.
+I believe that there is tremendous
+lowhanging fruit here. It's not just
+software testing like things that are
+super economically valuable, super
+interesting and that nobody is doing.
+The the the key though is even if you
+find such a thing, your problems have
+not ended because now you need to
+convince other people that it is
+actually super exciting and cool, which
+you might be able to do like kind of
+one-on-one, but like if you want to
+start a successful company, you need to
+somehow make yourself legible to capital
+in the in the words of of somebody who I
+like. Um so, you know, that's a whole
+another challenge. We got a little bit
+lucky there, right? as soon as you know
+as as our company was growing and
+scaling we'd kind of laid all the
+groundwork and the foundations here and
+then suddenly this giant thing happened
+in the world that made what we were
+doing super legible to capital and you
+know that that was just like a nice
+stroke of luck I think we would have
+succeeded anyway but it it's always nice
+when things break in your
+&gt;&gt; right so what you should ideally do is
+pick like a neglected area of the world
+operate in stealth for a while get a
+head start and then cause the area to
+suddenly not be neglected
+&gt;&gt; that's right
+&gt;&gt; but only after you have done a lot of
+pre-work
+&gt;&gt; that's right That's what we somehow
+managed to do.
+&gt;&gt; Actually, the capital thing is a thing
+that may be a good thing to talk about
+for a second. So, like one one thing
+that that that we got involved with. So,
+we started using antithesis as a product
+and we're like excited about the actual
+results. I guess a thing I didn't say
+before which was one one thing that made
+us really happy about it is it like
+actually found bugs that we didn't find
+before. It allowed us to do more
+aggressive, larger scale kinds of
+simulations even though we already had a
+deterministic simulation.
+&gt;&gt; And your systems were really well
+tested,
+&gt;&gt; right? Really well tested and had a
+really good record of a low number of
+bugs in production. But the curse of a
+system that has a really good level, a
+really good record of very few bugs in
+production is people start relying on it
+having a very good record of very few
+bugs in production in the future. And so
+the stakes go higher and you end up
+using it for more and you want to put
+more engineering into making it yet more
+reliable.
+&gt;&gt; That's a super interesting testing
+problem in its own right. By the way,
+like if your if your system performs
+better than its SLA, all everybody who
+depends on you will start to assume in
+code and otherwise that it will always
+perform better than SLA. And then if you
+ever merely meet your SLA, everything
+will go down and crash.
+Yeah, that's basically right. I've often
+wondered what are SLAs's for. I have not
+found like the whole like form of an SLA
+to be a particularly useful like
+engineering mechanism like in practice.
+We at at foundation DB we actually
+invented a technique didn't I mean we
+invented it but others have invented it
+too but like we call the technique
+bugification and the basic idea is if
+you have a piece of code that you have
+written well such that it 99.99% of the
+time does way better than its promise
+right like you know it returns an
+optional value but it always returns a
+value um you should when running in test
+sometimes just make it do the
+pathological thing with some low but
+real probability
+So that depends on that code, all the
+callers get used to the fact that it can
+like exercise its full its full spectrum
+of behavior.
+&gt;&gt; Right. And I guess famously Netflix was
+like, actually, we'll do this in
+production,
+&gt;&gt; right? That's the whole chaos monkey
+idea.
+&gt;&gt; I'm not such a fan of that.
+&gt;&gt; Yeah, we we've there's there have been
+spots where we've used it. I I have
+complicated feelings about it. I do feel
+like it degrades the quality of your
+overall service in a way that is often
+just economically inefficient and you
+just don't want
+&gt;&gt; I think Amazon actually might offer a an
+entire region where like you deploy your
+code there and their services will
+region
+&gt;&gt; they'll just like return 500 sometimes
+you know whenever you know yeah it
+actually a pretty good idea
+&gt;&gt; yeah certainly seems good as like a mode
+of testing
+&gt;&gt; yeah sorry you were saying I yeah so I
+guess we're talking I guess we're
+talking capital. So we got involved as
+customers. We found it like useful for
+finding real bugs. We found that again
+like in in in the way that you might
+expect increased the ambition of the
+kinds of things that we would try to do,
+right? There are like things that we are
+willing to experiment with that are
+riskier but we feel like more of that
+risk is tamped down by the better
+testing story. So it's been like a very
+positive experience for the places that
+we've applied it. Uh, and then we got
+involved actually in leading antithesis
+series A. It was pretty cool,
+&gt;&gt; which was like,
+&gt;&gt; yeah, which I think I think you guys
+found to be a little bit of an
+interesting and weird experience and we
+found to be a kind of novel experience,
+too. And I'm kind of curious how it felt
+from your perspective.
+&gt;&gt; Yeah. Well, you guys haven't invested in
+very many companies. So, it was not a
+thing that we thought was even on the
+table or likely to happen. I think it
+basically happened as like a happy
+coincidence. you heard through the
+grapevine that we were raising money and
+then I think your one of your corp dev
+people came and and chatted with us and
+we were initially like oh yeah whatever
+like they want to do some small
+strategic investment and then I think he
+was like you know we would consider
+leading the round and we were like what
+like that's completely unheard of um but
+it was actually an incredible experience
+um you know Silicon Valley VCs are great
+and they have many forms of knowledge
+and they have many form like they have
+deep networks and they have deep
+experience from working with many many
+companies that lets them give you all
+kinds of good advice but they are
+generally not super active users of your
+product. Um and and
+&gt;&gt; certainly not of this product.
+&gt;&gt; Certainly not of this product. That's
+right. That's right. Maybe Carta like
+had an easier time with that. Um, and so
+like I think, you know, I think one of
+the amazingly cool things about having
+Jane Street as an investor is just that
+like I feel so very aligned in terms of
+like you understand our vision and what
+we want to do, you know, like you guys
+give us like constant good ideas about
+the product and like strategic
+perspective on the world informed by
+your use of it as a customer. It's like
+a very different kind of advice than
+most investors can give and like we've
+already got the Silicon Valley VCs,
+right? Like we we have that and so
+having you guys as well just feels like
+an incredible superpower.
+&gt;&gt; Yeah. And I do think this lines up. I
+mean we're you know we are we are not
+certainly not primarily and not majorly
+like a VC. That's not the primary at all
+the primary thing we do. But we have
+been doing more and more investments
+over the year over the years and and
+those investments have mostly been in
+the form of companies where we are
+connected to the underlying work where
+we care about it are customers or want
+to be customers of it and we feel like
+we have direct kind of subject matter
+expertise on the area in question and
+that we really believe in the product
+and think it's great and want to use it
+ourselves and I think that's the kind of
+thing where we think we actually have
+some meaningful leverage.
+&gt;&gt; Yeah. Yeah. And I think you guys have
+done quite well. I think, you know,
+you're not VCs, but I think you've done a pretty good job of  
+spotting opportunities like, and I think
+you've you've got a track record of
+spotting them sort of before they become
+quote unquote legible to capital. Like,
+I think you guys were very early in
+anthropic, if I don't if I don't
+misremember. And I think you guys
+invested in anthropic at a time when
+they actually had trouble raising money,
+hard as that might be to believe. um you
+know because you saw something that
+others didn't you know and I think with
+us right like you invested in I mean
+like three months is like a very long
+time in in tech these days like I think
+you know today
+every single investor is probably lining
+up to invest in testing companies
+because it feels so salient you know
+with with with AI codegen but like three
+months ago when you guys made this
+investment
+no investor had ever heard of software
+testing or cared like to a first
+approximation and you know I talked to a
+lot of people who were like nobody has
+ever made a software testing company
+that has made any money like why do you
+think you'll be any different and who
+like really needed to hear arguments
+right whereas I think you guys sort of
+spotted that opportunity before the
+professionals did and it's worth saying
+I think we were interested in and
+excited about antithesis and the value
+it provided independent of the AI angle
+right I think the AI angle added a lot
+more but I to some degree I think we
+share some of your basic intuition that
+this stuff has always been important.
+&gt;&gt; Um but it definitely as a kind of you
+know market hypothesis makes a lot more
+sense in the present world where this
+stuff is becoming more salient because
+of of the challenge of verifying AI
+generated code. I I'm actually curious
+how you think about the product really
+working in this context because in some
+ways I think it's a really good fit
+&gt;&gt; and in some ways it's not quite perfect
+right because one of the critical things
+that you want
+&gt;&gt; both when you're thinking about RL right
+you want to like
+&gt;&gt; provide feedback to agents as you are
+training them and then also when you
+actually try and use this stuff is you
+want reliable feedback on whether the
+thing that they did is good but you also
+want fast feedback Anti antithesis is
+good at a lot of things, but it's not
+like super fast, right? When you send
+kick off an antithesis run to find your
+bugs, you know, you know, you might come
+back tomorrow to look at the results.
+&gt;&gt; So, I I actually think that last I I do
+think that there are ways it doesn't fit
+well, but I think that last thing you
+said is a unfortunate current limitation
+that is like highly contingent and will
+not be for long. Um, basically
+antithesis began like its bread and
+butter was like very very large
+distributed systems and those very large
+distributed systems tend to just kind of
+be expensive to run period. And so there
+was not tremendous
+like pressure on us to make all of the
+constant factors of running our software
+like really zippy and snappy. And you
+know
+basically people who were who were
+testing this stuff were just okay with
+getting a relatively slow answer and so
+we weren't under a lot of pressure to to
+do otherwise. Um as we move beyond
+distributed systems which we are doing
+this year you know that equation changes
+and I think you are going to see that
+antithesis gets way faster at giving
+results and we have a lot of really cool projects underway that are   going to enable that and make  
+that possible. And by the way I think
+that even for distributed systems you
+might be able to start getting pretty
+fast results. Like I don't think there's
+a law of the universe which says you
+can't test a distributed system fast.
+Um, at Foundation DB, we often got good
+quality answers within minutes or tens
+of minutes. Um, very thorough answers.
+Sometimes we'd even find the first bug
+in less than a minute. And I think that is totally a thing that you will be  
+getting from antithesis, you know, in
+the next year or so.
+&gt;&gt; So, what are ways in which beyond the
+kind of time time scale issues, what are
+ways in which you think maybe it doesn't
+solve all the problems for
+&gt;&gt; Oh, for AI in particular?
+&gt;&gt; Yeah. Well, so okay, there's a few
+things.
+Let's let's talk first about what I
+consider the most fundamental one and I
+think the most interesting one and I
+don't think that this is like
+catastrophic but I think it's like an
+interesting challenge that everybody
+who's doing any kind of you know
+autonomous software verification whether
+that's property based testing or formal
+methods or code review or whatever is in
+my opinion not thinking about. Okay. So
+code generation tools, code synthesis
+tools, specificationdriven
+tools like that have existed since way
+before chat GPT existed, right? These
+have existed for 20, 30 years. And
+nobody ever used them because they suck,
+&gt;&gt; right?
+&gt;&gt; And why did they suck? Basically because
+they all acted like evil genies. you
+would say exactly what you wanted the
+program to do and the, you know, nonLM
+program synthesis machine would crank
+out a program that exactly matched your
+specification and totally did not do
+what you wanted to do.
+&gt;&gt; Yep.
+&gt;&gt; Right. You you've had experience with
+this.
+&gt;&gt; Yeah. Yeah, I mean I've been sort of
+paying attention to like the program
+synthesis literature for a long time and
+like it is there's a lot of really great
+research and a lot of great researchers
+doing interesting stuff but remarkably
+little practical applications in it and
+all the things that people work on end
+up looking mostly like toys like I think
+maybe like the single most successful
+like program synthesis style thing is
+like Microsoft flashfill in Excel which
+is like you know pretty good but like I
+feel like for all the like smart work
+that's gone into this stuff, you would
+expect like in some ways to have more
+practical impact. But like the problem
+is just really hard to do well. And I
+think in some ways one of the reasons
+why LLMs are better than classic program
+synthesis and is that there are less
+evil genies. Yes.
+&gt;&gt; And like they're not really
+specification driven. They're like vibes
+driven. like you say and it makes some
+inferences and there's a lot of like
+leaning on the priors of the thing it's
+seen in the past and what it generates
+and it's just optimizing less.
+&gt;&gt; Exactly. Exactly. Exactly. Exactly.
+&gt;&gt; And of course the RL process makes it
+optimize more. Right. So this whole
+thing where you have basically uh like
+eval hacking where it like does kind of
+whatever it can do to try and get like
+the light to turn green, right? This is
+a problem with like LLM. It's a problem
+with people, right? Sometimes like you
+have some system where you have some
+checks in place and like a thing we talk
+about internally is like don't just play
+the video game, right? You don't just
+try and like score. You want to actually
+like do the right thing and use the
+alerting as a way of understanding
+what's going wrong. But if you turn the
+alerting into the the thing that you're
+actually optimizing for, very bad stuff
+happens.
+&gt;&gt; Goodart's law. Yeah.
+&gt;&gt; Yes.
+&gt;&gt; Yeah. So that's exactly right.
+Basically, basically the reason I
+personally thought that AI code
+generation wouldn't go anywhere like a
+year or two ago because of exactly this.
+I had experience with program synthesis
+tools. I was like, "Oh, they're all evil
+genies. They suck." You know, I think a
+lot of people who had experience with
+these tools had the same kind of
+reaction. And what we all missed was
+exactly the thing you just said. LLMs
+are not like they actually want to make
+you happy, right? Like like
+&gt;&gt; for good and ill.
+&gt;&gt; Exa Exactly. They're like the the
+sycophency thing is like there's
+actually a nice a nice flip side to it.
+Like they've been trained on like
+zillions and zillions of examples of
+people on Reddit and Stack Overflow
+being helpful and then they've been RLHF
+by people who reward it for being
+helpful and and so it actually is kind
+of trying to write the code that you're
+asking for as opposed to like write code
+that fits the specification that you
+asked for in the least amount of work or
+whatever. And what happens when you put
+these things in a loop with something
+that's like, eh, no, try again. Ah, no,
+try. Right. Like, it kind of shifts it
+back into being an evil genie a little
+bit.
+&gt;&gt; That's right. Although, to be clear, I
+think that the people who are doing the
+training are no fools. And that, you
+know, you've talked to some people who
+do this kind of training work and they
+pull they pull the system simultaneously
+in multiple directions, right? There are
+things that you do to pull it in the
+direction of trying to just satisfy the
+immediate feedback goal and also trying
+to pull it in the direction of like
+fitting more the general distribution
+and not just kind of totally getting
+completely twisted out.
+&gt;&gt; Yes. But the problem is that when you're
+done training, when you're actually
+running this thing, if you run it in a
+loop, it's it's still pushing it back
+towards being an evil genie. Not in
+terms of like shifting its weights and so on, but just in terms of its  
+behavior and what it tries next. Like
+I've seen this happen even with just
+very very very
+not sophistic like not property based
+testing right like I have clog code and
+I'm like hey do this thing for me and
+make sure the tests all pass and like if
+the thing is hard and it can't do it
+correctly eventually it deletes the
+tests or like or eventually it like
+makes the test pass in some trivial way
+or in some way that is totally not what
+I want and
+&gt;&gt; I do think this is getting a little
+better but the phenomenon is still very
+strong.
+&gt;&gt; Yes. And I think I basically think that
+the more powerful and unyielding the
+validation step is probably the worse
+this overall effect gets.
+&gt;&gt; Yeah. And another I think general
+problem with these issues, we talked
+before about the kind of functional
+properties of the software that you're
+optimizing for and then the
+non-functional properties like all these
+kind of architectural and clarity and
+extensibility properties
+&gt;&gt; and those probably get worse. Yeah.
+&gt;&gt; Right. Because if you look at the agents
+in their efficacy depends a lot on those
+non-functional properties. They just do
+better in context where things are
+tighter and more extensible and easier
+to understand and where the systems are
+fundamentally simpler, but they're super
+bad at maintaining those properties.
+&gt;&gt; Um, I feel like the the the thing that
+Anthropic came out with of like the C
+compiler that they built was a really
+interesting example where the they got
+really far. They built like a pretty
+good compiler. I mean, not actually a
+good compiler. You wouldn't want to use
+it for anything. But like an impressive,
+it was an impressive technical feat.
+&gt;&gt; You know, it's a little bit like the
+talking dog. It's, you know, it's not that what it says is so great.  
+It's that it talks at all. Like that
+they got a compiler that got to that
+level is is is impressive.
+&gt;&gt; But the thing a lot of people have
+focused on like, oh, you know, it didn't
+do any typeing and it didn't do this and
+it didn't do that. And that's like a
+little interesting, but the thing I was
+more struck by was the way in which it
+ended. And they were unable to make
+future progress to make more progress
+with this like team of agents approach
+because it just started to be the case
+that as the agents started to make
+improvements they would break other
+stuff at such a rate that they couldn't
+actually net
+&gt;&gt; which is an experience that every junior
+engineer has had too right like and it's
+why things like architecture matter and
+it's why things like you know
+&gt;&gt; making your system like actually fit
+together in a minimal and clean way and
+have concerns be orthogonal and well
+factored and all that stuff. Yeah, it's
+just like a bringing to life the like
+deconstruction of the non-functional
+properties of your software, right?
+&gt;&gt; Uh and that's I think that's one of the
+reasons why, you know, it seems to me
+like testing while still important just
+isn't enough, right? You still need to
+think about architecture. You still
+think need to think about the
+cleanliness of the code and all of that.
+Like it's not I think it's it's you just have to maintain those  
+nonfunctional properties. And and it's
+possible that if you put an LLM or an
+agent swarm or something in a loop with
+a really strong test or a really strong
+formal verification system or something,
+it's just going to make the architecture
+worse and worse in order to get the test
+to pass. Like that seems like a very
+plausible failure mode.
+&gt;&gt; Yep.
+So how do you think about
+kind of the completeness of antithesis
+as an approach, right? Like to what
+degree are you like an antithesis
+maximalist? I mean I don't so much mean
+antithesis the product but the approach
+right the approach is like we are going
+to have a kind of ability to do these
+high-powered endto-end randomized tests
+of our systems in a way that like are
+very crosscutting and can test check
+lots of different properties. That's not
+the only way to write tests, right? You
+know, you know, there's like the classic
+I'm going to like at a small scale write
+a unit test which like sticks an example
+in there and see whether the example
+behaves in the way that I want. Like
+&gt;&gt; to what degree do you think this the
+antithesis approach is really the
+approach that people should be doubling
+down on and to what degree do you think,
+you know, we should be throwing many
+things at the wall?
+&gt;&gt; Yep. So, I will first say that I I I
+want to dispute the idea that there's an
+antithesis approach. Um Okay. So the
+thing the thing that we've told people
+including all of our investors from the
+start is that this is not a
+solutionsbased company. It's a problem
+based company. Like our goal is to make
+software validation incredibly cheap and
+easy and and like running water and find
+all the bugs in all the software by any
+means necessary. And it just so happens
+that we thought that the lowest hanging
+fruit, the best way to like start making
+money and really start making a dent was
+to do this deterministic simulation
+thing and to make that cheap and easy
+for people to to adopt. Um but you know
+that is not the full extent of our
+ambitions. If we someday you like you
+know I I kind of dream of a day where
+software engineers don't need to know
+what deterministic simulation or unit
+testing or formal methods or you know
+concolic solving or or any of these
+things are they just hand their software
+to a box and you know and get back like
+it worked or it didn't. And obviously
+there's going to have to be a lot of
+very complicated things that happen in
+order to enable that vision. But like I
+kind of yeah that that's the dream.
+Okay. That said there's a reason we
+started where we did and it's that I
+think we do believe that this technique
+is uniquely high leverage and a little
+bit uniquely low adopted for how high
+leverage it is. And you know I've seen
+I have seen I have seen both situ. Okay.
+So like our team right is always dog
+fooding our own product which is a thing
+that every team that's making a
+developer tool should should do or
+really any kind of tool. Um
+&gt;&gt; it can be harder if it's not a tool that
+you use right developer tools where it's
+easiest.
+&gt;&gt; Yes. And so we we you know that's both
+fun. And I think I feel like that both
+shows the power and the limitations of
+the current basket of tools that we
+offer to our customers. Like we have
+gotten ridiculously far with just doing
+antithesis style deterministic PBT on
+everything that we write. Um including
+like UI components, browserbased stuff,
+you know, including like very low-level
+things, just like everything. Um, we
+have entire extremely complex systems
+that are literally only tested with
+antithesis and nothing else where like
+nobody has written a unit test and we're
+like one of the policies of that area of
+the codebase is that people don't write
+unit tests. You just add more, you know,
+more sophistication to the property
+based tests to cover whatever you need
+to cover. And then there's some parts of
+our code where I'm like, man, there
+should just be a unit test here, you
+know, and and that would make this a lot
+more straightforward. And so I feel like
+this is like kind of a wimpy answer to
+your question, but I kind of feel like
+there is a line, right? There is there
+is a place at which you should just
+write the stupid unit test or you should
+not use testing at all. You should be
+using something like proof-based
+techniques because of the nature of your
+problem domain or you should be using
+exhaustive testing, right? Like if your
+function takes an int32, you can just
+try all of them.
+&gt;&gt; Yep.
+&gt;&gt; Won't take that long.
+&gt;&gt; Definitely done that. Um, so like I I
+think that that line does exist. I think
+it is a lot farther away than most
+people realize. Like I think more things
+are amendable to property based testing
+than people think and that if we can
+make it easier and more powerful, people
+will use it in more situations where
+they don't currently use it.
+&gt;&gt; Yeah, I think I I think that's right. I
+and I think your point about it being
+neglected essentially feels right to me
+as well of like if you're going to see
+where you can add a new thing and make a
+big a big change. I feel like that's a
+natural thing to work on. Um I do think
+the other kind of testing is like really
+important. I think there's a a kind of
+like unreasonable effectiveness of
+example based testing, right? Like I
+think it's in some ways it's almost kind
+of sounds like a comically bad idea of
+like I'm going to have a big complicated
+program and then I'm going to test it by
+like writing six examples. Um, but like
+to a surprising degree for like modest
+complexity things, it actually like
+works super well.
+&gt;&gt; Um, and I think works especially well in
+code bases that have other good
+non-functional properties. Like a thing
+I've long been struck by is the degree
+to which having a really good and
+expressive type system that like
+captures a lot of useful properties of
+your program and tests together kind of
+there's a kind of multiplicative effect
+where it has this very strong property
+to kind of snap in place. Like you just
+kind of put your finger on a couple of
+spots and make sure that the behavior is
+what you expect it is and like the kind
+of analytic continuation of your
+program. the rest of the behavior is
+kind of smooth enough that there's kind
+of like only one natural thing for it to
+do and it kind of just like clicks in
+and does that one thing.
+&gt;&gt; Yes. I I think as a thing I've said
+before is like, you know, there's this
+funny thing about impossibility results
+where they often are actually cluing you
+into like a thing that you should really
+try and do. And and the reason is that a
+lot of impossibility results, this is
+true in mathematics, true in computer
+science, true everywhere, kind of rely
+on this like anti-inductive property,
+right? It's like it's like I'm going to
+prove that the thing that you're trying
+to do is impossible by constructing a
+really fishly awful example and like ha
+your technique fails here and I'm going
+to adapt it based on the technique that
+you're bringing, right? And like that's
+kind of that's kind of how you know
+impossibility results in mathematics
+often work like diagonalization
+arguments. It's also true in many famous
+impossibility results in computer
+science. And I think what's significant
+about this is like we're not trying to find bugs in  
+every random touring machine or even in
+a random touring machine drawn from the
+space of all touring machines, right?
+We're trying to find bugs in software
+that people write to accomplish business
+purposes. And that is a very very very
+infiniteely small subset in the space of
+all possible programs. And it's like a
+really nice one, right? It's like, you
+know, it's like it's like smooth
+functions or functions that are
+everywhere differentiable or something.
+It's like, you know, it's like the these
+are programs that people have built for
+a reason and have built so that they can
+like come back and modify them and
+extend them someday. And I think it just
+turns out that in that space of
+programs, testing is actually way more
+tractable than it would be in a
+completely random, you know, random
+program.
+&gt;&gt; Yeah, there are tons of things like
+this. Another fun example from our world
+is uh type checking in Okamel and any
+language in that ecosystem or in that
+kind of rough space of languages is like
+doubly exponential. Like you can write,
+you know, an 18line program that will
+not finish typeeing until the heat death
+of the universe,
+&gt;&gt; but nobody does. It turns out those
+programs don't make any sense, right?
+And you can find that like if you think
+really hard, you can figure out what
+those programs are, but they're not
+actually a practical part of the actual
+things that you run into when you when
+you actually do the real work. And
+again, I think this behavior of like
+real world programs being a much
+smoother, tamer, better behaved subspace
+is a really important one for lots of
+engineering questions.
+&gt;&gt; It's true. Although we do trollishly
+inside of our company have the like
+inside joke like at our last company we
+violated the cap theorem and at this one
+we're violating the turn halting
+theorem. So you we're just like moving
+up the hierarchy of theorems.
+&gt;&gt; Yeah. What's next? What's the next
+theorem to violate?
+&gt;&gt; I don't know. That's a good question.
+&gt;&gt; It's a good it's a good company
+formation question.
+&gt;&gt; Yeah.
+&gt;&gt; Um so we've talked a bunch about kind of
+the kind of engineering practices you're
+trying to create in the outside. um and
+a little bit on your engineering
+practices internally, but I'd like to
+hear a little bit more about that like
+what how does antithesis operate
+internally.
+&gt;&gt; Uh and I'm kind of curious how that how
+that differs from what you guys see in
+the outside.
+&gt;&gt; Sure. So, I think um
+I learned a a useful trick from somebody
+recently, which is when you're talking
+about your company's culture, like
+culture is always a set of trade-offs,
+right? There's no like purely good
+cultural attribute. Yep.
+&gt;&gt; They're all just like choices on a
+spectrum and being one thing implies
+that you are not the good things about
+the opposite. And so I'm going to try
+and phrase this in like the most edgy
+way possible maybe. Um so
+I think that we generally believe a
+couple important premises that have led
+us to pick a pretty pretty weird by by
+outside standards place on a lot of
+these culture spectrums. I think we
+believe that
+for many kinds of projects the overall
+cost of the project is dominated by the
+number of mistakes you make. Like like
+big architectural mistakes early on in a
+project can just have like an
+exponential effect on the amount of work
+that it takes to get the project done. I
+think we also believe
+that one of the biggest scalability
+barriers to
+human organizations is communication and
+that one of the things that is worst for
+communication is like lack of trust. Um
+and
+yeah, let's just start there. So, so
+given that you believe these things
+about the world, like what would you
+want your engineering culture to look
+like? Well, basically we try really, really hard to talk a lot about  
+what we're going to do before we do it
+and to debate multiple possibilities for
+how we could accomplish some important
+objective before we like go all in on
+one. And that doesn't mean that we don't
+prototype. Like often these discussions
+do involve people bringing prototypes
+and showing them to each other and and
+debating the merits of them. But like it
+is it is basically considered like
+uncuthter
+and then explain why you picked this one
+over that other one and then explain why
+you don't think there's a great third
+alter alternative, right? Like and that
+I think drives some people completely
+insane. Like like there's there's a lot
+of people who are just like, "Man, I
+want to put on my headphones. I want to
+write my code. Leave me alone." and like
+they just won't have a great time at
+antithesis where people are going to
+walk by and be like and there you know
+we all work in a big open room exactly
+like you guys do here and people will
+just come look at your screen and be
+like hey why are you doing that you know
+which is like not a thing that would
+happen at some other companies I've
+worked at um so we're highly
+collaborative highly deliberative
+you know collaborative does mean that
+we're all in a physical office together
+for the most part because it's you know
+adding any friction to communication
+just means that you get a whole lot less
+of it.
+&gt;&gt; Sure.
+&gt;&gt; Um it means that we don't really care
+about hierarchy very much. Like there is
+hierarchy. Every human society and
+organization has hierarchy. Um
+&gt;&gt; I've heard you're the CEO.
+&gt;&gt; That's right. But like everybody's
+opinions can be questioned and debated
+and like you know just because somebody
+is the big boss of some particular part
+of our software architecture does not
+mean that they get to sort of be
+dictatorial or rule by fiat. Like people can just come and be like I think  
+you're making a stupid decision and
+that's like a very normal thing and we
+try to praise people for sticking their
+necks out and making statements like
+that.
+&gt;&gt; Yeah. A lot of this feels very familiar.
+I think we've taken it like a pretty
+similar role. It's not like
+&gt;&gt; like the whole like big tech thing of
+like, you know, you're an L8, you know,
+sergeant, second class, something
+something. It's just like we just don't
+think makes a lot of sense for us. And,
+you know, people have functional titles
+as like someone who's like responsible
+for a given area or whatever. Uh, but
+there's no kind of general notion of
+title that like shows up somewhere.
+&gt;&gt; We're the same way. And I'm we're
+actually debating whether we need to
+change this at some point, but basically
+every single person on our engineering
+team has the same title on their job
+offer. It's senior engineer.
+&gt;&gt; Yeah. For a while. Yeah. For a while, I
+think for weird legal reasons, we
+thought we needed like two different
+ones and like for the first two years
+you were a software engineer and then
+afterwards you were but like with no
+internal like reference or anyone paying
+attention to that kind of stuff.
+&gt;&gt; Yeah. So the the the thing which I
+should probably not be saying but it's
+true is is we um we we sort of treat
+titles as like a as tools right like so
+when we're interacting with the outside
+world people can adopt any title they
+wish pretty much so it's like if
+somebody really needs to get into a
+conference like suddenly they're a
+senior staff engineer third class or
+whatever like whatever our marketing
+people decided would be the correct
+title for you to get into that
+conference and you know people you know
+can use sort of whatever titles in their
+by lines that they think would be most
+useful or put on LinkedIn like this is
+like a form of compensation like please
+pick your title but internally there are
+no titles
+&gt;&gt; right and I think part of that is we
+very much want a culture where the thing
+that matters is the idea
+&gt;&gt; and like what's the actual thing you're
+trying to do and not like the particular
+position and rank and like no culture is
+perfect our culture is certainly far
+from perfect and I don't think this
+ideal
+&gt;&gt; 100% works out in all the cases but I
+think it's definitely like directionally
+much more this way here than I think in
+lots of other places and I think it's a
+little disorienting actually sometimes
+for like like a you know a strong
+experienced person who comes from
+somewhere else and lands at Jane Street.
+It's like you know doesn't have like a rank that helps them navigate and  
+we have to actually be much more
+intentional about like trying to get
+them into the right spot and make sure
+that like people quickly realize that
+like oh this actually is a person who's
+like substantively worth including in
+and listening to in a bunch of different
+contexts because we like sort of just
+don't have the title tool as a way of
+making that happen. And so you have to
+use other methods to get people in the
+right spot.
+&gt;&gt; So how do you guys think about
+maintaining that as you grow? Because I
+think like this kind of organization is
+really really effective and also really
+hard to preserve if you grow quickly.
+&gt;&gt; Right? So I think one of the things is
+even though it feels kind of quick, we
+just kind of haven't grown quickly.
+We've been relatively disciplined about
+growing at I don't know what feels like
+a fast pace between 10 and 30%, you
+know, depending on the year, usually
+south of 30. Um and and when we've been
+on the upper range of that, we're like,
+"Wow, this is like really
+uncomfortable." Like we kind of maybe
+want to slow down a little bit and and
+we really feel like it's important to be
+able to take the time to absorb people
+into the organization.
+&gt;&gt; Um I don't I don't know how to run a
+company where you need to double every
+year for a few years. It seems
+terrifying
+&gt;&gt; and and it's just not how we've how
+we've operated.
+&gt;&gt; Um so that's one thing.
+Uh we've also just been very rigorous
+about interviewing just trying to make
+sure we're bringing in people who are
+very good technically like that's really
+important. Um, but also who fit in
+culturally, who are like nice and humble
+and yep,
+&gt;&gt; have good second order knowledge and
+aren't made super uncomfortable about
+being wrong because like we're all wrong
+a lot. Like you make a lot of mistakes
+and you want people who are comfortable
+owning up to those mistakes and
+&gt;&gt; Yeah, we design we actually deliberately
+design our interview to try and assess
+these qualities. Um, that's like a
+significant part of why it's set up the
+way it is.
+&gt;&gt; Yep. Yeah. Know, we have similar things
+from our side. It's we think it's it's
+after some early mistakes based on not
+understanding this, we realize that like
+you really don't just want to solve the
+people who are like best at solving the
+puzzles. Like being good at solving
+puzzles is really good, right? Being
+just like having like, you know, high
+wattage and just being really smart at
+stuff is good. Um, but you really want
+to make sure that whoever you're
+interviewing, you see how they operate
+under challenge. Yep. because like
+you're going to take everyone and you
+know there's more they can do and you're
+going to keep on asking them to do more
+until the job is hard and there's you
+know there's no end of hard problems to
+solve and so you want to see how people
+operate in that context. the the thing
+you mentioned of like niceness and and
+being good to work with and so on that I
+think we fully agree with that and that
+comes from a another sort of like
+fundamental observation about the world
+which is most problems are hard enough
+that one person alone cannot solve them
+and even if they were like your
+individual value that you bring just by
+like the stuff that you do in almost
+every case is dwarfed by the positive
+and negative externalities that you
+cause on the team like you know you are
+going to be chatting with your friend or
+your colleague at lunch and like have
+some good idea that makes their job
+easier or you're going to be mentoring
+some junior engineer and teaching them
+some trick that's going to make them
+more valuable for the rest of their
+career or you know on conversely you're
+going to be like being really mean to
+somebody and then they're in a bad mood
+for the rest of the day and and aren't
+as productive and also just make the
+place like a less fun place to work. Um,
+and so like that stuff just kind of
+dominates actually when you get to a
+sufficiently large organization size.
+And it's not to say that you can be
+ineffectual and really nice and and have
+a job. Like, you know, we there you have
+to get things done.
+&gt;&gt; There is still a bar. That's right. Not
+least because having people around like
+that is is terrible for morale. Um,
+&gt;&gt; right. Lowers the intellectual density.
+&gt;&gt; That's exactly right. But but it's sort
+of like you just need both and and we're
+just not going to accept you unless you
+are both really great on your own and
+also really great and magnify the
+abilities of the people around you.
+&gt;&gt; Yep. Yeah. I think that's totally true.
+One one point about the like you know
+the externalities really matter. I think
+that's true. I feel like you could take
+that kind of thinking in the direction
+of thinking that like what really
+matters is like organizational stuff and
+how things are put together and teams
+and all that. And I think that's that
+stuff is all really important. I also
+feel like the shape of this business
+makes very clear to us how amazingly
+valuable strong individual contributors
+are and like a lot of that value is like
+the externalities that they have. But
+like like individuals in both a kind of
+trading and a technology and various
+other contexts who are just like super
+good at their job and like not kind of
+built to be large scale leaders can
+still be just like enormously valuable
+and enormously well paid because that
+kind of individual contribution can just
+move the needle in a huge way. So like
+you know it's both like this kind of
+collective stuff that really matters but
+also people's just individual power to
+do amazing things is super important and
+it's really important to like recognize
+and compensate people for that kind of
+stuff.
+&gt;&gt; Yeah, I totally agree. I think you know
+another thing another thing that helps
+with keeping that kind of environment as
+you grow is just having strong espree
+and a strong like sense of yourself as
+an organization. And I think you know I
+think quirky cultural choices and quirky
+technology choices actually help with
+that. Like I think it makes people hold
+their heads a little bit higher. It's
+like yeah, I work at Jane Street. I work
+at Antithesis. It's like a slightly
+weird place. Like people who don't work
+here definitely don't work here. You
+know, it's not just like another
+interchangeable company. And I think
+that actually makes all these cultural
+problems a little bit easier to solve on
+every dimension.
+&gt;&gt; Yeah, certainly. I like to think so
+since I think I'm deeply culable for our
+weird choice of programming language. So
+I hope that has some positive
+externalities. There's actually a really
+interesting paper I read recently um
+that that talks about this in the
+context of hidic Jewish merchants in the
+New York diamond district.
+&gt;&gt; So
+&gt;&gt; amazing.
+&gt;&gt; Have you have you have are you familiar
+with this? The researcher named Beric
+Richmond.
+&gt;&gt; I have I mean I I am familiar with like
+the stores like I have seen those guys
+and been in this but I have not heard
+about the research.
+&gt;&gt; So they have incredibly low transaction
+costs with each other. They lend on
+credit. they uh you know they they they
+don't require huge amounts of
+collateral. They don't sue each other.
+They are very very very low transaction
+cost. And that is a big part of why they
+are so successful. And Richmond studies
+them and basically concludes that a lot
+of why they have such low transaction
+costs is because they are clearly not
+the world, right? They're clearly an
+insular group of people who all know
+each other, who all trust each other.
+and you know and and and where leaving
+that group or joining that group is very
+expensive and and he basically thinks
+that that kind of makes all of their
+economic dealings more efficient and
+smoother and it it's it's actually super
+interesting paper.
+&gt;&gt; Yeah, that's interesting. I do think the
+high trust thing matters a lot for us. I
+do think it reduces the kind of internal
+transaction cost. It's kind of easier to
+get things done. A thing that I'm kind
+of always worried about but still
+delighted seems to be still in place is
+that the the place it's still a place
+that can like pivot quickly. Like when
+something different needs to happen, you
+realize there's a new emergence and we
+have to change things and move people
+around and like focus less on this and
+more on that. Like we're able to do it
+in a way that feels generally pretty
+positive. Um people who come from other
+organizations are sometimes like we say,
+"Oh, we're reorganizing this area."
+people like there's a reorg and they you
+know they stiffen up in their chair and
+it's like what are you worried like
+what's what's wrong about re like we
+reorganize stuff all the time we change
+where the seats are we move it's all
+happens kind of routinely and like I
+real I then I hear stories about what
+reorgs are like at various big tech
+firms I'm like oh now I see what you're
+scared of
+&gt;&gt; we made we've made two huge pivots in
+the last two years that I'm actually
+just tremendously proud of our team for
+doing because they both required
+&gt;&gt; astonishing levels of like intellectual
+humility and like dealing with reality
+which is a thing that organizations are
+usually pretty bad at. Um the first was
+basically you know we had been in
+stealth mode doing R&amp;D like deep
+research for 5 years and then we came
+out and started selling it and at some
+point we kind of realized that we were
+still thinking of the world in a very
+R&amp;D way and then in particular we just
+were not listening to our customers and
+did not have the like customer service
+mindset at all and were really really
+bad at listening to their feedback and
+were really really bad at like doing
+what our customers wanted and that maybe
+this is like not a great property for a
+company trying to have more customers to
+have.
+&gt;&gt; That makes sense. And so like this like
+kind of like sense dawned on us and
+eventually we were just like oh we have
+to change how we think about everything
+and how we do everything and you know
+the company just like all pulled
+together and we're like okay we're going
+to be different now and and we did and
+we like turned on a dime and I think it
+went really well and it's like not 100%
+done but it's like notably and
+distinctly different. Um, and the second
+one was AI where basically for like most
+of the last few years we were kind of
+like AI coding is dumb. It like doesn't
+work. It's like not not like mostly a
+waste of time. Like you shouldn't do
+that. And then like you know Opus 4.5
+came out and everybody played with it at
+home and we were like ah crap this
+actually works now. And and it was just
+like again this like like a lot of
+places I think would have trouble
+admitting that they had been that wrong
+about something that important. And
+instead the technical leaders at our
+company who I respect tremendously not
+least for this were sort of like okay we
+were wrong like let's let's let's deal
+with the world now time time to change
+you know and like and like very quickly
+everything got reoriented and
+recalibrated and like I just I think
+that's what it looks like for an
+organization to be able to like adapt to
+a changing environment. I do by the way
+think that was like in some sense the
+right pivot point. I kind of feel like
+we've actually been spending an an
+enormous amount of energy building tools
+and trying to get agentic coding working
+effectively for a few years now. Um, and
+I think up until now it's kind of been
+bad. Like there are a bunch of things
+for which it's great. There are defin
+but but like for the majority of work
+you're doing doing like critical
+software. I think it's more has been
+more likely to slow you down than speed
+you up. And it it sort of they had this
+feeling of like
+&gt;&gt; you know spending a bunch of time
+building a boat and having a sail there
+and like holding the sail up and like
+there's no wind coming. Um and you know
+we get some utility out of it. People
+use it for some things, the tools get
+better, but like with a recent round of
+models both from from like all the
+vendors actually at this point, like
+there are the models are much better.
+Yeah.
+&gt;&gt; Uh and suddenly it feels like there's
+wind in the sales and now it feels like
+we're pretty well prepared
+&gt;&gt; and have you know a good team in place
+and are like, you know, being able to
+deliver a lot of value based on this
+stuff. But there was an awkward period
+of like
+&gt;&gt; I mean these things are miraculous but
+also not super useful. Um and now they
+seem both miraculous and useful.
+&gt;&gt; Yep. Yep. Yep. Yeah. So I don't know it
+is I think I think also like on all of
+this cultural stuff one of the most
+important things is just having senior
+people modeling good behavior like we
+all take great pains the senior people
+at the company take great pains to like
+give credit to others right to like to to loudly proclaim when they were  
+wrong or did something dumb just like
+showing that that is what we do.
+Everybody is always looking at the
+implicit like we all have the same
+title, but you're look you're looking at
+the implicit leaders and seeing how they
+act and so having them act the way that
+you want everybody to act is like kind
+of step one.
+&gt;&gt; Yeah. And I I I just want to say like
+don't give it up. Like it is possible to
+maintain at larger scale. I you know I I
+don't want to say we've done all of this
+perfectly but it echoes a lot with the
+kind of things that you're talking
+about. I think we really have been able
+to keep up with it. Um by the one other
+thing that has been I think important is
+the place is designed for long tenurs.
+like we just have people who have been
+around here for a long time. Like the
+turnover rate is pretty low and I think
+that affects a lot of things about the
+culture. It keeps a lot of institutional
+knowledge around and it helps maintain
+the culture. I think one of the things
+about cultures is they're kind of
+mysterious. You don't actually know
+which parts of it are the ones that are
+loadbearing and so you want to be very
+careful about preserving it in a
+somewhat conservative way. There's a lot
+of like Chesterton's tent fence kind of
+thinking going along.
+&gt;&gt; You know, that's why we're in DC.
+Everybody always asks me, why on earth
+did you put a ambitious deep tech
+company in DC and not the Bay Area? And
+it's basically 100% so that we can
+actually keep people and invest in them
+for the long term. It's not just the Bay
+Area has tons and tons of competition.
+It's actually just that the Bay Area has
+a meta culture of job hopping every 9
+months to get slightly more RSUs. And
+basically once every company is in that
+equilibrium, nobody invests in anybody.
+and it's like very hard to to be the one
+that stands out and doesn't act that
+way. Whereas in DC, you know, people are
+used to working for the government and
+working there for like 30 years. And so
+the like kind of ambient expectation in
+the water is like, yeah, you're going to
+go work somewhere and work there for 30
+years. And so we have ridiculously good
+tenure among our engineers and are able
+to invest in them. And it's just like a
+way nicer in my opinion.
+&gt;&gt; That's okay. That's amazing. Okay, that
+seems like a great note to end on. Thank
+you so much. This has been really fun.
+&gt;&gt; This was awesome. Thank you so much for
+having me.
+&gt;&gt; You'll find a complete transcript of the
+episode along with show notes and links
+at signalsandthreads.com.

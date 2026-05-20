@@ -1,0 +1,1300 @@
+Thank you.
+Hi, my name is John. As you heard that
+that's that's who I am described in in a
+few beautiful words.
+So I'm here to like dig into some pretty
+nerdy deep stuff and I'm hoping that
+you're all here for it. This is not
+going to be rust specific even though a
+lot of the stuff that I do is rust, but
+it happens to intersect quite well with
+people who care about rust tend to care
+about things like concurrency and
+parallelism and speed and data systems
+and algorithms and I have a feeling that
+much of this audience cares about
+similar things even if it's not because
+of the rust programming language. I'm
+hoping this will apply more broadly.
+You'll see a couple of slides that have
+tiny bits of rust code on them, but I
+think you'll be able to recognize and
+map it sort of mentally to whatever is
+your language of preference.
+This talk is titled are mutexes slow?
+And there's a I think it's a good word
+just law of headlines that says you can
+answer any such question with no and of
+course the answer to this is also no
+perhaps unsurprisingly, but the reasons
+why are interesting because we have all
+observed or at least most of us have
+that a mutex was slow that a program was
+slow because it was stuck taking a mutex
+or mutexes were taking forever to load.
+So how can it be that I claim that
+they're not slow if I've observed that
+they are slow. And in fact you know the
+the you know if we if you dig into and
+ask people what a mutex is for you'll
+hear things like mutexes are slow.
+You'll hear that reader writer locks are
+the thing that you should use instead.
+If you have read heavy workloads just
+use a reader writer lock and then you
+can have as many readers as you want and
+the universe is happy and everything is
+fast. You'll also hear things like lock
+free data structures are the best of the
+fastest, right? And you might wonder
+well what does that mean? What what is a
+lock free data structure, but also what
+is a lock? Like a lock is a mutex, okay,
+but what is a mutex? Like really what's
+going on at the CPU level and that's the
+kind of stuff we're going to dig into
+today to try to give you some intuition
+for if you take a given concurrent
+algorithm, how is it going to perform?
+Why is it going to be slow if it is
+indeed slow? And what does slow even
+mean?
+Um
+And the the reality is sort of to give a
+uh
+a preview, the reality is it's
+complicated. It's nuanced. There's stuff
+There's like stuff further down that
+influences why these are slow.
+Um the test we're going to use here is
+actually a very straightforward one. So,
+we're going to have a counter, and we're
+going to read that counter.
+Nothing is going to update the counter.
+We're just going to read it. And we're
+going to try to read it from many many
+threads.
+Um the This is in Rust code, but the
+basic idea is you have some counter.
+It's shared. In this case, it's
+atomically reference counter, but it
+just It's a way that you can have many
+threads that point to the same one, the
+same counter. And then in a loop, we're
+going to take a lock on that counter,
+and then we're going to read that
+counter. That's the star guard here. The
+reason I have black box here is to make
+sure that the compiler will actually do
+the read. Cuz otherwise, it would just
+optimize this code to this loop is a
+loop that does nothing. So, I don't even
+take the lock, and then, you know,
+I'm not measuring anything interesting.
+And then I'm just going to run lots of
+these in parallel.
+Um we're going to like There There are
+no rights. Uh so, surely this should be
+fast. Um And let's try and see what
+happens if we try to use a mutex here.
+So, there's going to be a mutex over a
+counter where we just read. This first
+graph, very easy. It is a graph that
+starts very high when there is one
+thread. It gets about 250 million
+operations per second, 250 million reads
+per second. Which, if you have like a
+2.5 GHz CPU, that means you take about
+10 instructions to take the lock and do
+the read. That's pretty good. When you
+have two cores, it drops to about a
+tenth of that. It drops to about 25
+million instead of 250 million
+operations per second. So, the graph
+looks like this.
+And then, once you add more threads
+after that, it looks almost flat. It
+goes down a little bit more, but then it
+just stays flat very, very low.
+And so this might make you conclude,
+well, okay, mutexes are slow. I just
+This is a code that just does reads.
+What is the mutex doing? Why is it so
+slow just because I added more threads?
+What you might assume is that a mutex,
+which is supposed to be mutual
+exclusion, only allows one thread to
+make progress at a time. So you would
+not expect it to get better with more
+threads, but you kind of expect it to
+stay the same. Right? The mutex should
+allow one operation to happen be
+happening at all times. That is not what
+the graph
+looks like. In- Instead, more threads
+give you worse performance. Now, what
+does this look like for reader-writer
+locks? Well, here's there's another
+graph, but this one's also very easy to
+explain because in this graph, there are
+two lines that sit on top of each other.
+The reader-writer lock, when you again
+only take the read lock and all you do
+is read, as you add more threads, the
+performance starts out really good,
+about the same as a mutex, and then gets
+about 10x worse. It ends up doing
+slightly better than the mutex, but it
+also, as as you'll see on the graph, uh
+the reader-writer lock actually gets
+worse over time.
+So as you add more readers, the
+reader-writer lock ends up being worse
+than a mutex as you keep going.
+The mutex sort of drops and then stays
+flat.
+And And what I'd like to sort of probe
+you for here is the
+to see if you have intuition for why
+that might be. And my hope, or the
+intention of this talk, is that the
+answer is I don't really know why that
+would be. That's weird. And that I can
+hopefully try to tell you why it behaves
+that way, and why that's actually kind
+of what we would expect.
+So clearly, there there's something else
+going on here. And so we need to talk
+about CPU caches in order to understand
+the sort of underlying problem here. So
+with this graph, you'll see, as as I
+said, it starts out really high, and
+then it gets worse, and then it stays
+about flat. Then we will see a graph
+that shows both the mutex and the
+reader-writer lock. Uh the blue the blue
+line here is the reader-writer lock. And
+and again, as you see, like it it starts
+slightly worse than the mutex, but it
+doesn't drop quite as much, but over
+time, as you add more readers, the
+reader-writer lock gets worse than the
+mutex gets worse. The mutex sort of
+stabilizes.
+And so, this is where we need to talk
+about CPU caches. Um and indeed, CPU
+caches are these things that CPUs have
+built into them to try to make it
+cheaper to access the stuff that's
+stored in RAM. Because the stuff that's
+stored in RAM is really far away from
+the CPU. It's far away in the sense that
+like the copper wire is far. And so, it
+can take you like hundreds of
+instructions to reach main memory. And
+hundreds of instructions are an eternity
+for a CPU. And so, you want to keep some
+memory much closer to the CPU, but
+closer to the CPU, you also have less
+space. So, you don't get to put as much
+memory there. You have to be very
+diligent about your actual like physical
+space usage. Um and so, CPUs actually
+have this hierarchy of caches. So,
+you'll see that this depends a little
+bit on the CPU. So, different CPUs have
+different architectures for this, but
+it's very common that there are three
+levels of cache. L1 cache is very close
+to the CPU. It's like soldered onto the
+CPU. L3 cache, on the other hand, is
+pretty close to RAM. It's not as far as
+RAM, but it is closer to RAM.
+The L3 cache is usually shared amongst
+all of the cores of your CPU. The L1
+cache is not shared. The L2 kind of
+depends on the CPU. It's just somewhere
+in the middle between L1 and L3. Its
+latency is somewhere between L1 and L3.
+And these also increase in size as you
+go up. So, the L1 cache is very small,
+the L2 cache is a little larger, and the
+L3 cache is decently large, and then
+RAM, of course, is is humongous, as we
+all know.
+Now, what happens if one CPU has some
+bit of memory, like the counter we were
+talking about, in its local cache?
+And then some other CPU core wants to
+read that memory, what happens? Well,
+there needs to be some kind of cache
+coherence protocol to negotiate between
+them who's allowed to write it when, and
+to make sure that the right value makes
+it back to RAM eventually.
+And that protocol is called MESI, uh M E
+S I. There are a bunch of variants of
+it, so there's also uh MSI, and there's
+M E ISI, and there's M E There's like a
+bunch of different various combinations
+of letters protocols, um but most of
+them are MESI-like.
+Uh MESI stands for Modified, Exclusive,
+Shared, and Invalid, and those are the
+four states that something can have in
+the cache. The cache keeps an entry for
+You can think of it logically as like
+every piece of memory, like every
+address in RAM. Um the reality is it's
+not actually every address in RAM, it's
+every chunk of RAM. So, the CPU has this
+notion of cache lines, so it takes all
+of your main memory, it divides it into
+um 64-byte
+chunks, and those 64-byte chunks are a
+cache line.
+And so, you took RAM and you just like
+write it out, like the first 64 bytes is
+one cache line, the next 64 bytes is one
+cache line, and so on. And the cache
+keeps track of memory on the
+sort of boundaries of of cache lines,
+and keeps track of which CPU cache has
+exclusive access to which cache lines,
+or which CPU cores share access to a
+given cache line.
+And this is where we get into some
+really interesting stuff. Um so, when
+the state is modified, it means that I
+have the only copy. So, if if it's in my
+cache as a CPU core and it's marked as
+modified, I have the only copy and it is
+dirty as in it differs from what's in
+RAM.
+So, that means if anyone else were to
+read it, not only would I need to give
+up my permissions, but I would also need
+to write it back to a place they could
+read it from.
+Exclusive means that I have the only
+copy, but it's not dirty. So, if someone
+else wants it, they can just take it
+without having to talk to me first.
+Uh or they would need to make sure that
+I move mine to invalid, but they don't
+need any data from me. Um like because
+that data hasn't changed. Then we have
+shared, which is multiple caches have
+entries for these and those cache
+entries are all the same. They all have
+the same value. Otherwise, shared would
+not be a legal state. And then we have
+invalid, which is I don't have a copy of
+this cache line.
+Um this could be the like it used to be
+like it is in my cache in the sense that
+I had it previously, but I'm not allowed
+to use that cache line entry anymore. It
+because it's been given away to someone
+else to be exclusive, for example.
+if you, for example, are core and you
+have a particular cache line in the
+shared state and you want to write to
+it, the protocol requires that you first
+make sure that no one else has it in the
+shared state so that only you do and
+then that everyone realizes that you
+have now moved it to the exclusive
+state. And at that point, you're allowed
+to read and write it as you wish. You
+don't have to tell anyone that you're
+now now modifying it even if you did
+multiple modifications.
+And then eventually, if someone else
+wants to modify or read that cache line,
+they have to tell you to convert it back
+into shared so that they can then get a
+copy that they can read from, but cannot
+write to.
+and and and the the interesting
+observation here is that writes to
+shared data
+requires coordination between cores.
+If I have a shared version of a cache
+line and and I want to modify it, I must
+talk to basically all the other cores
+because I need to make sure they know
+not to modify it and they know not to
+read it either.
+And this is where some of that cost come
+from. There's a bunch of cross-core
+communication.
+And in fact, if we look at a
+reader-writer lock, then a reader-writer
+lock, the implementation of taking the
+read lock is actually that you increment
+the reader count by one. So, there's a
+counter inside of the lock. Not the
+counter that we're, you know,
+benchmarking here, but inside of the
+lock, there's a counter that keeps track
+of how many reader threads are there.
+And that counter, in order to take the
+read lock, you have to write to.
+And so, if you have 100 threads that all
+want to take the read lock, they're all
+doing a write on a shared field.
+This means that every core needs to at
+some point get that one in exclusive
+mode, update it, and then make it shared
+again. And then the next core, the one
+that wants to read the lock, needs to
+get it in exclusive mode, modify it, and
+then share it again, and so on through
+all 100 cores. And so, in a way, you can
+think of this as there's a sequential
+part of every reader-writer lock.
+But, after you've done this, now you
+don't have to talk to the other cores.
+But, you do have to do it for the setup.
+So, so let's walk through what that
+actually looks like. Let's look at if we
+have two readers that are both trying to
+acquire a read lock.
+So, here we have core zero and core one.
+The S here is the cache line state for
+the cache line that they're operating
+on, whatever that might be. And then the
+note is just to explain what's
+happening. So, initially, let's say that
+core zero has exclusive access to this
+cache line and core one does not have a
+valid entry.
+And then core zero wants to do the fetch
+add, right? Because it wants to acquire
+the read lock. Well, that's easy. It has
+exclusive access, so it just marks it
+now as modified and then updates the
+one. No problem. There's no cross-core
+traffic.
+Now, core one wants to acquire the lock.
+Well, it it observes that
+this entry in the cache is already
+modified by core zero.
+And so, there needs to be now a
+write-back from core zero to core one's
+cache to inform it of the updated value
+because the value got updated at step
+one.
+So, that
+that edit needs to be communicated to
+core one.
+When that's happened, there's sort of a
+the protocol has some various kinds of
+optimizations, including things like you
+don't need to go via the shared state.
+So, you can just give the data over and
+say, I'm sort of giving you ownership
+alongside the data. And so, at this
+point now, core zero has invalid and
+core one has modified because it got to
+do its fetch add.
+And then, core zero wants to release its
+read lock. Well, the whole process
+happen again. So, now I I need core one
+to write back to core zero so that core
+zero can get in exclusive state and then
+decrement the counter of reader nodes.
+Um and so, what we see is if you have
+one instance of like I want to acquire
+the lock and release the lock, you
+actually require two cache line
+transfers.
+One to get it so you can do the add and
+one later so you can get it to do the
+release, the subtraction.
+Um and each of these transitions costs
+about 30 seconds. So, um there's sort of
+a this cache line ping-pong ends up
+being a really expensive operation
+because talking to different parts of
+memory cost different amounts of time
+because they're different distances from
+the cores. Um you'll see here that the
+oper- like if you want to read something
+or access something in L1 cache, it's 1
+nanosecond. It's like no time at all.
+But if you have to go to cross-core
+communication, which is what you need to
+do in order to do that cache line
+transfer, that takes about 30
+nanoseconds.
+And now, imagine that I have to do two
+of those, one's to acquire and one's to
+release. So, that's 60 nanoseconds in
+the good case.
+Accessing main memory is 100
+nanoseconds. That's the thing that we
+think CPUs think take forever. And we're
+already over halfway there just by
+acquiring the read lock alone.
+And and uh the the other thing that that
+I think is really interesting here is
+that for mutexes, it's not quite as bad.
+For mutexes, when you acquire the lock,
+you hold the lock and you know that no
+one else is going to try to increment
+that counter from you because, well,
+they can't acquire the lock. So, the
+problem, in a way, is reader locks
+because for if you have an exclusive
+lock, when you release, you know that
+you're still the owner of it. Someone
+else might have gotten a shared copy,
+but they will not have an exclusive
+copy. They can't have anything to write
+back cuz all they can have done is read.
+And so, reader locks almost scale worse
+than mutexes here. And this is one of
+the reasons why that reader lock thing
+gets worse is because as you get more
+readers, they contend more and more with
+each others. Whereas, if you have many
+mutexes, they don't really contend with
+each other because they're they're fine
+with going one at a time in a sequence
+and not causing all this cache line ping
+pong.
+The reason why people don't think about
+this problem that much is because
+usually when you interact with locks,
+you have a bunch of code in there. Like
+after you take the lock, you run a bunch
+of code and then you release the lock.
+And so, the cost of acquiring the lock
+is not really something that matters
+that much to you.
+But this is not true if you have short
+critical sections, like short amounts of
+code between acquiring the lock and
+releasing it. Because if that's the
+case, you're going to find that the time
+it took for the cache miss is more than
+the time it took for you to run your
+code.
+And so, in general, you'll find that the
+overhead of using a lock goes up the
+more you need that lock to be fast.
+It's sort of the inverse proportion of
+what you want here.
+For for longer things, mutexes are
+totally fine. Use them as much as you
+wish. Um it's primarily when you hit
+those those hot critical path loops,
+where you also know you have contention,
+where you need a mutex because there's
+contention, that a mutex doesn't really
+work very well.
+And this is also why real-world code
+tends to not worry too much about these
+problems, and it's only when you start
+writing pretty specialized code in those
+deep hot loops that you need to start
+knowing about things like messy.
+And so, I want to now take a a sort of
+side step to well, what can you do
+instead? So, if you can't use mutexes
+and you can't use reader-writer locks,
+what can you use? And I'm not going to
+propose that this is the correct
+algorithm. As I'll get to later, this is
+a bunch of tradeoffs, too. I just want
+to sort of inject in your mind other
+kinds of alternatives to sort of let you
+think about what else could you do that
+doesn't necessarily have this problem,
+but might have other problems. So, I
+want to talk to you about you with the
+left-right data structure. The
+left-right data structure is something
+that um I used in my PhD research, where
+I had enormous amounts of right uh
+readers and very few writes. So, I
+basically hit this problem, and the
+thing that I did in the when I held the
+read lock was a hash map look up and
+then nothing else.
+So, the read was very, very short, and
+so the overhead of the reader lock was
+just killing me as I needed something
+else.
+So,
+what's interesting here is it was trying
+to solve this problem of why do all the
+readers need to access a shared cache
+line? It feels like if the readers are
+supposed to be independent, they need to
+have their own cache lines, not a shared
+one. So, how can you design a
+concurrency primitive that is still safe
+for having there be many reads and a
+writer, but it's safe in such a way that
+like the readers are cheaper and the
+writer has to do more work. Because my
+rights were happened relatively
+infrequently, so I was willing to pile
+more work onto there if the readers
+could be highly parallel.
+So, the way left-right works is that you
+keep two copies of your data.
+Um you keep a left copy and a right
+copy. Uh you have a pointer in the
+center, sort of an atomic pointer that
+every reader and the writer has access
+to, and that pointer points to the side
+that the readers should read from. It
+points to the
+points to the copy that the reader
+should read from. The writer will always
+be modifying the one that's not pointed
+to by the pointer.
+And then when the writer has made a
+bunch of modif- modifications to the
+writer-owned right copy here, um then it
+switches the atomic pointer over to now
+point to the other side.
+When it points to the other side, then
+now all of the readers will start
+reading the the right-hand side copy,
+and the writer can eventually start
+modifying the left-hand side copy.
+And the intent here was the readers
+might not need to coordinate at all
+because the writer doesn't really care
+what the readers are doing with the
+exception of it needs to know when it's
+safe for it to start modifying the copy
+it switched away from. So, imagine you
+have a bunch of read threads that are
+reading the left copy before we swap the
+pointer. And then the writer swaps the
+pointer, those read threads are still in
+the left copy. And so some Sorry, left
+left copy. Um but so something has to
+tell the writer all the readers have
+read the updated pointer value now.
+They're in the right copy, and so it's
+fine for you to just now start modifying
+the left copy. So, some mechanism is
+needed here, some synchronization
+primitive.
+Um and it turns out that you can do this
+by giving every reader their own cache
+line. They have their own counter that
+basically keeps track of how many times
+they've read the pointer.
+And then the writer's job is going to be
+look at the counter for every reader. It
+has a giant for loop where it loops over
+all of the readers that exist, reads all
+of their individual counters,
+and observes that all of them have
+changed by at least one since when the
+pointer was swapped.
+The reason this works is because when
+you switch the So, you read all the You
+You switch the pointer, then you read
+all of the counters,
+and then we you read them again, if
+they've changed by at least one, it
+means that that reader has read the
+updated pointer is now doing a second
+operation. And if it's read the pointer,
+it has read the changed pointer, and
+therefore it's no longer in the original
+map.
+The interesting thing about this design
+is the readers do not share state with
+each other.
+The readers just keep their own counter
+for how many times they have read the
+pointer. They do not need to talk to
+each other. In other words, if if if we
+think back to the MESI protocol, this
+means that the core that's running in a
+given reader thread
+can just keep that cache line in the
+exclusive state. Never has to be shared
+except for when a writer wants to sort
+of do the pointer switch. Because then
+the the writer thread, the core that
+runs the writer, has to read the counter
+from every reader,
+and then, you know, turn it into the
+shared state, read the value, and then
+it goes back to the reader again to
+update.
+But only when the writer wants to
+contend with the readers does anything
+interfere with what the reader wants to
+do. Otherwise, the readers are
+completely independent.
+And
+And readers become even better than
+that. They now don't have to wait for
+anything.
+They don't have to wait at all. Even if
+there is a concurrent right, they can
+just keep reading their copy. So, the
+reads end up being lock-free.
+The reads do not pause for anything. In
+fact, they are wait-free. They do not
+wait at all. They don't take any locks.
+They don't have any loops. They just
+read the pointer,
+bump their counter, and then access the
+data. And that's all they need to do.
+And the net result of this is you get a
+graph that looks like this, maybe. Yeah.
+Uh and so this graph is linear. It goes
+up and to the right in exactly the way
+you would hope when you increase the
+number of threads. And again, that we
+now have the intuition to understand
+why. It is because the reader threads,
+the cores that run the reader threads,
+do not have to coordinate and therefore
+can just run fully in parallel.
+and and yeah. If one of the threads
+Here, take this.
+If one of the threads is dormant for
+some reason or maybe doing a lot of
+work, then they just still hold the old
+reference and don't increment it. Is
+that an issue? Uh-huh. So the algorithm
+is slightly more complicated than I told
+you. Um so the algorithm is actually
+that a reader will um
+uh increment its value, its counter
+value, um
+before it starts an operation,
+and again at the end of its operation.
+And so what the writer needs to look for
+is any reader where the number has gone
+up or where it's even.
+And that way you you know that like
+dormant readers are not a problem.
+Readers that continue to hold on to
+their access is a problem because they
+prevent the writer from starting to
+modify the other one. But it doesn't
+prevent readers from continuing to read.
+It just prevents the the updates to the
+So the the next thing you'll observe
+here is like the number here is pretty
+high.
+Like this is 3 billion operations per
+second that we get to read. But but
+again, it's just because we had
+wave hand about 10 cores. And so it
+should be about 10 times what we had at
+one core, which is not what you get with
+a reader-writer lock, even though
+the the name sort of implies you might.
+And the the key here though
+is that this only works if writes are
+rare.
+If writes are rare, then this performs
+really well, really really well, because
+the only writes can make contention in
+the system. On the other hand, if writes
+are not rare, it doesn't perform any
+better than what you get with a
+reader-writer lock. And in fact, if you
+start flipping I didn't include that in
+this graph. If you start flipping the
+ratios, you do more writes than reads,
+this does worse, because the writer has
+to do a bunch more work, and you don't
+really get the speed performance win
+from the readers being lower contention.
+And and the intuition here for why the
+reader-writer lock gets worse is again
+the same one we talked about earlier for
+why the reader-writer lock graph goes
+down. Is that the reader-writer lock
+gets punished more as you add readers.
+So here, there are nine times more
+readers than there.
+Right? So in that case, you you would
+expect to get a slow down because they
+contend more with each other.
+And and I I want to give you a debugging
+story here, because there's a there's a
+useful insight as part of this. So while
+benchmarking left-right 2 produced the
+previous graph that went up into the
+right linearly, I discovered that it did
+not go up into the right linearly. Uh
+there was sort of this weird dip where I
+was expecting it to keep going linearly,
+and instead it dropped significantly. It
+dropped by like 10x when it got to four
+cores.
+And I was like, why is this happening?
+This shouldn't be happening. It does not
+match my intuition for how CPUs work. Um
+and it turned out that the problem here
+was not like crossing between NUMA
+architectures or like you ended up going
+to like a different CPU package that's
+further away. Like I I went through all
+of these like ideas of maybe it's this,
+maybe it's that. Turned out it's
+actually pretty simple, and it's
+something that
+you get like it's the one of the first
+things you learn when you deal with
+concurrency at this level. It was
+something called false sharing.
+False sharing happens because remember
+how I said the cache doesn't operate on
+individual memory addresses, it operates
+on cache lines, 64-byte lines. Well, a
+counter, you can have more than one
+counter in 64 bytes. And so, if you get
+unlucky, the counters for So, this is
+like the not the counter we're
+benchmarking, but the counter inside of
+left-right. If multiple threads have
+their counters on the same cache line,
+then it doesn't matter that one is only
+modifying this counter and one is only
+modifying this counter, they're on the
+same cache line and the ownership, the
+messy ownership, is determined based on
+the cache line. So, when one writes and
+then the other writes, the cache line
+will still bounce even though they
+update distinct parts of that cache
+line.
+And so, the fix was like a one-line fix.
+It was to add 64-byte alignment to the
+type that holds the counters. Because
+now they must be on different cache
+lines, and the problem went away.
+Like it was it was just that. There's
+now a new release of left-right that has
+this fix in it, so now it should go up
+into the right for you as well. I
+contributed it upstream to myself. Um
+But but it's there's an important
+distinction here, which is that
+lock-free does not mean contention-free.
+Just because there are no locks, does
+not mean that the CPU isn't going to
+punish you because you made memory move
+around a bunch more. Like moving things
+across copper wires is expensive, and if
+you can avoid doing it, you will have a
+faster program.
+This is also why it's important to know
+about this, to have some amount of the
+the intuition for why did this thing
+perform that way, or why did it not
+perform the way that I wanted to, and
+try to like debug in a way where if you
+like threw this at a like perf or
+something it wouldn't really tell you
+because the thing that's going wrong is
+like the the CPUs have to talk too much
+to each other
+which is sort of a layer beyond the
+abstraction
+layer that we usually reason at.
+And what I want the sort of takeaway of
+this talk to be is that I want to start
+choosing a little more wisely. If you
+have to write code that needs to be
+highly parallel, highly concurrent, and
+sort of sitting in these critical loops
+then it's not as though you should just
+take the the first algorithm you find
+even if it's one that's been benchmarked
+against really good performance reviews
+or like you
+you like look on the the OCaml version
+of crates.io for the the fastest mutex
+or the fastest reader-writer lock and
+then you just use that one because the
+reality is you have to pick the
+algorithm that best suits the sort of
+data transfer patterns that your
+application has. Because the way we make
+concurrent programs faster is that we
+pick algorithms that align with what
+your program wants to do. You make use
+of every single like weird oddity that
+your workload has all of those can be
+exploited to make the algorithm slightly
+better for your use case.
+And and I mean left-right here is a
+really good example. It is not a drop-in
+replacement. There are a bunch of things
+that left-right does that you will not
+want to do for most applications. Like
+obviously it keeps two copies of all
+your data that's pretty expensive. Um
+readers can see stale data, right? So
+the writer gets to modify the stuff and
+thinks it's like modified the stuff but
+the readers don't get to see it until
+the next time they read after a pointer
+swap. Left-right has a mechanism where
+the writer can say I now want to wait
+like don't return until all the readers
+have moved on so you can do that but
+that's that then comes with additional
+cost to the rights.
+Um it's also single writer only. You
+cannot have multiple writers in
+left-right. It assumes that there's only
+one. If you want multiple, you have to
+put the right side of it in a mutex. And
+then now you have a mutex on top of a
+concurrent data structure and you're
+going to get sadness. It's possible, but
+it's not what it's designed for. Um,
+operations also have to be deterministic
+so that you can take an arbitrary data
+structure and turn it into a
+left-rightable data structure. The
+reason for this is because when you have
+this left-right split, imagine that you
+do a bunch of operations to the the for
+you left side left copy.
+Well, and now you switch the pointer
+over. Now you need to take the right
+copy and apply the same changes to that
+right copy as you applied to the left
+copy while it was the active one.
+Because it the right copy is sort of
+stale now. It didn't see those updates.
+That means you need to be able to log,
+like keep a log of the updates that have
+been applied here but haven't been
+applied here. And then you need to be
+able to apply them to the other one and
+they need to have the same result.
+Otherwise, you would end up with the two
+copies having different state. And then
+readers will get super confused.
+And so you can only do this for data
+structures that where you're able to
+keep an operational log that's
+deterministic in how it affects the data
+structure. Not all data structures have
+that property.
+Um, writers also have to wait for all
+readers to exit, which like may or may
+not be a problem for you. Like maybe you
+actually want them to be able to just
+run a bunch of writes while the reads
+are going. We don't really care. Maybe
+that's the application you want. You
+want weaker semantics. You could do that
+and probably build an even faster data
+structure. But the nuances of what you
+need is what gives you the performance.
+Um, there's a bunch of other stuff like
+it's not linearizable, so it's only
+eventually consistent, uh, which may or
+may not be a problem for you. For
+example, I would not use left-right for
+financial transactions, uh, but I would
+use it for things like caches or lookups
+or those kinds of things. So, the
+like your mileage may vary. The reality
+is that every solution has trade-offs
+here, right? It's mutexes are the
+correct choice for a bunch of concurrent
+algorithms. Just like reader-writer
+locks are the correct choice for a bunch
+of algorithms. And left-right is the
+correct choice for a bunch of them. But
+it depends on what your needs are.
+And that's what I really want you to
+take away from this. Um some of the
+questions I would recommend that you try
+to ask yourself here is like, what is my
+ratio between reads and writes? Those
+tend to really affect what algorithm you
+use. Um you should ask yourself how long
+is the code that I want to execute in a
+synchronized way? Cuz if it's short
+versus long, that changes the sort of
+budget you have for the synchronization.
+Um think about how many threads you're
+going to have. If you're going to have
+three threads, none of this matters.
+Right? If you care about a like it's it
+should be faster two threads than one,
+then okay, maybe it matters a little,
+but like you know, we saw the dramatic
+graph, it can matter. But usually that's
+not the kind of scale or concurrency
+where this stuff really becomes
+relevant. Um
+Can I tolerate eventual consistency?
+Like do I need strong consistency in my
+reads versus my writes? Do I need, for
+example, to be able to read my own
+writes? So, imagine that I, as the
+writer, I make a modification to the
+data structure, and then I try to read
+from the data structure, should I be
+guaranteed that I read the modification
+I just wrote? Left-right does not give
+you that guarantee cuz you might read
+from another map that's like the other
+one than where you were writing.
+But if you need that, well, then you
+need to take that into account in your
+design of the algorithm as well.
+Uh do you need linearizability? Like do
+you need even even stricter guarantees
+about two what two threads can possibly
+see in relation to another? Like which
+interleavings are possible?
+And I'm not going to teach you all of
+those things now. It's more that these
+are the kinds of things you should ask
+yourself if you want to go the sort of
+step beyond of just using an
+off-the-shelf concurrent algorithm.
+Always measure before you start
+optimizing these things.
+And the real lesson is that it's not
+about locks. It was never about locks,
+right? Coordination is expensive because
+of cache coherence, because of what the
+CPU needs to do to guarantee that your
+program executes correctly. The locks
+are just the interface you happen to be
+using. And there are a bunch of other
+ways in which CPU caches can burn you as
+well, but this is the one you're most
+likely to run into without necessarily
+realizing that that's the thing that bit
+you in the ass.
+A couple of other articles that are
+really useful that talk about more of
+the details here. This this top one I I
+really like, which is a breakdown of
+like how long do thing does things take
+in the CPU? Like how long does it take
+to read from disk versus talk to your L2
+cache
+versus send a TCP packet versus send a
+TCP packet to the other side of the
+world. Like what is the relative time
+scale of these things? Um and some of
+the other ones are also just interesting
+other data structures you might might be
+able to make use of. So for example,
+scalable reader writer locks talks about
+a way where you take a reader writer
+lock and instead of having one counter
+for the number of readers, you have one
+counter per core per reader.
+So there's like you don't have as many
+you don't have per reader you only have
+per core and therefore most operations
+are core local and the writer
+walks across all of them.
+Uh and so this also can be the kind of
+thing that like maybe that fits your use
+case better, but ultimately I hope you
+you give some of these a read to give
+you a better idea of what the trade-off
+space looks like and what options you
+have if you wanted to write some really
+concurrent code.
+That's all I have for you. Thank you.
+Questions?
+Do you have questions now? Cuz you had
+you had you had early questions earlier.
+Sure, I'll ask one more.
+I'm not sure how helpful this will be,
+but have there been any interesting
+hardware innovations for uh parallel
+programming? Like somebody released some
+new operation that made like mutexes
+like 10 times faster because it was a
+native operation.
+So so I wouldn't say there's been like
+revolutionary new things where like just
+whole workloads are now 10x faster, but
+the MESI protocol started out as the MSI
+protocol and then they added E because
+they found like the exclusive state cuz
+they found that certain workloads could
+avoid like half of their cache line
+contention by having this. And I think
+they're up to like seven or eight
+letters now in some of the more modern
+CPU architectures. Part of the problem
+is these are often proprietary
+protocols. Like we know that they exist
+because they are documented in the spec
+for the CPU, but they don't tell us like
+what does the CPU do internally? They
+just sort of tell us how to think about
+it. Um some of them are like earlier
+versions were open, but later versions
+we don't know exactly what the CPUs are
+doing, but we know that they work
+roughly like this. Um but but nothing
+where we've been like this is crazy. I
+think the closest I would say is um
+there's been some work on like when they
+build CPU packages to build them in more
+in 3D.
+Uh and the reason 3D is cool is because
+you can have shorter distances to
+things, right? So you can put your cache
+above your CPU and so now that cache can
+be bigger because it has more space to
+grow and so now you have a bigger L3
+cache and you can maybe share it among
+more cores. This is like the
+um for AMD processors they have this
+thing called uh
+3DX I think it's like you can buy like
+their CPU or the same CPU with 3DX in
+the name and the 3DX is just like they
+stuck an L3 cache on top and so I have
+more L3 cache now. Uh and and that ends
+up helping for some of this stuff,
+right? Because it means you don't need
+to go as far when you need to access
+data than another core written, for
+instance.
+But but not really anything that's been
+mind-blowing. There There has also been
+some cool work on um
+uh fetch add. So,
+one of the things that's neat about
+fetch add is that it's it's fully
+commutative, right? The The The The
+fetch add operation is add one and tell
+me what the number was when you added
+And what you can do is you can actually
+have lots of CPUs sort of pool their
+fetch adds, and then one core runs all
+of them, and then sends the results back
+to the other cores. And so that way you
+don't have to bounce the cache line
+around as much. Um I don't know of any
+current platforms that do this
+optimization, but I know for a period
+they did. Um
+And again,
+part of what makes the answer here
+unsatisfying is that so many of these
+systems are proprietary, and so it's
+just we we don't necessarily know. Uh we
+know what was published many years ago,
+and then we don't know how much of it is
+still in use, so it's a lot of it is
+also speculation.
+Thank you. Yeah.
+Cube.
+How would uh performance of left-right
+change if you had many or many readers
+joining and leaving
+over time? Uh for for which data
+structure? Oh, for left-right. For
+left-right, if you have many readers
+joining and leaving over time. So, uh
+the The way left-right is currently set
+up is that the list of readers is held
+in a mutex.
+Um and so if a reader wants to join, it
+has to take that mutex, uh allocate its
+own counter, stick it into the list of
+that mutex, and then unlock the mutex.
+And the writer uses that same list to
+figure out all the readers to read from.
+But the readers, once created, never
+have to access the mutex until unless
+they want to go away. And in fact, even
+if they go away, they could just leave
+their stuff there because then it's even
+and so the writer ignores them, but uh
+they should clean it up. Um if this ends
+up becoming a bottleneck, then you could
+easily make the
+that list be a um
+a lock-free linked list instead
+because you only ever need to add to it
+or walk it. You never need index
+lookups. And so you could make it like
+you could allow readers to join in
+parallel as well. Um the only thing
+you'd have to be a little bit careful
+about is to make sure that the writer
+reads all of the counters after it does
+the swap.
+If it reads any of them before the swap,
+then it can get confused. But but
+should be doable. It's just I haven't
+needed that optimization because readers
+joining has been
+not the bottleneck.
+Hm?
+Uh kind of getting at the a a similar
+thing to the hardware question, is how
+much variety is there in implementation
+of mutexes on a software level and how
+much of a difference does that make? On
+the software level, mutexes are
+a little bit of weird beasts. So,
+um the there was a period of time where
+there were a lot of like every language
+had their own implementation.
+Um and then a bunch of companies wrote
+faster implementations they wanted to
+use. And then eventually we got better
+operating support for mutexes. So,
+futexes for example are fast user space
+uh mutexes in in Linux. And
+you can usually just use those. Like you
+don't really need a lot of packaging on
+top of it. Um
+and then in in later years we found
+people who tried to do even like
+different kinds of optimizations on the
+mutexes so they're not necessarily about
+decreasing the contention cuz that's
+gotten to the point where like it's just
+the baseline contention. You you can't
+really do any better. Um but they try to
+decrease the size of the mutex.
+Um so there are data structures for
+example where I think the size of a
+mutex is one byte.
+Um, but they can still make it work.
+Is it two bits now? We're down to two
+bits?
+Yeah. But the problem of course is then
+you start if you start packing many of
+them together, then now you hit the
+cache line problem. And so now they're
+contending with each other and so it
+doesn't really help to make them smaller
+unless you strategically choose mutexes
+that are like don't contend with each
+other on the same cache line. And you
+can see how deep this rabbit hole goes.
+Um, I see. But in terms of quality of
+implementation, I would say they're
+they're all roughly equivalent now. The
+The exception is when you start looking
+at things like reader writer locks where
+different operating systems have very
+different mechanisms for them and they
+need to like just like mutexes they have
+to hook into the operating system to
+make sure that a thread that can't take
+the lock right now is unable to take the
+lock. For example, a reader comes but a
+writer is currently holding the lock.
+That thread wants to go to sleep. So it
+needs to talk to the operating system
+and then the operating system needs to
+have a mechanism to wake it back up. Um,
+and and that the the sort of how reader
+writer locks should work in the
+operating system I think there's still
+some iteration on. Also in user space
+like how how you place the how like how
+can you take the reader writer mechanism
+the operating system system gives you
+and make it more scalable for example by
+keeping multiple copies one per core
+where
+what like a a given thread will do is
+look up what core it's on, pick that
+reader lock, and then take that one. Um,
+and so that way you can you can like
+build better things on top of the
+operating system so that there's enough
+more sort of design space for reader
+writer locks than there is for mutexes.
+Nice. Thanks.
+I have a question back there, no?
+Um, you mentioned in your earliest code
+example that um
+you needed to provide a little compiler
+hint to prevent the compiler from
+optimizing away your entire benchmark
+setup. Um I'm curious about like what
+sorts of optimizations exist in
+compilers around mutex handling
+um and if there are any particularly
+surprising or shocking ones you've seen.
+So, compilers tend to be kind of careful
+around mutexes because users tend to
+assume that they
+will operate in certain ways. But but
+the way they do that is usually by
+having uh barriers. So, there's like
+I don't want to get too deep into like
+the different kinds of barriers and like
+the various like seek const versus
+acquire versus release and stuff. That's
+going to get so painful, but um the the
+compiler basically injects these little
+special sparkly bits in your in your
+assembly in the generated code where
+sometimes it's for the compiler,
+sometimes for the CPU, sometimes for
+both that says, "Don't move You're not
+allowed to move reads before this point
+or you're not allowed to write move
+rights after this point." Um and vice
+versa to try to basically ensure that,
+for example, if you take a lock and then
+you read something after you took the
+lock, the CPU can't do out-of-order
+execution and do the read before it took
+the lock cuz that would be
+not okay. Um
+but that's not really a
+it's not really a like a compiler thing.
+It's more of a the implementation of the
+data structure needs to know to inject
+those that those sparkly bits uh to to
+make this work correctly. Uh and if you
+don't, you would end up with a mutex
+that looks like it works correctly, but
+sometimes you read the value before you
+got the lock. Um
+uh compilers do tend to be
+like very good at optimization, a little
+bit better than we would like them to
+be, right? Um but but we would rather
+that than the other way around,
+probably, maybe. But there has been an
+argument in like recent years for dumber
+compilers cuz they're like CPUs have
+gotten faster, so make the compilers
+dumber so that we can do more stupid
+and have it do the correct thing.
+but but I wouldn't say like compilers
+are
+they're not like deeply tied to how
+mutexes work at all.
+I think we're good.
+All right, thank you, everyone.

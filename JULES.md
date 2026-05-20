@@ -144,3 +144,11 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 - **Check First**: Before deep architectural exploration, always check for `graphify-out/graph.json` or `graphify-out/GRAPH_REPORT.md`.
 - **Update**: Use `graphify update .` to refresh the repo knowledge graph after major structural changes.
 - **Efficiency**: Use the graph to navigate codebase relationships with 71x fewer tokens than raw file reading.
+
+## Section 15: Mandatory Fleet Tracing (V12.16 Total Observability)
+
+No agent action is valid unless it is traced. ALL agents (Antigravity, Gemini, Qwen, Jules, Codex, Bob, Droid) MUST emit telemetry.
+
+1.  **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+2.  **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+3.  **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.

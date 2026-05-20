@@ -35,3 +35,14 @@ ASCII GATE: [PASS/FAIL]
 SELF-AUDIT: [PASS/FAIL — details]
 NEXT: Director presses F5 in NinjaTrader 8.
 ```
+
+## MANDATORY FLEET TRACING (V12.16 Total Observability)
+
+No agent action is valid unless it is traced. ALL agents (including Codex) MUST emit telemetry.
+- **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+- **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+- **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
+- **Execution**: Before and after any tool execution (such as `replace_file_content` or `run_command`), you MUST call:
+  - Before: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Codex "Before <action_description>" IN_PROGRESS`
+  - After: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Codex "After <action_description>" PASS` (or FAIL on failure)
+

@@ -1,0 +1,28 @@
+services:
+  langflow:
+    image: langflowai/langflow:latest
+    ports:
+      - "7860:7860"
+    environment:
+      - LANGFLOW_DATABASE_URL=sqlite:///langflow.db
+    restart: always
+
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch-node
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    restart: always
+
+  docling-serve:
+    image: quay.io/docling-project/docling-serve:latest
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=1
+    ports:
+      - "5001:5001"
+    restart: always

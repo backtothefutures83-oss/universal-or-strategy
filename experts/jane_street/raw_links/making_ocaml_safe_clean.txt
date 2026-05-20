@@ -1,0 +1,1377 @@
+uh thanks so much uh Mark for that nice
+introduction and it sounds like the
+microphone is working yes you can all
+hear me great yeah thanks uh as you said
+for coming out tonight hopefully this
+will be a fun talk um as you said I work
+on the the tools and compilers team at
+Jan Street and uh the particular the
+particular sub team that I work on is
+called the okam language team and we
+work out a bunch of different things we
+build uh the core libraries that Jane
+Street uses and open sources uh we work
+on tools for things like refactoring
+code and pre-processing code uh but the
+thing that I'm going to talk about today
+is our work on the OK programming
+language itself uh I think oaml is a
+great language for many purposes
+including writing high performance
+software and if you go on YouTube you
+can find lots of talks of people from
+Jane Street explaining why we think it's
+a great programming language um but
+today I'm going to talk about the flip
+side of that a little bit some of the
+things we think could be better about
+okel and and the ways that we're trying
+to make it
+better uh okay so before I dive into
+uh uh you know the details of the of the
+extensions we're building I want to sort
+of put us on a Level Playing Field I
+assume not everybody here is an O camel
+expert so I'm going to talk a little bit
+uh for the first third of the talk or so
+about uh how o camel works today uh and
+why some of those things are maybe
+suboptimal for some of jam Street's use
+cases and then uh after we get through
+that I'll I'll cover the ways that we're
+trying to make it
+better okay let's dive in so I'm going
+to start with a a pretty low-level
+detail about o camel uh which is the way
+it represents values in memory and this
+is a this is a fact about oaml um that
+uh you know most okel programmers don't
+really have to think about in their
+day-to-day programming but if you're
+writing really high performance
+applications you do have to think about
+this fact uh and so okl has what's
+called a uniform representation of
+values so every value in O Cel program
+is represented exactly the same way
+they're all onew wide and that word is
+either an immediate with the data packed
+right into that word or it's a pointer
+to a block on the Heap uh containing the
+data uh that your value
+represents so um immediates uh are
+anything that fits in a machine word
+actually anything that fits in 63 bits
+will represented as immediate and if
+your type is 63 bits or less then I will
+pack it into the first 63 bits of a word
+and we'll make the last bit one to mark
+this as that immediate type uh so things
+like integers characters and booleans
+represented this way in O camel um on
+the other hand if your data doesn't fit
+into 63 bits then we represents it as a
+pointer to a block on the Heap and this
+block has a uniform layout it starts
+with a header word that explains how big
+the block is for
+example um and then it has a word for
+every value contained in that block so
+for example record would be represented
+this way and would have one subword for
+each field of the
+record um so so this is really cool
+every every value in oel is represented
+as as just one word either an immediate
+or a pointer um and this is really
+useful for the for the garbage collector
+among other things um why is it useful
+for the garbage collector well oaml is a
+garbage collected language and so the
+garbage collector has to like scan all
+the data associated with your program
+and this uniform representation of
+values makes that really easy the
+garbage collector can just look at any
+okal value and it knows it's going to be
+one word wide and that if it ends in a
+zero it is a pointer to a block on the
+Heap all words to end in zero in O
+program are always valid pointers to
+live to blocks on the Heap um and
+anything that ends in a one it knows
+it's an immediate and it doesn't need to
+track for the purposes of garbage
+collection so this uniform
+representation uh makes it easier to
+implement the runtime the garbage
+collector um it's also really useful for
+the uh implementation of polymorphism
+for a fast separate compilation of
+polymorphic functions so uh probably
+everybody knows what polymorphism is uh
+this is also what's called generics and
+languages like Java and C++ um but let's
+let's talk about another nice feature of
+okl which is polymorphism um so okl has
+a nice excuse me expressive St type
+system with type inference so here's a
+function an okayl function the map
+function it's one of the most common
+functions it takes a list l and a
+function f and it applies the function f
+to every element of the list producing a
+new list uh so this is a this is a very
+simple function and the details of it
+implementation don't matter that much
+for this talk but one thing that's cool
+about it is that it has this type and
+okl could automatically figure out this
+type for you so this type says that map
+takes a tick a list and a function from
+tick a to tick B and returns a tick b
+list and this tick a and tick B these
+are type variables they stand in for any
+type kind of like a generic variable in
+Java or C++ and uh ok doesn't need any
+help you didn't have to write any
+annotations on your function map in
+order for it to figure out that it can
+get this very generic type in some sense
+the most General type possible for this
+Bap function um so uh because we have
+nice type inference and conf figure out
+these very generic types polymorphism is
+simple and pervasive in O camel uh but
+coming back to our uniform
+representation of values how do you
+implement polymorphism um it's not
+actually obvious how to do that in most
+programming languages if if the data in
+okel had different shapes if sometimes
+it was multiple words wide and sometimes
+it had to be passed in different
+registers it would be hard to take a
+function like map and compile it to one
+assembly code implementation because how
+does that assembly code call the
+function f it doesn't know whether uh
+the data should be passed in a general
+purpose register or floating Point
+register how many how many words wide it
+is so because uh because we have this
+nice uniform representation values we
+can compile poly functions really easily
+because it doesn't matter what type they
+operate on that type is always one
+word um so we can compile every
+polymorphic function just once and and
+rely on this uniform representation of
+values which which makes compilation
+fast and easy of course other languages
+have other approaches to features like
+polymorphis or generics um in C++ uh to
+a first approximation the compiler makes
+one copy of your function per type so
+the compiler does a little static
+analysis to see all the different types
+that you use a generic function at and
+it'll make a copy for each of those
+different types and this has some
+advantages and disadvantages relative to
+the okl approach um for example uh you
+know C++ might be able to optimize these
+functions a little bit more because it's
+Building A specialized copy for each
+individual type uh but on the downside
+uh there are many copies of the
+functions now and this means your
+binaries are going to be bigger and also
+there's more pressure on the instruction
+cache so you might call map several
+different times in your program and even
+if you call it one right after the other
+um it might not be in the cast because
+it's actually a different copy of map
+that we now have to go
+fetch um and in C and other languages uh
+they approach polymorphism with compile
+time or runtime code generation so this
+is a jit right uh basically in C the
+your program when you call a function um
+on on a type the the the actual language
+runtime goes and checks to see if you
+have an implementation of the function
+for that type yet and if not it'll
+compile it right then for you it'll sort
+of pause the execution program compile
+the function and then then you can use
+that function this is called Just in
+Time compilation also a valid
+approach okay so uh changing gears a
+little bit I want to talk about one
+other feature of oaml before we talk
+about ways it could be
+better and that is that oaml has
+parallelism which sounds like a boring
+thing because uh most programming
+languages support parallelism but uh in
+oel this is actually kind of a new
+innovation before okel 5 which only came
+out a few years ago Oka had no support
+for shared memory parallel programming
+which made it really very far behind the
+times in terms of modern programming
+language
+implementations but oaml 5 did come out
+and it does have support for for for
+multicore uh parallel programming um
+with shared memory which is is tricky in
+a language in a memory managed language
+like OK because you need to build a
+garbage collector and a runtime that can
+deal with the fact that you have
+multiple threads executing concurrently
+and touching the same shared
+Heap uh and although oaml was late to
+this party I think being late um meant
+that we could uh or the okam community
+could do a really good job at
+implementing parallelism and building a
+parallel runtime so in particular okam
+has a sane memory model what do I mean
+by
+that um languages like uh C++ for
+example in the presence of data Races
+they have what you might call uh Halt
+and Catch Fire semantics um in the in
+the presence of a data race all bets are
+off anything could happen you know your
+computer can explode and okay this
+sounds ridiculous probably your computer
+is not going to actually explode but you
+can see really really surprising
+behaviors in your program you might
+think that if you have a data race uh
+okay well once the data race happens
+values might be corrupted but um but
+before that you know everything is fine
+that's not the case in C++ you can
+actually see corrupted values before you
+reach the point in the program where you
+seem to have a data race and also uh
+data races are not bounded in Space by
+which I mean uh you might think you have
+a data race on some variables and
+therefore their values can be corrupted
+uh and anything they flow to can be
+corrupted but other values are going to
+be fine and that's also not the case C++
+if you have a data race values that
+appear to be totally unrelated from the
+data race in your program um uh can be
+have arbitrarily corrupted values sorry
+and I should have said a data Ras of
+course is when you have multiple threads
+that access the same memory and at least
+one of them is modifying
+it um in oaml we have this really cool
+property that data races are bounded in
+space and time uh and uh that's you know
+so when you do have a data Ras in your
+program uh it only affects the variables
+that are involved in the data rase and
+only happens at times that seem like
+they're logically consistent with the
+program that you've written and this
+means that debugging data races is much
+easier um I'm sure most of you have
+written parallel programs and you know
+that it is basically impossible for
+humans to write data Race Free programs
+without substantial machine support this
+is really hard to do uh and and that's
+compounded by the fact that they have
+these weird behaviors it makes them
+really hard to debug it's a lot like
+debugging a memory corruption bug um you
+know the the the consequences of this
+data race are just so far uh removed
+from the logical place where it appears
+in your program that it can be really
+hard to track down so this this the fact
+that data races are bounded in space and
+time is a real advantage to O's
+parallelism
+implementation uh but it's not perfect
+um you may know that in Rust for example
+uh there's a race-free programming model
+so if you uh if you write your program
+in the safe fragment of rust then the
+language makes a guarantee that it will
+have no data races the the type syst of
+rust guards against that and that's
+that's not the case in okam we do not
+have uh at least an okam 5 out of the
+box a race free programming
+model Okay
+so we've talked about uh some some facts
+about how a camel works and I want to
+call your attention to like two aspects
+of that that are less than ideal uh
+which are probably obvious
+so I talked about how great it is to
+have a uniform representation of values
+and how this makes it easy to implement
+polymorphism and to implement the
+garbage collector but it does mean you
+have very limited control over like the
+layout of your memory and of your of
+your of your program's data so um if
+you're uh writing a really high
+performance application where that can
+be important this can be a problem so
+just to give you some examples of how
+bad it can be a no camel um it's very
+hard to keep data compact remember I
+said everything is a wordwide so that
+means if I have eight bits of data it's
+we just pack it into those 63 bits at
+the beginning of an immediate and stick
+a one at the end so your so your eight
+bits your bite takes a whole word um and
+it gets worse how about an N64 so I said
+that if your type fits in 63 bits we can
+represent it as an immediate it and
+otherwise we have to represent it as a
+pointer to a block that's allocated on
+the Heap right and an N64 doesn't fit in
+63 bits nor does a itol float so uh
+those things we have to actually every
+N64 we have to represent as a block on
+the Heap that's allocated and this means
+they take you know you have to have the
+header word and then it turns out in the
+particular case of N64 there's a
+additional word called the custom word
+which doesn't matter and then the actual
+data which means N64 is no camel are a
+three-word allocated block on the Heap
+okay this is not great for writing high
+performance software
+um so uh in addition to the fact that
+they're this makes data big all these
+pointers mean that the the prefetcher is
+defeated if you have an array of of a
+type that's not an immediate you have an
+array of pointers and that means their
+data is sort of all spread out over the
+Heap and you're not going to get good
+cache locality which is really important
+in hyperv
+pram and it also means that the garbage
+collector has to manage everything it
+has to manage every N64 and that
+increases the amount of work the garbage
+collector has to do and okel has a has a
+very performant gar garbage collector um
+we write lots of extremely performance
+software at Jan street that allocates
+Lots uh but uh but it would be better if
+we could let it do less work by not like
+making it manage every
+N64 um and as we talked about unsafe
+parallelism is no fun uh even even with
+a good memory model you are going to
+write data races and those data races
+are almost always bugs uh and so it
+would be better if we had a way to to
+statically rule them out also the good
+memory model does cost something so the
+way that we achieve data races being
+bowed in space and time is by adding a
+little bit of extra synchronization in
+in the runtime the the part of ampell
+that manages parallel uh
+processes uh and these synchronization
+steps are pretty cheap they did a lot of
+measurement and they they arrived at a
+really performant parallel runtime but
+they do cost a little bit and if we uh
+could statically rule out data races
+then we wouldn't need those additional
+checks okay so um so we'd like to fix
+those things about o camel uh and we are
+working on that at Chain Street it's
+loads of
+fun so I want to tell you about sort of
+our design goals as we add features to
+oaml to try to try to improve the
+situation um we are trying to give our
+programmers safe convenient and
+predictable control over the performance
+critical aspects of their program and I
+want to talk about each of those a
+little bit so by safe I mean the kind of
+safety that oel has always had oel is
+type safe and memory safe if your
+program type checks it is guaranteed not
+to seg vault at runtime and it's
+guaranteed that uh it won't have a type
+error at runtime and this is a really
+nice property that makes it easier to
+write o programs and easier to review
+them and make sure they're correct which
+is really important you know in a
+financial setting as you all
+know um and so we want to give people
+more control over their programs
+Behavior performance-wise but we don't
+want to give up the safety also these
+features should be convenient um uh oaml
+is a highlevel declarative programming
+language that makes it easy to write
+software quickly and we'd like these
+features to to have that character
+too and finally predictable so I'm not
+going to talk today about compiler
+optimizations um this is something we do
+work on we have a team working on uh
+compiler optimizations and they do great
+great stuff but a problem with relying
+on the compiler to make your program
+faster for you is that it's it's very
+hard to predict uh whether that's going
+to happen or not um compiler
+optimizations are often based on heris
+or they sort of pattern match on the
+exact struct structure of your program
+and this means that if you introduce
+small changes to your program all of a
+sudden the compiler optimization might
+start happening or stop happening and
+it's just very hard if you really care
+about the exact performance you're
+getting um to guarantee that uh these
+optimizations are giving you what you
+need so uh rather than relying on the
+compiler to make your program faster
+what we want to do is give you the power
+to express the performance behavior that
+you desired out of the compiler and
+guarantee statically that that's what
+you're going to
+get uh and also only where you need it
+so uh there are there are some people at
+Jam street that write uh software that
+is needs to be as performant as you
+could possibly imagine but actually the
+vast majority of Jan Street developers
+are just writing normal software that
+whose performance we want to be good but
+doesn't you know need to be measured in
+nanc and we want to make sure that as
+we're adding these features to the
+language we're not um we're not making
+those users pay for it we shouldn't be
+adding complexity that everybody has to
+see these features should only uh should
+only cost you something if you use them
+in terms of
+complexity um and we're doing this in O
+camel uh we think we benefit as Mark
+said a lot from the open source
+Community uh we're not like forking the
+language we're we're just building new
+okel features that we hope to to put
+into main Upstream okam later and uh we
+want to make sure that um we can
+continue to use public open source OK
+libraries and that we can continue to re
+release our libraries for other people
+to use so our extensions need to be
+backwards compatible with uh Mainline
+Upstream o camel
+so those are our design goals okay so
+now finally uh a solid what probably 20
+22 minutes in I will I will start
+talking about some of the new things
+that we're adding to oaml um so there's
+three major features that I'm going to
+talk about today um one of them is
+narrow and flat data layouts to solve
+that problem of giving users control
+over the the memory of their program uh
+another is support for stack allocation
+so that we can rely on the garbage
+collector a little bit less for data
+that does need to be allocated
+um and finally we'll talk about
+race-free parallel
+programming so uh we're doing this you
+know as I said uh in O camel and
+preserving type safety and to do that
+we're using two sort of fancy is
+features from the type system literature
+um fancy features I should say uh so
+these features are called kinds and
+modes and if you have never encountered
+those words in a programming languages
+context don't worry I will explain them
+as as we
+go um okay so uh let's start with narrow
+and flat data layouts or unbox types
+this part's pretty simple um I mean the
+goal here hopefully is pretty clear we
+just like to add new types to oaml that
+have different representations than the
+classic uniform representation that we
+talked about so we like to add types
+like these in32 hash int 8 hash float
+hash and I'll pronounce these unboxed
+in32 unboxed int 8 unboxed float um so
+these should just be the bits that you
+asked for not uh not like packed into 63
+bits and then have have a one added at
+the end and and unbox 1032 should just
+be should just be 32
+bits uh and we'd like to somehow add
+these these types to oaml so that you
+can do all the normal things you do with
+oaml types with them so you should be
+able to put them in records This Record
+has an unboxed 8 and an unboxed n32 so
+maybe it even fits in one word because
+uh it only needs 48 bits uh 4 bits I can
+count um uh and and in addition to that
+maybe we can have even fancier kinds of
+unboxed types so how about an unboxed
+record so this thing with a hash uh
+brace at the front is an unboxed record
+what do I mean by that so a normal
+record like the one before um as we
+talked about is going to be represented
+as a pointer to the Heap containing
+these values right an unbox record is
+different an unbox record is kind of a
+fiction for the programmer the
+programmer gets to manipulate it as if
+it's one thing and they can project from
+it and update it um but under the hood
+it's represented by just passing around
+the contents of the record individually
+so when you pass one of these two a
+function it probably gets passed in two
+registers one holding the inate and one
+holding the the int list rather than uh
+rather than uh a pointer to a block on
+the
+Heap uh and you know even more
+complicated layouts like we'd like to
+have an array of unboxed records so as
+we talked about in oaml if you have an
+array uh of data that doesn't fit in 63
+bits that's always an array of pointers
+um but maybe we can have an array of
+unboxed records like this so we just
+have like the int 8 and the in32 laid
+out next to each other in memory
+repeatedly like you would see in any
+normal San programming language so
+um the goal is to add these types to the
+language uh but there's an obvious
+problem which is that I explained at
+Great length how we depend on ok's
+uniform representation of values in
+order to implement things like the
+garbage collector and uh and
+polymorphism so what are we going to do
+about that uh and the answer is we're
+going to add a way for the type system
+Bo camel to track the shape of your of
+your type and use that information to
+help the garbage collector and to
+compile polymorphism and we call those
+shapes
+layouts um and layouts are a particular
+form of kind from the type systems
+literature so kinds uh you can think of
+as being like types of types so um in a
+normal programming language types
+classify values right your different
+values each has a each different value
+has a type uh and so kinds are like that
+but for types each type has a kind and
+that kind in our case is a layout it
+classifies the shape of the type
+um so uh we're going to use these
+layouts so the type system can track
+them and then the compiler can use them
+to know how to manipulate data
+appropriately so uh what kind of layouts
+are there well uh we have a lattice of
+layouts technically it's a join semi
+lattice but um hopefully nobody will
+call me on that uh so if we start at the
+bottom left there value is the layout of
+classic ampell values so every type that
+existed in ell before we added unbox
+types that's going to have the kind
+value uh bits8 is going to be the kind
+of types that fit in eight bits and bit
+64 is going to be the kind of types that
+fit in 64 bits um and we also have float
+64 because bit 64s are passed in general
+purpose registers but float 64s are
+passed in floating pointer simd
+registers and we can even have a kind
+like void uh void is the kind of types
+that don't have any representation at
+runtime okl has a fancy type system
+sometimes you pass around values to
+functions just for type
+uh and we can now give those layout void
+uh and just erase them at
+runtime um so there's also this layout
+at the top called any which is a weird
+one so any um is the layout of a type
+where the type system hasn't figured out
+what its layout is uh and this this is
+hard to use because if you have a type
+whose layout is any the compiler doesn't
+know how to compile a program using that
+type uh it just rejects it but it can
+still be really useful in signatures um
+you might imagine that we have a
+signature for like types that we know
+how to print so it's a signature that
+has a function at like T Arrow string or
+something like that and the point is um
+that signature makes sense for NE
+regardless of its layout uh and so we
+might want to write down that signature
+once using the layout any now any
+individual implementation of that
+signature for a given type will
+specialize the signature to to a given
+layout um but the signature itself can
+be shared across all layouts by using
+the layout
+any uh and we're also going to add
+aggregate layouts uh so so uh here's the
+layout of an unboxed record containing
+uh four things one of which doesn't
+actually need a representation at
+runtime so maybe it's three things um uh
+and yeah product layouts like
+that okay so uh so so how does this work
+in practice in the type system well the
+type system just keeps track of the
+layout of the types and uh we have to
+talk about how to implement the GC and
+how to implement polymorphism briefly so
+uh how do we Implement polymorph M well
+we do what other programming languages
+do uh we just have to make a copy of
+your function for each different layout
+that you use it at uh and this is still
+I would say better than what C++ does
+C++ is going to make a copy per type
+approximately uh we only have to make
+one copy per layout so per like class of
+types which is going to be a lot better
+and as for the GC we just have to teach
+it some new tricks so for example if you
+make a record containing some types that
+are uh classical C values and some types
+that are boxed we're now going to uh
+modify that header word that I talked
+about that records have uh to record
+which values the GC is supposed to look
+at and which values the GC is not
+supposed to look at and that's how it
+knows which values to look at and and
+won't ever look at a value that ends in
+a zero but is not a
+pointer that's unbox
+types um so that's the first of the
+three features that I'm going to talk
+about today the second is stack
+allocation I have more to say about
+stack allocation uh although we'll see
+how we do on
+time so um Heap allocation versus stat
+allocation so oel is a garbage collected
+language and like most garbage collected
+languages um all the data that it
+allocates it allocates on the Heap uh
+and uh Heap allocation is uh expensive
+uh relatively speaking I mean as I said
+earlier okel is very good at this and we
+have a very performant garbage collector
+but it does cost something oaml has
+what's called a generational garbage
+collector so there's a quote unquote
+minor Heap where small and short-lived
+values live uh and a major Heap where uh
+where big or long lived values live and
+uh managing memory on the major Heap in
+particular does really have an
+expense um the minor Heap is better the
+minor Heap is basically just a a bump
+allocator so there's just a big slab of
+memory and every time you allocate
+something on the minor Heap we increment
+the pointer to make some space for it
+and that's very cheap but it's still
+cash inefficient so um there's a real
+trade-off when you think about how big
+your minor Heap should be every time the
+minor Heap fills up we have to do
+garbage collection and like check which
+values on the Heap are live and move
+them to the major Heap and free up the
+memory and that cost something so we
+want the minor Heap to be big so that we
+don't have to do that very often but
+also if the minor Heap is Big it doesn't
+fit in the cash and so we have bad cach
+locality so there's just a trade-off
+here and there's no good
+answer um so stack allocation can be
+better stack allocation in the sense
+you're all familiar with from C or or or
+whatever your favorite programming
+language is um it's kind of similar to
+minor Heap allocation and that there's
+just a pointer that gets bumped right um
+but collection happens much more cheaply
+because you know in C when your function
+returns we just decrement the stack
+pointer you don't have to scan the
+values uh you're supposed to make sure
+they don't live past the lifetime of
+your function uh and and so we can just
+decrement the the stack pointer we don't
+have to do any
+scanning also in general this will touch
+fewer cach lines than the minor Heap um
+because we're reusing the same memory
+every time you call and return from a
+function uh so we'd like to add stack
+allocation to O camel but there's a
+problem which is that we said we're
+trying to keep o camel safe right and
+stack allocation is not uh obviously
+safe
+um uh in order to make it safe we need
+to follow a stack discipline so like uh
+turning back to our example of C there's
+a classic kind of bug and C where you
+allocate something on the stack and then
+you store a pointer to it somewhere uh
+and you kind of forget that it was
+allocated on the stack and now your
+function returns but that pointer is
+still stored somewhere and if you look
+at it later well that data is now some
+other memory entirely it's representing
+some other value this is a classic kind
+of use after free buug we want to make
+sure you you can't have that kind of bug
+and Oak camel
+somehow um so what do you need to know
+about a value to know that it respects
+the stack discipline well mainly you
+have to not do that thing I just said we
+should only stack allocate values if we
+never create pointers to them from the
+Heap because the Heap lives for an
+indefinite amount of time and stack
+allocated values are only going to live
+for lifetime of one function so if you
+create a point or two value on the Heap
+we don't stack allocate that value also
+if you return a value from your function
+we shouldn't stack allocated because
+when you return from your function we're
+going to pop the stack frame right so
+that memory immediately goes out of
+scope uh it's lifetime end and then we
+shouldn't uh and we shouldn't uh let it
+live past the end of this
+function okay so we need to add some
+features to the type system to track
+these properties Valu so that we can
+figure out what can be stack allocated
+and what can't be stack
+allocated uh before uh I talk about what
+those features are uh I should explain
+why we don't just do what rust does so
+uh probably some of you know rust and
+rust is a great language uh no
+complaints about rust um so why don't we
+use well sorry I guess I'm about to get
+to some complaints about rust so I just
+lied uh why don't we use RTI lifetimes
+uh well lifetimes are are comp so sorry
+I to say what lifetimes are rust is a is
+a manually managed language um and the
+way it works in Rust is that every value
+gets associated with a lifetime that is
+like how long that data lives and these
+lifetimes can be arbitrarily complex
+tracking the lifetime of something
+across many function calls and and like
+boundaries that don't correspond to the
+lexical scope of the program at all uh
+and and this lets it uh you know free
+memory when it's when it's exactly when
+it's dead rather than doing a collection
+step to figure out what's dead
+later um so but lifetimes are
+complicated so in Rust um the way stack
+allocation works is that functions take
+a parameter which is the lifetime of
+that function um and uh if your value
+that you allocate during the function
+can have that same lifetime that the
+function does itself if it's polymorphic
+in the lifetime then uh that value can
+be allocated On The Stack and this
+sounds prettyy simple and
+straightforward but there's a bunch of
+problems with it uh the first thing is
+you often trip into the need for what's
+called higher order polymorphism so rust
+has higher order functions that is
+functions that take functions as
+arguments and so now there's like
+multiple lifetime parameters right the
+fun this function has a lifetime
+parameter and those functions that it
+takes as arguments also have lifetime
+parameters and it turns out that in the
+presence of this kind of polymorphism
+type inference is undecidable uh so
+there's no way to write a type inference
+Engine That Could automatically figure
+out for you left times in your rust
+program it's inevitable that sometimes
+the user will have to add lifetime
+annotations and as we talked about at
+the beginning we're trying to preserve
+this character of oo having nice type
+inference and it being easy to use our
+fancy features so that doesn't fit in
+well uh also these lifetimes get very
+complicated and and they need to get
+complicated and rust because every every
+you allocate we need to understand its
+lifetime exactly but in O camel we have
+a garbage collector so if something has
+a complicated lifetime we can just
+decide to allocate it on the Heap and
+let the garbage collector clean it up
+when it notices it's dead we don't have
+to figure out how to give it a
+complicated lifetime that tracks that
+exact period of
+time uh so with those things in mind
+what we're using is modes so um modes
+are another fancy system fancy thing
+from the from type systems literature
+and uh the way we're using modes in our
+version of oaml is that they're
+properties that can be applied to any
+type so earlier I talked about kinds
+kinds kind of divide the universe of
+types into different buckets by their
+shape in our case right modes are
+different modes are orthogonal to types
+so it makes sense to talk about any a
+value of any type at any mode uh and
+we're going to use these modes to track
+properties like whether something lives
+uh past the lifetime of the function
+that it's allocated in uh and in our
+case these properties are are going to
+be deep properties so if you have a
+deeply nested record um with a bunch of
+pointers in it and we say that it has a
+certain mode we're talking about the
+whole the whole value all the way
+down um so to support stack allocation
+we add two modes Global and local uh
+Global is the default mode this is the
+sort of legacy mode for classic camel
+values and it means that the lifetime of
+something uh that has Mode Global is
+unconstrained uh we make no guarantees
+about how long it
+lives on the other hand if something has
+the local mode then uh we guarantee that
+it follows the stack discipline so
+something can only be assigned the local
+mode if it's not like stored on the Heap
+we don't create any pointers to it uh or
+return it from a function and the idea
+is that we're going to have the type
+system automatically figure out for you
+whether something has the local mode by
+tracking how you use values that you
+create also there's a subm moding
+relationship so uh you can think about
+it this way if something has the local
+mode you're constrained in how you can
+use it you're not allowed to store it on
+the Heap or return it from a function
+right so if you have something at the
+global mode it's perfectly safe to treat
+it as if it were at the local mode
+because all you're doing is taking away
+your ability to like store it somewhere
+um so so we can can set up the language
+so that um anywhere something of the
+local mode is expected it's safe to use
+something of the global mode which uh
+makes programming with this feature a
+little bit
+easier okay so let's have an example
+here's our trusty map function I have
+not changed it um but we can give it a
+fancier type now so uh this type has two
+lines on the first line uh I've written
+uh the the classic type it has in
+standard okamo like we talked about
+earlier and I've written a second line
+with ATS and the second line records the
+modes of each of the arguments to this
+function and here dot means the legacy
+mode I'm not making any promises about
+how this function interacts uh with the
+lifetime of this argument is with
+respect to this function but the local
+mode means that the function map
+respects the stack discipline with
+respect to the function argument in
+particular it doesn't let the function
+argument Escape uh from your call to
+map um so uh what that means and by the
+way that's true you look at map right
+map calls F but it doesn't like squirrel
+F away on the Heap somewhere or return
+or return f it just it just calls
+it um so uh then uh we can write a
+function like multiply by so multiply by
+uh takes a list l and a number Mt and it
+just multiplies uh every element of the
+list by
+Mt now it does that by creating a little
+Anonymous function that just multiplies
+the number of Mind bolts and a thing
+about oaml is that we have to create a
+closure for this function we have to
+allocate somewhere the data for this
+this function object itself um and uh
+where are we going to do that well uh In
+classical camel you would allocate it on
+the Heap but because we can see that map
+uses uh this function in a way that is
+consistent with a stack discipline we
+can allocate it instead on the stack uh
+and this means the garbage collector
+doesn't have to get involved here at all
+and it's automatically freed when
+multiply by
+returns okay um I'm going to skip some
+parts of this uh this section because I
+want to make sure I have time to talk
+about data Ras Freedom so I'm going to
+skip this slide but I do want to talk
+about this slide because I think it's
+really cool um so uh a thing that we
+learned about local is that it's not
+just good for stack allocation this
+property of whether something escapes
+its scope is a useful property you might
+want to track just for safety or
+correctness reasons so uh this function
+with file is a function from the okl
+standard library and the idea is you
+pass it a string which is a file name
+and then some fun function that you want
+to run on the contents of that file so
+that function receives an in channel. T
+and then it does something it computes
+something tick a and your whole function
+returns that thing
+Tok and the reason you would write a
+file manipulation function like this is
+that it can automatically manage the
+opening and closing of that channel for
+you of this file
+handle um so with file will open a
+handled a file handle and then uh run
+your function using it and then it
+closes the the file for you
+automatically when your function returns
+this is nice because it means you won't
+forget to close the the file handle if
+you use with file um but that would
+actually be incorrect if F uh if if the
+function we passed to with file stored
+the file handle somewhere if it like put
+it on the Heap or something um then with
+file is going to close the file and now
+later somebody may look at this file
+handle on the Heap and thinks think it
+refers to a valid file that's still open
+uh and that would be a bug in your
+program and we can use local in a way
+that has nothing to do with stack
+allocation uh to require that you pass
+with file a function that respects the
+stack discipline with respect to this
+this channel this file handle um so by
+giving with file this type we guarantee
+that the function you pass it won't like
+take that channel and store it away
+somewhere because that function has to
+uh has to not let it Escape has to
+respect the stack
+discipline uh so this is really cool we
+didn't uh see this coming uh uh
+originally but this this feature of
+being able to track um whether something
+respects the stack discipline or whether
+something escapes its scope uh allows us
+to provide a little extra safety in
+classical camel functions like with
+file okay um uh we should have mode
+polymorphism I'm going to skip some
+things here because uh we have finite
+time okay um and I want to talk about
+data Ras Freedom so I want to argue that
+modes which are the technology we just
+finished talking about are a great fit
+for data race Freedom so uh here are
+some things you might do to value that
+you might want to track whether your
+program does these things or not you
+might want to make an alias to it return
+it from a function create a pointer to
+it pass it to another thread these are
+all pro these are all like things you
+can do uh in your program and if we can
+track whether you can do things like
+this then we can maybe provide a way to
+provide a static guarantee of data Ras
+Freedom um so uh in our previous example
+we talked about local and local is a
+mode that tracks uh that tracks whether
+you do something to Val value the thing
+that it tracks is whether you let it
+Escape its scope um and uh we can add
+new modes that track things like this
+and then uh as it turns out we can put
+them together to guarantee data race
+Freedom uh and these operations are all
+deep so they fit into the they fit into
+this category of modes that we were
+talking
+about so uh what modes are we going to
+have I'm going to introduce two new
+dimensions of modes the first one is
+contention so uh contention tracks
+whether a value has been shared across
+threads uh a value can be uncontended
+which means it's local to one thread or
+it can be contended which means it has
+been shared with another thread um and
+we can use the type system to enforce
+that uh values that have been shared to
+other threads values that are contended
+uh you're not allowed to read or write
+to the mutable parts of them and this is
+going to give us a guarantee of database
+Freedom right this enforces that uh if
+you share a value to another thread uh
+you're not allowed to mutate it and so
+you can't possibly have a data race
+okay um of course we do want to provide
+some way to mutate shared memory and
+I'll get to that in a
+second first I need to introduce a
+second mode dition portability uh so
+contention was whether a value has been
+shared portability is whether a value
+may be shared uh it's a slightly
+different angle on the same kind of
+question so values can be portable or
+non-portable uh portable values are safe
+to share uh and non-port values
+non-portable values are not safe to
+share so what values are portable you're
+probably thinking okay so mutable data
+is not going to be portable that's not
+quite right actually mutable data can be
+portable almost everything can be
+portable the trick here is that we
+already have contention so we're already
+preventing you from doing anything
+unsafe by sharing meetable data across
+threads but there's a loophole in that
+plan and that loophole is functions um
+imagine that I create a function in one
+thread that mutates some data in that
+thread and then I pass that function
+itself to another thread um that
+function is not mutable but I'm sort of
+passing the capability to mutate data in
+the original thread uh by passing this
+function so I need to ban that I need to
+ban the ability to pass functions that
+do mutation to other threads and the way
+I do that is by saying that functions
+that capture uh uncontended mutable
+state that is mutable state that they
+have the power to mutate um cannot be
+sent to other threads those functions
+are not portable and we can build a type
+system that tracks its property of
+functions
+um oh I I meant to reorganize my slides
+because the next slide is a doozy but I
+guess I forgot so I will go into it um
+actually we have a whole bunch of modes
+uh here's here's a best J of modes uh uh
+so
+um uh we uh we have five modes with more
+four no we have five modal axes with
+more coming um and these modal axes it
+turns out can be nicely categorized by
+uh the distinction that I talked about
+between portability and contention which
+is whether they're about what has
+happened to data in the past or whether
+they're about what you're allowed to do
+with data in the future so locality
+which we already talked about is a
+future mode it's like portability
+locality is about whether you are
+allowed to let a value escape from its
+scope right we've already talked about
+portability attention it turns out we're
+going to have two other modes too
+uniqueness and linearity or two other
+modal axes I should say so uniqueness is
+about whether you have created an alias
+to value and linearity is about whether
+you are allowed to create an alias to
+Value um
+and here on this chart I've I've uh I've
+indicated a bunch of things the mode
+that is in bold that's the like Legacy
+one the classic o camel data gets to
+have and also there's a minimum and a
+maximum because as we talked about
+there's sub booting here there's always
+it's always safe to promote values in
+One Direction along these modal axes uh
+I won't I won't bore you with the
+details of going through all these
+different things I'm happy to talk about
+it more later but the point is we can
+track lots of properties using uh using
+modes and we can put that together to
+enforce data Ras freedom
+so let's come back to data race freedom
+and let's do that by looking at some
+examples of uh of uh what functions
+might what API we might give to
+functions using these modes so um how
+can you spawn a thread well uh we can
+give spawn this type so the main point
+is that the function that you're going
+to send to another thread needs to be
+portable uh supp portable functions are
+the ones that are safe to send other
+threads the ones that don't capture and
+mutate data so the spawn function simply
+requires that its argument is portable
+problem
+solved um and uh we can also have join
+now you might so join like uh waits for
+a thread to finish and then that thread
+returns some value and that it brings
+that value back to the original thread
+you might expect that join result needs
+to be contended because it's moving
+across threads uh but actually it
+doesn't need to be contended because uh
+when join Returns the thread that you're
+joining has finished running so there no
+longer another thread that has access to
+this data so we don't need to track it
+as
+contended um uh so okay uh here's the
+most complicated slide in the talk well
+I guess the the slide with the table is
+the most complicated but this is the
+most complicated one I'm actually going
+to try to explain um uh so this is like
+an API for safe parallelism using actual
+shared memory so uh and I'm going to go
+through it in a little bit of detail but
+um the idea here is everything I've just
+talked about portability and contention
+what they do is they set things up so
+that there's no way to share memory
+between threads and have that memory be
+mutable right but actually that's
+something you want to do we want to
+provide some apis that allow you to do
+that in a safe way so this is example
+this is an example of one such API that
+uses locks uh we they don't all have to
+use locks but this is one API that that
+does use locks to share memory in a safe
+way between the threads so I I'm going
+to have to go at a kind of high level
+here because I don't have enough room on
+the slide for all the details but the
+idea is that this type uh this type t
+here that's a type that represents a
+pointer to immutable data and uh the
+tick a argument to T that's the type of
+data that's stored at this pointer and
+the tick K argument uh is a trick that
+we sometimes use in oel type system it's
+what you might call a phantom type but
+basically that tick K identifies the
+lock that is associated with this
+pointer so uh I haven't shown you the
+the module that has locks in it but that
+TK is going to link this pointer to a
+data type from that
+module so then if we look at create um
+create is how we create a new shared
+memory cell that is protected by lock
+and we know what lock is protected by
+because it returns uh a a type or a t
+that has a K in it so you're going to
+need to have the key to this lock and
+that shows up on the next on the next
+function which is map
+so um map uh allows you to take a
+function and apply it to some data
+that's in one of these shared memory
+cells so in order to do that you need to
+have the key for the lock
+uh that uh that is associated with this
+this tick k um and we're going to set
+the system up so that keys are not
+portable you're not allowed to send them
+across threads so if you succeed in
+locking the lock and getting the key um
+then you know you're the only person
+that can access the shared memory right
+now uh and uh you're allowed to do
+things like map so map requires you to
+have the key and uh and requires you to
+give it a portable function that's going
+to run conceptually on this other piece
+of shared memory that might belong to
+another thread uh and then you get back
+uh a piece of shared memory that has
+been updated uh so it takes a type a
+function from type tick a to tick B and
+it updates the value that's pointed to
+to be a tick
+B um uh okay uh this API as you can see
+goes on further but uh and I'm happy to
+talk about it more but I'm not gonna I'm
+not going to go through the whole thing
+in this
+talk um okay so I think that's uh all
+the all the type Theory I have to show
+you today and I've uh just about
+finished on time so so just quickly to
+summarize some of this um uh how is it
+going some of so I should say uh some of
+this is more conceptual than other bits
+there's some Jan streeters in the
+audience and I'm sure that they're like
+oh I don't remember seeing that before
+uh um so uh stack allocation unbox types
+are being used uh in production systems
+in fact I'm here in Hong Kong this week
+I don't live here but I'm here to help
+one of the teams here use unbox types in
+the system and it's been it's been
+really fun um it's going okay
+uh uh there's there's lots more to do
+though uh these features you know uh one
+of the nice things about working on a
+compiler in a setting like jamr is that
+we can add features that aren't quite
+fully fleshed out yet so there's lots
+more work to do to make these features
+feel totally complete with respect to
+what you would expect to see in oaml uh
+but they are now usable and being used
+teams uh this slide is a little bit out
+of date I would say the data race
+Freedom implementation is finished but
+we're still in the initial stages of
+rolling it out so we're working with
+some individual teams to have them sort
+of beta test for us this API for data
+race freedom and we think that um uh at
+the moment nobody inside Jan street is
+allowed to write uh parallel
+applications in oaml because we don't
+have a way to give them a guarantee of
+data race freedom but very soon we're
+going to turn that switch and it'll be
+the case that people can write parallel
+applications and every parallel
+application will get this guarantee
+statically and we're very excited about
+that um how's it going uh I think it's
+going well uh this stuff fits into OK
+pretty well well um I can talk about
+some of this uh in more detail later if
+you're interested but um uh I think you
+know there are people that have writing
+very high performance software in okl
+for a long time at Jane Street and I
+think they report that these features
+make their lives much easier they don't
+have to do as as many crazy hacks or
+rely on like external function calls
+things like that they can write things
+that feel much more idiomatic by using
+the features that I've talked about um
+the the pay you go bit where we don't
+want other people to have to pay for the
+complexity here seems to be working
+we're pretty nervous about this as I
+mentioned we're in the process of
+rolling out data race Freedom which
+means we're like in the process of
+annotating all of our standard libraries
+with those portability and contention
+modes and uh you know I think we are a
+little bit worried about the complexity
+uh but so far so
+good uh and if you want to know more uh
+we have a YouTube series we have blogs
+uh we have academic papers I'm very
+proud of the data race Freedom Al the
+mode paper which won on award at poo one
+of the top uh uh top programming
+language conferences this year um and I
+think that's all I have so I'm I'm happy
+to take questions

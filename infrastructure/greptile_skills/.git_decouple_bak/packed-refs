@@ -1,0 +1,7 @@
+# pack-refs with: peeled fully-peeled sorted 
+203183d30b94178191a1958576ced107e3c31941 refs/remotes/origin/feat/gitlab-support
+ea6e1a2e7221bffb929bcd4b054da292e76788b7 refs/remotes/origin/feat/perforce-support
+ed5bcb10901be75dd2eef2f557de740e6ea5106b refs/remotes/origin/fix/greploop-check-before-trigger
+b90d85098f11f4667a0ec6898df1131a92c1d04d refs/remotes/origin/fix/greploop-check-pr-description
+4ae5198fb82fe28d7b452796152f2b1745051c77 refs/remotes/origin/main
+7d2aedcd4ced3d8d508a23a7df6e7f6a578e02a1 refs/remotes/origin/perforce/fix_review_comments

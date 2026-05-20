@@ -1,0 +1,2656 @@
+Hi everyone. Welcome to this talk.
+Everyone could make it. I'm here to
+introduce Matt Godbolt.
+Matt Godbolt is a C++ developer who
+loves looking under the hood of
+compilers, operating systems, and
+silicon. By day, he writes software for
+finance, like many of us here. By night,
+he emulates vintage computers and
+maintains Compiler Explorer. Well,
+Compiler Explorer is the official name,
+but everybody knows it as Godbolt. So,
+naturally, when someone set up the Jane
+Street internal instance, they named
+Godbolt, making Matt the first external
+speaker who already has an internal
+domain name named after him.
+Please join me in welcoming Matt
+Godbolt.
+[Applause]
+Thank you, Jasper. Well, thank you for
+having me. This is fantastic. I uh
+I I'm looking forward to talking to you
+about the kind of things that I love
+digging into. So, this is
+microarchitecture watch what happens
+beneath, which is not my best title. So,
+yeah, as Jasper says, Compiler Explorer
+is why you probably heard of me before.
+I love making emulators roll computers.
+That's what I've been doing for the last
+year as I've been on a non-compete. My
+non-compete ended today, which is why
+I'm able to be here talking to you.
+But, next week I'll be working at HRT.
+So, we'll be neighbors. I'll be up the
+street. Friendly competition.
+I also love trying to reverse engineer
+what the heck is going on inside your
+CPU. Right, Intel famously doesn't give
+a lot of information about what's going
+on inside the computer. And um
+that's for obvious reasons to do with,
+you know, intellectual property,
+whatever. But, there's a sort of small
+but dedicated community of folks who are
+trying to work out what actually is
+going on inside. This is my contribution
+to it where I was trying to work out how
+the branch target buffer worked inside
+some of the older chips. We're going to
+be talking about some old chips today,
+unfortunately, because I don't have
+access to some very, very new stuff
+because I've been on non-compete for a
+year, and it's very expensive to rent
+them. Um
+But, anyway, I I've done some research
+before. And my sort of claim to fame on
+this is that I was cited in the Meltdown
+and Spectre Spectre paper, which was a
+kind of a a kind of nice moment of
+recognition for this kind of stuff.
+Uh you've probably seen a CPU pipeline
+before in textbooks. And I know I've
+been speaking to some folks who are now
+sitting very threateningly in the front
+row.
+And they have a very deep understanding
+of everything we're going to cover here.
+But, for the rest of you all, hopefully
+you'll forgive me doing a quick sort of
+introduction reminder of what a CPU
+pipeline looks like. So,
+when I grew up, this is what a CPU
+pipeline looked like. You fetched an
+instruction, you decoded it, you
+executed it, and you wrote it back in
+sequence. And then, you know, you could
+do this as a sort of production line, as
+a pipeline, one step at a time. So, one
+instruction was being fetched while the
+previous one was being decoded, and the
+one before that's already being
+executed, and the one after that before
+that is being written back. And
+therefore, although it takes four cycles
+to get through here, we're still doing
+one useful piece of work every clock
+cycle. That was a big win.
+Modern
+CPUs though realized that if we can do
+we can do better than just this sort of
+single step at a time,
+we can break the system into sort of
+three broad categories. We've got a
+front end where we've got a branch
+prediction unit.
+I wanted to talk to you a lot about
+branch prediction. I actually did a
+whole bunch of reverse engineering work
+for it, but I don't have time. So, we'll
+have to talk about it afterwards or in
+the pub or something like that. But,
+anyway, there's a fetcher decoder as
+before. We have a rename step, which is
+sort of the gateway into a new world.
+And then, after that, this middle
+section here, this is the back end.
+Things can happen out of order, which
+sounds counterintuitive, but in programs
+very often we write code which has lots
+of little parts that aren't totally
+dependent on each other. You know, you
+read a value, you add 10 to it, you
+store it somewhere else. You read
+another value, you add 20 to it, you
+store it somewhere else. It's like,
+well, those two things could happen at
+the same time.
+And so, if you can pick up enough
+instructions in one go, you can actually
+do more than one piece of work per clock
+cycle. And that's what this sort of
+stack is here in the execute. And that's
+what the out-of-order system is doing.
+It's doing some clever dependency
+tracking, and then everything happens in
+whenever
+execution units are available and
+they've
+results inputs are ready. And then,
+finally, we come to the retirement
+stage, and that's where everything gets
+put back in the order that the program
+was written in so that you don't notice
+the monkey business that's been going on
+in the middle bit.
+Okay.
+But, we're going to be talking
+specifically about Skylake, which is
+old, 2019, 2020-ish era is when it was
+out. But, again, my laptop is a Skylake.
+My desktop machine is a Comet Lake or
+Skylake X, actually. Yeah, the laptop's
+Comet Lake. So, these are representative
+of the kinds of things that actually
+happen in a modern CPU, but they have
+changed into kind of server quality CPUs
+that you'll be using in your day-to-day
+job. Um where I remember them, I will
+try and call out the differences. But,
+again, I couldn't test the things that
+were on more modern machines.
+Uh so, out-of-order on Skylake is a
+little bit more complicated than that
+nice textbook diagram. We have a front
+end that looks like this.
+Again, the branch prediction unit we're
+not going to be talking about. We have
+sort of two parallel lines, the fetch
+predecode instruction queue, and then
+many decoders.
+Beneath that, we've got a micro-op
+cache.
+To the right of that, we've got a a
+queue of micro-operations, and amusingly
+named LSD. Then, we hit the renamer.
+We're going to talk about all of these
+things in a second. I just wanted to
+give you a big picture of like where
+we're going with all of this. Um
+There What was I going to say about
+this? There was something I meant to
+say. Uh it'll come to me. We'll cover it
+anyway. Uh so, anyway, this is the front
+end. At this point here, by the time Oh,
+that's right. Micro-ops. I've written
+micro-op here. So, instructions are
+specifically on Intel um are broken into
+smaller operations, micro-operations.
+So, unlike most RISC processors where
+you're just like adding two numbers
+together or you're reading or you're
+doing a branch, some of the Intel
+instructions are crazy, and you can like
+do some crazy address calculation, which
+is, you know, one number plus another
+one times four plus some offset, and
+that's the address that you're going to
+read from. Then, you read from that
+address. Then, you're going to add to
+it, and then you're going to store back
+to it. And that's one instruction. So,
+it makes sense for the poor front end
+here, which deals in terms of those
+crazy x86 instructions, to break it down
+into a sensible RISC architecture in the
+back end. But, we never get to see that.
+We just have to infer its presence from
+all the measurements we do on the
+outside.
+So, that's what a micro-op is.
+Yeah, so we By the time we get to this
+point here, we have a stream of
+micro-operations that are in program
+order. They get to the renamer, and then
+they reach the back end, which is a
+little bit smaller and simpler, and we
+won't be covering as much of this. If
+I've got my timings right, we've
+probably only got 5 minutes of this at
+the end. But, we've got a scheduler.
+We've got multiple execution units, not
+the four that are here. There are
+actually many more than that. And then,
+there's a write-back stage. Then, we
+have the retirement, and then
+post-retirement, we have the store
+buffer commit phase. And again, each of
+these steps is probably a
+simplification, but this is mostly built
+out of measurements that we can make.
+And by we, I don't mean me, actually.
+Although I have contributed to this in
+the past, that the community of people
+that
+uh that reverse engineer all this kind
+of stuff, I'm relying very much on their
+results that I'm presenting here. These
+things are not necessarily found in the
+Intel manuals. You have to go and dig
+them out yourself. So, I have some
+references at the end. If you're
+interested in this and how you can
+measure it yourself,
+knock yourself out. It's a really,
+really interesting rabbit hole to go
+down.
+Um this selection of
+TLAs, this soup of letters over here,
+are all the sort of shared data
+structures that each of the bits of the
+system can see. We'll talk about those
+separately, but I wanted to call them
+out to begin with. We've got a physical
+Excuse me.
+We have physical register register
+storage. So, while you tend to write
+programs or C programs in assembly that
+refer to, you know, EAX and ECX and EDX
+and whatever, the 16 registers that we
+have access to. 16, what a luxurious
+number. I know we were talking about
+earlier that we probably could do with
+some more, but like it wasn't that long
+ago we only had eight of them, of which
+two of them were used for other
+purposes. But, that is small fry
+compared to the number of register slots
+that are actually available on the CPU.
+And so, that behind the scenes, it's
+doing all sorts of allocation and
+renaming and
+and mapping to take advantage of the
+extra space it has on the chip. So, the
+physical register file contains all of
+the actual values of the registers, and
+there are probably hundreds of those.
+The RAT is the register alias table, and
+that's the the structure that maps the
+current EAX to where on earth it is
+currently on the chip.
+And other things. There's a reorder
+buffer, which stores essentially a
+ledger of all of the micro-operations
+that have flown flowed flown flowed
+through the system.
+And is essentially doing sort of the
+reference keeping of like this is the
+point at which we know an instruction
+has been issued, and later on we will
+retire it in the order that they came
+through into this reorder buffer.
+Then, there's a reservation station,
+which is also called the scheduler in
+some literature. That's where we
+actually store the things that have yet
+to be processed. Like the actual
+operations themselves are like, I need
+to do an add of this number and that
+other number. Or this number and a
+number that we'll get when we
+read that it depends upon has completed.
+They live in the reservation station.
+Branch order buffer is a sort of
+checkpointing system for branch
+misprediction. Again, I wanted to talk
+more about this, but sadly, we don't
+have time. But, it's fascinating. If
+you're sitting down and think about what
+the thing must be doing when it's
+predicting, you know, 20 branches in the
+future, and then it gets one of them
+wrong, and it doesn't want to throw all
+of the work away.
+And then, there's a memory order buffer,
+which is responsible for making sure
+that loads and stores to memory still
+make sense even though we've reordered
+everything. So, we're going to start
+with the front end. This is going to be
+the majority of the talk, and I forgot
+to start my timer. So, I'm going to have
+to rely on looking at the clock behind
+you to see where I am.
+I'm going to use this example, and I
+sort of it's thematic that I have to do
+it in C++. Although we did attempt to
+write this in OCaml earlier.
+It did not generate the same code.
+I will leave that to your imagination.
+So, it's a it's a bit of a it's a bit of
+a made-up thing. It's taking an array of
+integers, it's squaring them, and
+summing them up. So, it's just doing
+like a rolling sum of all of the integer
+sum squares, effectively it is. And it
+suits my purpose because it compiles to
+six instructions and exactly 16 bytes of
+machine code. So, I'm sure you're
+reasonably familiar with this, but on
+the right-hand side we have this text
+representation, which is the assembly
+code, and on the left-hand side is the
+bytes that the CPU actually reads out.
+That's the machine code.
+It used to catch me all the time. I used
+to use the two interchangeably, which is
+foolish. And you know, you don't really
+need to know about it. It's like we read
+the array pointer, we square it, we add
+it to our running total, we move the
+array pointer to the next element, we
+compare it to the end one, and then we
+jump back if it isn't at the end. Yeah.
+Pretty straightforward stuff, 16 bytes
+worth. Um what you'll notice though,
+immediately, is that each of these is a
+different length. We've got a two-byte
+instruction, a three-byte one, there's
+even a four-byte one here.
+In general, x86 instructions can be
+anything from one byte to 15 bytes long.
+And it's not sensibly written because
+it's kind of the sort of thing that
+happens when you take a design from the
+1970s and incrementally add things to it
+while we're maintaining backwards
+compatibility, which means that sort of
+everything has harks back to these
+ancient ways, and there's like bytes
+that say, "Hey, the the next byte is now
+interpreted differently unless it's
+Tuesday and the moon is rising, and then
+which case So, it's really quite
+complicated to disassemble x86. Anyone
+who uses ARM or or MIPS or RISC-V or
+whatever, it's lovely. They're all the
+instructions are the same length, so
+it's very simple. But that's kind of why
+we need to do this complicated decode.
+Another thing I'm going to quickly show
+you is an instruction trace of a sort.
+Um this comes through a somewhat heavily
+modified um tool called uica, which is
+the microcode analyzer that Andreas
+Able, um who's now at Google, has
+written and open-sourced. And this sort
+of lets us see the the an individual
+instructions journey through the
+pipeline. So, what we're seeing is one
+instruction and then all the stages it
+goes through from left to right from
+time base. So, this this instruction
+takes 16 cycles. On the first cycle
+here, it's being pre-decoded. It's
+hitting the the instruction queue here.
+It's being issued, dispatched, executed,
+and then retired in this particular just
+want to show an example. We'll have a
+few more of these up. I'll explain them
+a bit more as we hit them, but I don't
+want it to be surprising when I when it
+popped up.
+All right, first stage, fetching. This
+is probably the easiest stage, although
+I'm going to gloss over a whole bunch of
+really complicated stuff that it does.
+So, we have the predicted instruction
+pointer. So, the fetch unit doesn't wait
+for the program to definitely go
+somewhere. It's being told where to go
+by the branch predictor at all times.
+And so, that's kind of a really
+interesting uh aspect that I had never
+even considered because you might pick
+up a bunch of 16 bytes. And until you've
+decoded it, which is like four or five
+steps down, you don't even know if
+there's a branch in there. And by that
+time, you've already had two more
+16-byte chunks of memory that you've
+pulled up, and you're like, "Well, I
+went the wrong way, right?" So, and
+that's not a That's a That's a be an
+unconditional branch, right? If it's
+conditional, you have to actually even
+execute to work out whether or not
+you're going to take it or not. So, the
+branch predictor's got a great job. And
+it does by and large a good job. Um so,
+we we the fetch unit picks up 16 bytes
+at a time at a 16-byte um
+uh boundary, which means that if you
+branch through the middle of a 16-byte
+boundary, then you're immediately
+wasting a bit of bandwidth there because
+you're missing out on some of the bytes
+that you could have picked up in one
+cycle. The other thing to note here is
+that I'm not going to talk about caches
+at all because that's another two hours
+talk. Um but this obviously has to
+liaise with the TLB to go and work out
+where the heck these instructions
+actually come from and the L1, L2, L3
+caches to actually fetch the bytes into
+64-byte cache line to then pull 16 bytes
+of it down. So, there's a lot of work
+hiding here.
+But the result of this fetch stage is
+some kind of pipeline of chunks of 16
+bytes, presumably with some kind of
+address that's tagged with them, so we
+knew where they came from. And it can be
+checked later on. All right, easy one
+done.
+Because the x86 instruction set is so
+complicated, and because what we want to
+do is is unlock this parallelism where
+we can run more than one instruction at
+a time, if the most that we could do in
+a single instruction, sorry, in a single
+clock cycle was decode one instruction,
+then we'd be missing a trick down the
+line. And so, what we want to try and do
+is decode as many instructions as we
+possibly can out of this block block of
+16 bytes in one
+clock cycle.
+So, it's broken down into stages. The
+first stage here is a called a
+pre-decode stage. And the pre-decoders
+have a set of kind of flaky heuristics
+about what these bytes might mean.
+They're flaky because the only thing
+that we can think of, again, we being in
+this instance um
+uh
+Agner Fog, is that the only way it can
+be decoding this because we have no idea
+where the instructions lie in here. All
+we know is they don't overlap with each
+other, and they depend, of course, on
+having decoded the previous instruction.
+And so, how could you possibly do it in
+one cycle?
+The only thing we think of is that it's
+it just speculatively tries to decode an
+instruction at every possible offset,
+and then it has a sort of filter a step
+where it says, "Well, these ones overlap
+with the one that's come before, so it
+can't that can't be a valid decode." And
+again, it's a bit of a heuristic hack.
+It never gets it wrong, per se, but it
+sometimes conservatively tags
+instructions for the a later stage of
+the pipeline that are tagged as being
+more complicated than they actually are.
+So, we'll get to that in a sec. So,
+these 16 bytes happen to represent
+exactly my routine that we were that I
+showed. The pre-decoder tags it into It
+essentially just breaks it down and
+says, "Well, there's there's This is the
+opcode byte. These are the opcode bytes,
+whatever." Again, a lot of this now,
+when I'm pointing at this side here, is
+my kind of guestimate about what's going
+on. It's not canonical. There's no
+source for exactly what's flowing here,
+but hopefully you'll forgive me. And the
+interesting thing here is that what
+we've done is we've been able to
+discover where the bytes of the first
+instruction, which is that mole, the
+second one, which is the imul, the add
+edx, the add rdi here, and then for this
+last one, this is a compare and a jump.
+And at this stage in the pipeline, it
+spots an opportunity because although we
+treat them as two separate instructions,
+we have to. Well, that's what the ISA
+is. It's so common, you know, every
+branch every loop ends in a compare and
+jump if not equal or something like
+that. The Intel have decided to say,
+"Well, what if we had an instruction
+which was just a compare and jump as one
+unit?" Well, we could make a new
+instruction, we could issue it, and then
+write all the compiler writers, you
+know, actually emit this instruction, or
+we could just spot it in the instruction
+stream and replace it here. And that's
+what they do. This is called
+macro-instruction fusion, and it's
+tagged, at least, in this pre-decode
+step. So, we still don't know really
+what these bytes are. And again,
+sometimes the bit masks or whatever it
+does are wrong.
+I'm going to run out of time if I keep
+doing this.
+Um okay, from the Yeah, so the
+limitations of the pre-decoder, it can
+do up to five instructions in a cycle,
+and it does this macro-op fusion. Now,
+at the moment, and by the moment I mean
+for Skylake, it may have changed, but I
+don't think that this one has. Um a
+compare and test on anything that isn't
+memory, which is therefore more
+complicated, followed by any branch,
+that's treated as a single operation. An
+add, subtract, increment, decrement, or
+an and followed by a branch on these
+limited set of of instructions is
+treated again as a single unit as a
+compare and branch. Um it's worth saying
+that you probably don't do this,
+although you write compilers, so you
+might have the latitude to do this. Um
+don't put any length-changing prefixes.
+These are usually used in like the crazy
+32-bit modes um to to use smaller
+pointers, but they effectively snarl up
+the pre-decoder. It just goes, "Whoops,
+I don't know." Because you can make an
+arbitrarily complicated instruction out
+of just putting random-ass prefixes in
+it. Um and it just gives its hands up,
+and it takes I think it's three cycle
+penalty if if it sees one. It's like,
+"Whoop, I'm out." And yes, the other
+thing that it does do is it notices
+whether or not a an instruction is
+simple or complex. And so, it steers
+that instruction to the appropriate
+decoder. Uh steering's not really the
+right word, but
+um I'll see I should I tell you what I
+mean here. So,
+these sort of partially decoded
+instructions, which again are just
+blocks of bytes and presumably some kind
+of sequence. You keep these I say keep
+putting yourself and seek here. I don't
+think it uses addresses internally to
+track because obviously, if you've got a
+loop, you'll see the same address over
+and over again. It must be some kind of
+global sequence number that's used for
+like, "Hey, this branch was
+mispredicted. Everything after this is
+now
+garbage." So, I'm just going to say and
+sequence number.
+So, we've got partially just decoded
+instructions, and uh they're passed on
+to the decoder. The decoder, there are
+four units, and they are passed them in
+order.
+Um
+the result of which is, and again, this
+is me making up my own syntax over here,
+the micro-operations.
+In this particular example, every
+instruction is one micro-operation. So,
+each one in on that side is one thing on
+this side here. So, one of them is like
+a 32-bit load through rdi, a multiply,
+an add, an add, whatever. And then this
+one is a macro-fused one, in which I've
+made up an instruction of compare and
+jump.
+Um variously, these kinds of things.
+Okay. Um
+There are two kinds of uh fusion. One is
+the macro-fusion we've already talked
+about. So, macro-fusion, macro is big.
+This is how I remember them. That means
+that two big things, the instructions,
+have been fused into one internal
+operation. So, we've talked about that.
+Micro-fusion, on the other hand, is
+well, this stupid syntax, or sorry, this
+stupid ISA that Intel have come up with,
+it's so so common to have an address
+operand on the right-hand side. While
+this is logically two operations, that
+is, an add rax, comma r14 is go
+calculate whatever r14 is, go read that
+from the cache, and then come back, and
+then go to the ALU and add it to rax,
+right? That's two distinct operations.
+Practically, for most of the time, we
+What if we just made our micro-op like
+format a little bit wider and had like
+an optional memory tag, and then we
+could like put for most instructions
+that we've got space, we can say, "Well,
+this is both a an add and a read." And
+for the simpler cases, that can happen.
+And so, a micro-fused micro-fused
+instruction will later on be actually
+executed by two different parts of the
+chip as two micro-operations, but at
+this point, we can pack it into one
+micro-op in all the queues and things
+that are coming up down.
+so, we've got micro-fusion,
+macro-fusion. There is also a microcode
+sequencer.
+Uh the microcode sequencer is
+effectively a ROM with a sort of simple
+interpreter put on top of it. And so,
+anything that's more complicated than
+four micro-operations needs to come from
+a ROM rather than just being sort of
+hardwired in the code. And that ROM can
+either just literally puke out a bunch
+of micro-ops. Here's 15 micro-ops for a
+complicated instruction. Or it can
+actually have logic in it itself. It can
+actually go like, "Oh, okay. Well, while
+ECX is not equal to zero, keep issuing
+these micro-ops, right?"
+And so, for things that are complicated
+like locked operations, which I'm sure
+anyone who's done threading has seen,
+that takes more more operations than
+four. Or obviously things like rep
+stores, which is a repeating operation.
+This is effectively just a microcode
+sequence of just keep emitting the read
+and write operation until you hit the
+end of the thing that you're copying.
+And obviously complicated things like
+read MSR or cupid. They you know
+effectively runs a little program. You
+know, it's going to go off and say,
+"Hey, what kind of CPU are you?" Well, I
+can return that. So, that's kind of
+cool. I actually met somebody who worked
+at Intel. He said, "Oh, yeah, my
+neighbor writes microcode." I'm like,
+"What a crazy job that must be to sit
+there and just write write this stuff
+that's
+right on the other end of this.
+And then the other thing that's sort of
+done by the microcode sequencer are
+things like divides. I know they're also
+complicated, you know, more than four or
+five micro-operations, but it was kind
+of an
+opener to me. I was like, "Oh, that's
+how divides work." You know, it's got
+all this acceleration circuitry, but
+that's how they can short circuit. It's
+like, "Well, okay, we've reached the
+point where there's no more bits coming
+out. We can stop here."
+Anyway, I've got a thing about divides.
+You'll learn that in a second.
+So, we've got four decoders, but not all
+decoders are created equal. The first
+decoder is the the real decoder. It can
+do up to four micro-ops. So, any
+instruction that is four micro-ops or
+less can go and be passed by the first
+decoder.
+Anything that's also that's tagged as
+complex, even if it actually turns out
+to be a simple operation, gets put to
+the the first decoder and the other ones
+won't touch it.
+Any instruction that requires a switch
+to the microcode sequencer has to go
+through the first decoder as well. So,
+things like that I divide, the first
+step will be, "Hey, here's the setup
+code." And then now we're going to start
+reading from the microcode sequencer.
+Decoders two, three, four can only do a
+single micro-operation. So, only simple
+things. But this is actually the fused
+micro-op. So, those adds with memory,
+that still counts as one in this world,
+even though later on it's going to be
+um broken into two.
+We good so far? I've seen a lot of nods
+from the front row, which I appreciate
+very much.
+So, you can decode four instructions or
+five micro-ops, which means that like if
+you really need to get lots of
+micro-operations out, you can have a
+four micro-operation instruction
+followed by a one micro-operation
+instruction, and that can come out in
+one clock cycle. And then the other two
+decoders just have to sit and twiddle
+their thumbs. 311, 2111, or 1111. Right?
+And luckily, most things fit into this
+world, unless you're doing something
+silly like dividing again.
+The worst case you can possibly do is
+just have a sequence of instructions
+which are exactly two micro-ops each
+because they only go to the first one
+and all the other ones are are idle. And
+then the next clock cycle you generate
+two. So, that's the worst case.
+Um but although I've just banged on
+about this and it sounds interesting and
+complicated, and Intel refer to this as
+the legacy decode pipeline, not that we
+have any other choices. Thanks, Intel.
+Um we're mostly saved by the next thing
+we're going to talk about, which is the
+micro-op cache and the loop stream
+detector.
+Um I had a sketch of what might be in a
+micro-op. I've been sort of trying to
+in my mind construct a my own emulator
+stroke simulator so that I kind of
+exercise the parts of like what where
+things would need to go, but I don't
+need to talk about it cuz I'm going to
+have time.
+Uh just to show you some pretty rainbow
+diagrams. These are some other more
+complicated instructions that come out
+as being two micro-ops three and four.
+Although most of these are fused in the
+fused domain still. I think this is only
+two and this is only one. I think this
+is the only one that's actually three
+micro-ops. But you can kind of see a
+push RAX is like, "Well, I have to write
+RAX to the stack pointer and then I have
+to update the stack pointer." Makes
+sense?
+Exchange RBX RAX is probably temp equals
+RBX RA, you know, the whole switch
+thing. It doesn't do XORs, I'm pretty
+sure.
+Maybe it does. I mean, who knows? And
+then an add pointer here is one of those
+really complicated memory operations
+where we have to read the memory, we
+have to then add to it, and then we have
+to write it back. And writing back is
+always two ops because the the address
+generation is separate from the data
+part of the store for reasons we'll
+touch later.
+All right.
+And then yeah, because I have to put a
+divide on here.
+This is a 32-bit divide on Skylake.
+They've got a lot better. I mean, I'm
+sure Granite Rapids is a lot quicker
+than this, but this I know, when I first
+time I sketched this I
+got it to print this out, I was like,
+"Oh my god." Yeah, it's like 100 cycles
+for the for the 64-bit version. But what
+the interesting points are here is like
+so we can see that like in the first
+clock cycle, the decoder zero was able
+to output these three micro-ops. They
+kind of flow through. And then you it
+switches to the microcode sequencer and
+there's a two-cycle delay here. And now
+it kind of carries on doing all of its
+whatever magical stuff is going on here.
+A note about these, these are very
+empirically derived from like looking at
+port pressure. So, we're not 100% sure
+what the individual operations are
+doing. And sometimes these, you know,
+when things finish, I'm not totally sure
+it's right.
+So, yes, we're saved by the micro-op
+Uh the micro-op cache sort of sits
+logically to the side of this whole
+complicated pipeline we've just been
+talking about. And we're in one of two
+modes. Either we're caching or we're
+reading from the cache.
+So, unlike like the the regular sort of
+like L1, L2, L3 caches, it's not like
+every read goes and says, "Are you
+there?" Okay, no, I better go and do it
+the hard way. It's just you're in one
+mode or the other mode. And there's
+jumps that determine whether or not that
+process starts.
+Uh so, yes, in caching mode, as we're
+running through our program, the
+micro-ops that the
+translation engine has been doing,
+sorry, MITE is the microinstruction
+translation engine. As again, Intel
+loves coming up with complicated names
+for things. It's the or the legacy
+pipeline.
+They get pushed into this cache and then
+they're just sort of written into the
+cache. Or if a jump happens and the part
+of the branch prediction or whatever
+part notices that the destination that
+jump happens to be in the micro-op
+cache, then we start streaming instead
+from the micro-op cache.
+And this is the happy place. You want to
+be in this situation. So, the result of
+that is just a also micro-operations.
+Uh the micro-operation cache is the
+weirdest cache you've ever seen because
+it has a really difficult job.
+Um if you think about a normal cache,
+like an L1, L2, whatever, you've got a
+one-to-one mapping. It's like, "This
+byte is in that cache line." And then
+you just fetch the whole cache line
+around it and you whack it in the cache
+and you're done. But if we jump to an
+address that's not on a like a cache
+line boundary, then will we decode that
+instruction, but we don't we can't
+reverse back and say, "Well, what was
+the instruction before it then?" You
+just have to kind of start at that
+point. And so, there's a lot of really
+weird restrictions on it.
+This has changed a lot since Skylake,
+but the Skylake has 32 sets by eight
+ways. And each way cache line has up to
+six micro-operations in it. Some of the
+micro-ops take two slots. So, like if
+you've got one of the MOV with a 64-bit
+value,
+you need to have two slots in order to
+sort of store the 64-bit value. It is
+inclusive with the L1I, which is a clue
+into how it's implemented. And then the
+weird thing here is that there are no
+more than three ways can be used by any
+32-byte of of code.
+And this to me smells like they had hit
+a real snag because morally this is very
+similar to the trace cache that the
+Pentium Pro used. And I don't know
+you're all a little too young.
+[Laughter]
+But the problem with that was that you
+have as many entries in the cache as
+there are traces through your code.
+And so, very quickly you blow up as the
+the traces change. Um so, I think they
+try and limit that by saying if any
+block of memory, small small area of the
+of the program, needs more than three
+lines, then we're probably in this case
+where it's about to start monopolizing
+the whole cache. Like we'd rather throw
+it away and prevent it from being um
+cached at all.
+it's worth saying that yeah, the any
+branch, even a not taken branch, ends a
+cache line and then it starts caching
+from the next thing. So, it kind of
+tries to find the the sensible
+boundaries.
+But um the one of the sort of like take
+homes from this is if you're generating
+code, if you have more than one entry
+point into the same 32-byte block, then
+you might be not using the DSB as
+effectively as you like. And I know that
+it's quite typical in compilers to like
+start with a, "Hey, let's do some setup
+code." Then we jump to the end of the
+loop that then does the like the loop
+end and then it jumps to just below the
+setup code to like then run around. And
+you're like, "Ah, now I've got two
+entries."
+But so, you can have to think about it.
+Two is probably fine.
+and
+yeah, I forgot to say this before, but
+like you know, we this is why we align
+loops on 16-byte boundaries typically so
+that you get the benefit of the fetch
+system picking up the loop.
+Uh okay. But yes, in newer machines, it
+is more like
+um
+you can have six ways in 64 bytes. So,
+it's a bit of a weirder thing more
+closely tied to the L1 cache.
+All right. I think yes. And then you can
+deliver anywhere between four and six
+micro-ops per cycle, which means that
+even if they're complicated or simple or
+whatever instructions, you can get a
+pretty consistent stream out of it. The
+literature says six. I could only ever
+measure four. Um so, I don't know if
+whatever.
+All right. Yes. Uh yes, the loop stream
+detector. The loop stream detector
+So, in between this sort of source of
+micro-operations that's coming from
+either the legacy system or the cache,
+there is a queue. Obviously, you know,
+we love queues. Queues buffer if the
+renamer or the the execution unit is
+sort of backing up a little bit, we've
+got a bit of space in here. But this
+this queue effectively is a big circular
+buffer of a couple of hundred entries
+that we're writing our microcodes in
+program order in.
+And what the loop stream detector does
+underneath is it says, "Wait a second.
+You've jumped to a location that's
+actually already in this buffer." You
+know, it may have already popped off the
+end of it, but like, you know, we
+haven't overwritten it yet. Wait a
+second. Wouldn't it be better if we just
+kind of held that part and just kept
+streaming back that same sequence of
+events over and over and over again?
+And so, that's what the loop stream
+detector does. And that means it can
+turn down the whole front end. Then
+there's no caching that has to be done.
+There's no decoding. It's just
+brilliant. But it's relatively small.
+And it has limitations. So, it spots
+loops that fit in the queue entirely. It
+can deliver each cycle up to four
+micro-operations. And but it it can't
+deliver more than one loop iteration.
+So, if you have a really small loop or a
+loop that doesn't fit into a multiple of
+four, then you might get like uh you
+know, if it was five, you get four in
+the first cycle and one in the next one
+and then four and then one and four and
+one. Except, it can unroll. It actually
+spots the longest thing it can fit get
+up to eight times in the Skylake. Um so,
+that you it'll actually unroll that loop
+effectively in hardware and go, "Well, I
+now if I take my five iterations and I
+and I do them four times." My math is
+not good. Uh five fours are 20. 20 / 4
+Yes, I think we're good, right? Yeah.
+Something like that.
+Um so, then it would just fit and then
+in every cycle it can stamp out four,
+which is pretty cool.
+Which is great. But why was it in
+parentheses and why did it have a star?
+Well,
+it's disabled on Skylake.
+Which was reported by the due to a
+massive thing and this is where I'm
+actually going to bring up my notes.
+Sorry. You're going to have to see
+speaker view for a second because Yes,
+here we go. It was described as a
+nightmare level bug in the Debian fix.
+Short loops using the AHBH you know, the
+high part of the 16-bit register and the
+corresponding wide res may result in
+unpredictable system behavior.
+I mean,
+whoa.
+That is scary stuff. So,
+props to them. I don't know what it was
+and I'm There are people in this
+audience who probably can tell.
+But something about the OCaml runtime or
+the OCaml compiler liked to do this.
+Like in a loop it would use the high
+eight bits and the low eight bits. Maybe
+tagging. I'm looking over at you two
+because you're my favorite two to look
+at. But
+yeah, it was found by some folks in the
+OCaml community and reported and then it
+was Intel determined it couldn't be
+fixed and they just issued a microcode
+patch which turned the whole thing off.
+Wow.
+Yes. Yes, OCaml.
+We did weird things so you didn't have
+to, right? Okay. A renaming. So, now we
+get to the cool part here. Now, again,
+those of you who have done like college
+level stuff stuff courses in in in this
+kind of
+out of order execution, this is probably
+meat and drink, but I'm going to go over
+anyway cuz it's just really interesting
+and the penny dropped for me writing
+these slides about how important this
+whole process is. So,
+the renamer has probably the biggest job
+in the entirety of the front end because
+it has about three different jobs. The
+first thing that happens is that now the
+micro-ops have reached this point. This
+is like the first point where we can
+say, "This is definitely going to
+happen. So, we're going to put it into I
+mean, definitely. It's definitely
+speculatively going to happen. It might
+be undone later on when we discover we
+shouldn't have done it this way, but
+like we're going to write it into the
+the reorder buffer which just says this
+instruction happened or will happen."
+We also re- then rename the to physical
+registers. So, we take the EXs and the
+RDIs and whatever and we use this vast
+array of on-chip resources to actually
+use for registers. So, again, I'll talk
+about that in a sec. And then it also
+takes the micro-operations that were
+represented and shifts them off to the
+right execution units to sit to wait.
+So, they'll sit in those schedulers
+until either the uh the execution unit
+is ready to accept a new uh operation.
+Maybe you know, there's a multiplier
+that's backed up waiting and there are
+other queues
+other instructions ahead of it or um
+maybe this instruction depends on the
+result of an
+a previous instruction that hasn't
+completed yet. And so, it'll sit there
+and wait until all of its dependencies
+come in. But this is the point at which
+we kind of like fan out into all the
+various data structures and then the out
+of order system picks it up on the other
+side.
+Amazingly, although it's doing all this
+complicated work, it can do four
+micro-ops a cycle. I This is staggering.
+Maybe this is the kind of thing that in
+hardware is a lot easier than it sounds,
+right? This is the kind of thing you
+discover.
+So, the first thing we do is the reorder
+buffer write. This is just to have our
+ledger for in order completion later on.
+There is a process called unlamination
+that happens at this point. So, at this
+point sometimes the micro-op that came
+through, even though it wasn't micro-op
+fused, is determined to be this is
+actually more complicated than I can do
+in a single unit. And so, it'll break it
+up at that point into multiple pieces.
+Um some of the more complicated
+addressing modes sometimes fall into
+this category. For operations that could
+otherwise go to like the adder. It's
+like, "Well, the adder can't do this."
+I'm a little vague on that. I'll be
+honest with you. Um but unlamination is
+uh is a thing that can generate extra
+micro-ops at this point.
+There are 224 entries in the reorder
+buffer. That is the sort of top end of
+how many things that can be possibly in
+flight at once
+um that are in the system being
+executed. That's more like 500 on um I'm
+looking at you two in the front again
+for this. I think it's about 500 in um
+Granite Rapids and and above. So, that's
+that's what a place that they have
+changed a lot and expanded.
+It kind of looks something like this.
+You know, we have some kind of sequence
+number for each of the instructions in
+sequence. We know The information it
+needs to track is where are we writing
+to and then what rename happened. Um
+we'll get to why we needed that
+information. It's sort of weird that we
+need both the source and the old
+version. Partly for undo, you know, if
+we were to talk about branch stuff. But
+partly for another thing that I'd never
+considered before.
+Um and then we've got some kind of type
+of information and this has to do with
+like where if it's a branch, where where
+it's sort of restore state might be
+stored. And then the the important thing
+over here is that while this is all
+written to in this re- rob write, this
+part over here, the execution and
+exception is going to be written to once
+the instruction has actually finished.
+So, it's going to go through the rest of
+the pipeline and come back here. And so,
+in my sort of example I've got up here,
+this first instruction, this load, has
+completed, which means it's gone through
+the the system. It's finished.
+Um it's done with and it could be
+retired at any point. We could the
+retirement unit could finish it off. Um
+and you can see I can't remember what I
+did. Oh yeah, it's got a source down
+here with P22. Yeah. There's sort of an
+an implied dependency and that's not
+really that important. And again, we
+don't really know what this looks like.
+This is the minimum set of information I
+think it needs.
+The issuing step um is where we actually
+take the live to be calculated micro-op
+and give it off to these execution
+units. There are the execution units are
+in two big blocks that have many ports
+on them. It's a weird terminology. But
+there's an an ALU unit that has all of
+the things to do with, you know,
+arithmetic and logic as you might
+imagine. And then there's a sort of
+memory system which only does loads and
+address generation. And they have
+different numbers of entries. They're
+all presumably balanced by some kind of
+internal um
+pressure inside both the layout and the
+complexity of those things. And also,
+you know, the the experiments that Intel
+do in terms of how many of each type of
+instruction they typically have live at
+once.
+Um The issuing determines also which
+port within each of these. So, these are
+further subdivided. But at this point,
+this is when it's decided where it's
+going to ultimately go. So, even if it's
+an add and there are like three
+different locations on the chip where
+that add could happen, we decide now at
+rename time which of the adders it's
+going to go to. Which is a little bit
+myopic cuz you know, by the time it
+actually gets ready to run, maybe that's
+not the best choice of adder now. Maybe
+there's some free adders somewhere else.
+But it's useful to know. And obviously,
+it's a simplifying assumption here. Um
+the algorithm has been
+reverse-engineered with high probability
+that they got it right. And it's kind of
+a simple as you might imagine. It's to
+do with like the balance of how many
+operations have gone recently. And it
+picks tends to pick the higher port
+numbers if um if they're more free if
+there's a tie. And then it's sort of the
+of the four instructions um issued, the
+one and three go to the top place best
+place to to schedule them and two and
+four go to the second place. So, it kind
+of tries to balance them as well. It's
+again, it's documented. You can go read
+the Python code that does the same
+thing.
+And at this point also now um separate
+from unlamination which actually makes
+two entries in the reorder buffer for an
+instruction that we notice later on is a
+bit more complicated. Anything that's
+actually micro-fused,
+that is like the add with the RDI, gets
+separated into the load component that's
+going to go over here into the load unit
+and the add part that's going to depend
+on the load that's going to go into the
+ALU component.
+So, um the difference between
+unlamination micro-ops and micro-fusion
+is that this only has one sort of slot
+in the output buffer in the reorder
+buffer, whereas the unlamination stuff
+actually takes up more resources in
+there. Not that that's a huge problem
+with 224 of them.
+All right. Good. Good. Good. Good. Uh
+so, to again, I think really the reason
+for me putting this up here is to sort
+of show you what information is being
+stored in each part because for the
+longest time I had reservation station
+which is the scheduler, sorry, and the
+the thing that the issue is writing to
+and reorder buffer kind of mixed up in
+my mind. So, this is more of my symptom
+of me explaining to myself so that I
+could talk to you about it, but
+hopefully you'll forgive me. So, it
+looks something like this. We have a
+bunch of um
+of of operations micro-operations. These
+are no longer in any particular order.
+And we have, you know, maybe three
+sources that can happen and we've got a
+destination that it's going to write to
+and it's an add. And um this is a guess.
+Now,
+I've been unable to find anything that
+tells me whether or not the values of
+known quantities are stored in
+the
+um the the the scheduler in in this sort
+of micro-operation or it's just a
+reference.
+Now, the way that I've chosen to show
+this is that this one has two resolved
+sources. So, these have already
+completed the instructions that
+generated these two numbers. Maybe this
+was actually in the op code and this one
+was like reading from a register. These
+two have already completed. So, I've
+written the values in here. And then
+with for these guys here, I've shown
+that like I'm waiting for the previous
+instruction that's
+this guy in fact. He's going to write to
+P24.
+I'm going to wait for him. And then when
+he's completed, he'll tell me what the
+results are and I'll I'll put it in
+here. We don't know if that actually
+happens as in this broadcast action
+causes the issues things to get written
+as these slots to get written to.
+Um There's some circumstantial evidence
+that maybe it is because there's a
+broadcast bus.
+But it also opens more questions about
+what happens if you are issuing
+instructions that have two known
+quantities and then we have to read an
+arbitrary number of like physical
+registers in one clock cycle. Like if
+every instruction had three sources,
+each of which wasn't already in flight,
+then you could imagine that issuing four
+of them means that we have to read from
+the register port four times three times
+and that doesn't seem realistic either.
+So, and no one has been able to find a
+limit to how many you can read, unlike
+Sandy Bridge which had a very very
+limited number of read ports. So,
+something magic is happening, we don't
+know what.
+Anyhow,
+um let's talk about renaming. Um so,
+let's talk about first of all the nuts
+and bolts of renaming. So, what renaming
+is going to do is going to unlock more
+out of order opportunities down in the
+rest of the pipeline.
+And what we're going to do is we're
+going to break any dependency that we
+can because many times that when you say
+EAX, we just mean the current value of
+EAX and we're going to do something to
+it and then we're going to throw it away
+and then we're going to load something
+new into EAX and we're going to just
+keep doing this process over and over
+again and those things are in separable
+from each other. And so, one example of
+something where
+um the values of the registers are don't
+depend on an earlier value of the
+register is a loop because, you know,
+we're going to read into EAX every time
+around the loop and we're going to do
+some work with it and then we're going
+to store it into a value or whatever and
+then we're going to start the loop again
+and the bottom here. So, if we can break
+that dependency,
+um it means that we can run maybe two
+iterations of the loop at the same time
+or even more.
+I'll show you what I mean. We've got
+pictures coming for those of you that
+are furrowing your brow.
+So, the way that this works is we have a
+table that tells us where each register
+currently is. So, which of the physical
+registers and again, this is my made up
+syntax P whatever, um currently contain
+the most contemporary value of RAX. So,
+RAX is P39 and whatever. And then there
+is a free list of registers. These are
+registers that are currently spare chip
+real estate going spare. Fantabulous.
+For every time we read from a register,
+we're going to use its current value in
+the RAT.
+Every time we write to a register and
+completely replace it, it might as well
+be a new register. So, we're going to
+pick a new one off the free list,
+use that instead and then update the
+table to say this is where the the RAX
+register is now.
+So, this first instruction we're reading
+the RDI register and we're going to go
+and fetch memory from it and then we're
+writing to EAX. It really doesn't matter
+what was in EAX before. So, P39, don't
+care about you. So, what we're going to
+do, we're going to rename this
+rename this to be P45 and hopefully you
+saw that that kind of
+went that way. That's me popping off the
+front of the free list. This is in
+hardware, remember by the way, you know,
+this is like pretty impressive. And then
+P22. And then this mul here is EAX with
+itself, right? I'm squaring EAX and I'm
+putting the result in EAX. And I know
+the op code doesn't have three operands
+or it can do for some multiplies, but
+you know, it's been rewritten into this
+nice risky form by this point. Um so,
+when we read the EAX's, we're going to
+use P45 and then when we write, we're
+going to use a new one which will be uh
+P46 and this is indeed what happens. And
+so on and so forth. We can go through
+the rest of it here.
+And now we've got this whole rewritten
+set of op of micro operations that are
+phrased purely in terms of physical
+registers only. And we've sort of
+encoded the dependency between
+instruction values by if you follow the
+P45 in here, it's used here and then
+it's done with. So, you know, that has
+that's helped us.
+So, this is what that loop looks like or
+rather loop iteration and a half. Um
+So, I've got one and a half because it
+fits on the slide.
+If we didn't have a rename,
+this is what it would look like. So, the
+first iteration of the loop is from here
+to about here
+and you can see that the next iteration
+of the loop can't even start because,
+well, I can't read through RDI until
+I've finished adding to RDI from the
+previous iteration, right? Because it's
+like I have to wait for it, right? And
+it couldn't start we couldn't add four
+to it to move it forward until we'd
+finished reading the memory address of
+RDI because presumably I still need the
+RDI register or whatever. Again, this is
+I had to hack the code so badly to make
+it do this and I then went through it
+and sort of manually fixed it up, but
+you get the idea.
+If we were to sort of show you the
+zoomed out view, it looks like this and
+if you've seen these kind of diagrams,
+you can squint and you just look at the
+R's really and you kind of look down
+there and this is I mean, mostly
+throughput rather than latency, but it's
+10 cycles an iteration. Doesn't seem
+totally unreasonable. I mean, obviously
+you'd use SIMD if you were actually
+trying to do this for real, right? And
+you get more per iteration, but 10
+cycles an iteration.
+If we rename it on the other hand, it
+looks like this.
+So, on the first
+first cycle, we've already queued five
+of our instructions
+and we've issued four of them.
+They the first and the fourth one can
+already complete on cycle six because
+this add can be running concurrently
+with the load as they don't depend on
+each other anymore and so on and so
+forth. And you can see every time
+there's an E, there's usually a D
+underneath it because the the E means
+it's finished executing and the results
+become ready and immediately can be used
+in the
+the the the instruction that depends
+upon it. And this is evidence for the
+broadcasting theory of this where it has
+to kind of completes just goes
+anyone who cares, P45 is now 27 and I
+oh, cool, I got it and then he doesn't
+have to wait another cycle.
+Okay, I think we've got
+everything. So, it looks pretty cool.
+But if we zoom out, it's like
+one and a half cycles an iteration. It
+really makes a difference. It's super
+cool.
+All right, I've labored that enough.
+Right, let's talk about my favorite
+instructions. XOR EAX, EAX. You've all
+seen it, right?
+Yeah. Why the hell does it do that?
+Anyone want to shout out?
+No.
+Nobody wants to shout out.
+Sorry, Justin?
+It sets it to zero, but why not just do
+MOV EAX, zero? Come on.
+Smaller instruction. It is. It's a
+smaller instruction.
+But wait, there's more. XOR EAX, so let
+let's go through it first of all. So,
+exclusive oring a number with itself
+always leads to zero, right? Um
+and because of the stupid syntax of
+X86, this is EAX XOR equals EAX, right?
+So, it ends up with zero, fine. Compiler
+loves to do it, but the cool thing is
+the CPU knows that you love to do this
+as well and so it goes, oh, um
+if you're setting a value to zero, I
+don't need to do anything at all. All
+I'm going to do is I'm going to arrange
+to have a physical register that's
+always the value zero
+and I will just rename it. Okay, RAX is
+now P00 and any kind of thing that reads
+from it later on is just going to get
+the value zero, right? We're done here.
+Doesn't issue at all. So, although it's
+written to the reorder buffer, it
+doesn't go to any execution
+unit. It doesn't take up any resources
+at all. It's magic.
+We can also do some oneing idioms. There
+are some parallel oneing type things
+that can generate an all one. So,
+presumably there's some other magical
+register that happens here.
+We can also do move elimination because
+if you think about it, if I move RBX
+into RAX, all I've done now is I've just
+got two names for the same register.
+So, we we just have to update the RAT
+and say, well, you know, RAX is now P88
+which is incidentally where RBX is at
+the moment. There's no issue this is no
+issue. This doesn't mean there's no
+problem because there's a problem.
+There's no issue. There's nothing
+written. There's no actual work to do.
+There's no actual ALU unit needs to be
+done. But there is an issue because this
+actually does introduce a complication.
+It's surprising.
+there are limits. Um have I got a slide
+on notes here? Uh ah, gone ahead by one.
+So, there are limits, right? Because now
+we're allowing a single physical
+register to be aliased by more than one
+architectural register which means that
+suddenly we either have to do reference
+counting to determine when we can free
+that thing back up again or we need
+another trick to determine when
+everyone's finished with with that
+particular physical register.
+What it seems to use is it has four
+slots for rename for for aliases
+and once one of those slots has been
+used by having two registers point at
+the same thing,
+it until all of those registers have
+been overwritten, that P88 is now
+locked. It can't be freed. And also that
+slot can't be used by anything more. So,
+you can do four moves in a row and
+they're all free and then after that it
+becomes really expensive to move between
+registers until you overwrite both the
+source and the destination that both
+alias. That has gotten better and I
+think they now use a bit master track
+things in a much more clever way
+because
+on older Lake and onwards, they have
+another trick and I I know that I said I
+was just a scally, but this is just too
+cool not to talk about.
+Because, you know, adds and subtracts
+are so straightforward, what if the
+renamer goes, well, hang on, an add with
+one, why don't I just rename it as RAX
+is P88 and just remember it's got a one
+added to it?
+How cool. So, again, small increments
+and adds don't take up any resources at
+all. They just get written as sort of a
+housekeeping issue inside the RAT.
+We have to pay the price at some point
+two reasons. One, the range is only
+between minus 1024, so it's got 11 bits
+of range. And then if it hits that
+limit, it actually does issue the micro
+operation that says, oh, fine, add the
+thing and then we know where we are,
+right? And then of course after that it
+can be renamed from the new new value.
+So, it's pretty cool.
+Um there's also interestingly, if you
+think about what this really means is
+when
+P88 becomes ready if it were depending
+on it, anything that depends on P88 has
+been given the
+the the burden of having to now actually
+do this damn add, right? And so, many of
+the instructions, um that's fine, right?
+You just it's like, okay, I'm reading
+from P88 and there's an adder that kind
+of runs in parallel and then by the time
+the result gets to me,
+it's already had that offset that needed
+to be applied to it applied to it.
+But the shift uh like logical shift, for
+whatever reason, it takes a cycle to do
+it. Every time it if you and and this is
+how we discovered this is going on
+because this is not in the literature
+anywhere, right? Um
+if you do um
+if you like do MOV RAX, 10 and a shift,
+you'll measure the shift takes one
+cycle. If you do MOV um RAX,
+zero, INC RAX and then you do the shift,
+the shift now takes two cycles because
+it pays for doing the add in a single
+cycle beforehand. And we don't know why
+it does that, but the the the the guess
+that we have is that for things like
+variable shifts where you're shifting by
+the value of another register, because
+the barrel shifter it needs a lot of
+setup time and it's a lot of circuitry
+to do that kind of 64-bit shift
+arbitrarily, we figured that it probably
+needs the results a lot earlier in the
+cycle and so it hasn't got time to do
+the add and then set up this thing. And
+then rather than them just blanket the
+um the shifts that have um variable
+shifts, they just said all shifts. Or
+it's a mistake. I mean, mistakes have
+been made before as we've seen. So, this
+is super cool. It's really interesting.
+There's a whole blog post which I think
+I've got at the end that that's
+fascinating to dig into this. Okay.
+We are 50 odd minutes in to the
+presentation. I don't think I've lost
+too many people. Most people's eyes are
+still awake or open or they're awake or
+both.
+And we This is the summary. This is
+where we are. But this is the meat of
+the talk, just getting to this past
+stage.
+So, we've got a in a predicted program
+order which gives us a sequence of
+instructions. Those instruct or
+instruction pointers which are then
+fetched. They're decoded into
+micro-operations. Those micro-operations
+are renamed and then the reorder buffer
+is written to in program order and then
+these sort of micro-operations that are
+pending execution get written into the
+scheduler.
+Right. Okay. Back end looks really
+simple in comparison, but it does hide,
+you know, kind of the thing we care
+about, you know, actually doing the
+work, right? Everything is just sort of
+preamble.
+So,
+I've already said re-reservation
+station. The scheduler and the
+reservation station are two names that
+Intel use interchangeably or certainly
+Agner Fog does. And so that's where I'm
+getting a lot of my information from
+there. The execution and then the write
+back. So, it sort of looks something
+like this. We've got Now it's We've gone
+from this nice pipeline to a big soup of
+things that can be done at some point.
+And so we've got this the the two
+reservations to two schedulers, whatever
+we call them, reservation stations that
+have their 13 line entries that are just
+sat there waiting for either all of
+their operands to be ready
+Sorry, not either. Waiting for their
+operands to be ready and for an
+execution unit that they've been tagged
+to go to to become free. So, that's what
+they're sitting there in this of these
+queues.
+But again, the queues are not really any
+order. It's just whatever's ready. We've
+got the reorder buffer and we the write
+back for the reorder buffer is just to
+say this instruction is now done. It was
+completed. It doesn't have to be any
+other values. Now, way back when in sort
+of like the
+Oh, crap. What was the one Sandy Bridge?
+I'm forgetting now. They have such
+stupid names. I really wish they would
+come up with a good name exists. Anyway,
+earlier earlier on, the reorder buffer
+actually contained the physical
+registers. Effectively, it just used the
+reorder buffer as the physical register
+store. And so the results of everything
+were written back into the ROB, but
+that's no longer the case. They are
+still They live down here because we
+added, you know, vector operations. And
+if we had, you know, 512-bit wide slots
+up there, it's a lot of waste for a lot
+of, you know, they're still writing
+AVX-512 all the time, which maybe you
+are.
+I know you can't tell me. Um
+Maybe you can.
+Um no. So, we've got reservation station
+here. Um yes, we've got various ports
+attached to these reservation stations.
+And sort of broadly, the big picture
+thing is every clock cycle, the the
+scheduler says which of these
+micro-operations is ready to run and
+issues them to one of these ports that
+has many actual logical units. You'd
+think that this is just like an address
+this you know, multiplier or whatever,
+but they each have different usages. And
+then those are pipelined themselves, so
+they have their own pipeline, but
+they're fixed length and they come out.
+And when the result comes out, five
+cycles later, three cycles later,
+whatever, it comes back into this right
+back bus and it sort of says, yes, P47
+is now 127. Maybe it's written to the
+physical register file. Well, it's
+definitely written to the physical
+register file. Maybe it's written to and
+snooped on by some of the other entries
+that are waiting for that result. And
+they become ready to run. And then the
+whole process just keeps going until
+there's Well, just keeps going. There's
+no It never stops, right?
+Fabulous. Okay. So, looking at the ports
+that we have, this again is Skylake
+We've got a whole bunch more on the more
+up-to-date Granite Rapids type things.
+But by and large, you can sort of see
+where all of the engineering effort went
+down on this poor thing that gets all
+this work here. So, there are three
+units that can do integer and vector
+vector operations on like simple
+integers. Um there's there's two that
+can do the shift, one that does the
+permute, some string operations and
+whatever. The number here is the
+latency, incidentally. Um
+so, um if you if you're doing you're
+doing it wrong if you're using x86, for
+what it's worth. And so the the
+execution ports over here are doing all
+um arithmetic type stuff except for the
+kind of like here's one of these kids
+that doesn't look the same as the
+others, which is the store unit, which
+is weird that the store unit doesn't
+live in the load store unit, but
+Over on this world,
+a bunch of load ports that can do works
+and they can also generate the address
+of the store. And then one sort of
+really um you know, kid that can only do
+simple addresses and therefore, you
+know, um I don't know what happened
+here. Maybe they were like we
+copy-pasted it twice and then they
+didn't have enough room for it. They
+edited a bit and were like, well, we
+can't do the complicated addressing
+here. We'll just have to have that kid
+do that.
+Cool. Right. I forgot where I was going
+with this. Never mind. I think you get
+the idea. There's a lot of things that
+go to different ports. Um you'll um
+Yes. And so yeah, typically it picks the
+highest port of the available ports if
+there's a tie because the higher ports
+can do fewer things. And so if it can do
+a vector shift in this one, it's kind of
+freeing up ports zero and one to do more
+of the other weird thing that might be
+coming down the line.
+All right. So, the address generation
+and store load unit generates addresses.
+Surprise.
+And it does the loads. Hey, who thought?
+Um What does that really mean?
+Um well, we're going to have to
+introduce something called the MOB, the
+memory order buffer. This is probably
+the most complicated part and we only
+have like four minutes to do this, so
+there's going to be necessarily some
+simplifications here. Some of the
+simplifications is in my understanding.
+Some of the simplification is that no
+one has come up with a way of measuring
+exactly how this works yet. And some of
+it is I don't know user error on my
+part. I don't know.
+Um so, there are three kind of parts to
+this. There's a load buffer and a store
+buffer.
+And there are some predictors which are
+absolutely bonkers that we talked about
+earlier and I don't think I have time to
+go into depth that we went into at the
+table, but
+this prediction is all over the place.
+So, the store buffer
+holds all of the stores that have not
+yet gone out to the real memory.
+And now remember, everything we're doing
+is speculative speculative at this
+point. Until the instruction retires, we
+haven't got cast iron guarantee that
+something upstream of it that happened
+in program order before it hasn't gone,
+oh, I just divided by zero or I
+mispredicted a branch or anything like
+that. So, until it gets to that
+retirement unit, we can't let the store
+go out to to real memory, right?
+So, we have to hold it in this sort of
+holding pattern. But of course, if I
+store to memory
+and then the next instruction reads from
+memory, I might reasonably expect to see
+the number I just stored in memory,
+right? That would seem quite bad if it
+didn't. So, I have to do something about
+this. So, the store buffer is has many
+many hats. One of them wants to just to
+hold the stores until they go out to
+memory. The other one is to kind of
+handle the loads that have come after it
+that might need to read from the things
+that haven't yet committed.
+So, it's broad broadly broken into these
+two parts where we have the address
+calculation and the data calculation
+separately from each other. And this is
+why this data unit lives in the ALU
+because where do the where do the values
+that are going to be stored come from?
+Probably the ALU.
+And the address is generated by the the
+address gen. What we're doing here is
+that by separating them, most of the
+time, maybe not all the time.
+Some of the time. Let's just go with
+some of the time. Some of the time, you
+know what address you're going to be
+storing to earlier than the data that's
+going to be stored to it. Like, you
+know, you square root something 20 times
+in a row. So, you got this huge long
+dependency chain of square roots and
+then you store it to address 20. Right?
+I know that it's going to store to
+address 20 pretty early on. I'm going to
+have to wait through 500 cycles before
+those square roots have all completed.
+Why do I care about the address? Well,
+if I've got a load coming on and it's
+not to address 20, I can do that load.
+So, I I need the address more than I
+care about the data for the purposes of
+letting other instructions that are
+later in the flow get their results.
+So, we have the address, we have the
+data, we have how wide that is, whether
+it's completed or not, and whether or
+not it caused a fault.
+Obviously, again, if we cause a fault,
+but we it was on a path that is not got
+to because we're going to divide by zero
+before we get to the fault or, you know,
+Spectre meltdown notwithstanding, you
+know,
+then we don't want that to actually take
+effect. And so when it comes to
+retirement, we'll we'll check whether it
+was a fault or not.
+Uh so, stores, we have to wait for those
+two, address calculation and the data
+operations. And then we sit in that
+buffer serving the incoming reads. And
+then eventually, we actually commit. And
+that happens way much later after we
+retire this once it's retired.
+Uh the load buffer on the other hand
+stores the loads that are happening and
+some status about the prediction stuff
+that I alluded to, but I'm not going to
+go into. But this is useful tracking
+some guesses. It makes some intelligent
+guesses about whether or not a load may
+never alias, in which case it can issue
+it really really early. The problem with
+that is if it gets it wrong, it's
+incredibly expensive. It has to do a
+whole bunch of like uh
+state clearing to kind of undo the fact
+that it let a load happen that was
+actually dependent on a store before it,
+but it didn't run. There's not not like
+an undo mechanism for that. So, it just
+throws everything away.
+Um so, we have, you know, some kind of
+reference to where the ROB is, how wide
+it is, and what address it's going to uh
+that it's been served from. And again,
+um this is also
+the the the the order in here and this
+the store color here is a reference.
+It's called this in the literature.
+There's a there's a
+a pattern that talks about store color.
+They don't go into any details of what
+that really means. If you look at the
+RISC-V implementation of this, it uses a
+complicated bit mask, but effectively,
+this is some way of it saying which
+stores could potentially have affected
+this load. As in, where is it in the
+sequence of stores so that I've got some
+way of tying the things together and
+knowing that like once all previous
+stores have been accounted for, I can do
+this load.
+So, loading is really really really
+complicated, which is one of the other
+reasons why it's slow. Not just, you
+know, we talk about L1 cache. It's like,
+hey, it's three or four cycles to get to
+L1 cache. It's like, it's going to do
+all this as well, right? We first of we
+do some prediction about the ambiguity.
+Again, out of scope, unfortunately. We
+have to wait for the address to be
+calculated. Hopefully, that's quick. And
+then we have to check the store buffer.
+Now, if we get a hit in the store buffer
+and there are no intervening stores
+between the hit that we made and
+anything that hasn't yet been resolved,
+then we know that no store earlier than
+this load can possibly affect the value
+other than the one we found. And we can
+go, "Hooray! We don't even have to go to
+L1. This is like L0 cache. Here you go.
+Here's your number."
+If that's not true, if we miss, as in we
+don't find anything in there, but there
+are also no stores that haven't been
+resolved earlier than us, we know like,
+"Hey,
+there are no stores that are in the
+queue that have not yet been flushed out
+to memory, so we can just issue the load
+now." And then it will actually finally
+go to the L1 and start the whole process
+of reading from memory. And obviously
+the load finishes and eventually
+completes and comes back and then we
+send it off to the program. It's a
+miracle that any of this stuff works,
+right?
+And if not, if it was still in sort of
+ambiguous state where there are
+unresolved stores, we just have to wait.
+We have to keep going and sit in this
+queue until all of those stores have
+been resolved, which is why we try and
+predict if it's going to happen. And
+sometimes that's worth it.
+Okay, here there's some patent number
+here, which I'm sure you're not allowed
+to click on because of all the legal
+things, but let's not go there. All
+right. Uh the other thing that the
+memory order buffer is involved in is
+all of those horrible locked
+instructions that you want to do.
+Fences, so you know, like store fences
+and load fences are like operations that
+will cause those things to drain out
+before any further instructions that can
+issue loads can happen and that kind of
+stuff. And it's sort of vaguely alluded
+I'm going to put just the worst total
+sort of here, but my my confidence in
+this has been irredeemably shaken by our
+conversations earlier. Where's Andrew?
+He was He was here earlier, I'm sure.
+Yeah, yeah, there he is.
+So, there's definitely some things that
+go on with this, but that happens on
+later on. Um
+So, finally we get to talk about
+execution. We are We are now exactly at
+an hour since I started talking to you
+all and we're going to talk about
+execution, which is luckily the most
+boring stage because it just it does
+what the old CPUs used to do, right? You
+know, it's pipelined, you know, there
+are machine traps. Interesting, this is
+where floating point assists happen. If
+whoever is has ever hit the hideous
+performance cliff of denormals, there
+are some nods in here. To the best of my
+understanding, what happens here is that
+if you So, the floating point unit can't
+handle numbers that are like not 1. * 10
+to the minus whatever or 2 to the minus
+whatever. Um so, for very very very
+small num- numbers that are below float
+min, whatever the thing is, um the there
+has to be special casing for it. So, the
+hardware can't do it, but it can't
+determine that ahead of time. So, by the
+time it gets to this point the the
+multiplier of the adder and divider
+goes, "Oh, crap. Uh
+Uh
+right. Uh what do we do? We've We've got
+like a a number I can't deal with." It
+just has to essentially flush the
+pipeline. And then it goes back to the
+microcode sequence uh and says, "Can you
+just generate me the code that can
+handle this, please?" You're like,
+"What?" You know, dynamically like
+undoing as is a deoptimization kind of
+thing, like a jit deopt. Um yeah, it's
+crazy. Anyway, and the execution ports,
+we hope that they're balanced. Like in
+terms of the latencies, if I go back to
+the slide before, it used to be the case
+you could sort of see, "Oh,
+Oh, all right. I won't do it now. But
+like the the they try to like make it so
+that there aren't different latency
+numbers of instructions because one of
+the other things that happens is if two
+instructions on an execution port
+complete in the same cycle, like you've
+got a three-cycle guy and a five-cycle
+instruction that was issued two cycles
+earlier, they both want to complete in
+that last cycle and that
+that would delay one of them. So, they
+try to avoid that by like coming up with
+sensible everything's a multiple of two
+over here and then we do this type of
+thing or whatever. There's There's some
+tricks to it.
+Um gosh, where were we?
+So, that's what I mean by that. Uh
+and then yeah, we we talked about this.
+The write-back stage is the results are
+broadcast, they're written to the the
+permanent register file
+physical register file, not the
+permanent register file, that's
+different. And it's marked complete in
+the reorder buffer. All right.
+Retirement. Retirement is the easy bit.
+all we're doing all the retirement
+system is I mean, yeah, we're all We're
+all trying to retire. I know I know,
+earlier perhaps than than not, but but
+finally everything is done. So,
+that reorder buffer is essentially that
+ledger again of all instructions that
+flow through the system. The retirement
+system is trying to pick up as many
+um completed instructions as it possibly
+can and say, "Okay, these are now done."
+And they can be freed back off. And what
+That's the other thing, it does do the
+freeing. So, this is where the registers
+that were renamed are now freed back to
+the system as they've been all the way
+through the system. But of course, the
+op- opcodes that we've just seen, it's
+not that the it's not that the register
+that was just got written to that we're
+freeing, it's whatever it used to be
+when it was renamed right back at the
+beginning of the pipeline. So, we know
+that when we complete the register that
+replaces EAX completely and it used to
+be PA88 and it's now P50, at the point
+that it retires PA88 is now free. So,
+that's when it gets chained back onto
+the list. And that's also why
+that is simple provided you have no
+aliasing and no one else has also got
+PA88 at that point. Um
+so, this is where exceptions actually
+get handled. We talked about this as
+just a flag and then that's when the
+whole thing goes horribly wrong.
+Hopefully you're not doing too many
+exceptions in your code. And not not
+exceptions like C++ exceptions, I mean
+exceptions like machine checks and um
+you know, divide by zero and and um
+memory stuff.
+The stores are also marked as senior in
+that memory order buffer because they
+they're going to continue to live in
+there until they actually get flushed
+out to the real memory. And the retire
+system can do four micro-ops a cycle,
+which is very rarely a limitation, but
+if you you can you can sort of prove it
+with very very pathological code. Um
+yes, and then late The last stage is
+It's not really a stage at this point.
+It's just that the the um the store
+buffer is kind of retiring stores in
+order as well. As they become senior,
+that means they can go out. That means
+the instruction that caused them to
+become ready um
+uh has completed, so they they're okay
+to be committed. And then some magic
+happens, something something total store
+order, some kind of liaison with the
+other the chips uh on the on the die and
+all the other um
+subsystems. And I This is where I can
+tell as far as I can tell this is where
+the RFO, the read for ownership, that
+actually is the kind of kind when we
+talk about pa- cache ping-ponging and
+false sharing, this seems to be when it
+happens. I was very vague on this,
+honestly. I was trying to work out where
+it could possibly happen. I should
+probably talk to you all and see if you
+can have opinions on that afterwards,
+but it seemed Okay, right. Well, that's
+it. It's pretty straightforward, right?
+And to think that I was going to talk to
+you about branch predictors as well. Uh
+but um you know,
+I uh where's the next thing? There it
+is. Yes, a conclusion. There's not
+really a conclusion to this. The whole
+talk is the conclusion. It's like this
+thing is an amazing edifice that's been
+built, right? It's amazingly
+complicated. Uh the kind of advice and I
+I I feel like I'm you know, teaching
+your grandmother to suck eggs here. This
+is like you all know this, you know. Do
+things simply and straightforwardly.
+Don't do divides. Again.
+Integer divides, that is. Floating point
+divides fine.
+I don't care about those. Uh small align
+loops are good. Um
+the the let the renamer do its work.
+Again, I wrote this before I had the
+conversation with some of your experts
+and um
+the the call for more registers was
+really interesting to me because I
+hadn't really thought about the
+implications, but my small loops seem to
+work okay. So, I'll stick with those.
+Um but yeah, so the renamer is really
+clever at doing its work. You shouldn't
+need to worry about having more
+registers.
+With an hour massive footnote, speak to
+these people.
+Um yeah, I'm sure you all have
+questions. Um I've got a whole bunch of
+references here that you can go and look
+at. I will make sure that these slides
+are available to you all so you can go
+and look through them all. Um thank you
+very much indeed.
+All right, I got the queue.
+Is there anyone brave enough? I have I
+have swag as well. You can come and get
+stickers.
+Before you go, you can come and grab a
+sticker or I have one special or two two
+coasters, which are not very exciting
+cuz they're made of cardboard, but
+I'm trying to bribe you to talk to me.
+Somebody speak. Come on.
+Oh, there is a question. Hello. All
+right, I'm going to try not to hit
+anyone, but I'm sorry. I don't think I
+signed anything
+to say I wasn't causing physical damage.
+Uh are are the physical registers like
+equally as wide?
+Good question. Um no. So, the physical
+register file is broken into different
+pieces. I thought I had the numbers up
+on one of the slides. Maybe I did, but I
+didn't talk about it. Um there are
+different number of registers for
+different types of Sorry, different
+number of physical registers for
+different types. There are like several
+hundred flags registers because they're
+small and pretty much every instruction
+affects the flags, but almost every
+other instruction doesn't give a
+about what those flags were. So, you
+want to try and rename them away and
+make sure there's no false dependencies.
+For the AVX things instruc- registers,
+there seems to be a batch of like
+full-width
+um 512-bit physical registers. And the
+renamer seems to want to use those only
+when it knows that it needs them.
+Otherwise it it tries to use 256-bit.
+Again, it's trying to save some kind of
+real estate. Again, I I'm waving my
+hands a bit here cuz I haven't had full
+experience personally of this, but I
+from re- reading in the literature,
+there is some kind of cleverness about
+the allocation of those. And obviously
+then the 64-bit general purpose
+registers are there's just some couple
+of hundreds of them. And I'm going to
+put They're at least 64 bits wide. They
+are at least 64 Yes, and they're they're
+made for each type of register. So,
+they're at least 64 bits wide. Yeah, um
+another thing to note I I was very
+cavalier about saying RAX and then then
+showing things that had EAX on them and
+all that kind of stuff. Now, we all know
+that they are the quote same register.
+It used to be the case again Sandy
+Bridge era that if you wrote to say AX,
+then um the register allocator gave you
+a new AX RAX like EAX effectively at
+that point. And then it also wrote out
+an opcode that was like and or it with
+the remaining part of the old version of
+that register, right? To kind of combine
+them. That seems to be not the case
+anymore. It just seems to just emit them
+and magic happens and and and you if you
+write to the bottom 16 bits, then uh you
+don't have to do any extra work. But
+yeah, so but they're all 64 bits wide is
+my understanding. Yeah. Good question.
+Okay, one over there. Do you want to try
+and pass it over rather than
+Excellent. Uh do you have much of a
+sense of how much variety there is in
+the design between like these Intel CPUs
+and AMD or even like other
+high-performance CPUs? Uh not really,
+actually. No, my my my my sort of
+childhood experience was all ARM, but
+then that was very, very old and and not
+very sophisticated. Um and then I've
+only really been concentrating on the
+Intel CPUs. That Having been said, you
+know, the things that I know are
+different in AMD are the branch
+predictor. That's something I've done my
+own research on to, and that is very
+That's got a very different ethos. It's
+sort of Um but I don't know about this
+these kinds of aspects of it. I Maybe
+someone else in here will do, but
+Sorry for the non-answer.
+And there's a question there.
+Um I I've heard like two perspectives on
+whether ISA matters. Like is ARM faster
+because of, you know, all the non-ISA
+things, or is it faster because of ISA?
+So what is your take?
+So I think, again, in those halcyon days
+when ARM was actually a RISC processor
+and was, you know, I could disassemble
+it by just by looking at the instruction
+because they were that straightforward,
+I think it probably had an edge against
+the the contemporary x86 era
+um thoughts. But I think that ship has
+sailed, you know, with all of the new
+whiz-bang features that the ARM can do
+now. I think they have just as
+complicated a set of decode steps and
+prediction and and pipelines and out of
+order and all that kind of stuff. So I
+don't know that it makes that much
+difference. It's more of an
+implementation detail of the front end
+as to how the actual adds and subtracts
+get their way into the ALU than that is
+you know,
+I guess the one one argument could be
+that the x86 ISA is sort of poor man's
+compression, so you get a little bit
+more I-cache usage, maybe. But, you
+know, we've all seen 15 site of 15-byte
+instructions as well. You're like, "I
+don't know if that's better, you know."
+So yeah. No, again, another non-answer
+for you there, I'm afraid.
+Question at the front, I think. If you
+want to
+carefully. There we are. Lovely.
+Um like how did anyone figure any of
+this out? Like what kind of crazy
+experiments are people running to figure
+all this out?
+&gt;&gt; yeah, huge shout-out to the OG for all
+this is Agner Fog, who is a Danish a
+retired now, as I found out last week, a
+retired Danish anthropologist, which is
+exactly the kind of person you'd
+imagine.
+He seems to be more of a social
+anthropologist than a technology-focused
+anthropologist, or was. And so this sort
+of
+Why?
+I'm doing something. So he he did a
+whole bunch of experiments to reverse
+engineer things. Now, so the short
+answer for for for that is there are
+performance counters. Those performance
+counters have revealing names, even if
+Intel don't really want you to know
+what's going on. And you can use them
+and infer from their usage. So like the
+my own research back on earlier was
+about um answering the question did the
+You know that the the XKCD with someone
+is wrong on the internet?
+And you're like,
+"I've got to go." It was one of those.
+Someone made some sweeping statement
+about like backwards branches were
+always predicted taken.
+And I'm like, "Really?
+Always? Hm?
+But what if you don't take it?
+You know, what if it's a conditional
+branch that's backwards?
+Anyway, the the long and the short of it
+is yes, it is in on some unconditional
+ones are different from conditional
+ones, whatever. But like the the the the
+measurements were due to do two things
+that were in the Intel documentation
+about early resteers. And they don't
+tell you what this is. It's just like,
+"Oh yeah, the number of times the
+pipeline was was resteered early." And
+you're like,
+"Okay." And then late resteer and then
+some other thing. And if basically
+my
+inference, which was backed up by the
+evidence I got and the conclusions I
+drew, was
+like I said in the beginning, you don't
+even know if there's a branch in a
+16-byte block of memory, right? So the
+fetcher is just going predict Sorry,
+yeah, the BPU and the fetcher are just
+going to go 16 bytes, 16 bytes, 16
+bytes, 16 bytes. But as soon as a branch
+is detected really early, like in that
+decode decode stage, it can send a
+message to say, "Oh, well, whatever
+you're doing is probably wrong, because
+if you didn't tell me that I had to
+branch at this point,
+you should branch." And so that was an
+early resteer. So it's like only three
+cycles of latency, and then suddenly
+you're already getting on the right.
+And so by playing around with that, plus
+by branching forwards and backwards and
+then timing it and then seeing how far
+apart instructions were, that's what
+those color pictures were, you can kind
+of infer some of the patterns of what
+what's going on. And then for things
+like the much more complicated stuff
+like the micro-operations and stuff,
+there are counters of how many micro-ops
+um have been executed by each stage of
+the pipeline. So you can run experiments
+where you're just kind of adding over
+and over and over again. You say like,
+"Oh yeah, the counts are going up from
+ports 0, 1, and 7. So those are the
+three that can do this operation." And
+so on and so forth.
+Um and then you know, you build huge
+dependency chains and then you try and
+do some things behind the back of those
+dependency chains and see which other
+counters go up. And you're like, "Oh,
+these things are weird that we hit the
+renamer. It wasn't able to rename
+anymore because like well, it was wait
+Things like that." So there's a whole
+bunch of experiments and um
+Travis Downs has probably got the best
+set of um work on this. So he's This is
+his blog, but he also uh writes
+something called uarch-bench.
+Am I getting that right? Which is um
+kind of like a whole suite of
+micro-architectural benchmarks. Agner
+Fog has his own stuff as well. I've got
+my own branch of that, which is what I
+use for the BTP stuff, which I is now
+I've made it recompile again. It's It
+was It was broken as hell. Um so yeah,
+there's And then Andreas Abel and his um
+I can't think of the the other person on
+this paper, but as a I think it was his
+master's thesis, they spent a whole
+bunch of time trying to work out the
+algorithms behind the renamer and the
+the uh which ports get allocated at what
+time and how long they are. And they
+found a whole bunch of things that like
+no one else had ever noticed before,
+which was just bonkers. And then I I
+love the fact that we can experiment
+with something which like I'm carrying
+around with me all the time. And you're
+like, "I wonder how it works." And
+you're like, "You can go and find out."
+But yes, so the short answer is all
+those weird counters and then very
+careful timings. And the the sadness
+about this is, and I'm sure we again, we
+talked about this earlier, is that most
+of these things only work if you have
+actually got a physical machine in front
+of you, which obviously I do in the case
+of a laptop and I do in my desktop at
+home.
+You know, I tried to get a
+a Granite Rapids machine, and I, you
+know, it's expensive enough to hire
+them. And then I get to the my Amazon uh
+account. And I've got it running and I'm
+like, "sudo this." And it's like, "Oh,
+there's only three hardware counters on
+this." And I'm sure there's more than
+three hardware count- Oh, it's virtual,
+isn't it?
+So I couldn't do the measurements I
+wanted to on those. Um
+And it's the same with magic trace,
+right? You need a real actual
+honest-to-goodness computer to run it on
+in order to actually get an answer.
+Any other questions?
+Thank you, by the way.
+All right, you want the one next to you,
+and then we've got one behind you. Um do
+you have a favorite x86 instruction? Do
+I have Oh, no.
+Not re- I'm very simple, actually. I
+quite like
+I quite like um
+There's one of the parallel comparison
+things that I always forget, but I when
+I see it, it makes me chuckle. And I
+can't think which one it is. It's like
+what like PCLMEQ
+something something. No, I Yeah, good
+question. I just want the kind of thing
+I should have a good answer for, but I
+do not know.
+We'll accept least favorite, too. Uh
+least favorite?
+Ah.
+Least favorite?
+No, I I wish I had a pithy and amusing
+answer for you, but you're putting me on
+the spot.
+What was the They were took one away for
+the um
+They took one instruction away that used
+to be used for binary coded decimal, and
+it was They didn't bother porting it to
+the the the 64-bit. And I'm like,
+"Come on, you have so much legacy crap,
+and you didn't bring this instruction
+over." And that's got a funny name. I
+can't remember what it is now, but
+anyway.
+Yes, sir. Presumably, we can use this to
+make our code fast. And Intel wants
+their CPUs to look very fast. So why is
+this all so hidden and impossible to
+describe, and why don't they just tell
+us more? I don't know. So you can I
+mean,
+again, it may be possible that within
+this building there are people have
+access to information that I do not have
+access to, but I am certainly aware of
+it my time at at Google that if you have
+a certain volume of uh
+of uh um
+uh chips that you buy from Intel, then
+there's a sort of sliding scale of how
+many how friendly they'll be with you,
+going from like we can send somebody to
+come and help you debug your problems
+through to we can fabricate your own
+specification of chip, and here's the
+designs and they had a the pink books, I
+think, and the yellow books. They were
+like different names for different
+levels of classified information. And
+suddenly,
+when I had some very off-the-record
+conversations with some some
+contemporaries around the Spectre and
+Meltdown times, they were like, "Well,
+yeah, the pink thing, it talks about
+the" And I'm like, "What are you talk-
+Whoa, what?" And they're like, "Have you
+not got those?" I'm like,
+"No." And they're like, "Oh, we
+shouldn't have said anything." And I'm
+like, "Oh my god, even knowing that they
+exist is a
+So
+I think some people do have access to
+this information. But to answer your
+actual question, I think they
+they don't want to promise things about
+how it works, because, you know, what is
+it? Ah, Hyrum's Law. Anything that can
+be relied upon will ultimately end up
+being relied upon. Of course, you know,
+that's why we have instructions from the
+1970s, although not my my my friend the
+binary coded decimal adjustment.
+Um so they don't want to be painting
+themselves into a corner, and presumably
+as well as an intellectual property
+aspect to this. You know, even though it
+gets reverse engineered. So like um
+The branch predictor in particular, I
+think, is one thing, cuz I do know that
+AMD is very different from the the x86
+one Sorry, the Intel one.
+And um yeah, the the folks who reverse
+engineered the the Skylake branch
+predictor,
+um they found a really interesting case
+where and again, we don't I have
+I was going to do some more slides that
+I could afflict you with, but
+unfortunately, I didn't get around to
+them. But effectively,
+the various smooshing and hashing and
+things that it does to kind of come up
+with a this is a fingerprint for this
+particular branch and the sequence of
+operations that led to it, such that I
+can have a a table that says, "Hey, the
+last time we were in this state at this
+branch, we took the branch." You know,
+that kind of feel. That's what it's
+going on in a branch predictor, right?
+Um they um
+the sm- They discovered, these
+researchers, that the bit five of the of
+the branch address was essentially a
+direct map. So if it was clear, there
+was one half of the entire branch
+prediction system that you were using.
+And if it was set, there was the other
+half of the entire product you know the
+effectively the hash didn't mix bit
+five. And they used it to uh generate a
+sandbox
+sort of meltdown Spectre style where if
+you're a JIT compiler, you could
+contrive the code that you JIT compiled
+to only allow branches to happen when
+bit five was set.
+Right? In your in the code that you
+generated. And then you make sure that
+your supervisor and all the checks about
+like are you in bounds? Are you not in
+bounds? Whatever has bit you know people
+laughing bit five clear. And now you
+effectively have two branch prediction
+domains. And now you're not subject to
+Spectre meltdown. How cool is that? And
+I'm like yeah, if they'd have told us
+that, we'd have used it. But then of
+course now they'd be like oh we
+have to keep it this way. We probably
+didn't even know ourselves that bit five
+leaking out like that. So, I think it's
+a bit of all you know what what is the
+Hanlon's razor? Never ascribe Yeah no no
+I don't think Hanlon's Hanlon's razor
+applies here which is what is the never
+ascribe to malice that which is
+explained by incompetence. But no, cuz I
+think a very very common to people I
+think some very careful decisions have
+to be made about this kind of stuff. I
+mean we are obviously in a very
+sensitive intellectual property
+environment ourselves. And so, you know,
+try trying to tow the line between the
+things that we do think is useful
+and the things that most people don't
+need to know but could be a competitive
+advantage would be my biggest guess
+there.
+Plus just documenting it would be a
+pain.
+Any more questions?
+Okay, I'm being waved at from the back
+as in times like we're done on the time.
+So, once again, thank you all for
+inviting me out here. I've had a
+wonderful time and
+yeah.

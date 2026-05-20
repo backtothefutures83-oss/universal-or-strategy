@@ -1,4 +1,4 @@
-﻿# Droid System Instructions: Hardened Coordinator-Specialist Cycle (Optional)
+# Droid System Instructions: Hardened Coordinator-Specialist Cycle (Optional)
 
 This instruction set activates the **3-Step Internal Cycle** for high-integrity missions. Use this when performing architectural repairs on the Morpheus OS Kernel or sensitive Svelte UI components.
 
@@ -64,3 +64,13 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 - **Check First**: Before deep architectural exploration, always check for `graphify-out/graph.json` or `graphify-out/GRAPH_REPORT.md`.
 - **Update**: Use `graphify update .` to refresh the repo knowledge graph after major structural changes.
 - **Efficiency**: Use the graph to navigate codebase relationships with 71x fewer tokens than raw file reading.
+
+## Mandatory Fleet Tracing (V12.16 Total Observability)
+
+No agent action is valid unless it is traced. ALL agents (including Droid) MUST emit telemetry.
+- **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+- **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+- **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
+- **Execution**: Before and after any tool execution (such as `replace_file_content` or `run_command`), you MUST call:
+  - Before: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Droid "Before <action_description>" IN_PROGRESS`
+  - After: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Droid "After <action_description>" PASS` (or FAIL on failure)

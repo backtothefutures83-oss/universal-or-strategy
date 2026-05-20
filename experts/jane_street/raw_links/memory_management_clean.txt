@@ -1,0 +1,2242 @@
+Thank you. It's uh really uh great to be
+here at Jane Street or sit back at Jane
+Street. Um the I I gave a talk here in
+in 2018 actually um that I uh really
+appreciated the opportunity to to to
+give. I actually referred to that talk
+somewhat recently um because that talk
+there's a a little bit that I regret
+about that talk. I generally live
+without regrets. Um, yes. Was it
+supposed to be a joke? But I guess it
+was. I guess. Yeah, that I I it's like I
+guess that's obvious that I live without
+regrets given some of the things that
+I've that you know, people think that
+like I I I actually also I should say
+there was a long period of my career
+that predates really internet video.
+That's when I was really loose. Um, what
+you're what you're actually seeing is a
+much more buttoned down, wiser, older
+person. in that talk in 2018 uh there
+was a um after the video was over there
+was a really great question and that
+question the talk was about all of the
+the accreted and acrudeed complexity we
+had in our systems and um I don't I
+don't remember who the questioner was
+but I still feel guilty because the
+questioner asked is there anything that
+that is going to resolve this complexity
+explosion it seems again this is in 2018
+things are just
+hopelessly more complicated. And I
+remember just being like, we're just
+it's basically we should all just jump
+in a lake. I mean, it was very So I I I
+would like to apologize to that
+questioner because I actually think that
+that's a lazy answer. Um and we actually
+uh can improve things. We can actually
+make better systems. And that's
+something of the of of the topic we're
+going to talk about today. And I I
+really I hate to do this because God,
+this this dude really gets my goat. Um
+I you know you would think like so this
+is this is an excerpt from an essay that
+Mark Andre venture capitalist um wrote
+in in 2011 on why software is eating the
+world. This thing so this is written in
+2011 so this is now you know like almost
+15 years ago. This thing has been
+trolling me for a decade and a half like
+this thing won't stop trolling me. Um,
+and the the the thing that just drives
+me absolutely crazy about these VC think
+pieces is that they're not exclusively
+wrong.
+And they're but they're definitely not
+right. And
+venture capitalists seem to have this
+unique capability, at least for me, to
+be both to say things that I both
+emphatically agree with and emphatically
+disagree with, often in like the same
+sentence.
+Uh, and it's actually which is kind of
+interesting. Gives you this like kind of
+crazy emotional reaction. It's honestly
+kind of the emotional reaction you get
+when you're raising money in general for
+a company because you will get both like
+absolute stern rejection and total
+embrace in the same moments from
+different people. So you like your brain
+crosswires itself. Uh and and this is
+what these these think pieces are able
+to do this and this one definitely it
+does this to me. Um and in this regard
+I'm going to do a quick aside. Um, so,
+uh, I want to talk a little bit about
+the thermal grill illusion because this
+is, you'll see where I'm going with this
+metaphor here. So, um, the if you've
+ever been out to the, uh, the
+Exploratorium in San Francisco, uh, I'm
+sure this is true for other science
+museums as well, but I know that this is
+where I discovered this particular
+phenomena, where I saw this phenomenon.
+There's a great exhibit kind of off to
+the side of the exploratorium
+and there they are two coils and one
+coil contains is warm not not hot warm
+about 40° C 40° C is only slightly more
+elevated than your body temperature it
+feels warm not hot and on the other coil
+it's cool not cold but cool and the
+coils then uh intertwine
+And when you grab the combined, it's a
+wild phenomenon. It when you put your
+hand on the in the the the interspersed
+warm and cool coils, your brain explodes
+and it immediately because your brain,
+it is wild, your brain is like get your
+hand off this thing. Like it it feels
+like you've just touched a hot stove.
+And this is what's called the thermal
+grill illusion. was actually discovered
+by a physician, Torson Thurberg, in
+1896. I really wanted to get like the
+original paper, even though it's in
+Swedish. He's got like a diagram of this
+thing. And man, I spent so much goddamn
+try time today trying to convince an LLM
+to like get this thing for me. And it's
+like, you know, they're like, "Oh, well,
+if you we want this, you should do like
+an inter library loan because this is
+like I know you trained on this thing.
+Like, don't just just give it to me.
+Like, you already stole it. you've
+already done the wrong thing. Like I'm
+just asking and anyway it was and then
+it's like it feels like super weird to
+be trying to talk a like an LLM into
+like arguable crimes because IT I
+DEFINITELY didn't feel guilty at all. I
+felt annoyed. I'm just like I just like
+come on give it to me. But I I I'm not
+going to do an inter library loan from
+like the Royal Academy of Sweden. Thank
+you very little. Um
+but the discovered 1896 and so uh this
+kind of wild phenomenon this actually
+excerpt which uh Gemini tried to offer
+up as the original 1896 paper by the
+way. I'm like don't think that one's
+from 1896 this like much lauded Gemini 3
+pro model or whatever. Um, but so this
+is actually from a much more recent
+paper in 2019 trying to study this
+effect because it's actually still
+unknown what causes this. And the this
+is a where they they've tried to study
+it much more precisely with these kind
+of interspersed um you've got you've got
+hot and cold plates and they're trying
+to look at the actual like neurological
+reaction because they actually don't
+understand it. So I I think like this is
+obviously a much more scientific way to
+do it. I think you could just have me
+read VC think pieces and you would get
+the exact same reaction. Like whatever
+is going on in the brain is the exact
+same thing where the brain is like yes
+but also emphatically no and just like
+get away get it away from me. But unlike
+with this I actually am now just like
+mesmerized by these VC think pieces and
+I I I keep having to go back to it. So
+I've been back to this essay so many
+goddamn times. I've spent more time
+getting trolled by it than Andre ever
+spent writing it for sure. Um, so I mean
+I guess jokes on me, but so we're going
+to go through it a little bit. Um, and
+so the you know this line at the top
+here is is kind of the the famous line
+from it. Um, that seeing more and more
+Silicon Valley style entrepreneurial
+technology companies that are going to
+be invading and overturning establishing
+industry structures. Again, this is in
+in 2011. So when he has predictions over
+the next 10 years, you can kind of hold
+them to it, which we're going to do here
+in a little bit. Um, so this is actually
+the the thing that I think is actually
+kind of like most interesting from the
+piece in hindsight now from again 2011
+because this is looking back to 2000 um
+2000 much more recent than when when
+this piece was written than 2011 is for
+us today here in late 2025 and looking
+at the cost of in on LoudCloud which was
+the failed startup that he had with Ben
+Horowitz um the where just to host a
+basic internet application was 150k a
+month. Uh and now that that same
+infrastructure in in Amazon in 2011 is
+$1,500 a month to which many people with
+AWS bills are going to be like, "Wow,
+how quaint. You were able to do anything
+for only $1,500 a month in 2011." Uh it
+feels like AWS bills are actually quite
+a bit higher uh today for a bunch of
+reasons. Um but this is a huge delta,
+right? Right. And I think that this is
+something that that that Andre points
+out that certainly uh was revolutionary
+is that cloud computing elastic
+infrastructure made available
+infrastructure that could be software
+defined made available to anyone with a
+very low cost of entry and that did
+allow for an explosion of kind of
+software as a service kind of offering.
+So that that is all not wrong. This is
+basically the best part of the piece as
+far as I'm concerned. Um that's
+definitely right. Then we get to these
+and I I like if we're going to talk
+about this piece, we have to talk about
+some specific paragraphs. I'm sorry. So,
+um, photography of course was eaten by
+software long ago. And this is like one
+OF THESE YOU'RE LIKE, YOU KNOW, YOU'RE
+LIKE,
+OKAY. SO, LIKE, do words mean anything
+now? Like, what does that mean in 2011
+to say that photography was eaten by
+software long ago? I don't even know
+what that actually means. Um but so yes,
+okay, we have mobile phones for sure and
+we have we have cameras. Softwarepowered
+camera is like that's we're beginning to
+stretch things here. Um because there's
+a lot of hardware obviously involved in
+that camera much more so by the way in
+2025 than there was in 2011. I mean, if
+you look at the quality and I actually
+went back to some of my my the photos
+that I took on a camera phone in 2011
+and they look like a like a a Kodak
+chrome a Kodak 110 camera that I used to
+have as a kid in the 80s. It's like
+they're pretty grainy snapshots. And I
+mean the photography on phones right now
+is is extraordinary. But it's not just
+because of software. It's also not just
+because of hardware, right? that if you
+look at the the the history of of
+computational photography since 2011,
+which by the way it wasn't eaten by
+software long ago, there was a lot of
+software hardware codees as part of
+that. And who was the beneficiary of
+that? Well, first of all, we were the
+beneficiary of that. When you go take a
+photo of your cats or your kids or what
+have you, you're able to whip your your
+camera out very quickly. We're all
+walking around with cameras all the
+time. I think that is a that is wildly
+revolutionary. something that was
+inconceivable say a century ago and I
+think it's going to have long-term I
+think there's so few photos of uh if you
+know if you're a Gen Xer you're just and
+especially if you're I'm the first born
+okay so I actually got a baby book my
+sister a Gen Xer as well is just like
+did I even exist before like my college
+graduation it's just like nothing I mean
+just like no baby book nothing um and
+now we document our lives so thoroughly
+in part because of this revolution which
+is pretty interesting okay okay So Mark
+and we're going to like okay we're you
+know you're and then okay so what are
+the companies that are the these
+companies that we should look to as the
+software companies that are going to be
+eating the world in in this coming
+revolution of computational photography.
+Oh there it's Shutterfly Snapfish and
+Flickr. And again, if you're me and
+you're like immuno compromised when you
+read this stuff, you immediately are
+like spending, you know, a 35 minutes in
+a Shutterfly rat hole figuring out like
+which PE shop bought Shutterfly to chop
+it up. You're like, where am I right
+now? It's like why am I? But of course,
+like Shutterfly, Snapfish and and Flickr
+are all I mean, they're not even like
+trivia questions. I mean, these these
+are companies that are yes, they exist
+or they did exist, but they are not the
+they were not the innovators. They were
+not the leaders. I mean this this
+paragraph is basically like wrong.
+Sorry. Um then I'm not done. I'm so
+sorry. I you're just like are we going
+to do this THE WHOLE TIME? LIKE NOT THE
+whole time. But you know, Henry did tell
+me like I got you know that I I can
+maybe maybe Well, um the So uh that now
+I just educated you about about Snapfish
+and Flicker. We're we're going to learn
+more about defunct companies here. Um so
+today's largest direct marketing
+platform is a software company, Google.
+This is like one of these things where
+you're just like you just get to make up
+words. I guess that like if a company
+writes software that's a software
+company. It's like it's actually okay.
+All right. Which is whatever fine.
+Obviously software extremely important
+like that's no one no one's disputing
+that. Uh so now it's been joined by
+Groupon Living Social forsquare and
+others. Who are THE OTHERS? THEY GOT TO
+BE JUST LIKE I MEAN WHO SORRY I I mean
+like above these are above the fold.
+who's below the fold for for for group
+on living social and forsquare. I mean
+this is a cemetery. Um this is um and
+they were using software to eat the
+retail marketing industry. It's like
+definitely like like eating was taking
+place. I'm not sure who ate whom or what
+ate what. I think the creditors ate at
+least some of those companies. Um
+and I think we've been generating over
+$700 million revenue in topline and
+bottom line. a lot of education, a lot
+of economic education that can be had
+here. Um, after being in business for
+only two years. I mean, that's well
+there there's an irony in that sentence
+for sure. Um,
+but again, these are these companies
+were were easy come easy go kind of
+companies, right? They they they were
+companies that didn't exist and then
+exploded and then like broadly
+disappeared. Um the uh by the way
+there's and I I I do I guess have some
+self-control because I didn't snip the
+paragraph on gaming which points to
+Zinga and Roio as the so the uh at the
+expense by the way of Electronic Arts
+and Nintendo AND IT'S LIKE WELL
+YOU WOULD HAVE ACTUALLY been much better
+off buying Electronic Arts and being an
+LP in a 16Z but the uh um
+oh my apologies to any LPs in A6Z Um
+and then all right so what's next? So
+this is the past where we you know the
+the these titans of industry group on
+living social forsquare roio zinga and
+so on. Um and don't forget like snapfish
+and you know the snapfish flicker and
+shutterfly. Okay so that's how we got to
+the the current titans of industry. Um
+what is to the future and this is where
+you just get to like okay do are we
+going to revisit this one? Uh that
+healthcare and education are the next
+that's where the next zinga roio and
+forsquare is going to come from
+healthcare and education. I would just
+be curious. I'm like, no, like just what
+happened here? I mean, is is there one
+of these? I actually don't even know
+that there is. Um, actually, and this is
+where I do, again, I've got some
+self-control. My venture capital firm is
+back is backing aggressive startups in
+both these. I'm like, oh god, I would
+love to go find, but you got to go find
+their zeros. It's like, you know, it can
+be a little bit. Um, so, uh, we these
+industries, I would say you have not
+seen it. Now, which is not to say that
+like software is not very important in
+healthcare, obviously in education. Uh
+in education, I actually think the most
+important educational product that was
+developed is actually like the
+Chromebook. Um honestly, because the
+Chromebook put the And we don't really
+talk about the Chromebook, I think, very
+much, but if you got kids, you know,
+your kids have got Chromebooks.
+Chromebooks are like pretty ubiquitous.
+They are amazingly cheap. They're very
+actually surprisingly robust considering
+the way I've seen them jammed into
+backpacks and so on. Um, and they are
+actually I mean one one kind of tragedy
+the the Chromebook is that it's so
+effectively secure that you the kids
+don't really have the ability to kind of
+take it apart because the thing is
+actually built pretty well in that
+regard. Um, so the the but the
+Chromebook really revolutionized
+education by and certainly during the
+pandemic Chromebooks were very
+loadbearing right a lot of kids learning
+during during the pandemic from from
+Chromebooks. So I think in some regards
+it is actually a a hardware software
+product that was actually much more
+revolutionary in education and then
+healthcare I mean this is what I just
+have like healthcare of course has been
+revolutionized over and over and over
+again by software software hardware
+systems right I mean if you I I mean god
+forbid if you have to present to an
+emergency room tonight with with
+abdominal pain you will likely go into a
+CT right you will computed tomography
+revolutionized healthcare as did MRI, as
+did NMR, as did ultrasound. Very, very
+important technologies. I guess I'm not
+sure if that that qualifies for having
+been eaten like photography was eaten,
+but I don't know. I guess we just kind
+of make things up when we're a VC think
+piece. Um, all right. So, with what's
+the problem here? So, the the problem
+other than my own me being
+imunocmpromised around VC think piece is
+the problem is that it is extremely
+reductive. And it's reductive for like
+understandable reasons. It's like I get
+it. Like you're a VC. It's like
+bacteria. You kind of do what VCs do. Uh
+and in particular, you conflate
+innovation with new company formation.
+This kind of drives me nuts. Um if you I
+mean you all work for an established
+company. You know, there is a lot of
+innovation that happens at established
+companies. News flash. And yes, there's
+innovation that happens in startups, but
+actually when when you are new company
+formation, you got a whole bunch of
+other things that you're trying to do at
+the same time. It's actually very hard
+to be truly innovative in terms of
+certainly technologically innovative
+with new company formation. A lot of the
+our deepest innovation actually comes
+from established companies. So like the
+the the kind of the the fundamental uh
+false dichotomy is this kind of
+conflation with innovation and newcome
+information and also innovation with
+like economic disruption, right? the the
+the the only real innovation is actually
+something that is like economically
+disruptive that's going to like you know
+assue regulators or you know what have
+you. It's like that's if it doesn't move
+fast and break things is not innovative.
+It's like well that's [&nbsp;__&nbsp;]
+obviously. Um and our most important
+innovations actually are are don't
+actually do that. They abide by the
+constraints of the system and do really
+interesting things. But anyway he
+doesn't see that but of course that like
+whatever he's a venture capitalist like
+seriously what do you expect? That's
+fine. the the the the thing that then
+you also get this kind of conflation
+with uh software consumption versus
+software development like just because
+you use a spreadsheet does not mean that
+you are now a software company right so
+uh there there's that that that's a
+little bit ridiculous uh and then of
+course the conflation between software
+development and software companies like
+because software is very core to what
+you do does that make you a software
+company I mean I'm not even sure it
+matters right? Like what does it what
+does it mean to even be a software
+company? I mean to me what it means to
+be a software company is that your
+product is software. And there's that's
+actually like pretty limited and not
+honestly that that interesting to me.
+Like the the true folly here though is
+the this idea that software and hardware
+are totally disjoint. And that essay I
+think over and over and over again kind
+of implicitly denigrates hardware.
+Hardware is something that is it is low
+margin. It is commodity. There's like a
+bunch of kind of ways that hardware is
+actually denigrated unless it's changing
+your life with the phone in which case
+software ate it apparently. Um the but
+there's this kind of idea that like it
+of the primacy of software that software
+is what what is our our true value in
+innovation and the physicality of it is
+actually irrelevant and I think that
+that is really problematic. I think it
+was very wrong when it was written in
+2011. Right? So in 2011, if you could go
+back to a time machine in in 2011, like
+you're probably going to go like buy
+some Nvidia, some TSMC, some AMD, right?
+I mean, some Apple, um, companies that
+that are very much in the physical
+world, but companies for whom software
+is extremely important and like so the
+and no one's disputing that, by the way,
+that software is very important. We know
+that software is important. um extremely
+important, but it's the false dichotomy
+that is the problem with entries piece.
+All right, so this is going to require
+us and I'm going to apologize in advance
+for this. Um the we do need to think
+about just for a second of like what
+even is software and be careful on this
+one. I'm kind of like uh I I'll tell you
+that the uh I was long ago um I was
+interviewing Arthur Whitney. Um and you
+you may have heard of Arthur Whitney. Uh
+Arthur Whitney is a really interesting
+technologist. Uh worked for Morgan
+Stanley. Uh developed a language called
+K. Um Kx systems.
+Wild stuff. Um so I was actually
+interviewing Arthur. Apparently Arthur
+has given no interviews since this
+interview in 2009. Um which was kind of
+wild and I'm wondering like maybe that
+affected him more than it affected me.
+Um but Arthur is the kind of guy. So
+Arthur in particular among other things.
+Um, so Arthur was taught APL by Ken
+Iverson. He was like, so when he was
+like 11. And at the time I had a
+four-year-old and he wanted to teach my
+four-year-old K,
+which is some would say that's like it's
+kind of child abuse. I I would I mean I
+knew like like the difference is like I
+actually know my four-year-old and like
+uh good luck with that. First of all,
+any four-year-old is is is is a
+challenge no matter what. I'm like,
+"This kid is I don't think this kid's
+gonna be very interested in Kay, as it
+turns out." But I admired Arthur's
+optimism. He's like, "Let's teach him
+K." I'm like, "Let's actually just get
+him to put on his [&nbsp;__&nbsp;] shoes." Um the
+um so, you know, the different goals
+there. Um but in talking to Arthur, you
+know, Arthur again is so bright and
+thinks about things so differently, you
+kind of causes your brain to blow up.
+And at one point I did we were having
+this conversation like what is software
+because to me this is like and and I
+feel very lucky that we are kind of
+where we are at this kind of time in
+human history because software is that
+important. I mean software has this
+extraordinary
+staying power. I mean I disagree
+obviously with the false dichotomy of
+Andre but software really is marvelous.
+I mean it is amazing because it has
+properties of both information and of
+machine and you can look at it either
+way because it's actually truly both and
+there's there's so much that comes from
+that the cost of goods sold of software
+is zero. It's knowledge knowledge that
+we run as machine and that that leads to
+all sorts of like wild things. So I was
+curious what Arthur thought about this
+like what is and what is your analog for
+software and I think that there's like
+lots of analoges to be had. Um I think
+ultimately the answer is like software
+kind of defies it because it is so
+different. Um but I was asking is analog
+and thought that you know sometimes
+people will say like software is like a
+bridge you know it's you were building a
+bridge like a big civil engineering
+engagement uh some maybe it's like a
+biological system like I don't know. So
+I asked him this question like what what
+is the the analog for software for you?
+And he kind of pauses and says
+poetry
+and I was like you know kind of and and
+the way I mean he he exudes such craft
+in the way I mean for Arthur the beauty
+of code is how few characters it
+contains.
+I'm just putting it out there. I'M NOT
+CASTING JUDGMENT ON IT. I'm saying that
+I'm just like just letting you know like
+that is that is that is Arthur's view
+and there is a kind of aesthetic to that
+that you have to admire. Uh and he's
+definitely like lived this. I mean so
+you he's very consistent that regard but
+this whole thing like really had me
+thinking of like what even like I'm I'm
+asking this question about the analog
+for software like what is software
+because you you think like what is
+software? Well, software is the
+instructions that you run on a machine.
+Like, okay, so does the so if I get rid
+of the hardware, does the software still
+exist? It's like, well, I think so,
+right? I mean, I I think we would
+acknowledge that the software exists in
+a in a vacuum, does software have to be
+touring complete? Like, I don't think
+so. If you say that software has to be
+touring complete to be software, there
+are lots of things that look and feel
+like software that you that you're not
+going to acknowledge as software. And
+ultimately this maybe it's the
+mutability like software is mutable
+hardware is not mutable. The problem is
+we've got software that we actually have
+in the mask ROM on a microcontroller
+that is immutable that is definitely
+software and we also have have an FPGA
+that is hardware that is mutable. Is an
+FPGA hardware or software? And I think
+any kind of like discussion on this will
+ultimately get you to the conclusion
+that like Uklid was writing software. I
+I I don't know how you can it's very
+hard to have a definition of software
+that admits the things that we all agree
+is software without letting you sneak in
+the back from several thousand years ago
+with a with a GCD algorithm. Right? the
+um and software. I mean this is kind of
+the amazing thing about software is this
+kind of timelessness of software. And I
+think actually to go back at the top in
+terms of like why was my answer to that
+question kind of fundamentally wrong
+because in software when we do innovate
+we can actually that that innovation can
+carry in perpetuity.
+There is software that you deal with in
+some capacity that will survive you.
+That's kind of wild. That's not true of
+anything else. The software will long
+survive the hardware that it's on. Like
+that's pretty wild. Like that's that's
+pretty interesting that the software
+will long survive the hardware. When I
+was I I remember during Y2K
+uh after the the Y2K rollover, I was
+actually in New York City talking to a
+very to to the the the CIO of a big bank
+and we were talking about about the Y2K
+what Y2K meant for the for the bank.
+They had many more Y2K issues than we
+had at Sun. At Sun, our Y2K issues,
+about a third of them, this is is it
+actually this is as dumb as it sounds. A
+third of them were like leap year
+problems. And you're like, look, I'm
+like a Gen Z or a millennial, so I like
+I barely remember the year 2000, but
+like wasn't that like a number of digits
+in the year problems? Like, yeah, yeah,
+that was a number of digits in the year
+problem. But it turns out there was
+another totally different Y2K problem.
+So the every four years is a leap year,
+right? Except for every hundred. Except
+for every 400.
+And a rem. So, so 2000 if like if you're
+dumb, it's like, you know, the old like
+bell curve meme. If you're just like an
+idiot that like every four years is a
+leap year, you're fine. Your software is
+good.
+The And if you're like a brainiac,
+you're like, well, brainiac, your
+software is actually broken because
+you've encoded amazingly. There's a
+decent amount of software that did this
+that encoded the rules one and two, but
+not rule three. And the way they did
+this is because they took an offset from
+1900 because there's a lot of software
+that starts as an offset 1900. So if you
+take that offset and you mod that by
+you're like oh GREAT OKAY THIS AHA I'm
+clever it's not a leap year. It's like
+no it is a leap year just like can you
+do me be like the dummy over there. Um
+so we those were our problems. Um we
+there was actually a bug in the at
+command. You would run the at command is
+yes. Sorry we're here I guess. Uh the at
+the the at command is a Unix command
+that allows you to run a job of the
+future. And if you did at PL there at is
+very strange. You can give it the syntax
+of at plus and then give it like n days
+or you can give it a unit of time. It's
+also like where are we? Like this is
+this Unix like this is like weird Unix.
+You get this is like this is like the B
+sides of Unix. Some super weird Unix.
+And so you could give it at plus a
+number month. It's like what does that
+mean? So he's so like well if you're on
+the you know the 15th of the month then
+you want to do at plus one month it'll
+run on the 15th of the month. It's like
+that's great. I hate to be that guy but
+there are days that exist in this month
+that don't exist in that month. So like
+what do you do like you know what kind
+of what kind of sociopath is going to
+run something on app plus one month when
+it's the 30th or the 31st of the month.
+And so in particular we had a bug where
+if you were targeting February 29th 2000
+remember 2000 the 2000 is a leap here
+right so two February 29th very much
+does exist that software would run that
+on March 1st
+by the time we discovered this bug this
+is only with this this plus month syntax
+by the time we discovered this bug four
+of these days had already passed there
+were only sever only so many left in
+1999 but things People were so gripped
+by fear over Y2K. It really is like this
+is where I know I feel like I'm down in
+the Gen X home uh telling you tales of
+the way it used to be. But people were
+truly gripped by fear. Whenever you see
+people like whenever there's a mass
+hysteria and there's like lots of mass
+hysteria about lots of things right now.
+It's always useful to go back some of
+the past mass hysteria and people were
+very very afraid that the world was
+going to stop on on January 1st, 2000,
+which would have been super entertaining
+because it would have started with New
+Zealand. Part of me kind of wanted this
+because you would have this thing where
+like New Zealand bursts into flames like
+the the the no one has heard from New
+Zealand. There's just like a
+thermonuclear explo and then you're like
+okay now the rest of the world there's
+like this doom that's going around the
+globe and Hawaii is like we might live
+but we only have we but that didn't
+happen. So it actually it turns out like
+nothing really happened because we spent
+a lot of time pray for photography. So
+I'm at the bank like where are we? I'm
+at the bank. I'm asking and we're
+talking Y2K and the CIO says, "You know,
+it's funny. Um, actually 45% of our Y2K
+problems at this very large bank came
+from a single hardware platform." So,
+you can imagine I was at the edge of my
+seat. That guy could have done anything.
+He could have been like, "And I will
+tell you that next week." I mean, I I I
+would have been I was at the edge of my
+seat. Like, what platform? The IBM401.
+And that was a that was actually like a
+a true brainbending moment in ter it's
+like IBM 1401. So IBM 1401 in case all
+the numbers blur together which would be
+very reasonable. The IBM 1401 is a
+computer so old you barely call it a
+computer. It's it's an accounting
+machine. Uh it is a store program
+computer. You should go to the computer
+history museum in in Mountain View. You
+can go see an IBM 1401. They've got one
+that's restored. You should go watch go
+to the car if you ever get out to
+California. Like the reason to go to
+California, like look, I know I'm in a
+room of nerds. I'm not gonna The reason
+to go to California is to go to the
+computer museum in Mountain View and
+look at the card punch they have on the
+IBM 1401. That thing is space age and it
+was made in 1949. It is it is absolute
+mechanical marvel. So that's how old the
+1401 is. 1401 that's the that's the
+punch from the the 1401. The 1401 dates
+from the ' 50s. This is a machine that's
+basically in the ' 50s, not the '60s,
+early 60s. They did a transistorized
+1401. But you're just like, how what? So
+this is a a computer that was old in the
+early60s
+and how are you running software in
+production? Well, as you can imagine, it
+was software that was running on an
+emulated hardware platform that was
+running on an emulated hardware platform
+that's running on an emulated hardware
+platform and so on. So on the one hand
+like that is that is amazing and that is
+this this amazing power of software but
+it does get to like what's the software
+and what's the hardware in that system?
+It's running on virtual hardware that's
+running on virtual hardware that's
+running on virtual hardware. It's like
+and does it matter? I mean that's the
+other thing. It's like is all of this
+like a a distinction without a
+difference? I think like a lot of this
+is we know that hardware is important
+and we can talk about what that is. We
+know that software is important, but I
+think what's actually important is not
+thinking about how they're different,
+but thinking about how we we use them
+together to develop a system. So, I
+think it it is uh it's it's kind of a
+waste of time to try to really uh
+distinguish those. So, at Oxide, we very
+much set out with the idea of doing
+hardware software code design. So what
+we wanted to do we and this came from
+our own experiences trying to run on
+commodity machines and having no end of
+problems and the problems that were in
+our own software you can go fix those.
+The problems that we couldn't fix were
+the ones that were deeper in the stack
+and we I had a storage product at Sun
+back in the day. Um, we had we had
+written a bunch of software. Every
+single piece of firmware that we did not
+control from many different vendors at
+one time or another was completely
+debilitating to us in like increasingly
+comical ways. It was almost like the
+gods wanted to like really make a point
+that like the like the way these systems
+can fail because they they start
+operating at such cross purposes and
+those were the problems that we couldn't
+do anything about. So when we started
+Oxide, we we we felt strongly that we
+needed to do our own board design. Um
+actually what I felt really strongly
+about is getting rid of the BMC. The BMC
+is the baseboard management controller.
+It's the computer within a computer on a
+server and it's this kind of like
+garbage that it's the thing that has
+like the VGA port out the side and it's
+it's
+nothing but problems. Um also I've got
+resentment because it has my initials um
+the the BMC. So certainly back at Sun
+the BMC caused no end of problems and I
+would have these subject lines that
+would give me a fight orflight reaction
+because that you know BMC induces panic
+or it's like what no no no so no I'm
+kind of like my my Michael Bolton there
+but I wanted to get rid of the BMC and
+in particular scale it down make it
+something that is much more
+comprehensible and software that that we
+could control. Um, we wanted to do our
+own board design, our own rack design.
+We did our own uh our own switch design
+and importantly all of our own software
+from the lowest layers all the way up. I
+well with an asterisk on it. All of the
+software that we could do. What's
+amazing is for all the software we've
+done, there's still software that's out
+of our reach that we rely on other
+people to do. And that software is still
+very very proprietary which is a huge
+problem because we what we have found is
+and this thought this going in but have
+absolutely seen it now having an actual
+like shipped working product and and and
+so on. The the ability to actually
+co-engineer co-design the software and
+the hardware allows you to do some
+really unique things that are really
+important. So we went into this with the
+being that was kind of the belief. Um we
+knew we had to do our own comput sled.
+Um I if I if I could go back in time and
+slap myself I mean I do it over several
+things. One of them would be over the
+fact that I thought we were going to
+tweak reference designs. Like I said
+that several times like oh we will just
+tweak a design. You do not tweak a
+design. Um by the time we were getting
+rid of the BMC and replacing it with our
+own service processor you are designing
+your own board. Um but like this should
+be a possible thing right? It's like
+we're not making our own silicon. We're
+taking like we're taking these
+components and yes, it's a complicated
+PCB and yes, the layout is complicated.
+Yes, yes, yes. But like this is a
+solvable problem, right? And when you go
+do that, you are able to actually go do
+a bunch of very important things. One of
+the things that we did um in terms of
+our own software. So we uh we did our
+own switch um which um we felt that we
+needed to do um we were I was a little
+bit concerned when we first raised that
+a venture capitalist would ask us like
+what are you doing about the switch
+because it's like well we kind of think
+we need to do our own switch which I
+know feels like very ambitious now. We
+want to do not just our own comput sled
+design but our actual our own switch
+design. Um fortunately I overestimated
+VCs um who never asked us that. So, and
+actually I I came horn I you know I
+would have this like fight orflight
+reaction when someone says I have a
+technical question for you and I used to
+think like oh god like here it comes
+here comes the technical question and if
+you if any of you were to say that I
+would have exactly that reaction it's
+like okay here it comes here comes a
+really tough question but that no no
+when a VC says I've got a technical
+question it's like I got a question that
+I think is pretty smart and I would like
+you to validate that it's a smart
+question for me please which IS A MUCH
+EASIER TASK HONESTLY IT'S A MUCH EASIER
+TASK WELL, IT'S MIXED. IT'S A much
+easier task if it's a good question.
+When it's a moronic question, you really
+have to be like, "Okay, let's pretend
+that this is a really insightful
+question." Um, so there was that. But
+what I was really braced for is like,
+"Oh my god, they're going to ask us
+about the switch." And they never did.
+It's like, "Okay, great." In fact, they
+would also say things like, you know,
+technically we know you can do this. And
+I'm like, I am not explaining what we're
+doing very well because technically this
+is I am so far off the end of my skis on
+this one. Like are you out of your mind?
+Like the the amount that we're taking on
+like no no like sorry there's like this
+is loaded with technical risk but that's
+obviously the things you're thinking not
+saying to you like hey let me stop you
+there pal. There is lots of risk in this
+thing. You're like okay am I you want me
+to put money into it? Like yes yes put
+it on the bonfire. Uh you don't want to
+do that. So like, okay, but I should
+know like, oh boy, there's a butt
+coming. And of course, the butt was
+like, we don't think there's a market
+there. It's like, IT'S LIKE, YOU'VE GOT
+IT EXACTLY BACKWARDS. IT'S TECHNICALLY
+so challenging that I'm not sure we will
+ever get a machine that actually works.
+But if we can, the market is huge,
+right? And that's like you can't really
+explain that. Um, so we didn't know we
+were going to do we we had not confided.
+Nobody asked us about the switch until,
+of course, as you might imagine, someone
+not unlike yourself, coming from a
+company that had deployed a lot of
+compute. Um, a terrific technologist
+said, "Brian, you did not preface this
+without got a technical question for
+you, which is of course like why would
+you?" Um, Brian, what are you doing
+about the switch? Like, damn it, I
+almost made it. And we were seeking an
+angel investment from him. I'm like,
+"Look, I know you're not going to want
+to invest in the company when I say
+this, but we think we need to do our own
+switch. I you know, I'm I'm I'm sorry to
+We have died. I'm sorry to tell you
+this." Um, and he's like, "Okay, if
+you're doing your own switch, I'm in." I
+like, "Okay." Uh, and as he said, we did
+not stand on our own two feet until we
+kicked Juniper App. And I'm like, "Oh,
+okay. Interesting." So, we've done all
+this now and our like we it was really
+hard to do our own switch, but now that
+we've done it and we've got it working,
+there are so many things that we can
+kind of uniquely do. It's really
+uniquely powerful. And I think like the
+biggest challenge of doing a lot of this
+stuff was getting over the fear of doing
+it and like once you tack into it, it
+was all a bunch of things and we so it's
+kind of worthwhile like looking back on
+these things and you know um in terms of
+the things we've done we um so we we
+eliminated the BMC. Yay. Uh we did our
+own operating system appropriately
+enough called Hubris. Um the uh also the
+debugger for hubris is appropriately
+enough called humility. I did the
+debugger. Uh I think that you you could
+observe that there's actually a lot more
+humility in hubris and a lot more hubris
+in humility, but that gets complicated.
+Um we um we eliminated the switch
+operating systems. We did our own
+switch. We eliminated the UEFI bias.
+That's actually for all of the things we
+did actually the riskiest thing that we
+did was the elimination of the UEFI
+bias. And so the bias is is the the the
+basic input output system. It's very old
+dates from CPM. UFI is a stow away from
+Itanium. Um, amazingly enough, it's like
+I managed to leap the species barrier
+and now we've got UEFI. It's like the
+the Wuhan bat or what have you. Um,
+so the and this UEFI bias is this this
+bootloadader that exists at the very
+lowest layers of all x86 systems and
+sadly ARM systems as well because ARM
+there was this moment in history and if
+you were like alive and and awake during
+this you you had the same frustration
+where ARM is like we need to be like x86
+and you're like where you going with
+that? We're going to adopt a UEFI bias.
+LIKE NO
+NO NOT YOU ARM that's the whole reason
+we like ARM is YOU DON'T HAVE A BIAS
+LIKE WE need to be successful like they
+are you're like oh god so they have a
+UFI bias like oh god and the problem
+with this layer of software it is this
+very very lowest layer of software very
+much software and it does it needs to
+boot the system effectively but it's a
+very complicated system that it needs to
+go boot it needs to go find an image to
+go boot how does it do that well it
+actually needs to like bring up the
+system to boot the system. So there is
+this there very much this catch22 and
+there's an entire world of complexity in
+these things and but it's not written in
+a very modern way. Um that's putting it
+euphemistically. One of my colleagues
+Josh Kuo calls the calls UEFI MS DOS
+circa 2099 which is kind of what it is.
+It's like futuristic DOSs. It's very
+weird um about the way the the the
+software is structured, but you have
+this very like this this deep kind of
+platform enablement layer and then it
+finds the thing that wants to go boot
+and then it's like [&nbsp;__&nbsp;] Okay, I got we
+got to like put everything back. So it
+basically sends the system backwards and
+so when when the operating system boots
+the operating system actually is on a
+system that has already booted and this
+stuff has real problems that there's a
+bunch of I mean you've got all the
+problems in terms of like boot time and
+so on but like this software has
+vulnerabilities in it real
+vulnerabilities deep stuff and if you
+are able to break in to the bias you
+control the brain stem of the system.
+You control everything. So the uh we
+wanted to get rid of this layer entirely
+and that was I mean it's a sad state of
+the server industry when it came along.
+People were like impossible. You
+absolutely can't do it. Like you there's
+no way you can do it. Apparently Google
+had tried and failed and so anything
+that Google has tried and failed is like
+tutologically impossible for humanity. A
+little bit annoying. Um but that this is
+what we want. And so we actually
+eliminated this and what what we did we
+don't feel is very like uh revolutionary
+from an abstraction perspective. We
+actually control the first instruction
+and then we boot the system. That's what
+we do. So there is no bootloader because
+we are actually in that spor payload
+that is actually that when you come out
+of reset that's what you actually pull.
+We're in that payload and then there's
+enough in that payload to pull the rest
+of the system in but it's not booting
+something else. and we are holistically
+booting all the way up. We never send
+the system backwards. What this has
+meant is that we have to do a bunch of
+very very very low-level initialization.
+So we bring up the PCIe engines. We
+bring up obviously multiple cores. We do
+a bunch of things. We don't have to do
+dim training fortunately. So uh DDR
+double data rate memory uh needs to be
+trained. This is this very like we're
+now into like the true dark arts. Um, so
+DDR is this highly highly highly parable
+parallel noisy interface that is very
+high speed and the it needs to be
+effectively tuned every time you boot.
+It needs to be trained to figure out
+what the right parameters are so you
+don't lose data. That seems nice. It's
+like okay you you do your training.
+Sounds good. Sounds important. Uh that
+is done by on AMD. That's actually done
+by there are hidden cores on the AMD
+package and that's done by what's called
+the PSP on AMD that actually does the
+DIM training. So we don't have to do
+that when you come out of when you
+execute first instruction dims are
+trained but nothing else is brought up.
+So we engage in that lowest layer of
+platform enablement. It's like well
+doesn't that make you like very welded
+onto AMD? I mean yeah I by design we
+have this like different approach
+because right now in the server industry
+people want a commoditized world so the
+world becomes commoditized to serve
+them. It's like you effectively have
+garbage to build on because you've
+selected for garbage. If you want to
+have something that actually works you
+need to integrate it much more tightly
+together. And that means like making
+choices. So, we made the choice in 2019
+that uh it's like no, I think it's going
+to be AMD, not Intel. And there were
+people who were like, no way. It's like,
+yeah, this this one's easy. Actually,
+this one is easier than you might think.
+In 2019, it was very clear that the
+house was on fire and Intel and that
+Intel was going to be in the situation
+that they are now in if they didn't
+course correct, which they broadly
+haven't. Um, but so we we are very
+tightly mated on to onto the parts that
+we select. Um, which has been really
+important for us. So it's like it's kind
+of reasonable like okay so we've got
+this whole thing working we have which
+is great uh we've got it we've shipped
+it u we've got our next generation sled
+that that is that is working we brought
+up we're shipping that it's great we've
+got systems in the field um how do we
+feel about all this how do we feel about
+having taken all this on and the thing
+that's kind of amazing is you look back
+we don't regret a single one of those
+decisions and in fact the decision to
+not have a bias which I kind of felt and
+I Everyone at oxide felt like we need to
+have our own software at this layer. It
+will be a longer slower path but it's
+important. I think what we learned is
+actually it was a faster path. It
+ultimately was faster for us to get up
+by having that software ourselves. Now
+it was really hard but it but ultimately
+it was a huge win to control that layer.
+And as as we look up and down the stack
+there's not really a decision that we
+regret. In fact, the decisions that we
+regret are where we didn't go yet
+further where we've got software that we
+still don't control that we want to go
+control because we can in terms of the
+the hardware software codees where we
+can find those pieces that we can
+design. We've got both the hardware and
+the software we can design together. We
+can do really extraordinary things. Now,
+I think that there's a bunch of we can
+talk about all the great functionality
+that we have been able to build, which
+is great. I think I'm a just too much of
+a failure junkie in that I'm I'm a bit
+of a scholar on how things fail. I it's
+mesmerizing, right? Because when you
+look at how things fail, it tells you
+how they work. So I I I think pathology
+is really important and interesting in
+computing systems. So for me, like the
+times that I have felt this the most
+strongly of like yes, this is
+emphatically the right path are when it
+doesn't work. Well, maybe shortly after
+we get it working, maybe when uh but
+there was actually never any regret when
+it wasn't working. It was more just like
+I hope we don't die. Um but the when
+we've had these problems, it's like it
+just unequivocally I want to talk about
+a couple of these. Um and I'll hit on
+just a couple of these. Um so uh one was
+actually way back in the day uh when we
+had our first bringing up our first
+board. Uh as you can imagine was our
+first board. So there were a lot of
+things a lot of things in motion. the
+CPU would not come out of reset and the
+CPU would do this very vexing thing
+where it would power on uh seemingly we
+would we would give it it would initiate
+uh its power on sequence which says like
+give me you know I need to set these
+rails to this value great and then after
+1.25 25 seconds it would bounce and it
+was like actually let's do it again.
+You're like okay what happened? What?
+You didn't like the first one? Like nope
+I guess I didn't. You're like okay. And
+this was uh you know our assumption was
+like okay the power is marginal. Power's
+bad. We're spending tons of time making
+the the
+power and actually AMD is like actually
+we've never seen power this good before.
+Like your power margins are very very
+good. Like at this point it's definitely
+not your power margins. And we went down
+so many blind alleys. And one of the
+challenges when you are kind of going
+your own way with respect to hardware
+software design is like I mean obviously
+like we own we've got lots of
+differences between us and a reference
+design and the state of the industry is
+basically like what are the differences
+that it must be that you're like is that
+what we feel like first principal is
+linking to you? So in particular there
+is a a a pin on the CPU called KB reset.
+It's active low. So it's KB reset low
+and you're like is the K Yes. It's
+keyboard keyboard. Like you're on a
+server CPU. It will never see a
+keyboard. It's like we've got a pin on
+that dedicated to the keyboard. Yes.
+Yes. Now AMD says like that can be a no
+connect. Like great. Can it be like a
+[&nbsp;__&nbsp;] off? Because that's how I feel
+about it. But it's a no connect.
+It's a no connect. So we leave it as a
+no connect. And AMD's like ah what about
+KB reset L? And like you told us that's
+a no connect. They're like yeah but like
+this like the CPU is angry. The gods are
+angry. We the gods demand a sacrifice.
+Can we go sacrifice KB reset L. It's
+like it really should not be KB reset L.
+Desperation will do remarkable things
+for you. Like okay let's see what we can
+do. Can we we need to tie KB reset L so
+it's not a no connect. Doesn't float. Um
+we actually need to tie it down. So uh
+this is a photo of that happening.
+And this is where I mean I you know I've
+got such a marvel Eric Austin and our
+team. This is a photo that he took. Uh
+this is very much his hands. Uh for any
+Jenzers, this is a dime. Um it's I too
+hard to explain. Um and but this is
+running that from that pin all the way
+out and tying that down. Of course,
+didn't change anything. All right.
+Awesome. That was fun. Actually, it was
+kind of a relief. Honestly, it would
+have been really angering if that had
+been the problem. So I guess it's it's
+good that's a problem. All right. So uh
+what was the problem? And the problem
+and several weeks of debugging this
+these were some long weeks because these
+are like we are not going to live. Um we
+actually need to resolve this problem.
+The problem was an actual firmware bug
+in in software that we did not develop.
+So the regulator, the voltage regulator
+had there's actually a protocol that the
+CPU speaks to the regulator which is
+kind of crazy, right? Like the absolute
+like lowest layer of the system and it's
+something that you would recognize even
+if you're doing software in a much
+higher layer where there there is a
+protocol and the CPU is requesting
+different voltage levels at different
+times. This is how I mean this is truly
+a marvel. If you look at the the the
+draw on a CPU as workloads are
+fluctuating, it is a you will see the
+current move a lot as it will request
+more effectively and it will adjust its
+own voltage accordingly to actually put
+more work more power to work and that's
+a consequence of phones and laptops
+right phones and laptops we really care
+about the power management of those
+things. So we have that in the server
+space anyway it's amazing. So there's a
+bunch of amazing stuff in there. Very
+rich protocol. That protocol says like,
+"Hey, here's the voltage level that I
+need." Uh, as it turns out, there is
+that's the VOTF packet. Uh, there is a
+VTOF complete packet that the regulator
+needs to send back to the CPU saying,
+"Hey, I did it." And the the the tool
+for verifying power, they've got AMD's
+got this really cool tool called SDE
+that you plug into the socket and it it
+verifies all your power, which is great.
+We were using that to verify power.
+Power is awesome. The problem is that
+thing didn't care at all about the
+completion packet. The CPU kind of
+understandably did. So the CPU would be
+like, "Yo, can you set the voltage to
+this level, please?" And it would do it.
+And it would never say that it had done
+it. And as a result, CPU is like, "All
+right, I don't know what the hell's
+going on over there, but I'm, you know,
+okay, I'll I'll I'll ask again." I mean,
+it's like it thinks that we're the
+four-year-old that won't put on our
+shoes. Be like, "Okay, I'll try it
+again."
+Um, and the actual problem was a we had
+we had firm a firmware bug and a
+firmware bug that actually had already
+been fixed by Renaissance. The the
+Renaissance FE was like, "God, you
+really should have contacted me much
+sooner." It's like, "Well, we want to
+make sure that it wasn't that was us."
+Um, but it was this was like a very eye
+openening moment because you've got this
+and a firmware bundle that we don't have
+a access to, but it it's not something
+that can be dynamically updated in the
+system. You actually that comes with the
+part. You've got a finite number of
+those that can be flashed onto the part
+and then you're out of slots, you blow
+the slots. So, it's it's in nonvolatile
+RAM and you think like, wow, all that
+software like there's sophisticated
+software at these very lowest layers of
+the stack. And it was for all of my
+desire to start a company that would not
+get get bit by firmware bugs. It was a
+firmware bug that bit us first, which I
+think is kind of amusing. Um, but that
+was kind of that was a wild problem and
+also a relief that we had done so many
+other layers that we are if we're down
+to the voltage regulator software like
+okay that those we'll accept I guess at
+some level. Um, another one that was
+absolutely brutal. We had a Nick um the
+and um our so the nick is the network
+interface card. Um, nick choices are bad
+just in general. Like it's just it's not
+a great landscape. Uh, and we kind of
+famously um we've got something called
+RFDs, requests for discussions, like
+kind of RFC's that we are some are
+public, some are not. Um, but our RFD on
+our Nick selection, we called the four
+nicks of the apocalypse. Um, because
+that it felt like we were choosing
+between death, war, pestilence, famine,
+disease, I guess. Um, and Broadcom, by
+the way, is war. Broadcom's always war.
+Like, you know, Broadcom is war. I can't
+remember Melanox split into. And then
+like Intel was like pestilence, I think.
+Um, and Chelsea was famine, and we're
+like, you know what? We're going with
+famine. Um, and there are a lot of
+reasons why we we're um I mean, that was
+that was a lot of things that were
+valuable about that. Um, but so we had
+this Chelsea Nick. have a Telco nick and
+that nick would we would transiently
+fail to train all of its PCI lanes. So
+on some small subset of boxes, it
+wouldn't and and then you could you
+could bounce it and it would and and it
+would uh it would train, but it was some
+of these would train all the time and
+some of them would would would train
+much less much more sporadically. And we
+ended up doing a bunch of very low-level
+debugging that over a a long period of
+time. But it required us to be able to
+modify that lowest layer of boot
+software over and over and over again
+and with a lot of debugability to figure
+out what was going on. And what we
+actually discovered is that if you reset
+this thing a second time, it would
+always function correctly.
+What we call the double pured. As it
+turns out, this is so they isolated this
+is a b this has been a bug for them for
+19 years
+and assuredly a there was a there
+something out there did does a double
+pured that needed to be ac so every
+system on the planet will issue two
+resets to every nick to accommodate god
+knows what. It would be actually
+interesting to know like what broken
+device everybody's accommodating. But
+this the the brokenness in this nick was
+able to hide out under that bug. So this
+Nick had an unrelated issue that they
+never located because everybody does
+this double reset. Well, except for us
+because it's a reset. You need one of
+them. It's like, well, long story, but
+better send us a second one. Um, so it
+would again it would and this was also
+an eye openener in terms of of how long
+I love the very long shadow that these
+things cast. Um, so the and the last one
+and this one is is is definitely
+Germaine because uh you all at Jane
+Street were the first ones to actually
+see in this. Um so, uh the IBC is an
+intermediate bus converter and you had a
+sled, sled 19, famous to us. um that
+would uh that every like not so long
+every like 24 to 48 hours it's drives
+would reset
+and which and then oh so when the drives
+which by the way like the operating
+system is not that's not really the way
+it works like you you're not allowed to
+just like reset things arbitrarily and
+so in particular the drive is like all
+right well I guess I'm waiting to be
+initialized now I was just reset the
+operating system meanwhile has IO's in
+flight and so on and at some point the
+operating system is like what happened
+to all of our IO devices and the
+operating system was like we have lost
+all of our IO devices and the operating
+system would bounce and it would bounce
+everything would come back up be fine
+but we were seeing this like pretty
+persistently and assumed that like we've
+got a drive issue but we're seeing it on
+all drives at once so all 10 drives in
+the sled we're all resetting
+simultaneously like this got to be like
+a drive issue and actually what we
+thought we were I mean the nice thing
+about doing all this software yourself
+is uh whenever we have a problem
+anywhere it doesn't even enter our mind
+that the problem might be due to
+somebody else. We're always like, "Nope,
+we definitely own this one." Uh, and in
+particular thought that this might be an
+interaction with the firmware on the
+part with respect to the way we're
+bringing up PCA engines. So, we were
+very concerned about that. Well, as it
+turns out, that's actually not what it
+was. What it actually was was the bus
+converter is a big part at the back of
+the sled that converts from 54 volts DC
+down to 12 volts. And on a small number,
+3% of our sleds, occasionally, every day
+or so, maybe maybe once a week, that
+voltage would dip from 12 to 8 and go
+back up. And it would go down for about
+a millisecond and a half. So it's like 2
+milliseconds down and 3 milliseconds up.
+And amazingly, this is just like this
+kind of the you know the amazing bit
+about regulators and physics and so on
+that from 12 to 8 you are within the
+input threshold for all the regulators
+on like everyone else is like all right
+weird but cool like don't know why my
+input voltage is dropping but like I'm
+with you my job is to regulate 33 or my
+job is to regulate 10 and my okay that's
+fine I'm cool with it. Um the drives
+however like uh so the again we're going
+from 12 to to just below eight. Uh and
+uh the drives are like yo we we operate
+on 12 like we like I'm not cool with it
+at all. And so that's why the drives are
+all reset. So the drives all bounce but
+everything else in the system was fine.
+This was another one of these that was
+like super chilling. So we and and we
+wanted before we got your sled back we
+wanted to actually take some iterations
+on it. So, one of the things that we did
+is we actually modified our the service
+processor firmware to to use the the the
+regulators, the hot swap controllers
+that are actually on those shark fence
+on the drives because they are witnesses
+to a crime and they have a little
+facility in that regulator that allows
+them to record minimum maximum values
+and so they would see the voltage drop
+and like okay so we actually know
+conclusively that this is the issue. Um
+so we got that back that was on 3% of
+sleds. We were, as you can imagine,
+working with our IBC vendor to
+understand why this is happening. Um, of
+course, we heard what I I swear we at
+Oxide will never say, which is like,
+never seen this before. This is like a
+Dellism, right? If you have Dell, like
+we've never seen this before. And you're
+like, what? Why are you saying that?
+Like what what what is that? Like you
+It's like how are you not saying that to
+care less about my problem? It just
+feels like that is the opening sentence
+in a paragraph where you close my case,
+right? I mean, it just I it's and and
+you won't hear that out of us. You may
+hear from us that that uh we've never
+seen this before, but you won't hear
+you're the only customer seeing this
+problem. Like we the um so the uh they
+had never seen this before. We were the
+only customer seeing the problem. Um and
+what um they couldn't reproduce it. We
+send these units back to them. They
+couldn't find it. Um, and what we what
+we were able to do is actually test
+these things in the factory. We were
+able to validate them in the factory.
+So, we weren't able to ship any more of
+those sleds out. Um, they actually we we
+just learned just this past week that
+like actually they debugged it. uh and
+there is an the there's a circuit issue
+on the the input voltage has got that
+circuit is not totally robust and in
+particular that it's just close to the
+margins and if you have parts this is
+one of the things that's very
+frustrating about like actual hardware
+like the stuff that you hold in your
+hand indisputably hardware we can argue
+about an FPGA but like a capacitor or
+resistor these are definitely hardware
+the thing that's frustrating about those
+is like there's there's variability to
+those things which is super frustrating
+if you're coming from software. We don't
+have really that kind of like some
+software either works or it doesn't. You
+don't have that kind of variability. But
+if you that variability could add up and
+then you would have this an IBC that was
+vulnerable to thinking that there was a
+drop on its input that wasn't there. So
+it would start to regulate down because
+it would think its input is dropped and
+then it realizes like [&nbsp;__&nbsp;] put it back
+and and it but and within that the
+drives reset. So I but this was a
+chilling example because I think to
+myself, God, how many times have like if
+you just saw a drives reset, your first
+thought is not that the bus converter is
+broken. Like that that thing's job is
+like super straightforward. Not to take
+anything away from the complexity of
+that, but it's also like it regulates
+that voltage for and it it it's going to
+have an uptime of 100.0% you would
+expect. So the idea that you would have
+a transient in a bus converter, it would
+again get eye opening and eye opening
+about like if we had not done all of our
+own software and kind of thought of this
+whole holistically you just have a ghost
+and that's what we actually have in
+other systems. systems where you aren't
+doing that hardware software codeesign
+you just have ghosts like bad ju guuju
+voodoo happens whatever it is
+poltergeists re reboot it I trying to
+get the like it's like everything is
+like Linux audio right you know you're
+just like please God you know work like
+what sacrifices do I need to make for my
+Linux audio to work and like when we
+don't actually build these things
+together that's what the world is so
+it's it's really dangerous to to to to
+think about you and's folly really is a
+problem to think about like these things
+as being like no no the primacy of
+software it's like no we actually need
+to co-design these things together
+holistic design and when we design
+things holistically we're able to solve
+really novel problems and I actually
+think it's actually we shouldn't think
+of Andre's folly although again if
+you're like me and you get trolled by
+VCs you probably will but really Allen K
+put this put this best in 1983 people
+who are really serious about software do
+their own hardware and that is the way
+we should think about hardware. Hardware
+is when when we collectively are really
+serious about our own software systems,
+we want to co-design that with the
+hardware. And we like what's on what
+side of that divide is actually less
+interesting than it is to actually build
+these things together to deliver a high
+performing robust system that is able to
+enable us to do things way way way up
+the stack at a at a great distance from
+that code design. With that, thank you
+very much.
+And sorry, I know I've gone a bit over.
+I'm not sure if you are
+So, yeah, we've got time for questions.
+If people just want to raise their
+hands, uh, we can pass around a mic or I
+think this, uh, box should work, too.
+&gt;&gt; Oh, wow.
+&gt;&gt; Testing. All right. Uh, you mentioned a
+couple times that there's still software
+that you don't control in the oxide
+slide.
+&gt;&gt; Um, what are some examples and what's
+next?
+&gt;&gt; Yeah. Right. Um, well, that regulator
+software. um the um the the big examples
+um the drive firmware. We have not done
+our own drive firmware. So when you're
+on that SSD, that's another whole
+universe. We don't we've not done any of
+that, right? So we're not buying raw
+flash. We're buying actual SSDs. Um
+uh that one I don't know that uh if that
+one's next or not, but that one is of of
+interest. Um, I think that we we don't
+control any of the software that
+actually runs on package on the CPU. Um,
+so there and there's a whole network of
+hidden cores. You got the PSP, you've
+got all the other cores around there. I
+would dearly love that to be open. I
+would actually would love actually let
+me back up a little bit. What what we
+actually need to develop these kinds of
+systems is transparency at that hardware
+software interface. So what I actually
+actually don't have like a need to write
+all the stuff ourselves necessarily but
+we actually I'd like to understand what
+it's doing. So it is we we have
+pervasive open source upstack which is
+great. We do not have pervasive open
+source downstack and I would I mean
+there is no SSD that has open firmware
+to the best of my knowledge. I would
+love to be wrong actually. Um there is
+no nick that has open firmware. Um and
+actually I guess what's next is the nick
+for us. um there we control the software
+in that it is delivered through us um
+the the software that runs on on the
+Chelsea part but that's ultimately that
+they develop their own uh we've got a
+driver for but they develop their own
+firmware um we with the nick um we are
+effectively doing our own nick by not
+doing the hard parts so nicks are really
+really challenging the certities are
+really challenging right it is these are
+super high speeded interfaces and and I
+I I actually I know this because I've
+talked to folks here at JS Street who
+who've used the the XYlinks line of
+parts. The AMD versol 2 is a super
+interesting part for us and we can
+actually go do a real because it's got
+hard blocks that are assertis. So we can
+actually do real software control and so
+that's actually I guess what's next for
+us because like that one is like very
+much in development. Uh next thing would
+be the the the top rack switch the the
+middle rack switch uh based on Intel
+Tino.
+Um they we ultimately got Intel to open
+it all up, but that is still super
+proprietary even though they've killed
+it, which is very frustrating. Um the um
+we for our nextg switch um we're the
+Exite Labs has got they've got a part
+called the X2 and we've gotten them to
+completely document their the lowest
+levels of their ISA. So we are doing we
+will effectively do on our Tofino switch
+right now. We are required to
+effectively use Intel's P4 compiler.
+We have always wanted to do our own
+compiler there. Um so we are which
+Intel's like you can't. It's like okay
+can we have the micro architecture
+documentation so we can figure out if we
+can or not. It's like no you can't have
+that. Like well then we definitely
+can't. Um on the on the X2 um we will do
+our own P4 compiler. So and then we will
+open source all that stuff. I mean the
+other thing is like all the software we
+do we open source. um because like I'm
+not really worried about someone
+walking. I mean you would have to make
+all of our same design decisions to I
+mean you can knock yourself out. Um but
+the um so that that would be what's next
+for us. But the and the biggest single
+problem we had with Tofino were the bits
+that were proprietary. um the
+proprietary
+lowest level system software firmware um
+is a huge problem um because it allows
+there's so much stuff that hides out
+there. So the stuff that's open I if we
+have an open SSD we probably would need
+to implement our own I mean I we're also
+like cleareyed about like it would be
+really hard to do our own uh SSD
+firmware. We'd want to be or our own FTL
+our own flash translation layer and we'd
+want to do that for exactly the right
+reasons. you'd want to know and we're
+not just doing this stuff because like
+we're just to do it and to the contrary
+we want to pull stuff in off the shelf
+wherever we can. So I think that that's
+what's next for us.
+&gt;&gt; Hey, thanks for the great talk. I was
+curious if you guys are thinking about
+doing silicon design or FPGA design of
+of some kind. And if so, um, one of the
+things that Oxide has done is invested
+heavily on like safe programming
+languages like Rust. I I'm wondering if
+you have similar thoughts about what
+better hardware design might look like
+for you guys.
+&gt;&gt; Yeah, it's a great question. Uh so, um
+FPGA, yes, we already have. We we've got
+FPJs in the first slide. We got FPJs.
+The in our our Cosmo based slide, FPJs
+play a much larger role and then we're
+doing an FPGA based nick. So, we're
+doing a bunch of FPJ stuff work already.
+Um HDL is a bit un um it's a bit tough
+um unfortunately there. Um we we did I
+do and I do still love blues spec but bl
+the reality of blues was that it was did
+not have um the the kind of the the the
+throw weight that we needed to really be
+able to use it for high speeded stuff in
+particular was going to be really
+problem really problematic. Um, as we
+get into AS6, we at some point will do
+AS6, I think. Um, the anyone at Oxide
+would say that it would start with the
+the root of trust. Um, we which is a
+pretty
+big lift because that's secure silicon.
+That's that's a real challenge, but it's
+also uh that that's a part that we've
+got we've got room for improvement in
+that part, I would say. Um, for the
+high-speed stuff, um, I would love to.
+It's really really hard and that's those
+are still like really locked by a couple
+of proprietary software companies like
+if you want to do an ASIC you are about
+to be a customer of some real
+proprietary software companies like
+cadence and synopsis and the to the
+point where like that whole ecosystem is
+kind of nuts in terms of like the way
+that I you get IP you've got to be tied
+onto a process node. I mean, I feel
+like, sorry to get me onto something,
+but the I like I felt like Intel had a
+great opportunity to just absolutely
+redefine everything. Um, but it would
+needed it would have needed a much
+crazier CEO. Uh, it needs a much crazier
+CEO. Um, because there is like some
+really interesting opportunity to go
+like open up what a fab looks like. But
+that's the kind of thing you need to go
+do to really revolutionize it. I think
+we at oxide would be pretty limited
+about what we can do. I think we end up
+being like a cadence customer
+unfortunately. Um so uh but the FPGA
+it's much much more tractable FPGA we we
+and we have b done a bunch of different
+things. We will continue to open
+everything that we're doing. You're
+still using a proprietary tool chain um
+from zylinks but it's it's it's better
+than the ASIC tool chains. Does that
+answer your question?
+&gt;&gt; Yep. Thanks.
+&gt;&gt; Yeah.
+&gt;&gt; Hi. Uh great talk. But um I live a lot
+higher up the stack in my day-to-day
+work. So you mentioned a lot of times
+that you have this like functionality
+performance robustness that results from
+doing your own hard work. Can you give
+some examples of like some stuff you can
+do in software further up the stack that
+was enabled by your hardware work?
+&gt;&gt; Yeah, absolutely. So, well, in
+particular the um when you control the
+switch and you control the nick, you now
+have a true networking fabric that you
+can truly program. And you think like a
+bunch of the things that you want to go
+do like you want to do firewalling, you
+want to do do virtual private networks,
+you there there are a bunch of things
+that you want to be able to do to to
+provision a tenant, a bunch of things
+that are again way up the stack.
+When you don't control all of those
+layers, those become really arduous or
+impossible. So those are the kinds of
+things that that we've been able to do.
+um from an observability perspective um
+being able to to again see from top to
+top to bottom from a performance
+perspective being able to know be when
+and actually one of the things I I'm
+really excited to do we have not done
+yet at all uh power management um so
+right now the parts have got have got
+tremendous power management great power
+management capabilities they are
+basically all on autopilot which is
+pretty good it's great you what you
+would like to be able to do is actually
+stuff more equipment into a rack have a
+rack that actually that where you were
+able to dynamically cap how much power
+it can draw and then you could say like
+all right look so I'm yes I want this
+rack this is you know for a Cosmo rack
+it will be at like 33kw I want this
+thing to only draw 20KW and have you the
+control plane decide like which CPU gets
+that um and that then allows you to like
+really rethink the kind of work that you
+then schedule onto that thing and so
+there's a bunch of stuff I mean like
+that I'm sorry those are are those is
+that are those helpful examples that
+&gt;&gt; Oh, definitely 100%.
+&gt;&gt; Yeah. Um, but no, there's a lot of stuff
+that you can only do when you can you
+can uniquely cut across that. For sure.
+&gt;&gt; Beautiful. Thank you.
+&gt;&gt; Hi. Um, so I was wondering how you think
+about the trade-off between like, you
+know, building something quickly so you
+can see the ways that it will break
+versus going very deep from the get-go.
+Like are there places where you kind of
+cut a corner and and used something
+didn't dig into it so that you could
+build the rest of it and then later dug
+into it when you needed to kind of
+&gt;&gt; Yeah, for sure. And so uh prototyping is
+really important. So in in in
+are you asking in terms of hardware or
+software or both or
+&gt;&gt; uh I guess it's kind of both. Yeah.
+&gt;&gt; Yeah. So the um for sure. So um on
+hardware, one of the things that we
+started to do a little bit and then
+realized that we weren't doing nearly
+enough and then we put the gas pedal on
+is building much smaller boards that are
+studies in the way a particular
+component might work and you can build
+those. I mean it has never been easier
+to build hardware than it is today. The
+for all the kind of hardware is hard you
+can go lay out a board you can go
+especially like a board that's a simple
+board for something that's low speed. I
+mean, I think we had a board uh where
+that kind of the idea entered Cliff's
+head and he had the board out to PCB Way
+11 hours later and like and these are
+like small boards, but they are boards
+that allow you to to to study a much
+smaller aspect of the system because
+what you want to avoid is having when
+you kind of bring that whole system
+together, you want to make sure that you
+are only debugging the problems then
+that you could only debug any problem
+that you could debug earlier, you want
+to debug earlier. So those things are
+like little throwaway boards that we'll
+do and iterate very very quickly on them
+and then and I think a as time has gone
+on we have more of a bias about like do
+those fast like don't even don't even
+wonder if we should do that or not and
+also don't wait I mean one of the
+problems we had early is that we would
+well we're doing this prototype board
+like let's add more to it. It's like,
+"No, no, just make like if you want to
+make a prototype board to for an idea,
+just have it test that one idea. Don't
+wait for anybody else. Just go and get
+that back and then we can actually have
+something we can experiment with." Um,
+for sure. And I think that actually
+allows you to be much more rigorous
+about the system. Does that answer your
+question?
+&gt;&gt; Yeah, thank you.
+&gt;&gt; Yeah, you bet. Uh, we I and I I I should
+have said this earlier, but we So, we've
+got our we had the On the Metal podcast.
+We started the company. We've got an
+Oxide and Friends podcast that we
+normally record on Mondays, but not
+recording it today for obvious reasons.
+um the uh and we've got an episode on
+the on building protoboards that you
+that you'd really like if that's
+interesting to you.
+&gt;&gt; Yeah. Awesome. Thank you.
+&gt;&gt; Yep.
+&gt;&gt; Hey, sorry, one more question. So, uh
+GPUs have obviously become a big part of
+data centers and GPUs.
+&gt;&gt; GPUs. Oh, yeah. Yeah. Right. What about
+GPUs?
+&gt;&gt; Ever heard?
+&gt;&gt; Huh? Sorry. Tell me more. Yes. GPUs,
+right? Those things.
+&gt;&gt; So, how are you guys thinking about like
+integrating it into the model that Oxide
+has?
+&gt;&gt; Yeah, totally. Great question. Yeah. So
+the so here are the problem here is the
+challenge with GPUs. Um obviously
+important. Uh there are two doors. One
+is labeled partner with Nvidia and the
+other is labeled compete with Nvidia.
+And what both of those doors have in
+common is death.
+as far as I'm concerned the the and the
+problem with Nvidia is Nvidia is this
+very proprietary island and they want to
+take the whole system and I like I don't
+you know again it's like bacteria I
+don't like fault them for it it's like
+the bacteria's fault it's just like it's
+doing what bacteria does so they are
+trying to build a big and their aim has
+been towards expansion
+okay super proprietary company though
+really really really proprietary company
+and makes it really hard. I don't see
+I've never seen how we can by partnering
+with Nvidia
+deliver something that delivers oxide
+value. Like I I I just like don't know
+what the advantage is over us doing it
+versus a super micro sled because I
+can't do we can't do any of the the
+value that you get.
+So I kind of need one of these other
+folks to please like can we make that
+compete with Nvidia door not be death?
+Um, and AMD is obviously super
+interesting. Um, they've made a bunch of
+interesting moves in that regard. Um, we
+will do an accelerator sled for sure.
+Um, but it's got to be done in a way
+where we can deliver oxide value. We're
+not going to do it just because like if
+someone wants Nvidia, we're we're we're
+the wrong they should just go buy a
+super micro box, knock yourself out.
+Well, no, I don't like that. Like, well,
+I know, but that's that's so um but it's
+obviously super important. I mean, I
+think it's um it's kind of like we're in
+a bit of a wild I mean, obviously a wild
+time in many different dimensions. I
+don't know how that's going to how
+that's going to unfold because right now
+the parts that that are being generated
+for training in particular are don't
+have anywhere near the reliability that
+I think people should be able to expect.
+I mean, you guys have you all have much
+more experience with this than I do, but
+some of the failure rates that I've
+heard about
+are shocking
+shocking. And again, like I'm the guy
+that obsesses over like 10 discs that
+reset, you know, once a week or whatever
+like the things that are dead on arrival
+um are or have the some of the thermal
+issues and so on like that we would need
+to be able to deliver a much more robust
+system. So we would be looking for a
+partner that would allow us to do that.
+&gt;&gt; Is there a third door with other
+companies that are building inference
+accelerators or
+&gt;&gt; Sure. The I I love the crazy door. So
+that's the crazy door and I love the
+crazy door. I'm all for it. So there's
+and there's a bunch of stuff that's out
+there. Um there's a bunch of um and the
+presence of Risk 5 allows people to put
+soft cores in front of this stuff where
+you can like quickly take because I
+think you can make a pretty good
+argument that GPUs are actually not
+great for inference, right? There's a
+lot of of uh of kilowatt hours is being
+kind of burned that you could use much
+more efficiently. So um I'm all for it.
+That'd be great. I what what we what I
+would just want and then with a smaller
+player this is easier. It's like we just
+need to have a transparency at that
+hardware software interface and um the
+which be but if we have that then we can
+go do that. Um and this is the kind of
+thing where we would also like really
+look to you about like what are the
+kinds of things that you're seeing and
+you need and we can absolutely go we've
+got lots of things that we can go do. We
+just want to make sure that we're
+delivering something that is actually
+valuable. If we can deliver something
+that's valuable, we can deliver
+something that's really valuable because
+you then you do you look at things like
+power capping and so power management
+will you be able to do it holistically.
+Having true multi-tenant support on
+these things like the multi-tenency on a
+GPU is like real rocky and and the and
+again this something you all have more
+experience with than I do but it's like
+with the CPU we've got great
+multi-tenency and I would want to have
+those same things on these things that
+that that function as accelerators. I
+think at the same time you've got a
+bunch of these things coming on package
+and that's also I mean I've not quite
+figured out why AMD is like
+disinterested. I I think it's like it's
+like don't overthink it. It's like a
+kind of what Conway's law thing because
+you've got the the accelerators and the
+you've you've got the kind of the the
+GPUs and the CPUs under the same house
+like can't I take these chiplets and
+combine them on package which they do in
+these things the the the Mi300A they did
+this with the these APUs but then
+they're like very disinterested in them
+and kind of like upset when you're
+interested in them. You're like okay
+that's all right never mind. Um I I I I
+feel like I'm talking about like
+throwing you a wedding shower for
+someone with whom you're going to break
+up. You know what I mean? You're just
+like, "Can we just can we not talk about
+Bob, please?" Like, and I'm like,
+"Okay." Um the um so I we're really
+interested in that stuff, but haven't
+seen exactly a path. I was saying that
+that's kind of what our thinking would
+be. Yes. Let me know that if I'm wrong.
+&gt;&gt; Thank you.
+&gt;&gt; So, um about like your partnership with
+AMD. I remember hearing like a while
+back that AMD was like looking at open
+sourcing like their silicon
+initialization stuff.
+&gt;&gt; Yes. Has there been
+&gt;&gt; open sill?
+&gt;&gt; Yeah, open sill. Yeah,
+&gt;&gt; there been good progress on that and
+influenced the decision to like go with
+AMD or I'm not after.
+&gt;&gt; Yeah, after. Um, great question. Um,
+&gt;&gt; very supportive of open sill. Open sill
+is effectively an open bias. They're
+taking that lowest layer of silicon
+initialization and making and which is
+great. Actually, I'll tell you the
+reason that that I'm very supportive of
+that effort. we were going to open
+source our all of our software. This
+included a bunch of low layer platform
+enablement which we would actually need
+AMD's permission to go do. Um and I'm
+like oh god and we had some we did at
+some some trial balloons of some kind of
+orthogonal software that we wanted to
+open and it just like got lost in
+bureaucratic morass at AMD and I'm like
+I'm really not looking forward to that.
+Open sill fortunately
+made it so we didn't have to ask that
+question because open sill effectively
+opened up the lowest layers of
+implication details that we were relying
+on. So we are very supportive of open
+sill for that. We are never going to use
+open sill ourselves but I think it's
+great. So I'm very supportive um because
+it allows us to open up our layer um and
+very supportive of AMD opening and all
+vendors should be opening up all of
+their software. Um there was a a a very
+interesting moment with the hyperscalers
+AMD is learning
+people think like look I know we're
+crazy but people so we'll say things and
+then they they'll hear like you know
+I've heard that from other people as
+well like you guys are not the only ones
+that think that as it turns out it's
+like I know that that's I've been
+telling you the entire time but so on on
+that there are lots of other
+hyperscalers that were super interested
+in that effort and that AMD was a bit
+surprised by I think so um very very
+supportive what we said.
+&gt;&gt; Thanks. Yep. You bet. Thank you very
+much.

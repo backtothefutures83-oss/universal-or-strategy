@@ -23,6 +23,7 @@ Every handoff prompt MUST contain the following four pillars:
 
 - **Trading DNA**: Knowledge of Apex MAE rules, slippage protection, and NinjaTrader constraints.
 - **Workflow References**: Pointers to `.agent/workflows/` or specific `scripts/`.
+- **Agent Metadata (KNOWLEDGE)**: Pointers to `docs/brain/live_[agent]_help.txt` to ensure the next agent understands your current command surface.
 
 ### 4. Forensic Findings (The Directives)
 

@@ -41,3 +41,19 @@ When sweeping for empty `catch {}` blocks, the following sites are PERMANENTLY E
 - `src/V12_002.Photon.MmioMirror.cs` -- 2x Dispose-pattern catches (best-effort cleanup, no re-throw needed).
 All other empty catches in src/ MUST be logged. Add `catch (Exception ex) { Print("[MODULE] <context>: " + ex.Message); }` with ASCII-only module tag.
 If a new Dispose-pattern site is found, document it with a one-line rationale comment and add to this table -- do NOT silently skip it.
+
+### 9. Mandatory Fleet Tracing (V12.16 Total Observability)
+No agent action is valid unless it is traced. ALL agents (including Bob) MUST emit telemetry.
+- **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+- **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+- **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
+- **Execution**: Before and after any tool execution (such as `replace_file_content` or `run_command`), you MUST call:
+  - Before: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Bob "Before <action_description>" IN_PROGRESS`
+  - After: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Bob "After <action_description>" PASS` (or FAIL on failure)
+
+### 10. Autonomous Skill Creation & Self-Improvement
+All agents MUST perform a post-use audit after every skill or tool use:
+1. Check if any instruction was ambiguous or produced an unexpected result.
+2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
+3. **KNOWLEDGE SYNC MANDATE**: Whenever a new agent doc ($doc), help capture, or SOP is created/modified, the agent MUST run `graphify update .` to ensure the project brain is current.
+

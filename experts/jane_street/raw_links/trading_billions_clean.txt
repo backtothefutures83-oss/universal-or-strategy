@@ -1,0 +1,1741 @@
+I'm Mark. Um, I've been at Jane Street
+for a little under 10 years now. I've
+moved around the firm a bit, but I've
+spent the bulk of my time doing
+something close to what we would now
+call production engineering here at Jane
+Street. And I'm going to talk a little
+bit about some of the interesting
+challenges that come from the
+intersection of that discipline with the
+trading environment. I'm going to start
+with an intro. That's this um I won't
+infinitely recurse. Um I'll then go into
+some relevant features of the production
+environment. What makes trading such an
+interesting space in which to operate
+software in production? Uh and in what
+ways is it similar to other domains? And
+for those of you who work at other
+trading firms, uh some of this will be
+familiar, some of it may be different.
+Maybe the ways in which we place
+emphasis on things might be different.
+Um
+spend about 15 minutes on that. I'll
+actually try to spend a little less
+time, but we'll see if I succeed. And
+then we'll talk about what it means for
+us at Jane Street. How should we think
+about building technology, processes,
+culture in light of the features of the
+production environment. I kind of hope
+to spend a little more than 15 minutes,
+but again, we'll see how I do. Um, and
+then I'll talk about a sample incident
+that will hopefully make everything feel
+a bit more concrete. And then I'll leave
+as much time for Q&amp;A as possible.
+Hopefully that sounds good. Um, so a few
+more words of introduction. First off,
+I've said production engineering at a
+trading firm. Production engineering.
+Similar words might be DevOps or SR.
+It's kind of similar concepts. Um, this
+is one plausible definition. Uh, I don't
+claim it's a perfect one, but maybe it's
+good enough. Um, maybe a more human
+definition is roughly, you know, we've
+got a bunch of software running. It runs
+on computers that have hardware
+failures, uh, in data centers that have
+cooling outages, over network
+connections that get their cables cut,
+uh, connected to exchanges that have
+their own issues, and of course, we
+occasionally deploy our own bugs. And
+so, how do we technically operationally
+manage all this stuff in production and
+again, especially when things go wrong.
+So, that's basically the problem
+statement. Uh and then I said you know
+at a trading firm. So what is trading?
+What does a trading firm do? Um
+very basic uh basics of trading sort of
+the system diagram that you need to
+know. You start off with some trading
+system could be a human trader could be
+an automated system someone coming up
+with some strategy.
+The primary input into a trading
+strategy in our model is going to be
+market data. So an exchange can tell you
+recent orders, buys, sells, etc. in some
+stock. And a trader who's going to
+decide what to do with that is going to
+be interested in those order tick-bytick
+order um information. And then they're
+going to come up with some strategy,
+some trades that they want to execute.
+And when they do that, they're going to
+need to execute it somehow. So we're
+going to connect to some sort of order
+entry port. um I might call it an order
+engine throughout the course of this
+talk that's going to be directly
+connected to an exchange. We might have
+a lot of different different order entry
+ports connected to a lot of different
+exchanges and that order entry port is
+going to write to the exchange and also
+read to the exchange read from the
+exchange. The exchange will act the
+orders or reject them communicate that
+it has been filled some way like that.
+That may be a thing that is already in a
+lot of your heads. Maybe it's like your
+model of trading already. There's one
+more piece that people forget about a
+lot. Um, I actually won't talk about it
+a ton in this talk, but would love to
+later because it's the area in which I
+first started at Jane Street, so it is
+near and dear to my heart. Um, but once
+you've done a trade, you also need to
+tell the world and yourself that you've
+done it. So, you need to keep track of
+your positions. Uh, that is then going
+to feed back into your trading strategy,
+which needs to know what its positions
+are to correct the performance logic.
+And you also need to upload those trades
+to regulators also clearing firms and
+other external entities.
+Um that is the basic system diagram that
+you kind of need to have in the back of
+your head and I want to go into one more
+thing which is I have said the word
+order a bunch like you send an order to
+the exchange. Um let's look at what an order is. Um, when we talk about  
+an order, we're talking about an instru
+an instruction to an exchange to execute
+a certain trade. And this is, I would
+say, like the simplest order that you
+can kind of come up with. There's five
+main key components to this order that I
+want to talk about. There's the side,
+you can buy or in this case sell. Uh,
+there's the quantity, one share, maybe
+100 shares, maybe a thousand shares.
+There's the instrument, symbol, ticker.
+What is the thing I'm buying or selling?
+In this case, JCOM, could be Apple. Um,
+and then there's a price, which is going
+to consist of a quantity and a currency.
+That's the basics of an order. Uh, they
+can get sort of arbitrarily complicated
+uh with more foot guns, you know,
+multipliers, quoting conventions, all
+sorts of funky stuff. Um, but this
+example is going to be good enough for
+the purposes of this talk.
+That's the intro. Now, let's get into
+some sort of more complicated features
+of the trading environment.
+Um, feature number one is every order is
+important. This is notably different
+from many other web services where maybe
+it's not the end of the world if one
+client's request to your web server
+fails or is a little slow. It's not so
+bad they can wait, try again. Maybe
+worst case you end up with an unhappy
+customer. It's not really the end of the
+world. Returning to our previous example
+of an order.
+Simple. Uh but if you were to get any of
+those details wrong, it could be
+catastrophic. Uh what if you make a
+mistake in any one of those economic
+details?
+uh to give one hypothetical example like
+what if you were to make thisam this
+mistake and
+sell 600,000 shares at a price of one
+yen instead of selling one share at a
+price of 600,000 yen. Quick mental math.
+Uh if you were to execute this or submit
+this order and if it were to get filled,
+you would lose roughly 600,000 squared
+yen. Um now you may think, okay, this is
+a pretty implausible bug to write. Like
+that's a huge mistake. Just don't make a
+mistake that big. Uh but you know
+thousand engineers writing code that
+needs to be handled by automated systems
+and manual trading. So you have to avoid
+fat finger bugs. Um there are different
+order types. They do get more
+complicated. There's different exchange
+protocols. You kind of need to be 100%
+sure that you're not going to somehow
+make this mistake. And you might think,
+okay, doesn't like the system kind of
+save you? Like okay, sure. like surely
+someone submitted this mistake and like
+you can sue or something, right? Like no
+one's gonna actually let this go
+through. Um unfortunately this is not
+like some random hypothetical example
+that I came up with. Uh this was a real
+thing that happened December 8th, 2005.
+A trader at Mizuo made this exact
+mistake and he immediately tried to
+cancel the order. The exchange did not
+accept his cancel. Uh the order went
+through. it was filled. The firm lost 27
+billion yen. Uh Japan's primary stock
+index fell about 2%. And I think that
+trader was pretty unhappy as was the
+firm. Um they sued. They won some money,
+maybe like a quarter of the total losses
+they were requesting. Um so yeah, I
+would not count on the financial system
+saving you. Uh you you just cannot count
+on that. So that's one reason why every
+order is important.
+Um, separately there's compliance
+concerns. Like the SEC is just not going
+to be happy with 99.99%
+success rate. Like they actually want
+you to report every order. Uh, you will
+get fined if you have a few thousand,
+you know, missing reports here and
+there. So yeah, in general, feature
+number one of the production
+environment, every order is important.
+Maybe I can more generally uh I can
+generalize that into
+trading is just generally scary. Um,
+especially automated trading where we're
+connecting computer programs uh to our
+bank accounts and telling it to operate
+in a tight loop. Like anyone who has
+written software should, you know, know
+that that is a scary sentence. It would
+be scary enough if the logic were all
+trivial, but logic actually gets pretty
+complicated. The, you know, the price
+might be more complicated than that
+simple one number price I showed you
+before. There could be a price with a
+multiplier.
+The multiplier for a given instrument
+could be different depending on the
+context in which you're talking about
+that instrument, whether it's like
+pre-trade or post trade. Um, and
+remember, getting any single one of
+these details wrong, uh, can be
+catastrophic.
+Or it could be just a little bad, but if
+you do it enough times in a tight loop,
+that can be catastrophic. Uh, which I'll
+get to in a second. Um, and then the
+last bullet point there about adverse
+selection, I just want to say sometimes
+these examples can seem contrived like
+you know, okay, sure you roll this bug,
+but nothing bad is actually going to
+happen in the real world, right? And the
+problem with the trading environment is
+no uh something bad will happen. Uh, in
+this environment, as soon as you decide
+you want to do a bad trade, every other
+market participant very eagerly wants to
+do that trade with you as fast as you or
+they possibly can. So once you make a
+mistake, it is sort of immediately
+pounced upon which is I think pretty
+unique to the trading environment.
+Um and again uh if you think this is you
+know theoretical paranoia, this is a
+real thing, quick show of hands. Who has
+heard of night capital or night day?
+Okay, less than half. Okay. Um about
+half.
+I'm not going to spend too much time on
+this, but I just want to recap this
+story. Um so the basic story of Night
+Day is they were a trading firm like
+Jane Street. Uh this story happens in
+2012 I believe. They were among the
+leading market makers, automated trading
+firms uh based in the United States at
+the time and they had some dead code
+which if triggered would lose them
+money. There was a bug. It would lose
+them money on every order that went
+through that system. It would only be
+triggered by another system sending a
+certain config flag. uh and that other
+system never sent that flag. So this
+never triggered in production. Then they
+did two things simultaneously.
+One is they repurposed the config flag
+to do something else instead implement
+some new feature. Uh they this was to
+save themselves a version protocol
+version bump protocol upgrade. Uh I I
+have done this before repurposed a
+config flag to save myself a version
+bump. Um, so this new feature that they
+were implementing did not have the bug.
+So this is like a good thing this
+change. Uh, you know, they're avoiding
+the bug now. Um, then they started
+sending the flag from that other system.
+Um, so you can kind of see like, uhoh,
+better hope step one goes well. There's
+going to be a problem. You can probably
+predict that step one did not go well.
+Um, it mostly did. They had, I think,
+eight instances of this system. Seven of
+them successfully upgraded and one of
+them failed to upgrade. Um it actually
+did send like notification emails that
+it failed to upgrade but this was
+ignored. So the open happens and they
+immediately start start losing money. Uh
+every trade that goes through the system
+that didn't upgrade loses money. The
+engineers immediately identify the
+system as the culprit. And what do you
+do when you just rolled to a new version
+and it is hemorrhaging money? You roll
+back. Uh they did not identify that it
+was the system that failed to rolled
+that was losing money. They thought it
+was the system that rolled. I think a
+pretty intuitive reasonable thing to
+think quite frankly. So they pretty
+quickly rolled back um and that 8xed the
+speed at which they were losing money.
+45 minutes later they had lost about
+half a billion dollars and they
+basically ceased to exist at that point.
+Um they had accumulated billions of
+dollars of positions that uh went
+against them and they like their own
+stock price collapsed. Uh they were
+bought by a competitor a few months
+later and now we talk about it in talks
+like this as a cautionary tale. Um
+there's a ton of nuance to this story
+that I'm glossing over. There's I could
+have a whole talk on lessons from night
+capital day and that is not this talk.
+Um the main thing I'm trying to convince
+you of is just that you know this is not
+a theoretical concern. This is a thing
+that happens and that we think a lot
+about
+um and yeah there are some uh the SEC
+has a great report on this uh if you
+enjoy late reading it is actually like
+an amazing postmortem and you should
+read all the details. Um so that's
+feature of the production environment
+number two like trading feature number
+one every order is important feature two
+trading is generally pretty scary
+feature three a little different timing
+matters a lot um our system follows the
+trading day so systems shut down uh in
+the morning and they start up at the
+beginning of the day and nothing really
+happens in these uh in these times at
+the beginning and end of the day and
+then there's these huge spikes at the
+market open and the market close. Uh
+people not in the industry may be
+surprised at just how large a percent of
+our overall volume happens in those
+small windows. Uh and in between there's
+like a lower constant level of trading.
+Um this is a slightly simplified model.
+Uh stuff happens during the day too. So
+sometimes there's special trading
+events. FOMC minutes. This means like
+every few months the Fed will announce
+various like economic data or you know
+their policies. This is a big trading
+event that that's one example. So a lot
+of these we have these planned trading
+events that we that we know about.
+Sometimes the events are unplanned. Um
+Trump tweets something or you know a
+country invades another country or
+something and volatility goes haywire.
+Um that's a thing that happens as well.
+And then to say one more thing about
+timing um
+external systems like we have a lot of
+external dependencies that are really
+anchored to time. So there's a pretty
+interesting flow throughout the day
+where you know at 7:30 a.m. every day
+you download some metadata from some
+external service that then you load into
+your systems. You load those into
+another set of systems. Some other you
+download some more metadata and you've
+got this kind of ticking clock of about
+two hours every day where a bunch of
+things need to happen in concert and if
+anything slows down you need to scramble
+to fix it before the open. Um there's a
+few examples listed here. There's more
+examples that I could give but this is
+the kind of shape of what the trading
+day might look like. So that's another
+I'll say that's like interesting feature
+of the production environment. Number
+three is just that um timing matters a
+lot.
+The last feature I want to talk about is
+we have internal users. Um this is
+actually in my opinion the most
+interesting of all of them. Um it's
+pretty cool to work in an environment
+where all of the users of our technology
+are mostly within the same building or
+at least within the same company. And
+I'll talk more about the implications of
+that later. But it is just important to
+know that if something is wrong with our
+system, we can talk directly to the
+users in a very high bandwidth, high
+fidelity, sort of no BS way. I don't
+have to couch my language and pretend
+like I didn't uh, you know, be worried
+about some reputational impact of the
+service going down or something. I can
+just say exactly what's wrong and our
+user can talk to us about exactly the
+impact that's happening on them. And
+that's going to really affect the way
+that we respond to things in the
+production environment.
+That is the main features of the
+production environment. I think I am
+ahead of schedule if I timed it right.
+So I'm happy about that. Um so now let's
+talk about the implications. What does
+Jane Street do uh as a result of those
+interesting features? Um let's start by
+talking about monitoring.
+So you might be traditional with maybe
+more SLO based monitoring. Um that might
+look something like this. So the error
+rate is below 01% i.e. you know 99.99%
+of our requests should succeed. This is
+a pretty standard shape of alert that
+you might monitor. Um we do very little
+of this. uh there's a problem which
+maybe you've identified which is I just
+said 100% of orders are important. Um so
+if the 01% of order that you want to
+cancel is that one that's really really
+important um you know the one that's
+going to bankrupt you then this alert or
+an alert based on this SLO is not going
+to help you very much. That's not just
+true in the order space. You know, you
+might say like 99.99% of our instrument
+symbology should be accurate, but you
+know, you really can't have you can't be
+trading the wrong symbol on any order.
+The fact that every order is important,
+it's sort of every aspect of the order
+is 100% important as well.
+So, we actually do very little SLO based
+monitoring in our live trading systems.
+What do we do instead?
+We do a lot of event-based monitoring
+and alerting. Um
+what does event based monitoring mean?
+It means we have a section of code where
+it says if this condition happens then
+raise this error for a human to look at.
+And the main feature of this uh I say
+feature it's kind of a blessing and a
+curse is it forces you to think about
+every single edge case. So in
+traditional SLO based monitoring, one of
+the awesome things about it is you can
+ignore unimportant edge cases. Who cares
+if there's some weird condition on some
+weird browser version with some weird
+plug-in configuration that causes 12
+users to have the web page load slowly.
+Like it's just not important. You don't
+need to waste an engineer's time dealing
+with this condition. Um that's a great
+feature for people uh who can sort of
+set up that kind of SLO based monitoring
+with event- based alerting. What we're
+saying is actually we need to look into
+that edge case and we are going to
+decide consciously in code or maybe in
+some config that's attached to the code
+um that we need to at least identify
+that issue and verify that we've decided
+it's not worth an alert.
+Um so we really at least in these like
+trading based systems we really catalog
+every edge case that comes up and decide
+whether or not to alert on them. We
+don't necessarily like fix every single
+edge case. Sometimes we have decided
+that we can fail safely in some way but
+we really do enumerate all of them and
+modify our alerting accordingly.
+And so some benefits and downsides of
+this. So the benefit obviously you get
+the safety that we're after. There's
+some other nice things like you get a
+really high fidelity of alert detail in
+SLO based monitoring. You might have
+this annoying problem where you've
+decided okay the rate of failure has
+gone up two times over the last month
+for like a wide variety of re reasons
+like maybe you need to do some data
+analysis to figure out which ones are
+most problematic or if you should just
+change your SLO or or what the deal is.
+uh it can be a lot of kind of annoying
+debugging when you have a specific call
+site with a specific alert. You kind of
+know exactly what happened and what you
+need to fix. And that direct link to the
+call site is also nice. You can just
+look at the code that generated the
+specific error condition rather than
+having to look at a broad range of
+symptoms.
+The downsides as I've kind of alluded to
+are you have to enumerate every edge
+case which is just a lot of work. uh it
+can be noisy uh if you failed to
+enumerate every edge case. There can be
+tribal knowledge where you decide ah
+yeah this thing is happening again but
+we know that's not an issue. Uh and it
+can be hard to change alerts instead of
+just changing a config you know change
+99.99 to 99.95.
+Um you have to change the logic that is
+generating the alert which in turn means
+you need to understand the codebase
+pretty deeply. It makes it harder, I
+would say, to have some like far off
+distant s uh like operations team that's
+monitoring your system without being
+deeply familiar with it.
+All that being said, we do use plenty of
+metrics based alerts as well, uh both
+for many cases where there's not a real
+risk concern, um and also to measure
+like long-term health of our systems, uh
+and improvements to like our performance
+as a whole. Um but a lot of what we do
+is this event based alerting
+and I'd like to talk a little bit more
+about what kind of event-based alerts we
+really like. Uh there is a classic
+mantra in like S sur land like alert on
+symptoms rather than causes. Um again
+like quick show of hands who is like
+familiar with this phrase or concept?
+Ah sick. Okay very few people.
+Excellent. Uh I will not rush past it
+then. Um so a classic example here is
+you've got some CRUD app uh you know
+some web server that's connected to a
+database and as you're writing this
+system you might think to yourself um I
+am going to raise an alert whenever the
+database goes down and your logic that
+you're intuiting is probably something
+like the database going down is
+obviously bad and
+it is obviously going to cause user
+impact if they try to connect to my web
+server when my database is down, they're
+going to get 500 errors and they won't
+be able to connect. And furthermore,
+when I get this alert that the database
+is down, I know exactly what the root
+cause is. The root cause of the 500
+errors is that the database is down, so
+I need to fix the database. Uh, if I
+were to not alert on it, then I might
+get a user complaint that they're
+getting 500 errors, and I then need to
+debug logs, whatever to eventually find
+out what I could have known all along,
+which is that the database is down. So
+that might be what you intuitively think
+and I think in many cases at in many
+places at Jane Street and I mostly
+believe this. Um we mostly think that's
+wrong and you should not alert on your
+database going down. Um and the basic
+logic for this is you're going to need
+to alert on the 500 errors anyway. Um
+because the database going down is not
+the only reason why your users might get
+500 errors. there's a bunch of other
+reasons and you probably can't list all
+of them. So you need to alert on the the
+500 errors. And so if you alert on both
+now you're getting duplicate alerts.
+That's noisy. That's a problem. That's
+maybe problem number one. And that's
+kind of like the best case. Um, and the
+worst case, which is actually I'm going
+to claim very likely, is that a lot of
+those assumptions I just said about the
+database going down is obviously bad,
+obviously, obviously going to cause user
+impact. Those assumptions are actually
+not true. Um, it may be true at the
+moment that you're writing your app, but
+over time you're going to realize that
+you occasionally need to do database
+maintenance, and you're going to come up
+with some scheme where you have a backup
+database, and you can actually do safe
+uh database maintenance with no user
+impact. And so you're going to say,
+okay, well, I'll silence the alerts
+during my database maintenance window.
+And then at some point, you're going to
+do an ad hoc maintenance and you're
+going to raise an alert. And then after
+that, you're going to say, "Ah, okay.
+We're going to create some RPC for the
+person doing maintenance so that they
+can proactively silence the alerts for
+the next three hours as I do my ad hoc
+maintenance." And it's just going to be
+duct tape on top of duct tape all
+covering over the fact that actually
+none of your users care about your
+database. They care about the 500
+errors.
+Um there it is true that the part I said
+about it being convenient to have the
+alert pointing to the database being
+down. Um that is true that that is
+convenient aspect of debugging but there
+are less noisy less costly ways of
+getting the same benefit. You can attach
+the metadata that the database is down
+to the alert that's generated or you can
+have a monitoring dashboard that
+displays information about the database
+so that when you see the alert you know
+to go to this dashboard and it will it
+will be there. Um you can quickly draw
+the connection without having to look at
+another alert which might wake your on
+call staff up um just because of routine
+database maintenance.
+So, we do a lot of uh symptom based
+alerting in general. Um, and one
+particular variety I want to call out is
+what I'm going to call like orthogonal
+alerts, maybe based on epistemic health
+rather than service health. And you I
+kind of think of these as like uh an
+extreme version of a symptom based
+alert.
+Um, this is a case where we really have
+no idea what the root cause even might
+be. In fact, we don't even detect a
+problem with any particular service. We
+just know that something is weird about
+the world. Something that some service
+is outputting seems wrong in some way.
+Uh, and this may be a little abstract,
+so I'll give two examples. We have an
+alert called feel too good or trade too
+good. Uh, this means we made too much
+money. Um, and this is my favorite alert
+at Jane Street. Uh I don't know if it is
+like kosher to say that you have a
+favorite alert like not a fun party
+trick or something but uh it is my
+favorite alert. Uh it can catch so many
+issues in so many different places in
+our tech stack. If you have problems
+with market data, if you have problems
+with instrument generation, if you have
+problems with the order engine, if you
+have problems with your trading
+strategy, if you have a rogue trader, if
+a trader has fat fingered something,
+anywhere in your trading stack,
+something can be caught by this one
+alert. Um that's like sort of yeah
+symptom based alerting on crack or
+something. Um another example might be
+like high percent of market volume. If
+you're normally 3% of market volume and
+all of a sudden you're 60% of market
+volume. I don't know what happened but
+like that's pretty weird and indicates
+that maybe something has gone
+catastrophically wrong.
+Um by the way that one looks a little
+more solo to me which is you know cool
+and fine. Uh I think the main thing is
+it's a bit orthogonal to any specific
+indicator of service health.
+Um and yeah, I would say like what those
+two examples have in common is that
+they're not related to any particular
+technical failure in any particular
+service. They're more indicating that
+our understanding of what the cohesive
+unit of our systems is doing is wrong at
+some like high abstract level.
+So these are some of the alerts that we like. Um whenever you raise an  
+alert, you have to think hard about
+who's going to receive the alert. And uh
+I think these examples are a really good
+use case of that. I just said they're
+not tied to any particular service. So
+which service owner should
+like receive the alert? Uh and I kind of
+like you guys to spend like 20 seconds
+just like thinking about this question.
+Um like if you have this alert on like
+feel too good like who should look at
+that and how should they respond to it?
+Yeah. Literally spend 20 seconds think
+about it.
+Cool. Um I'm not going to call on people
+because I think the mics won't work and
+stuff. Uh, also there's no right answer.
+Uh, yeah, it's a totally unspecified
+question. Uh, but I do want you to kind
+of think about that question in the back
+of your mind. I'll hearken back to this
+in a little bit. I'm curious what you
+guys thought. Um, yeah, just something
+to think about for now. Um, the last
+thing I wanted to mention in this
+section is we do obsess over signal to
+noise ratio. So I have basically no
+secret sauce here except to say that
+this is just a thing that the firm has
+to take really seriously as part of its
+culture. I think it's a pretty neat
+thing about Jane Street that you know
+traders, devs, production engineers,
+sort of everyone deeply understands that
+noisy alerts are worse than useless. And
+we care so much about human attention
+that we do end up spending a lot of time
+um you know tweaking alerts, alert
+thresholds, alert logic, whatever, going
+over ed every edge case so that we can
+have a good signal to noise ratio. And I
+think you probably can't really do this
+event-based alerting unless you just
+have a really strong cultural foundation
+of caring about signal to noise ratio
+because it is so prone to noisy alerts
+that you need it like embedded within
+the culture not just like the tech nerds
+or whatever but like everyone traders
+etc. Um yeah
+part of the culture. Yeah.
+Cool. Another thing I want to talk about
+is defense in depth. So I had drawn a
+diagram similar to this earlier, but
+I've now added this external risk
+enforcer. And I've been talking a lot
+about alerts, but I had previously said
+that like any
+problem is catastrophic. So like what if
+we fail to raise an alert? You know,
+what if we have a bug in the alert
+generation logic? Um, and I think the
+basically the only way that I know of to
+solve that problem is to just have a lot
+of defense in depth and have a lot of
+things that need to go wrong hopefully
+in an uncorrelated way for you to, you
+know, be confident that you're not going
+to have big problems. Um, so what we do
+is we run similar alerts in different
+systems written by different teams uh
+and try not to share too much underlying
+metadata metadata logic. Um, so you
+know, the trading system might have its
+own risk checks monitored by a trader
+who's applying some judgment. The order
+entry port has its own risk checks. And
+then you're going to have some external
+system that, you know, reads in after
+the fact that submits maybe leases to
+the order entry port that has its own
+risk checks. And again, importantly,
+these are all written by different
+teams. Um, so you know, if one alert has
+failed to generate, the other alert
+hopefully will. And the main weakness in
+this pro in this uh approach is
+probably they have some common
+dependencies. And so you're gonna have
+to look really carefully at those common
+dependencies and you might need
+duplicate versions of those dependencies
+as well. Um yeah
+uh some more about defense in depth.
+This is kind of going to be similar to
+the feel too good thing I talked about.
+um which is we have we monitor technical
+health monitored by technical staff and
+we monitor trading health trading impact
+monitored by trading staff and again
+those are two sort of orthogonal uh sets
+of alerts that hopefully can cover a
+similar ground of thing. Uh so tech
+system monitoring is going to look like
+is our software or hardware experiencing
+technical issues? Are our systems able
+to execute trading decisions as
+expected? Do we have external
+connectivity issues? Whereas trading
+impact is going to be are we having the
+market impact that we expect? What P&amp;L
+are we acrewing? Are we sending the same
+orders that we intended to send? And
+like the feel too good case, uh
+sometimes traders noticing weird trading
+impact can inform technical staff of
+problems with our technical health.
+And the very last thing I want to say
+about monitoring is it is not optional
+uh at a trading firm. Um I I sort of
+hear of uh other firms where it's kind
+of like an ancillary thing. Maybe like
+the project you give to the new joiner
+if it crashes, you know, who cares? It's
+not serving any customers. It's not a
+huge deal if it goes down. And that is
+not the way we treat monitoring at Jane
+Street. Um we basically don't trade
+unless it's being monitored. And so
+monitoring systems are among our most
+robust, most well- tested, most
+redundant, we have failovers, etc. So
+that's just another sort of philosophy
+around monitoring at Chain Street.
+Okay.
+Uh there's one more thing I wanted to
+talk about sort of how we treat uh how
+we react in our production environment
+to sort of the the nuances of the of the
+trading environment. and that is
+business context is key. So production
+engineers and all technical staff who
+respond to things in production which is
+basically everyone uh need deep business
+context and a actually a correlary or
+not a correlary the inverse of this is
+traders uh need technical context. So,
+if you remember that bit I said earlier
+about how we have internal users,
+the ability to communicate effectively,
+I sort of implied was good and useful
+and nice, but you can only really take
+super advantage of it if you can
+actually speak really effectively
+together in a high fidelity way, which
+means or I mean another way of putting
+it is like it raises the stakes and
+importance of being able to communicate
+effectively with people who speak kind
+of different languages from you. So, you
+know, communication bandwidth is much
+higher. If a trader can say, you know,
+spoo market data looks stale. And I, as
+a technical staff, know immediately that
+when he says spoos, he means index
+future of the S&amp;P 500. Uh, and that I
+know that this trades on the CME, which
+is located in Aurora, Illinois, which
+therefore means that probably if I
+search for AUR uh in our list of order
+engines, I'm going to find the order
+engine that he's talking about. And so,
+yeah, in an incident, if someone were to
+say, "Spoo's market data looks stale,"
+it would probably take me, you know, two
+or three seconds to find the relevant
+order engine or market data feed that trader is referring to. Uh, if you  
+don't have the business context to know
+what that means, you might want to do,
+you know, ask him what spoo means. Okay,
+it means this symbol name. I'm going to
+do some lookup table to see the
+exchanges that this symbol trades on.
+It's going to give me some identifier.
+I'm going to look up that identifier.
+it's going to give me some other thing.
+We can bypass all of that and know
+immediately what the person's talking
+about. This is a bit of a contrived sort
+of simple example. Um, but I think
+deeper examples exist as well where
+traders can say pretty nuanced things
+about the trading and technical staff
+who know some nuances of the trading can
+pinpoint the likely culprit or system
+that might be at at fault.
+Um
+and lastly I had also said that timing
+matters and knowing those special market
+events is really important for you know
+technical staff to be aware of. Uh you
+can know that different market events
+will impact different desks differently.
+Um understanding those nuances can be
+really valuable. Ah the reason our
+market data is going crazy right now is
+because yes Trump just tweeted about
+steel tariffs. um we should be prepared
+to respond accordingly. Uh I understand
+why we're getting these delays. This is
+what we should do. Um this sort of thing
+happens all the time and it is really
+useful to be able to have that context
+and avoid doing things like rolling a
+system before some economic news that's
+going to affect the desk that that
+system is serving.
+That is the sort of what it means for
+production engineering. I think I'm
+still doing good on time, right? Okay.
+Um, and now I want to get through a
+sample incident. Uh, which will
+hopefully make this all a little bit
+more concrete. Uh, this sample incident
+is loosely based off an amalgamation of
+a few separate incidents. So, it's not
+like 100% real. Uh, but it is pretty re
+like it's pretty realistic, I would say.
+Um, and yeah, hopefully interesting. Uh
+so
+um in this sample incident uh 7:15
+routine roll of order engine completes
+new version it's kind of standard um has
+some bug fixes small refactor tests pass
+uh cool 931
+um fill two goods raised to trading
+desks for a bunch of symbols.
+Um, at this point there's a lot of
+individual traders who have each
+received like one feel too good. And so
+no one quite knows that there's some
+widespread problem, but maybe a bunch of
+people might start looking into their
+own subset of trading.
+9:32,
+uh, the order's team receives an alert
+called too many fill goods and the order
+engine automatically halts.
+Um, so now I'll do a quick sidebar. uh I
+had talked about who should receive the
+feel too good alert. I think there's a
+lot of plausible answers. I think this
+is one possible answer which is like
+maybe you have uh individual feel too
+good alerts go to the trading strategy
+that is related to that specific symbol
+and maybe you have some meta feel too
+good alert that goes to some tech team.
+Um in our case I I had asked the
+question you know if this could be um an
+alert that covers anywhere in the tech
+stack like which tech team should
+receive the alert and the thing that we
+do at Jane Street is we uh send them to
+the order engines team. Um and the basic
+idea is the order engine is the last
+point before you sort of get to the
+exchange. It's like the last point of
+safety uh before your risk is going out
+the door. And so theoretically, the
+order engines team should be the team to
+most reliably guarantee that we're not
+doing bad trades. They're our last line
+of defense. That's our answer. I think
+there's a lot of plausible ones. Um
+that's what we do. So 933. Um order
+engines is going to start an incident.
+They use a system we have called what
+changed. Uh what changed is you know you
+type in a system and it tells you all
+the things that changed in that system.
+You know, you can imagine binary
+changes, but also any relevant config
+changes, any relevant metadata changes,
+anything like that. And they very
+quickly see that there was some code
+changes that were released this morning.
+And you look at a list of feature names.
+One of them says, you know, refactor of
+price serialization. Okay, price
+serialization seems like potentially a
+pretty scary thing to get wrong. Uh,
+hope I serialized the price right. Maybe
+the refactor caused a bug. So, I start
+investigating that.
+Um within a minute as you start
+debugging the uh price serialization
+change you realize that that change was
+actually rolled to many more order
+engines than just the one that you're
+currently investigating.
+Um you now have a bunch of interesting
+things to think about. So maybe you can
+kind of divide the belief story into a
+few possible categories. Let's assume
+for a second that we have 100%
+confidence in our alerting. Um that
+could indicate two things. One is it
+might indicate that the price
+serialization feature is a red herring.
+Um if our alerting is 100% correct and
+the price serialization is a problem,
+then shouldn't all the other order
+engines also be raising filter goods?
+That's one thing you might think. The
+other thing you might think is okay well
+maybe the price serialization change is
+to blame but it's only affecting this
+order engine for some reason. You know
+it's related to the specific protocol
+that this order engine is communicating.
+That's kind of like one category of
+thing if if you believe 100% in your
+alerting. Uh the other possibility is
+you don't 100% believe that your
+alerting is perfect. Uh, and so you
+think this price serialization change
+was rolled out to a bunch of other order
+engines and maybe those other order
+engines are actually also losing money,
+but we haven't yet discovered it. Maybe
+our feel too good thresholds are too uh,
+you know, risky or something.
+So at this point, we might start talking
+like should we be preemptively halting
+these other order engines that are
+rolled with this suspicious code change?
+And this I don't think we're going to do
+this immediately. We're going to spend a
+few minutes talking about it. Um, and
+that's that's what's happening right
+now.
+A few minutes later, as this discussion
+is taking place, traders join the
+incident call and they report that
+market data looks stale. Uh, and so when
+I say stale here, what I mean is they're
+receiving you they would expect to
+receive second by second or faster ticks
+for each individual symbol they're
+trading. They're saying like, "I would
+have expected to receive a bunch of
+ticks in Apple by now, but actually I
+haven't received any and I'm trading
+based on the market data that we got at
+9:30 a.m. this morning, you know, at the
+open." Uh, that seems like a big
+problem.
+Um, as soon as they report this, the
+entire incident bridge immediately
+thinks to themselves, "Ah, maybe this
+price serialization thing is all a red
+herring. Maybe the problem is market
+data." So, let's have market data join
+the incident call.
+and the market data team will see some
+symbols that look stale. Uh, you know,
+they pull up their monitoring and they
+say, "Yeah, uh, I agree. We're the
+traders. These symbols, the last time
+they were updated was yesterday's close.
+Um, they don't they aren't marked as
+stale." Uh, so when I say marked as
+stale, what I mean is you might think
+that we have a system for reporting to
+clients of the market data that actually
+we you should not use this market data.
+You should use something else instead.
+this one is not reliable. We're not
+doing that. Um, so I think there might
+be a bug. I think people might be
+getting stale market data and thinking
+it's live.
+They start debugging. Uh, you use like
+our metaarch tool, you know, you search
+the symbol, one of the culprit symbols
+into our metaarch tool and you see that
+um, there was an exchange driven change.
+What I mean is an email uh from the
+exchange saying yeah uh in two weeks as
+of like today uh we're going to split
+the market data feed. So again, split
+the market data feed, meaning maybe
+they're sending this market data over
+four partitions right now, a quarter of
+the part symbol universe in each
+partition. They're going to create a
+fifth partition and 20% of each of the
+old partitions will go to the new
+partition. You should start connecting
+to this new partition on this day. And
+the market data dev says we should be
+robust to this, but I can imagine that
+we have a bug. And the bug is um we mark
+entire feeds as stale or not stale and
+maybe we missed this uh EDC like you
+know exchange driven change and so all
+of the symbols that are on the new
+partition we're just like not reading
+that new partition. We still have them
+internally in a config attached to the
+old partition and we've said that old
+partition is current. So, you guys are
+trading based on yesterday's market
+data, like the closing price yesterday.
+Um, the market data team says this
+shouldn't be possible. Like, we have
+fixes for this. Like, that's not how the
+logic works, but I can imagine that we
+have this bug and we definitely did miss
+this EDC. Um, I think we should keep
+trading halted right now on this order
+engine. I don't think we need to uh roll
+any of I don't think we need to halt any
+of the other order engines because this
+really does seem like the culprit. we're
+going to roll a config change to account
+for the uh for the change.
+They do that a few minutes later. They
+roll a config change. We turn on the
+order engine. Uh see if we continue to
+get fill two goods. We don't. And we
+sort of conclude, okay, the
+situation is resolved. We found the
+culprit. Um and then people start doing
+some thinking like, okay, but how
+confident are we that we've actually
+solved the issue? uh can we be convinced
+that the market data bug is the the
+cause of the problem? Um and
+maybe two weeks ago you get this uh
+exchange notification. Um
+we do some investigation and determine
+that yeah there is a bug. Um the the
+exchange did send us a you know not
+notice that um so in the market data
+feed the the exchange tells us yet we've
+moved these symbols and we are supposed
+to have logic that reads this and knows
+to mark the symbols as stale but we've
+actually never exercised this logic
+because we've never missed an electronic
+uh we've never missed an EDC before. So
+there's sort of two things that have
+gone wrong. One is we missed the EDC and
+two is uh we didn't handle the missing
+the EDC correctly. Um we had a bug in
+how we handled partitions. You know that
+code path had never been executed.
+So some interesting takeaways here. Um
+again my favorite alert uh the feel too
+good is the thing that caught it. You
+know an order engine uh alert caught an
+issue in the market data. Um that that
+that's pretty cool. Good job. Feel two
+goods. Um
+I think in real life other alerts
+probably would have caught it too. Uh
+maybe like our our trades not appearing
+in the market data. Uh you know I think
+you can imagine a trader saying we did
+this trade in Apple but I don't see the
+trade that I just did in the market data
+that I'm receiving. So I think market
+data is stale. I think that alert
+probably would have raised. Um
+some other takeaways. Uh going back to
+timing matters. So a pretty interesting
+thing in this case is uh nothing we did
+really mattered that much. Uh you know
+we reacted really fast to everything
+like one minute in between each thing. I
+think that's like a pretty impressive
+timeline but actually all the damage had
+been done as of 9:31. You know we missed
+the open. Uh that is the problem. So I
+think a lot of the post-mortem here
+would have involved us asking whether we
+could have caught this anyway like 20
+minutes earlier. Uh if we could have
+caught this 20 minutes earlier with
+pre-open trading or some other alerting
+um then this quick resolution would have
+actually allowed us to make the open. Um
+you can also imagine cases where you
+know maybe at some point in this
+incident the trader would have said uh
+by the way Fed minutes are in 20 minutes
+and again that would have really
+affected the way that we handled the
+incident. We would have had to do things
+with a certain level of urgency and we
+would have made different risk decisions
+along the way.
+Um the other thing I want to highlight
+is the communication between traders and
+tech. And again I think this instance
+where
+the traders join the incident call and
+report that market data looks weird
+that was sort of the turning point in
+this incident. That gave us the key
+insight we needed to know to call in
+market data. And that is really common
+in Jane Street incidents where from a
+technical perspective sort of everything
+looks fine. uh at least looks like our
+systems are behaving correctly, but when
+a trader can report that we're doing
+something wrong from their perspective,
+that can really speed up resolution. Uh
+and again, you know, this uh sanitized
+version of an incident uh maybe doesn't
+make it quite so clear how useful it is
+to be able to talk uh understand each
+other's languages so that the incident
+room isn't just like total chaos of
+people not understanding what the other
+person is saying.
+Um
+that is really the main highlights
+takeaways that I wanted to get out of uh
+this sample incident. Um just to wrap
+things up um
+the things we sort of talked about here
+we rely a lot on eventbased alerting.
+Again, we have SLO based alerting, we
+have metrics based alerting, but those
+tend to be more for long-term health,
+whereas we rely a lot on event- based
+alerting for actual live trading system,
+sort of core of our alerting
+infrastructure. And we rely a lot on
+these orthogonal epistemic alerts uh to
+protect against a really broad range of
+failures.
+And then our monitoring systems are
+among our most critical. We make sure
+that they are more reliable than the
+trading systems they are monitoring. We
+would rather a trading system go down uh
+than the monitoring system go down.
+And we have a lot of defense and depth
+for the most important systems. You just
+have to use multiple again maybe
+orthogonal systems to get at the same
+thing. You simply can't create a system
+so reliable that you can be 100%
+confident that it will be reliable
+enough. and support staff needs business
+knowledge and internal communication to
+be able to make high-quality decisions
+and move fast in an incident.
+And then one last thing I want to say uh
+just to keep myself honest. Uh this is
+all a little bit of an exaggeration. Um
+there's plenty of ways in which lots of
+uh production engineering at Jane Street
+looks a lot like it does elsewhere, but
+in this talk I did want to highlight
+some of the differences. Um, but there's
+plenty of areas in the firm where, you
+know, it's not quite so tight hot loop
+of trading. Uh, and you can afford to
+take a more like normal approach to S
+sur production engineering, whatever the
+case may be. We've got a pretty wide
+variety of that. Um, that is the end of
+my talk. Uh, any questions?
+&gt;&gt; Yeah.
+&gt;&gt; Hi Mark, thank you so much for the talk.
+I just had a quick question on the
+sample incident that you shared. Um so
+you did mention about the importance of
+monitoring systems and how critical they
+are and as we look at the sample
+incident um the root cause was two weeks
+ago an email from exchange which is
+super important.
+&gt;&gt; Yeah.
+&gt;&gt; Right. So I was just curious as to like
+you know for any monitoring obviously we
+do have fancy monitoring systems but
+emails come first. So weren't there any
+u monitoring or any acknowledgement that
+someone you know acknowledged that email
+or monitoring that um this email from
+exchange was act or any change had been
+rolled out in response to that? Um
+&gt;&gt; yeah great question. So uh this exact
+mistake is absolutely a mistake that
+we've made multiple times and we try
+really hard to avoid making and just the
+basic problem with uh these exchange
+driven changes is we don't need to do
+anything for like 99.99% of them and
+unfortunately like we can't convince the
+exchanges to only tell us about the ones
+that we care about. So they tell us
+about everything and we need to spend
+some manual effort trying to parse them.
+So, I know nowadays we've got like
+various LLMs and stuff trying to like
+get at some of the signal to noise and
+we've got like a whole process for
+people staring at them and trying to
+make the right decision, but there have
+been multiple cases where people have
+just made the wrong decision. Uh, read
+the email and determined it didn't
+affect us and we were we were wrong
+about that fact and uh that's what
+happened in this incident.
+&gt;&gt; Yeah. Yeah.
+So it's like follow up to the um
+incidenting questions like how is it
+how's it even possible that the they
+don't time stamp the market data and
+start trading and the price is like from
+yesterday they close sounds like sounds
+like very important
+and second like why why would all the
+engines catch it? it seems like at least
+like the last piece of software that
+cares about the stiness of market data.
+Um so this is like interesting questions
+I I have for for the instance and the
+second questions I I have is uh
+regarding the the event based um alerts.
+So in the firm we we rely heavily on
+metrics based alerts because like once
+we start doing event based um requires
+like indepth integrations of this like
+every piece of software being able to
+generate all these events is like how is
+it like these things orchestrated in in Ju like is it part of the  
+responsibility to make sure these things
+is deeply integrated in the software by
+the productions engineering team or is
+it like a practice that every team has
+to do? Um, okay. I'm gonna I think I
+caught all that. Uh, but I I may not
+have. So, I'll go first question first.
+Um, so sort of like isn't that like a
+giant mistake to accidentally be reading
+yesterday's market data prices for
+today's live market data? Um, one thing
+that maybe I sort of glossed over in the
+beginning is we trade on a really wide
+range of exchanges from super well-
+behaved exchanges that are extremely
+liquid and this would be like wildly
+implausible to ever happen to like
+pretty weird sketch exchanges uh where
+maybe like they're most of the time
+really inactive and it's actually not
+that crazy that you might not have had
+market data in a symbol for a given day.
+Um, so I think in the incident that this
+was based off of, it was an exchange
+that normally has very low volume, but
+due to some weird news like became
+really really high volume. Um, I again I
+think this might have been like a
+geopolitical I forget the exact details
+but I think it was some geopolitical
+thing where some country became very
+important and so that country's exchange
+uh was kind of going crazy and we
+Yeah. So basically like a thing that was
+normally implausible became very
+plausible. Um that is I think the first
+part of your first question. Uh the
+second part is isn't it implausible that
+like the order engine catches the market
+data bug. And again I guess the thing I
+would highlight is that the order engine
+the error that the order engine is
+raising is not anything to do
+specifically with market data. It's to
+do with some like epistemic status about
+the world. And so the order engine
+didn't notice that market data was
+wrong. the order engine noticed that we
+sent a a trade that seemed too good and
+that helped us identify market data.
+Does that answer the your first
+question?
+&gt;&gt; Yeah.
+&gt;&gt; Um I'm sorry I forget your second
+question.
+&gt;&gt; Yeah. It's like when you when we start
+doing all this like event based um thing
+why is like really in depth integration
+to software and is it like how is it how
+does these things orchestrated in Jesus
+like every software team needs to do
+this like integrations or is like
+product engineering is going to do some
+extra monitoring third party stuff.
+&gt;&gt; Yeah. So I think in general like we
+most of our production engineer teams or
+really all of our software teams tend to
+monitor their own systems. So we don't
+like have one team that is writing the
+core logic and another separate team
+that is writing the alerting around that
+system. Um the people who are developing
+the software are also deeply integrated
+into writing the alerting. Does that
+answer your question?
+&gt;&gt; Yeah. Yeah. It's like it would that
+makes like every single team it's like
+um they have to engineer space
+specifically for every kind of events
+that is like baked into to software. So
+that's like um cuz like for for us we we
+rely heavily on metrics uh alerts
+because like it's it's easy it's kind of
+hard to make every single like software
+just yeah
+&gt;&gt; to make event based
+&gt;&gt; um alerts without like generating tons
+of noise.
+&gt;&gt; Yeah, I think my like short answer to
+your question if I'm understanding it
+correctly is basically the answer is
+yes. like software engineer teams, all
+engineering teams at Jane Street need to
+think really hard about all the ways in
+which their software can go wrong and
+raise alerts accordingly. Um, and like
+think about how the humans on the
+receiving end of the alert is is going
+to respond to that alert. And yeah, I do
+I think it's a lot of work in a lot of
+ways. Uh but it does mean that we have
+really reliable robust alerting that we
+then feel really good about and can
+allow us to sort of paradoxically like
+move really fast in other ways because
+we are so confident in our alerting that
+we know that we'll catch something if
+something goes wrong.
+I think I saw a hand. Yeah.
+&gt;&gt; Uh thanks for taking the question. I'll
+stay anonymous for now. Um I have two
+questions I think. First one is uh
+perhaps relatively straightforward for
+you to answer and the second one uh if
+you're not feeling comfortable to answer
+I can
+&gt;&gt; okay cool.
+&gt;&gt; So the first one is uh I think um do you
+guys have some sort of common login
+standard across different teams
+responsible for different components. So
+the reason I ask this is imagine you
+mentioned in your system uh you have
+some sort of a risk alerting risk
+monitoring right and they have a
+separate team that's presumably let's
+say it's responsible for generating the
+actual trade actions and if something
+goes wrong say the alert comes from the
+from your alerting system and if you try
+to look at the logs
+uh so personally
+had the experience that so for example
+you goes into the close auction and the
+monitoring system says oh my IV my
+participation rate is too high. So alert
+goes spun off and then you get the devs
+try to investigate and they look at the
+order system and they have one set of
+logs and they try to check say oh what
+is the auction volume at the time. So
+they would search for the keywords for
+example what is the indictive you know
+auction volume and crossing volume
+whereas then you try to cross reference
+say oh why did the monitoring system
+throw that alert and when you go to data
+logs rather than say you know the
+indictive and cross volume they say IV
+so sometimes you actually need to be
+able to diagnose you need almost like a
+subject expert knowledge from two
+different systems purely because the
+devs decided to use different
+conventions and there isn't a place to
+enforce the sort of conventions. So does
+Jen Street have some sort of common
+standards?
+&gt;&gt; Um yeah, I think the answer to that is
+like a little nuanced. Uh unfortunately
+I think we have some common alerting
+libraries that most teams use. I think
+for and yeah I find this question
+actually maybe this is I hope this is
+the harder question. Uh, I know you said
+it was gonna be the other way around,
+but I find this question hard to answer.
+Um, yeah, I think we have common
+alerting libraries. I think we have some
+common standards. I think
+like it depends a lot on the set of
+alerts you're talking about. One thing
+that's true about Jane Street is we
+don't have a lot of topdown edicts. In
+fact, we have approximately zero top-
+down edicts. So really every generator
+of an alert is sort of free to do it in
+their own way. Uh and I think that does
+mean that like if I am on one team and
+then I move to another team, I need to
+understand that team's conventions uh
+for alerting. All those teams are
+hopefully using a relatively common set
+of tooling provided by like our core
+services team. Um but they're kind of
+free to use that tooling in their own
+way. So, you know, we're going to have
+like the same log levels throughout the
+firm using the same logging library, but
+a specific convention around, you know,
+what terminology you use around a
+specific condition, uh, could vary team
+by team. That being said, a lot of the
+teams I'm talking about here, like
+market data, order engines, are building
+market data and order engines for all of
+our desks. So if you're trying to debug
+something for like the equities team
+that's connected to the market data,
+that's the same team that's like the
+bonds market data team. Like a lot of
+our infrastructure is sort of shared
+across different trading strategies. So
+I think a lot of these like risk
+question alerts are going to be from a
+common framework that's going to apply
+to a bunch of different tasks. Does that
+answer that question? Kind of.
+&gt;&gt; Yeah.
+&gt;&gt; Okay, that was the easy question. Great.
+That's
+&gt;&gt; hopefully more straightforward.
+Uh so the second one is um
+again ties back to the monetary system
+that you mentioned right and I can
+imagine for chain capital you probably
+as a firm has an overall at any point in
+time a risk appetite or risk capacity
+that you're taking and then inside it
+you have your individual desks or
+functions that's taking risk at any
+point right and then you have some sort
+of trade events that's originated from
+your trading trading system or different
+trading components or trading desks and
+then I imagine at some point you want to
+keep counter of your overall aggregate
+risk precision. Yep.
+&gt;&gt; So when that comes through, how does Jin
+Street do do you guys act have the
+system um I guess the overall monitoring
+uh does that act as the final gatekeeper
+and it's sort of like a blocker that you
+essentially pay for a computation time
+cost to process that thing first and
+then as a single aggregation point pay
+for the cost of the check before you
+decide to let it out the door or you do
+some other asynchronous way like
+&gt;&gt; yeah uh again I think the answer to that
+is a little complicated and maybe I'll
+go back
+to
+some slide around here somewhere maybe
+um like the two kind of different kinds
+of alerting that we have um I think in
+this talk I have mostly been thinking
+about like our technical health not our
+like trading like sort of thoughtful
+trading risk
+So the way we tend to do this is when
+you're thinking about like the sort of
+overall firm risk that we're putting on
+that tends to be in our trading
+monitoring systems that traders are
+looking at and making human time
+decisions about how much like firm risk
+we're willing to put on as a whole. And
+then we also have like I guess we maybe
+my answer is we do a mix of the two
+where for some amount of risk there's
+like automated systems that will turn
+off if you're exceeding this risk and
+then for other sort of more firmwide
+risk things we have humans looking at
+them and trying to make decisions based
+on you know what they think is safe over
+the course of you know days whatever the
+case may be. Does that answer your
+question?
+Um
+Dan's telling me I don't have much time.
+Uh
+how many more questions? Two.
+&gt;&gt; One more question. Okay. Uh arbitrary
+you in front. Thanks for sitting in
+front.
+&gt;&gt; Great. Um thank you so much for the the
+talk till now. Um so I come from a
+startup hedge fund and it's pretty
+interesting to see all the sophisticated
+systems you have here and uh the time
+period that you started 9:31 and you
+kind of resolved the issue by 9:45. Uh I
+think it takes us like that time to
+figure out what went wrong really. So
+that's impressive. Uh but there are two main aspects that I think about here  
+is that first is the event based
+alerting right. Um so we do that
+sometimes but sometimes what happens is
+when one thing blows up 100 other things
+are going to blow up as well
+&gt;&gt; and then you have thousands of alerts
+like it just multiplies right.
+&gt;&gt; Um so how do you deal with that? And the
+second question is you mentioned the
+order engine halts. Um
+making that decision is it as easy as
+just like oh yeah halt it but what if
+the next set of orders are way more
+important than the orders that have
+already been executed and then you when
+you resume resume the orders that came
+in between like suppose if traders are
+still like oh you want to trade do you
+just put them in the market or market
+has changed by now? So so how do you
+deal with like these two things? Um,
+I'll answer the second question or the
+second part first because my memory is
+bad and it's the part that I remember.
+Um, so I guess as a sort of concrete
+technical matter, I think once the order
+engine is halted, it would reject the
+trading systems order and so the trading
+system would have internal logic knowing
+that it would need to resend the order
+if it wanted that to get filled. That's
+sort of the concrete answer there. Um,
+how am I so bad? Sorry, can you just
+repeat all the questions very quickly?
+So the first one was like when your
+alerts multiply
+one thing breaks and like you know it's
+just a dominant effect sometimes.
+&gt;&gt; Yeah. I think we don't do great at that
+is like my honest answer. I feel like we
+have absolutely that same problem. If
+anyone's solved it, talk to me
+afterwards. Maybe uh maybe we'll copy
+some stuff from you. Um I'm trying to
+like come up with a you know better
+sounding answer, but
+&gt;&gt; yeah, I don't think we do great there. I
+think Yeah, I think that happens here
+too. Yeah, because if that happens, I
+think it becomes difficult to kind of
+solve an issue between like within 14
+minutes, right?
+&gt;&gt; Um, let's see. It doesn't feel like it
+often becomes a huge problem. And I'm
+trying to think of why that's the case.
+I guess it might be useful to think of a
+concrete example like in this example I
+gave, we there wasn't any no system
+noticed anything wrong with any system.
+Um, the only alert that raised in this
+case was feel too good. like as far as
+we were concerned all the systems were
+healthy and so like we wouldn't raise a
+cascade of alerts because as far as
+we're concerned like everything's going
+fine. Um, in cases where there are like
+we know that there's a system problem, I
+think, yeah, the maybe the biggest
+problem is like many different systems
+will raise alerts that they're each
+down. But it tends to not be super
+problematic because in fact, again, we
+do system symptoms based alerting. So,
+you know, this system that's supposed to
+serve this users for this purpose is now
+down. That's a real valuable alert that
+lets us know to contact those users and
+let them know that they need to change
+their behavior somehow because the
+system isn't going to behave as effect
+as expected and so on for all the
+downstream systems. Um, so I guess we
+don't tend to have that problem because
+of the symptoms based alerting that I'm
+talking about. And then I'm so bad with
+memory. Sorry, what was your second?
+&gt;&gt; No, I I think that's all the answer.
+&gt;&gt; Okay,
+&gt;&gt; cool. Thank you all. And apparently uh
+that's the last time for questions, but
+I'm happy to stick around and talk to
+anyone afterwards. Thanks.

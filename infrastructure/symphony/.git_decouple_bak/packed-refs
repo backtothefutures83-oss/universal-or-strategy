@@ -1,0 +1,9 @@
+# pack-refs with: peeled fully-peeled sorted 
+255648eb9e01f23af29fb4b1fb16f70270cbb6ed refs/remotes/origin/acod/fss-887-investigate-any-brix-run-fails-in-any-of-the-argon-clusters
+51532ebcbd090f063fafd6bd64e6665dd4470ef7 refs/remotes/origin/bede/netsec-1129-supervisor-snapshot-reconciliation
+ea86b01bc1a4ee5854f8efcbed139a2df5fbd562 refs/remotes/origin/codex/block-input-required-sessions
+46b7b9120beb648b78629fa75bab02a516e1c189 refs/remotes/origin/codex/persist-token-usage-ledger
+7521631193f8478625a73db324a5ba213ae79625 refs/remotes/origin/cristian/symphony-dashboard-agent-details
+83d74e19dc71ee37c90b3c353451eb883d832994 refs/remotes/origin/dev/dtm/workspacewrite-implicit-issue-root
+bbef62364db25970cf0e732fc61011ab753d2604 refs/remotes/origin/main
+51532ebcbd090f063fafd6bd64e6665dd4470ef7 refs/remotes/origin/push-nzyowrnsvtsy

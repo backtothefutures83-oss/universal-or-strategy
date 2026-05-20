@@ -1,0 +1,1859 @@
+[Music]
+welcome to signals and threads in-depth
+conversations about every layer of the
+tech stock from Jan street I'm Ron
+Minsky it's my pleasure to introduce
+Aaron Murphy who's a ux designer here at
+Jane Street Aaron does a lot of
+interesting work here and also has a
+really interesting and varied background
+she's worked at NASA's jet propulsion
+laboratory which is not a place I knew
+hired ux designers worked as a design
+consultant on her own founded her own
+independent design studio is also a
+talented illustrator who has her own
+quarterly journal and has done a lot of
+exciting design work here so thanks for
+joining me thank you so much for having
+me so I just love the fact that you
+worked to the JPL it ties deeply into
+some of the things that I think are
+interesting about the kind of ux
+projects we have here because I imagine
+the GPL is a place that's designing for
+Experts of various kinds and a lot of
+the kind of design work not quite all of
+it but a lot of it here is also focused
+on various kinds of experts anyway I'm
+just super curious how did you get to
+the JPL I had the same thought I think
+when I was in school that in my head
+those who went to NASA jet propulsion
+laboratory were engineers they were
+scientists they were roboticists
+designer was just something that did not
+seem like it kind of fit into that
+sphere and I certainly when I joined JPL
+I feel in a lot of ways that I kind of
+lucked out there was an individual who
+was working there that really wanted to
+bring human- centered design thinking to
+the way that we design spacecraft and
+the way that we think about operating
+spacecraft and it was early enough stage
+where there was not as many design
+schools at the time that were focused on
+interaction design and user experience
+which was the thing that I was studying
+in school and so it happened that they
+reached out to the school and at the
+time I was actually working with a
+professor at the University of
+Washington that was really interested in
+thinking about how design principles and
+thinking how do you test and iterate on
+user interfaces with a person how could
+that fit into more techn environments
+not just consumer products so there was
+already some exposure that I was getting
+just working with that professor and
+working on a project for cockp pick
+designs with Boeing where I was actually
+starting to see a similarity of creating
+storyboards thinking about what a person
+is thinking about when they are
+navigating a digital system that for me
+was like oh I see the wein the weigh-in
+was actually like knowing the right
+individuals who are looking for that
+type of talent when you talk about this
+process of building and designing things
+with humans involved in that process is
+that kind of what you mean when you talk
+about human Center design yes I think
+there is this instead of just going off
+of the idea of what kind of thing we
+want to build out or thinking
+exclusively about the system itself but
+actually talking with an individual and
+interviewing them and having one-on-one
+chance to discuss what they're trying to
+achieve with the tool that's what I
+typically find myself doing so when you
+got to JPL what were the actual kind of
+projects you were working on how did JPL
+come around to thinking they need needed
+someone to focus on design you kind of
+mentioned there was someone there who
+championed the idea but in what kind of
+context what kind of projects were being
+worked on I think one of the first
+projects that I was working on actually
+was to help scientists actually access
+orbital data from Earth orbiting
+missions there was an interest in
+creating some web portal and doing it in
+a way where it's not like the standard I
+guess catalog that a lot of scientists
+were used to where you didn't have as
+much insight into maybe like the
+metadata it a real laborious process to
+find the right kind of data and you'd
+have to go to all sorts of different
+sites or know the right kind of people
+who had that data available on some kind
+of USB or could send it to you directly
+on an email and so at the time the very
+first project I had a chance to work on
+was trying to consolidate into one data
+portal all of the earth based
+information that JPL was collecting and
+make it more accessible for a wider
+audience of researchers you said
+earth-based dat is that like geospatial
+information about the Earth itself about
+the moon about like what's the data sets
+mostly Earth and specifically like CO2
+concentration and just understanding the
+composition of our atmosphere and so
+there was different data products that
+were available to people and we wanted
+to create kind of a workflow and
+experience for people to know what level
+of data there's some processing that
+might go into the actual data itself and
+we wanted to create a UI that displayed
+that level a lot more clearly we wanted
+to organize it in a way that you knew
+exactly which satellite they were
+pulling data from or if there was an
+actual like data center on Earth that
+was collecting information that they
+could then maybe compare against so you
+wanted there surface both the data and
+the Providence essentially of where the
+data came from yeah exactly what were
+the challenges in figuring out how to
+put this all together as you sit down
+with Scientists at JPL or trying to do
+something what were the things you
+learned that surprised you and informed
+the kind of work you were doing I think
+it was really hard to be a new designer
+and then also design for experts within
+a domain I had absolutely no familiarity
+with you hadn't previously studied
+astrophysics before going to JPL I
+really hadn't I think the most that I
+got from my experience in school that
+kind of prepared me for this was
+probably working with a lot of the
+students within the engineering program
+and just kind of getting a sense of how
+they think about problems that are
+slightly different from designers and
+the big takeaway from that is just how
+to ask questions and just how to kind of
+unpack an environment that I'm not
+familiar with and I think that's one of
+the sharpest tools that JPL really
+equipped me with as a designer was just
+to be comfortable in spaces where the
+domain is unclear or not as exactly
+relatable for someone like myself who's
+not an expert and then have the tools to
+just be interested and ask questions
+without any fear of looking silly or
+maybe asking something that seems too
+basic in retrospect I think I can
+actually still go to this website for
+all this orbital data but to go back and
+look at the design now it's like a
+pretty I think straightforward problem
+space that I would do totally
+differently but in addition to trying to
+think about like how do we make sense of
+all the data products that a scientists
+would want to have access to and might
+want to look through and use for their
+research how do you build a tool and
+that was just something at that time in
+my career I just did not have a lot of
+insight into and so it was a lot of just
+giving it a try asking a lot of
+questions I did a lot of interviews with
+different scientists from what I
+remember there was like this convention
+where all these scientists who were
+studying the Earth's atmosphere actually
+came to kind of like a conference local
+to JPL at the Caltech school and I was
+able to just sit in the crowd not really
+understand what was going on in the
+presentation slide deck but was able to
+kind of take notes and follow up with
+people in that group and just introduce
+myself as a ux designer trying to create
+this sort of data portal and there was a
+lot of very interested and happy
+participants who are willing to give me
+insight into their work and I think it's
+a that even Beyond some of the
+earth-based work that I was doing at JPL
+once I started getting into more of the
+Mars rover missions that same level of
+how do you understand a domain and
+understand what a person's trying to
+achieve within that domain the skills I
+was picking up from just talking with
+these researchers really translated well
+and that's I think something that it's
+really a key element to the way I do a
+lot of my design work at Jam Street as
+well just really understanding what are
+people trying to do what is their ual
+domain and not being too afraid to dig
+into some of the technical details of
+that so you talked a lot about ways in
+which you learned in the process which
+it seems like you're really focused on
+your self- learning things which seems
+really important at the same time I'm
+sure that when you go into a room and
+sit with someone and walk through how
+they access things and you have maybe
+Engineers who are working on the systems
+that are paying attention I imagine they
+get surprised and learn things too do
+you have like examples of the kinds of
+things that the colleagues you were
+working with learned things from these
+interview processes I remember the
+feeling of having people get excited
+about storyboards we've talked about
+this I think in the past a little bit
+the idea of just being able to Showcase
+what you as the designer sees as the
+experience of say a Rover planner or a
+scientist in their environment looking
+at a very specific interface reaching a
+Breaking Point or something that the
+tool isn't serving them in their
+Challenge and then coming up with some
+kind of solution in an actual like new
+UI I remember the storyboards just
+resonating I guess with that audience
+because they just hadn't thought about
+their process from that kind of
+perspective you get these things called
+bed sheets which are huge workflow
+diagrams that really just articulate how
+will this system be built out and
+they're really just a lot of boxes and
+arrows and it's very rich information
+that the designer should also be aware
+of but there's this other layer on top
+of it of just like well how does a
+person navigate between these
+distributed systems do they have enough
+information on the page to feel
+confident that they're navigating
+through that system efficiently in the
+case of the scientists that were kind of
+working on this how does input from that
+team what kind of science intent that
+they have how would that actually move
+through the system that's a little bit
+abstract and I can totally talk a little
+bit more in detail on that but that
+seemed to be the thing that kind of
+resonated with people we weren't just
+looking at boxes and arrows anymore we
+were thinking about what is a person's
+experience through those boxes and
+arrows so for someone who's never seen
+one before what is a storyboard so a
+storyboard typically looks like you have
+multi panels that just highlight these
+significant events in a person's
+workflow so the thing I was kind of
+referring to is this idea of maybe a
+scientist who is working on a team that
+is trying to get data from the
+spacecraft the storyboard could offer
+like here are scientists that are able
+to use a particular tool to articulate
+what science they'd like to do that day
+the next panel might show how that
+information kind of goes to the Rover
+planner to see if it's even feasible to
+do can you actually drive to this
+location can you actually extend the arm
+to do this type of spectroscopy and so
+the storyboard is just kind of outlining
+an actual panel very much like a comic
+strip essentially that helps people just
+kind of Envision what you are seeing as
+like the day in the life of that
+scientist and collaboration with the r
+planner in collaboration with the actual
+software tool what's the workflow for
+you actually creating these Comics I
+guess is this like you go and talk to
+them and get your sense of what the
+process is and then you kind of on your
+own go and draw it all out and show it
+to them and it's your way of
+communicating to them what you've
+captured about what their workflows are
+like essentially yeah I would say that
+there is this process of when I'm
+learning about a new domain for the
+first time being able to have a
+one-on-one conversation with a person
+and actually drawing in real time with
+them is definitely a part of the process
+as well and just being able to put into
+some tangible State what they're saying
+so I can reflect it back to them is my
+ultimate goal because what I want to do
+is actually just simulate what they're
+doing because a lot of of these domains
+that I've worked with in they're not
+entirely relatable experiences I'm not
+an engineer and I'm not a robber planner
+I'm not a scientist though that would be
+cool um I'm none of these individuals so
+in order for me to feel like I have a
+good intuition and judgment around what
+they're trying to do I need to recreate
+that experience storyboards for me help
+because they are these visual aids that
+look like a comic strip they tell a
+story that's sequential and it's a
+really great communication tool for when
+I do go back and follow up with that
+person to just understand if I'm folling
+along with what they're saying and if
+it's something I can continue to
+reference as I build out their system or
+as I design their system are these
+storyboards actually always sequential
+when I think about the user interface
+there's a certain Choose Your Own
+Adventure part of it there are lots of
+different paths you can take and
+different things that you can do do you
+sometimes include that in the
+storyboards by having them fork and
+merge to illustrate different path
+through the system yes and I think when
+I'm actually in the mode where I'm
+translating something that a person's
+doing with maybe a series of tools and
+trying to consolidate into one nice
+succinct workflow yeah I'm definitely
+starting to Branch out into you could go
+in so many different directions if you
+land on this one page but I'm super
+methodical and I tend to create very
+linear patterns for these things just so
+again I'm working often with these
+complex workflows or there's some
+elements to what an engineer is trying
+to do that I might not be as familiar
+with so I do try to lay it out very
+linearly at first but for that kind of
+complexity over time so in addition to
+being a designer you're also an
+illustrator and it sounds like this
+actual physical process of drawing is a
+big part of how you approach the
+communication around it how do you
+relate these two different parts of how
+you think are they just one whole or are
+these two different skills that you mix
+together sometimes but not always how
+does that all fit that's an interesting
+question I think that it's one whole cuz
+I just don't see them as different I
+didn't think that drawing was going to
+be this useful tool I suppose in my
+career I assume that when I originally
+went to school I really wanted to be an
+architect and that seemed like a
+complete onetoone of the skills that I
+was passionate about and having a
+practical application of them but I
+didn't see that in some of the work that
+especially like a place like JPL or Jane
+Street I didn't see drawing as a tool
+that would be helpful at least at that
+point in my career I see it as a way of
+just reflecting back to people and
+showing a tangible evidence that I
+understand something I just need to see
+things and that's probably why I find
+myself as a designer is I think that a
+lot of times designers are offering the
+skills to bring what could be a future
+experience for someone or a future
+reality into the present so that we can
+kind of interrogate it and think about
+like well is this actually going to be
+useful should we test it with some
+people are there other ways we can do
+this I just feel like sometimes I just
+need to be able to see what the future
+is and drawing is my method for bringing
+that into a present state where I can
+actually make sense of it so for me it's
+like sense making it's not even an
+artistic expression it's just there's a
+lot of things that I'm learning in these
+domains and the best way to catch on to
+what I'm observing what I'm hearing from
+conversations with Engineers what I'm
+seeing in just observing scientists that
+are looking at the recent download of
+data from a spacecraft drawing just
+makes that real to me in a lot of ways
+how Universal is this do other designers
+who are also in the kind of the human
+oriented design space is doing this in a
+very drawing focused way a common
+approach I would say that drawing
+unfortunately gets a bad rap I think
+that there's a lot of designers that
+I've spoken with personally that are
+very insecure about their drawing skills
+and like they don't want that to be the
+thing that makes or breaks their design
+process and I certainly don't think that
+it is that's my chosen method and has
+been helpful for me I tend to encourage
+everyone to draw though I think actually
+the more messy the drawing the more
+honest it is and just the more like I'm
+trying to be in this space where I don't
+know what the answer is but I need to
+create some signal for another person to
+help or another person add their opinion
+so I feel like it's a very human method
+I've seen it actually work quite well in
+these environments that aren't entirely
+human they're Engineers there's
+Aerospace there's all these kind of
+elements that don't really seem all that
+relatable but if you can create some
+drawings you can create an understanding
+of what you're doing and connect more
+with your colleagues and understand what
+they're trying to achieve and to be fair
+Engineers do a lot of drawing too
+there's lots of people standing in front
+of whiteboards trying to put up
+structures that represent things about
+designs and how systems fit together I
+guess it tends to be less human oriented
+you're drawing pictures of the human
+using the thing and we usually draw like
+the thing yes and also our drawing
+skills are less good there's kind of
+like layers right like I think that it's
+actually fun to draw with Engineers
+because they are often like here's the
+underlying system and I feel like I
+offer the layer on top of it of if this
+is how we've built out the back end and
+if this is how the data is supposed to
+behave then there's this top layer of
+what a person is going to see and that's
+the part that I know is part of my lane
+and what I'm trying to understand and
+it's kind of interesting to draw with
+people and I try to encourage my
+engineering colleagues to do that
+wherever we can so you've had a really
+interesting and varied career as a
+designer how'd you get here so honestly
+the way I got here I hadn't heard of
+James tree before it is not something
+that we're not really big in the design
+World we're not not yet not yet I hadn't
+actually heard that they were looking
+for a designer but I did have a friend
+who knew someone who was working here
+and she had told me Aaron there's a
+place that you should probably consider
+working for because there's a lot of
+nerds that are trying to build out these
+really complex systems it's perfect and
+she was right and so I found out that
+they were trying to hire a ux designer
+and I was really skeptical the entire
+time to be honest I just didn't
+understand what would a design inue at a
+quantitative trading firm or prop
+trading firm the design space felt very
+foreign to me and so I took on the
+interview one because I wanted to work
+with some people that were very smart
+and interested in making complex systems
+more manageable and useful certainly
+that was one of it but I was also just
+curious I just wanted to know more about
+what would a designer do in an
+environment that's thinking about the
+Dynamics of our economy and what kind of
+products would those teams be building
+and because I didn't have words to
+describe it even after researching it
+and just looking into what James Street
+is known for that made me even more
+interested that I was like not wrapping
+my head entirely around what the firm
+was trying to do and I knew I needed to
+talk to people who were working there to
+demystify all of that and so I certainly
+Ed my interview to basically understand
+that and in so doing I met the team that
+I was on and really enjoyed the Rapport
+and the ways that they were envisioning
+bringing design into their work and
+having a design CL culture so now that
+you've gone through that process can you
+articulate that a little more clearly
+why does Jane Street want to hire ux
+designers I think that we're discovering
+that some of the older methods of
+building tools internally might not
+scale well into the future and what I
+mean by that is we want to have better
+integrated tools and we want to have an
+experience for people where they don't
+have to guess too much on what they're
+doing when they land on a new internal
+tool and I think that that does start
+with how are multiple people using it
+not just one engineer who created the
+tool and like we maybe create some
+documentation people can train up on it
+maybe that worked at a certain point of
+maturity in The Firm but I don't think
+that at any point people were not aware
+of the user experience the more I work
+with engineers and see their process I
+was really pleasantly surprised when I
+started that there was already an
+interest in fing up with users and there
+were dedicated channels to collect
+feedback from people in the moment but
+there was this awareness that maybe they
+can do a better job and I think part of
+this is just a matter of scale as you
+have more people The Leverage you get
+from really improving and tuning the
+interface that you provide people just
+gets bigger and bigger when I started at
+Jam Street there were like 35 people or
+something like that now there's 2,600
+and so the amount of Leverage that you
+get by making things simpler to use
+simpler to discover is Big there's also
+just way more stuff to learn and so
+having more of the things that you come
+across and need to use as part of your
+job be really easy to pick up and use
+when the firm was smaller we just built
+much less stuff so you have a big
+complicated system with lots of
+interconnections between different teams
+and you want to keep the cross terms
+down the amount that you pay for all of
+these extra connections you want to get
+value from all the things people build
+without it being as much friction for
+people and you mentioned that people
+already cared about this kind of user
+experience question which I think is
+right but another aspect of it it's not
+just about having someone who's
+dedicated to it but there's a real
+expertise that comes in and just
+understanding the approach this whole
+idea of sitting down with end users and
+watching what they're doing it's in some
+sense just obvious that you should do it
+but it also feels kind of silly and
+wasteful in time and stuff and I think
+having talked to a bunch of people
+who've been through some of these
+processes with you people are surprised
+by how much they learn through this and
+stuff that they thought was going to be
+like super obvious and of course people
+will understand this you look in actual
+life what happens when people pick up
+the tool and realize oh man they are
+holding it wrong so yeah and I think
+that's one of the values that comes from
+having people who've just done this
+before that was probably the very first
+month of Jane Street for me not only
+learning about the domain itself and
+learning what do Traders actually do for
+the first project that I jumped into
+there's a tool that we're using to
+ensure that we have the right settings
+for meetings and you're able to have the
+appropriate audio setting and the
+appropriate video conferencing tool and
+we're using a separate open- Source tool
+that helps people have the preferred low
+latency audio experience that they want
+there was this effort to really sit down
+with people and actually watch them use
+this tool encouraging them to create
+their own meeting and have me just
+Shadow them as they go to a specific
+room try and initiate their meeting from
+there being able to kind of see like
+where in the UI did they get messed up
+or tripped on what are the certain
+things on the UI that they felt like
+they were having issues and
+understanding and seeing that in real
+time documenting it videotaping it and
+then sharing it with the engineering
+team was really insightful for them yeah
+and the whole thing of having a meeting
+seems like such a simple thing yeah we
+just want to go into a room and hit a
+button and have a meeting and like have
+a meeting with some people who are here
+in the New York office and some people
+who are in London and maybe some people
+who are remote dialing in from their
+home office and having that whole thing
+work it's not nearly as simple as it
+should be and we did a bunch of work on
+our side we have different requirements
+than like the average user of Zoom both
+in like the size of the meetings and the
+latency requirements on the audio and a
+bunch of other things that mean that a
+lot of the external Solutions just
+weren't a really good match here and
+from my perspective I feel like over you
+know years as we built this out and
+worked on it I got to really experience
+how this thing that should be simple
+kind of wasn't it was hard to get all
+the pieces to work and there's a lot of
+careful thought and effort that happened
+over the course of years of Machining
+that process down and making it smoother
+and simpler to cute things like
+attaching things to the wall that you
+could scan with your phone so that your
+phone could know what room you're in and
+actually dial in the right meeting in
+the right place now it's just delightful
+I feel like as a regular basis like I
+walk and I think oh this stuff is so
+nice like I walk and I hardly have to
+think I hit a single button and it
+basically does the thing that I want and
+the thing that can be lost between that
+relatively simple experience is how much
+work is required to make the thing
+actually simple
+absolutely I think that was the tricky
+thing for me when I started which is
+where do we need to simplify it when I
+first saw the mobile UI I had immediate
+assumptions on like what were the things
+that needed to be improved I think one
+of the things specifically was just
+there were so many different ways that
+you could start your meeting it wasn't
+just one simple button which we've kind
+of evolved into now or very easy way to
+find other options but at the time
+everything on the UI was just the same
+hierarchy and the same color and
+organization on the page and for a
+person who had never done this before
+and was maybe used to some of these
+external tools it was hard to know like
+where they needed to start and it was
+hard to engage them in a way that they
+felt pretty confident that they were
+going to make it to a very important
+meeting or be able to have the ability
+to hear their colleagues and see them at
+the same time and so these things that
+do seem simple and have been resolved in
+the past are made like we are
+integrating a little bit of complexity
+with this kind of low latency tooling
+that fits for our very specific use case
+of allowing traders to feel like they're
+actually on the same tra floor together
+and to do that it did require actually
+meeting with people and not just coming
+up with designs that were just adopting
+the same patterns that we had seen in
+other tools or experienced with other
+tools so I expect part of the process of
+doing all of this was teaching people
+within the team that you were working on
+how to approach these problems with a
+new set of intellectual tools and I'm
+curious how did that go right there's a
+lot of teaching people how to do new
+things convincing them it's worthwhile
+to spend time on this and you're coming
+into a domain where they already know
+how to build software they feel like
+they know how to build these tools what
+was the process like of getting the
+engineers around you to take part in a
+full way in this kind of design process
+I feel like I was lucky because I feel
+like the engineers just recognize that
+there's like a whole other dimension to
+their system that they maybe didn't have
+as much expertise or experience building
+out which is the ux that's something
+that kind of comes at the end from what
+I gather for a lot of Engineers where
+it's like you think deeply about how the
+system should work how should it
+function and then oh yeah we should
+probably make a UI so that people can
+use it that's like kind of a gross
+oversimplification but I think that it
+seemed as though and from what I've
+experienced even elsewhere like knowing
+how to integrate that collaboration
+between building a functional product
+but that also people want to use and
+find useful is always something that we
+have to adapt and figure out as a team I
+feel lucky because I think people were
+very receptive to it and they were very
+interested to know like what do you need
+to do to make something more use user
+friendly yes it was very much oh
+whenever we were presenting new features
+or we were identifying like the tool for
+the conferencing there were a lot of
+things on their road map that people
+were interested in building out new
+functionality that they wanted to see
+and I felt like through asking questions
+around like well do people need this
+have you received a lot of insight from
+like our help channels of people
+requesting this feature what does the
+tool do now and how do people navigate
+through that today we should maybe have
+some kind of insight into like what are
+people doing before we actually assign
+any kind of priority on like what we
+want to build out next I felt like by
+asking those questions that reminded the
+team that there's going to be people
+using the tool who are not in this room
+and actively hearing some of our
+reasoning for adding this feature those
+people exist and we should try and think
+about what they would want is the first
+step just like generating awareness of
+it yeah in some sense that all sounds
+like a much better experience than I
+would have expected I just feel like
+it's really I one thing I could say I
+think this is actually more recent I've
+actually noticed that I've had to adapt
+some of my own research methods to the
+ways that we are building out these
+tools so I'm used to setting up these
+meetings with people where we can sit
+down and look at the tool together and
+just go through a set of tasks and see
+in real time like how are they able to
+use the latest build of our tool
+together and I will take notes
+diligently on like what it is that is
+breaking in the UI what is not very very
+understandable I'm used to this very
+methodical process where you are sitting
+with a person in that moment and what
+I've kind of noticed in some of the
+projects that I've done recently is that
+those methods have worked and there's an
+interest in the engineering team to
+continue those discussions but they've
+actually wanted to have more discussions
+with users I've had to like break out of
+some of my more methodical approaches to
+research and actually adapt some of the
+cultural elements of Jan Street into the
+research and what I mean by that is like
+going up to people in the moment and
+asking them like oh we've noticed that
+you logged into this product and I'm
+just kind of curious like what your
+experience has been like and asking them
+in real time as they're working through
+the latest build to talk about their
+methods versus the more organized
+research efforts that I would do it
+feels kind of now like we're actually
+trying to find even more lightweight
+ways to gather information as the
+person's using the tool and how does
+that tie into what you see as the
+culture of the firm like why culturally
+that more ad hoc lightweight stuff seem
+more preferable it all depends I guess
+also on the state of that product I
+would say that when we're first building
+out something in it's Green Field it's
+good to just meet with people oneon-one
+but what I was noting with this cultural
+element is that there is this
+environment at Jane Street that I've
+noticed as I'm working through designing
+internal tools where people are really
+receptive to communication and having
+like these casual moments where we catch
+one another in the hall or we are able
+to stop by one another's desk I'm used
+to environments where it's a little bit
+more formal and in some ways where you
+need to set up actual meetings or
+establish these very distinct points of
+communication but I think that there's
+actually an opportunity to learn even
+more about what people are doing when
+you're able to see them in context and
+actually meet with them and establish a
+kind of relationship of who that person
+is what they're trying to do with the
+tool and like where they might be
+running into some kind of issue and I
+felt like that was more of a cultural
+thing and it kind of makes it almost
+even more approach for designers to
+enter into this space there's this
+environment that's actually quite
+welcoming to talking about the domain
+and showing what they're trying to do
+with their software which I think
+ensures that a designer who's coming
+completely from the outside is able to
+practice that domain and learn the
+language and feel empowered to connect
+with their end users so I feel like
+that's a jam Street Experience that I've
+had and I've been wanting to adapt my
+approach to research around it's
+interesting I think of that as a
+cultural thing this very kind of free in
+communication style but it's also like a
+cultural thing that's reinforced by
+architecture the way we lay out the
+people is like we have these big trading
+floors with lots of people all pretty
+physically close to each other and I
+think the reason we've wanted that from
+the beginning is all about communication
+about making it really cheap to talk to
+someone who's next to you and I think
+that's the thing that I've noticed over
+many years is that it's really
+surprising how big of an effect of small
+differences and ease of communication is
+to how people behave we periodically
+reorganize where people sit and move
+groups around and some of that's cuz we
+have to the firm is growing you need to
+move things and sometimes it's just good
+to mix things up because you move two
+groups like closer to each other and two
+other groups farther away and it just
+changes the communication pattern in a
+really surprising way oh absolutely yeah
+and there's actually this new feature
+that we had added to our help slack
+channel that there's a channel that's
+just alerting us when a person logs into
+the tool and we get their username and
+we can easily find where they are in the
+office and we can go up and talk to them
+one of the engineers on the team added a
+very rough estimation of how close they
+are to you so it'll tell you oh this
+person's right around the corner like
+this person is 54 M away from you or
+this person is like two floors above you
+and so I don't know even just like
+knowing where they're located and having
+an awareness of oh I just like walk by
+there is a lot of connection you can
+build and I feel like the design itself
+becomes just Stronger by having that
+constant iteration that is informed by
+these discussions with real users so
+tools for meetings are a good example of
+a tool that's used very broadly no one
+is an expert in having meetings
+sometimes I feel like I'm an expert in
+having meetings but that's my own
+problem but there are lot of tools that
+we're building that are tools that are
+really focused for experts and in many
+ways I think a lot of what we need from
+the ux side of things is like you were
+doing at Boeing building cockpits right
+Building Systems designed for people who
+are expert in the field that are often
+focused on presenting information in a
+really dense and efficient way and
+pretty different from what you might
+expect from a consumer software kind of
+environment can you say a little bit
+more about some of the projects that
+you've worked on that are a little bit
+more in that space there's a few
+projects that I'm working on the one
+that actually I just mentioned that has
+the ability to know like who's logged in
+is a tool called blueprint which is a
+tool that's allowing people to manage
+and provision their applications in a
+more standard Consolidated system so
+that's one of the things that I'm
+designing for another is a tool called
+APD which is helping people basically
+Run apps and jobs like automated
+procedures that maintain the
+functionality of their systems and then
+we have a lot of the observability work
+so we're thinking about these
+distributed systems that we're building
+out and we want to have a solution
+internally that allows us to have better
+visibility into the performance across
+all of the different systems that your
+app might be interfacing with those are
+like some of the main tools that are
+kind of outside of the realm of
+relatable workflows I feel like there
+are experience that I've had remotely
+that have been cumbersome with some of
+our own video conferencing tools so I
+can pull from that sort of working
+schema of mine but when it comes to
+things like maybe automating a certain
+job or to run at a very specific time of
+the day these experiences are outside of
+my realm of what I tend to do and what I
+do as a designer and that does require
+interfacing a lot more with the actual
+Engineers who are using the tools to
+understand what they're trying to
+achieve and how the current systems are
+not serving their needs I I think
+actually this has been a lot of how I
+think about the development of how we've
+built tools for people over time is
+early on we were all able to rely on the
+fact that we're essentially building
+tools for ourselves right you'd build a
+tool and you would use it and other
+people would use it but you were always
+very close to the use case and then as
+the organization grows and there's a
+wider diversity of different kinds of
+things you need to do and there's just
+more expertise in different Corners you
+end up designing things for people whose
+jobs aren't that much like yours that's
+a whole different discipline of how do
+you figure out what some other person
+want and you can't anymore rely on the
+stuff that's just in your head it just
+changes everything dramatically yeah it
+definitely takes you out of your comfort
+zone I suppose so are there ways in
+which like designs and like the
+principles behind the designs are
+different when you think about these
+kind of focused expert tools versus when
+you think about building tools for more
+occasional casual use I'm thinking a
+little bit about like I look out at
+consumer tools and there's a certain
+sameness I feel like to lots of
+different broadly focused of like a
+certain Airy prettiness and dist
+between the different UI components and
+stuff that shows up there and it feels
+like there's a set of things that people
+are optimizing for about stickiness and
+making it really easy for people to get
+into the new thing that all feels very
+different from what you want to optimize
+for when you're building a tool for
+someone every day they're coming in and
+doing their job deeply integrated with
+this tool how does that like difference
+in goals affect the way the designs work
+out the airiness of our consumer
+products is definitely something that
+I've certainly designed systems around
+the past it is all about being very
+thoughtful about how you introduce
+information to the end user over the
+course of their full experience with a
+tool it's so different at a place where
+I'm working with people that are used to
+information-rich tools or things that
+are just you want to have an awareness
+of all the information you have access
+to all at one time and I think the
+principles I'm still calibrating in a
+lot of ways it has been a culture shock
+in a lot of ways to hear people say like
+oh I actually want to see everything on
+my screen this font is far too big or I
+don't like that there's so much white
+space in this area this actually makes
+me nervous we could fill that with more
+information like that's that is a very
+common piece of feedback that I get and
+a lot of individuals are just when I
+come to them with a figma prototype of
+potential direction that we might take I
+have a lot of memories of some of my
+initial conversations with people just
+wanting to make things more compact
+wanting to know like is there any more
+information that I could see for this
+state of this job or this app like I
+want to know what I have access to and
+I'd also like it to be responsive
+because I'm going to make it super small
+on my screen and push it off to like the
+left- hand side and you know one of four
+monitors that I'm using so their
+environment is like very different from
+what I think I would design for if I was
+creating an experience for an average
+consumer yeah it's maybe worth painting
+a picture of what a typical workstation
+looks like here there's almost a bare
+you know human rights minimum you have
+to have at least two monitors someone on
+a trading this might have four or six
+and people who are doing jobs that
+involve intense live monitoring of
+things typically have these monitors
+painted over with many little boxes each
+is a different view into a different
+system that they're watching and they're
+all like blinking lights and noises
+going on lots of noises infinite noises
+Traders move to our floor and now I get
+to hear the cacophony of things
+happening I'm always curious what they
+mean but yeah and when I think of like
+what are the prototypical user
+interfaces that people really dive into
+and use a lot there things like a
+spreadsheet which is you know dense
+grids full of constantly changing
+numbers they're text editors people vary
+a little bit on exactly how intensely
+they feel this way but suddenly there
+are lots of people who are like get rid
+of all the Chrome I just want like as
+many lines of code as I can get on my
+screen at the same time and then the
+other one is the terminal where again
+the terminal is simple and functional
+and you know lots of a very dense
+presentation of data and I love all of
+those things and I think they're all
+very useful but for a long time Jam
+Street operated this whole web thing had
+never
+happened it just doesn't exist that's
+right like we didn't know how to use it
+and we mostly didn't try and I think
+there's a lot of Virtues to the kind of
+tools that I was just talking about but
+there are also profound limitations you
+know at some point in our Evolution we
+had I don't know five million lines of
+code in our code base but not the
+ability to draw a straight line right
+the
+ability right very limited ability to do
+visualizations certainly in a kind of
+programmatic way and another way in
+which I think these kind of user
+interfaces tend to be impoverished is
+they're not very good at providing you
+help just the basic affordance of a tool
+tip is Magic right it's just like an
+incredibly simple and useful way to
+provide people information at the place
+exactly where they need it I love emac
+but it's not good at that kind of thing
+and so in some sense I think those are
+why we cared so much about putting more
+and more stuff into web uis as a way of
+kind of delivering user interfaces you
+also give something up there's something
+valuable about the like spreadsheet and
+text editor and terminal world I'm kind
+of curious how you think about the
+trade-offs between those different ways
+of building experiences for end users I
+know you are not primarily a command
+line Dennis no but I feel like I've had
+more experience learning to navigate
+through the command line the appd tool
+is a command line interface right now
+the goal is to actually take what exists
+and turn it into a web experience that
+provides people better integration with
+other web applications that can help you
+build some context around is your app
+functioning correctly it's probably not
+a good description of it but yeah for me
+I'm following you APD feels like kind of
+like the tool that's related to some of
+the trade-offs that we have to think
+about between a command line and a web
+experience so like one of the nice
+things about terminals as a way to
+surface uis is they give you very few
+choices which is like a weird thing to
+think is good right isn't it good to
+have more choices but one of the nice
+things especially inside of an
+organization that's really bad on
+average at visual
+design is that you can't spend a lot of
+time deciding which font you want to use
+and what is the size of the font and
+what's the width of the bevel you have
+no choice of fonts and there is no bevel
+you're kind of forced to only think
+about how am I going to put together
+this array of characters in order to get
+across the thing I want to get across
+and there's a degree to which
+constraining the design space gets
+better things out the other end I think
+if you give people who aren't really
+good at free R design web UI you're
+going to get a lot of eye bleeding bad
+designs that are like confusing and hard
+to use what I've seen from some
+translation away from a CLI to the web
+experience is you just take the like
+command line at the bottom and you bring
+it into a web experience and that is
+just the one place that you go for
+navigation things kind of just behave as
+if you were in a CLI but you're actually
+in like a browser and a web browser
+itself that's a way to go it's not
+really taking full advantage I guess of
+like some of the other things you can do
+I've definitely seen I know we have some
+uis that operate that way and there are
+parts of that where I look and see it's
+like a thing that looks like a command
+line I'm like oh now I feel
+comfortable being able to like just
+maintain your hands on the keyboard at
+all times is just like another user
+Behavior I suppose that I've also just
+become a lot more cognizant of as I'm
+designing things so in addition to if
+you are finding yourself kind of
+translating away from a command line
+interface where you can really just
+navigate the entire thing through key
+bindings and just using your keyboard
+being able to have a UI that's a web UI
+specifically that has very clear
+Direction on which keybinds you can use
+and an ease of use from the keyboard
+it's like something that is now very
+much a part of my Approach now or a set
+of principles I suppose that I kind of
+refer back to as I design more
+experiences within Jan Street and I
+sometimes look back at even some of the
+things that I made in my first 6 months
+at the firm and I'm aware now of how
+complicated they could potentially be
+for someone who just used to using their
+keyboard I'm already starting to build a
+slightly more in tune awareness around
+like what does it mean to have a good
+user experience for this population of
+users right and maybe it's forth the
+thinging the reason why we care so much
+about keyboard interfaces is because
+they're just dramatically faster you
+look at someone using a spreadsheet or
+an editor they reach to touch their
+Mouse and you want to slap their hand
+it's like don't do that cuz it's just so
+much lighter in the end you get the set
+of sequences of keystrokes wired into
+your neurons and it just makes things go
+go go in a much smoother way again for
+an expert right for someone who has been
+using the tool for a long time they can
+be in that state of flow where they can
+just almost effortlessly move really
+quickly through the user interface and
+that's really great I think that's one
+of the bigger challenges that I've had
+with working with a user community that
+predominantly works just on the keyboard
+is yeah how do you still translate that
+ease of use that they have right now
+with their command line interfaces to a
+web application there's some things that
+are going to be completely different
+with the web UWI but for the things that
+are standard if you're going to change
+the status of something if there's like
+a set of actions that people are used to
+doing and they have a critical impact on
+your system those need to behave in the
+way that they expect and that they've
+experienced already in their command
+line interface I think the stakes are
+high when we're trying to offer a web
+experience in lie of a known command
+line interface making sure that there is
+a accurate interpretation of what people
+actually need to take action via their
+keyboard and making sure that's
+reflected properly in the web UI is
+incredibly important and if we don't do
+it right that just leads people to not
+want to adopt that tool and so I feel
+like there's a lot of additional work
+that I feel I need to do in the very
+beginning stages to prioritize that
+translation of critical key binding to
+the web UI so that there isn't a drop
+off of users from feeling like they'll
+just continue to tolerate maybe a system
+that's not scaling well to their
+evolving workflows and what they need as
+a team I feel like you would learn a lot
+about how people think about keyboard
+interfaces if you studi the three
+editors we support there's like vim emac
+and vs code and each of them have
+dramatically different philosophies it's
+a very interesting space the other thing
+that I think is interesting about the
+editor space text editors in particular
+are tools for experts by experts you
+know these tools were like the designed
+in the' 70s many of them and like in
+many ways aren't that different from the
+original versions that were in the70s I
+mean they've grown in lots of ways but a
+lot of the core idioms around which
+they're built are preserved from those
+early designs it was sort of the
+opposite of human oriented design or
+something it was just some Engineers who
+wanted something and they built the
+things that they wanted and that is a
+different way of getting humans in the
+mix but it's this interesting question
+of when you think about designing tools
+for experts this whole thing of
+interviewing people and trying to
+understand their workflow seems very
+important but at the same time this
+expert insight into like what are the
+workflows and how do you design ways of
+interacting that really match those
+workflows tightly one of the questions
+I'm interested in is how do we
+effectively integrate those two kinds of
+insights together to build really
+excellent tools for experts that both
+capture what's unique about the domain
+and also leverage these broader insights
+about how to design things I think about
+that as being one of the bigger
+challenges of my probably design career
+at Jane Street for sure it's just I have
+an awareness that there are a lot of
+tools that we've been able to build out
+because enough people found existing
+systems to be problematic and so they
+just created a new one enough people
+have trained up on it and enough people
+learned how to use the tool and their
+content and I think that for me I know
+I'll never be an engineer I'll never be
+a Trader that is not the scope of work
+that I can provide but the big challenge
+for me is how can you actually still
+understand their domain enough to have
+that kind of intuition or build up a
+little bit more of that empathy around
+what these experts are experiencing I
+can't say that I figured out how to do
+that I will say that the experiences
+I've had at JPL this first year at Jan
+Street it does feel kind of like being
+immersed in that environment and having
+these conversations with people where
+I'm able to observe in real time what
+they are actually doing and see exactly
+how they're trying to integrate these
+different tools into their workflow
+that's the thing I'm like most
+interested in learning more about yeah
+it's hard stuff so you've obviously
+spent your time working on a bunch of
+concrete design projects but another
+thing that you're thinking about is how
+to build out design as a discipline here
+and growing that team you are a ux
+designer here you're also currently the
+only ux designer here and we're actively
+looking to add more people to that team
+and I'm curious like how are you
+thinking about this process of trying to
+find people what do you think we should
+be looking for in finding people who
+would be a good match for the kind of
+problems and who' be excited about
+working here yeah we're actively looking
+for another user experience designer
+that's excited about learning about this
+particular domain and has already the
+skill set and experience of building out
+and shipping products for people and
+that already started to like use some of
+their designs they have that experience
+of making decisions on a tool putting it
+out into the world and seeing what kind
+of response from their user Community
+they can use to like improve their
+system so I feel like the individuals
+that we're looking for were certainly
+interested in people with user
+experience design background but we're
+looking for a lot of designers who have
+demonstrated an ability to be in a
+domain that's not as familiar so
+certainly a number of people that we've
+had conversations with have had
+experience in like the fintech world
+there are people who have maybe worked
+in Aerospace there's a couple of
+individuals that I've spoken to that are
+familiar with robotics and
+are going through that same kind of
+process of how do you partner with
+experts to build complex tools so
+essentially are you looking for people
+who had the experience of building for
+people who are experts in things that
+they themselves are not experts in I
+would say so we see a future where
+there's actually a lot more diversity of
+designers from all sorts of different
+disciplines I think that's like the
+ideal situation is just to have a
+variety of perspectives to inform what
+people are trying to do and build out
+designs you know in collaboration with
+our engineers and Traders but for now we
+are kind of looking to see if there are
+individuals who are able to kind of jump
+into a really difficult and complex
+domain and clarify like what needs to
+get designed and clarify exactly what
+the challenges are for people that are
+working on these types of tools so
+that's what you're looking for in the
+people that you want to find what do you
+think should make Jane Street an
+exciting place for a designer to come
+work at what's a unique opportunity here
+my sense is that you get to just go a
+lot deeper into what an experience is
+like for an individual who's going to
+use your end product I think that this
+is the one place where I've had the most
+latitude to just go up to individuals
+talk with them about the tools that
+they're working on understand more on
+like how tools that I'm designing for
+can be improved and subsequently I've
+just learned a lot about systems we've
+built out and I found myself navigating
+through those systems on a command line
+interface which I never thought I would
+have to do in my career I always thought
+that I would just kind of live in this
+design research space and think at a
+high level on like what things need to
+happen and never would I Venture into
+the depths of how it was built out but
+in creating these relationships with my
+colleagues and learning what people
+actually need from their tools I see it
+as like this need for designers to go
+even deeper in their understanding of
+what they're actually building and there
+are times at other firms other agencies
+these places that I worked at in the
+past where you don't get that much
+collaboration with your engineering
+counterparts and you do have to just
+kind of live in this place in the
+product life cycle where you don't
+really know how this thing is going to
+get built out and you just inform what a
+person would need and I think that I've
+had much more exposure to like this more
+holistic process of how we actually make
+a functional tool and like what are some
+of the things that people will run into
+what challenges people will run into
+with that new system like I just feel
+like I have a lot more more access to
+that than I have in any other place and
+there's almost a culture here that's
+excited to help you navigate that space
+some of the things that I've done
+especially like command light interface
+are learning a little bit more on like
+how we architect these distributed
+systems all of those things are pretty
+foreign and just outside of my scope of
+knowledge but there is a lot of
+individuals here that are very happy to
+sit and talk through that and share
+their knowledge in a way that doesn't
+feel at all judgmental and it doesn't
+feel like has this negative impact on
+their productivity they see it as an
+opportunity to make another team member
+more informed of what they're building
+and in so doing have a deeper empathy
+into what they can produce what they can
+Implement versus what are some of the
+things that we can't do yet I don't have
+that kind of reach when I'm just a
+designer either working on my own thing
+or on some of these other past teams
+right it sounds like to me there's two
+things you're pointing out here one is
+you get a chance to go deep in the
+domain so if you're the kind of person
+who really likes geeking out and
+understanding the details of stuff you
+wouldn't normally get a chance to dig
+into that's an exciting thing and the
+other thing it's just highly
+collaborative with the engineering team
+you're not making a design on the
+outside and saying here are some
+specifications of things to do you're
+kind of working back and forth with the
+people who are building the system on
+that latter point I sort of Wonder like
+how do you even do it the other way it
+seems really hard to like design a thing
+where you're not working closely with
+the engineering team because I feel like
+if you're just kind of Designing what
+you want the thing to be the world kind
+of seems very wide open there's lots you
+know this is what the ideal user user
+flow would look like there are lots of
+constraints about what's easier and
+harder to do and I feel like a lot of
+the art of Designing great software is
+figuring out a thing which is
+simultaneously simple for the end user
+and also simple to implement Simplicity
+is like a profound value both in design
+and in software engineering finding that
+kind of middle point where you can be
+simple on both dimensions at once I feel
+like requires a lot of collaboration and
+understanding you said a lot of nice
+things about what it's been like working
+here and doing design here but what has
+been the hardest part of adapting to the
+kind of work we do here I think the
+hardest thing that I've had to deal with
+is maybe just accepting some of the
+limitations that I have as a person
+that's not deeply embedded in a domain
+to the same degree is the end users that
+I'm designing for I feel like I have
+experienced this in other like very
+technical complex domains that I've
+worked with but there is something about
+being in an environment at this point
+this particular point in Jam Street's
+just interesting because I feel like
+people are still used to like creating
+tools when they need them and having a
+shared knowledge across other Engineers
+that they work with to just train up and
+use that tool there's sort of an ease to
+making sense of these domains that I
+think for myself it can actually be
+quite challenging I don't write code I
+don't build out my prototypes I use all
+of that is done for me in figma and I
+think that the hardest part for me is
+being in a world that's like
+transitioning away from what they're
+used to which is being able to kind of
+spin up tools as they need and then
+going towards a world that actually
+there's holistic user experience for
+tools and there's an understanding that
+the end users have very different
+expectations for like a web experience
+and maybe sometimes even a preference to
+have a web experience over something
+like an existing CLI although my hope is
+that we don't like totally give up on
+that flexibility of just kind of
+spinning things up we've been using
+command line tools for a long time I
+don't expect that to actually stop one
+of the things I think is like one of the
+kind of big quite open challenges in
+building graphical user interfaces is
+how do you share some of the benefits
+that you get from more traditional more
+language oriented tools I think the
+thing that's great about command line
+tools is they're organized around words
+rather than pictures and there's a kind
+of composability to language a grammar
+that you have for how you can construct
+things on the Unix command line the
+nicest part of it is this like pipe
+operator the ability to like run a bunch
+of commands and pipe output from one to
+the other and the whole system has been
+engineered so that there's like a kind
+of standard way in which you represent
+data or a few standard ways in which you
+represent data and it's like just easy
+and light and natural to take a bunch of
+different tools that were built not
+necessarily explicitly to work with each
+other but with a kind of shared set of
+idioms and values and then you can just
+put them all together and make something
+new in a like pretty simple and pretty
+lightweight way and there are limits to
+how well those user experiences work you
+don't get tool tips but you get this
+profound composability
+and I'd love to see a world where we had
+graphical user interfaces that retained
+some of that composability and I like I
+don't quite know how to do it I think
+it's actually a hard problem something
+about having this kind of linguistic
+aspect not be totally lost is something
+that I'd like to see there I don't know
+I'm curious if you've thought about this
+kind of composability question as you
+start stepping into tools like blueprint
+and APD that are more about connecting
+lots of technical pieces together this
+kind of extensibility like how do you
+retain that I haven't really thought as
+extensively about this I guess the way
+that I kind of approached building out
+these tools for like APD and blueprint
+right now is like there are things that
+you can communicate through consistent
+navigation consistent layout of a page
+that can like help a person make sense
+of the information in front of them
+graphically without having to kind of
+read through again like I don't really
+use that much of these command light
+interfaces so I don't entirely always
+know like what it feels like to have
+something that you can actually like
+read out and understand what the program
+is going to do but there are certain
+patterns and elements of consistency
+that I'm trying to infuse in the designs
+that I'm building out for not just like
+APD and blueprint but even for like some
+of the newer tools that we're seeing
+emerge for like some of our
+observability platform applications and
+I think that that maybe is like the way
+of having some I don't know if you can
+really like spin up things and like have
+your own applications but if people are
+trying to build out user interfaces or
+extend maybe from something that's
+already been built out there could be
+like user patterns that we've already
+identified as being helpful and we've
+utilized across appd and blueprint that
+maybe someone else could use for their
+own tooling and reuse I guess there is
+an interest and like taking a lot of the
+design system work that we had done
+early on of like creating these
+consistent components consistent buttons
+the right kind of coloring and when you
+have like a certain button State there's
+consistent states that you would see all
+of that can actually be kind of packaged
+up into something that can be reused if
+you were interested in building out your
+own web application ideally in the
+future you would have all these
+components ready for you to pull in and
+actually build out your experience yeah
+for sure there's like some important
+kind of composability that comes roughly
+at the level of widgets where you build
+a widget that has not just the right
+visual presentation but the right
+Behavior baked into it in a way that you
+can then hook that into other pieces and
+like there's a lot of work we've done on
+the kind of web programming side to make
+that kind of component stuff really good
+the thing that I feel like is hard to do
+is this kind of cross tool compatibility
+of like you built a tool and you built a
+tool and you built a tool and now you
+want to like hook all those tools
+together I've seen some patterns that I
+think work reasonably well one of the
+things that like some of the trading
+desks have done is they might have one
+tool that decides where their focus is
+what's the particular security that they
+are paying attention to and then maybe a
+bunch of other tools in the back end you
+know that tool will publish that
+information the other tools can watch it
+and then like something changes and like
+all of your tools even though they were
+implemented independently will all kind
+of change focus at the same time to pay
+attention to the new thing you're doing
+so that's like one way of getting things
+to hook together another thing I feel
+like I've seen done but I don't know if
+I've ever seen it done well is there the
+some kind of tools where you try and
+have a dual life to the UI so there's
+these cool like dashboarding apps where
+you can like click some buttons and
+create some views and create some
+buttons and create some sources of data
+that pull different sources of data and
+kind of create a visualization that then
+people can like watch and interact with
+and it's a really easy way to get
+started up but then you might want to be
+like okay but now what if I want to turn
+that into a textual representation that
+I can like edit in a different way and
+commit to a source code repository and
+so like having like this dynamically
+constructed structure of the UI live a
+double life where you can flip it from a
+purely graphical specification into like
+oh yeah here are the five components you
+have combined here's a definition of
+those components and then you could go
+in like edit and transform it or even
+programmatically generate those so I
+feel like that's like a kind of thing
+that you see like little versions of
+that another actually good example is
+like you have all sorts of uis for doing
+filtering your issue tracker or whatever
+has some way of filtering and sometimes
+you can have something where there's
+like a SQL like query language let you
+do it and sometimes there are UI where
+you can like click buttons to say filter
+down to this filter down to that or
+whatever and one thing you can do is you
+can have like the set of buttons that
+you do could behind the scenes be like
+constructing the SQL query that
+represents the filter and then have this
+way of flipping back and forth between
+the two
+representations so you're both a ux
+designer and an artist and I'm curious
+how do you think about the role of
+Beauty in ux design oh
+God I mean that's probably the best
+response to it I'm always like trying to
+avoid the concept that like the designer
+has come to the engineering team and
+their role is to help make the UI pretty
+I think that's like a shorthand for a
+lot of people that it's not entirely
+like dismissive I think that for people
+pretty is actually a term that means
+like it's clear it makes sense it makes
+a person feel confident that they know
+what to do when they arrive at the
+Landing page of an interface I do
+sometimes feel like it's also like a
+shorthand for like you as a designer can
+come in at the end and not have any
+insight into the domain and still do
+your job I'm sure you can come in at the
+end and like put a nicer polish to
+everything and it will all work out this
+is something that the designer doesn't
+need to be embedded in any way into the
+thinking and the functionality and like
+what this tool should do for a person
+and so Beauty has just been this really
+tricky element to my design process I
+don't think that this is the case for a
+lot of other designers I've had
+conversations with people about the idea
+of like making things pretty that kind
+of quote or that term and it doesn't
+seem to bother people as much I think
+that for me it just kind of erases like
+a very important element to the design
+process where you can't get to something
+that's clear and beautiful without
+really understanding what it should be
+and having an awareness of like the
+complexities of it I don't think that
+you can just like be brought into
+building out a tool and just like polish
+it like you need to actually understand
+the mechanics of what it is what
+environment it exists within there's
+almost something dismissive about
+talking about being pretty because it's
+just like putting a Fresh coat of paint
+on a thing and I think that it can like
+really limit what you build out and the
+kind of collaboration you can really
+have with a person like a design who's
+coming on to your team to codify like
+what it is a person's trying to do into
+something that we can actually interact
+with on a screen there's a little bit
+but there's something about picking the
+right clear and simple way of presenting
+data and presenting your options and
+doing it in a way that like I don't know
+something about the visual appeal I feel
+like does matter at a functional level
+the way in which humans see and interact
+with things I think makes some kind of
+difference but it's complicated and very
+subjective right I think so subjective I
+think think that's probably the thing
+that makes it hard a lot of the time for
+me to actually think about beauty as
+like its own isolated thing when I am
+designing interfaces there are patterns
+and best practices for color treatments
+and font sizes that you'll see on like a
+screen but I I very rarely am like
+prioritizing it it's almost like I will
+just take those patterns that already
+exist and really put a lot more of my
+effort into making sure I've fully
+understood what people are trying to do
+and like how can you use all those
+pieces to kind of like orchestrate that
+desired experience is not the primary
+thing that you're thinking about it's
+not even like a compliment at times a
+lot of people are always like oh wow
+this like interface is so much prettier
+now or like oh I just really enjoy using
+this tool it's pretty if they don't
+mention like the usability part that's
+usually where I'm like oh you say it's
+pretty but tell me more about whether or
+not it's actually helping you the
+problem that I'm most interested in is
+whether or not it's actually useful and
+if it's actually something that people
+care about incorporating into their
+day-to-day work for me that would be the
+beautiful thing is like oh this once
+really tedious and problematic workflow
+that a person has like tolerated for
+years is now made much more approachable
+or it's so much easier to just kind of
+pick up and use that is I think the
+definition of Beauty for me and I but I
+often feel like beauty comes in this
+like kind of aesthetic sort of
+interpretation or like what we see is
+like the only only thing that designers
+are able to produce but I think to even
+get to that point where it's like clear
+and engaging and something that people
+want to use and actually is
+transformative to their workflow there's
+a lot of work that goes into that that
+you can't do without being able to dive
+into that domain pretty is very much for
+me like this kind of byproduct of really
+understanding what you're building well
+that seems like a great note to end on
+thank you so much for joining me thank
+you so much this is
+great you'll find a complete transcript
+of the episode along with links to some
+of the things that we discussed at
+signals and threads.com thanks for
+joining us and see you next time

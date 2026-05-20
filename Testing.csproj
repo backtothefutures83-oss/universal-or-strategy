@@ -40,6 +40,9 @@
     <Compile Include="src\V12_002.PureLogic.cs" />
     <Compile Include="src\V12_002.StickyState.cs" />
     <Compile Include="src\V12_002.PositionInfo.cs" />
+    
+    <!-- Services (Pure C# - no NinjaTrader dependencies) -->
+    <Compile Include="src\Services\*.cs" />
   </ItemGroup>
 
 </Project>

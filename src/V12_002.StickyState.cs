@@ -22,6 +22,36 @@ namespace NinjaTrader.NinjaScript.Strategies
         private long _stickyWritePending;        // Interlocked gate: 0=idle, 1=write scheduled
         private const int STICKY_DEBOUNCE_MS = 50;
 
+        /// <summary>
+        /// Snapshot of header configuration properties for thread-safe serialization.
+        /// Replaces anonymous object to eliminate CS0656 (dynamic keyword not supported).
+        /// </summary>
+        private struct HeaderConfigSnapshot
+        {
+            public bool IsRMAModeActive;
+            public bool IsTRENDModeActive;
+            public bool IsRetestModeActive;
+            public bool IsMOMOModeActive;
+            public bool IsFFMAModeArmed;
+            public int ActiveTargetCount;
+            public double Target1Value;
+            public TargetMode T1Type;
+            public double Target2Value;
+            public TargetMode T2Type;
+            public double Target3Value;
+            public TargetMode T3Type;
+            public double Target4Value;
+            public TargetMode T4Type;
+            public double Target5Value;
+            public TargetMode T5Type;
+            public double StopMultiplier;
+            public double RMAStopATRMultiplier;
+            public double MaxRiskAmount;
+            public string ChaseIfTouchPoints;
+            public bool IsTrendRmaMode;
+            public bool IsRetestRmaMode;
+        }
+
         #endregion
 
         #region Save -- Serialize + Atomic Write
@@ -51,7 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     : null;
                 
                 // H18-FIX: Snapshot header config properties (CRITICAL - eliminates torn reads)
-                var headerConfigSnapshot = new {
+                var headerConfigSnapshot = new HeaderConfigSnapshot
+                {
                     IsRMAModeActive = isRMAModeActive,
                     IsTRENDModeActive = isTRENDModeActive,
                     IsRetestModeActive = isRetestModeActive,
@@ -105,7 +136,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// H18-FIX: Now accepts snapshots to eliminate race conditions with background serialization.
         /// </summary>
         private string SerializeStickyState(
-            dynamic headerConfigSnapshot,
+            HeaderConfigSnapshot headerConfigSnapshot,
             Dictionary<string, ModeConfigProfile> modeProfilesSnapshot,
             Dictionary<string, bool> activeFleetSnapshot,
             KeyValuePair<string, PositionInfo>[] activePositionsSnapshot)
@@ -118,7 +149,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             return sb.ToString();
         }
 
-        private void SerializeSticky_WriteHeaderConfig(StringBuilder sb, dynamic headerConfigSnapshot)
+        private void SerializeSticky_WriteHeaderConfig(StringBuilder sb, HeaderConfigSnapshot headerConfigSnapshot)
         {
             // Header
             sb.AppendLine("# V12 StickyState v1");
@@ -175,7 +206,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             sb.AppendLine();
         }
 
-        private void SerializeSticky_WriteModeProfiles(StringBuilder sb, Dictionary<string, ModeConfigProfile> modeProfilesSnapshot, dynamic headerConfigSnapshot)
+        private void SerializeSticky_WriteModeProfiles(StringBuilder sb, Dictionary<string, ModeConfigProfile> modeProfilesSnapshot, HeaderConfigSnapshot headerConfigSnapshot)
         {
             // Build 1106: [CONFIG_*] -- per-mode profile snapshots
             // H18-FIX: Use snapshot instead of mutating live _modeProfiles dictionary

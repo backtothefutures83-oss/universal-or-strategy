@@ -1,0 +1,1356 @@
+cool so yeah good afternoon everyone my
+name is Karl I work for a company called
+October I work writing automated trading
+systems and I've done that for about 10
+years in total and so today's talk is
+just going to be basically a day in the
+life of a developer of high-frequency
+trading systems I'm also a member of SG
+40 so I try to give a little bit of
+feedback from the trading community and
+to the standards ie what's important
+from a low latency perspective from
+trading but I'm definitely not a C++
+expert these people in this room who
+will know ten times more about C++ than
+me it's not necessarily a problem though
+you just need to be really good at
+measurement you need to be really good
+at a plain scientific method you need to
+understand the tools if you can do that
+and you can measure and you can measure
+well you can write very very fast
+software without knowing the standard
+inside out so I'm going to give a very
+quick overview of what we do won't go
+into that in much detail because they
+can take an hour or two just by itself
+but I will talk about the technical
+challenges that we face those two topics
+are just an introductory then we're
+going to get into the real stuff which
+is the actual techniques that I use on a
+daily basis for writing fast C++ I
+mentioned some surprises some war
+stories and then finally I'm going to
+discuss how to measure C++ and that's
+probably the most important few slides
+of the talk it's it's really all about
+measurement if you want fast code
+cool another thing is that I would
+absolutely love to be able to discuss
+absolutely every optimization trick out
+there but I can't just not enough time I
+just had a run-through of my slides this
+morning threw away about half of them so
+yeah this is only a very very brief
+example into optimation to optimization
+techniques for low latency so low
+latency not high throughput not trying
+to process 60 100 frames a second but
+just trying to be very very fast when
+you need to be fast so what do we do
+well most market makers providing
+liquidity to the market that basically
+means we're providing prices to the
+market to say we're willing to buy this
+instrument for a certain amount we're
+willing to sell it for a certain amount
+for more than that by instruments I mean
+a tradable product a starka future an
+option it's just pure coincidence that
+these instruments on the table over
+there not those sorts of instruments
+let's have some challenges you need to
+be moving your prices quite regularly if
+you don't move your prices you'll miss
+out on the trade or even worse you'll
+get the trade but it wasn't what you're
+looking for because you didn't move your
+price fast enough and someone else has
+lifted you on that
+so what market makers do is they try to
+just make the difference between buying
+and selling this they want to buy a
+stock then sell it again sell it buy it
+that will hopefully balance itself out
+so market makers own and you know
+quantitative funds or hedge funds or
+anything like that that they're not
+looking to build a position with the
+intention that the markets going to go
+up or down they're really just trying to
+make a small amount of profit by buying
+and selling fairly frequently ultimately
+this always comes down to two things
+buying low selling high yeah there's
+some complex maths in there sometimes it
+gets ya a little bit complex but
+ultimately that's what all trading
+algorithms come down to
+and success means being just slightly
+faster than your competitors doesn't
+need to be by a second it can be a
+picosecond just as long as you're faster
+I think this is quite a nice picture
+actually because gives you an idea yeah
+like no one no one really remembers who
+comes second or third or fourth in a
+race right and it's kind of the same
+thing with electronic market making you
+really need to be the guy out in front
+but safety first a lot can go wrong in a
+very very short period of time so you
+need to be able to detect errors and get
+out not the other way around
+you don't want to think about things
+then get out of the market you want to
+get out then figure out what's gone
+wrong because a lot can go wrong in a
+few seconds that's best automated
+obviously it's a good quote okay so I'm
+going to talk about the hot path a lot
+too sometimes I'll say fast path but
+it's the same thing this is the code
+which sees a message from the exchange
+decodes it figures out that this is an
+interesting event this is a price change
+this is a trade this is something a
+market open event executes the auto
+trading strategy decides it wants to
+trade run some risk checks make sure
+that that's okay
+and then finally seems a order to the
+exchange to say I'd like to trade or I'd
+like to change my price or something
+like that that's the hot path the
+characteristics of the hot path are
+quite interesting probably one to five
+percent of the total codebase and it
+gets executed very very infrequently
+maybe point zero one percent of the time
+you'll actually have that hot path fully
+execute now that's at odds with the
+operating system the hardware the
+network basically everything in the room
+is at odds with trying to execute a hot
+path not very frequently but when it
+executes very very fast very little
+latency
+so even networks for example we're based
+on fairness which makes sense they want
+to catch up but until there's enough for
+a packet to be fully sent in the packets
+sent and you know make sure that no one
+sender is saturating the network and the
+same with operating systems are all
+about you know multitasking in cod4
+differ multitasking these are things
+that you don't actually want from a low
+latency perspective one final point
+jitter you don't want to be fast most of
+the time that sometimes you're slow if
+you're fast four times out of five
+that's great but if their fifth time
+you're so slow that you end up with a
+bad trait because you didn't move your
+price or you missed out well if you miss
+out you miss an opportunity but if you
+get hit on a bad order or a bad trade
+that can be quite expensive so it's very
+frustrating you can have code which runs
+faster on average a lower median but the
+standard deviation is to wait that's
+actually not a good thing you prefer a
+tighter deviation than an agile faster
+median so weird as C++ come into this
+well it's a language of choice within
+trading companies and that's no
+coincidence it's low cost you get
+basically zero cost abstractions you can
+get your hands on the hardware
+reasonably but it's still a relatively
+abstract language that's great that's
+what we want but there's some catches
+your compiler and compiler version
+building link Flags different libraries
+that you're using the machine
+architecture these are all going to
+impact your code and they all
+unfortunately have interactions with
+each other as well so you really need to
+not just know C++ well but figure out
+what the compiler is actually generating
+anyone no app for that very very useful
+no coincidence that this comes from a
+trading company you'll learn more about
+that on Friday I believe but tools like
+this is great you can change the
+compiler flags see what happens
+have a look at what the actual resulting
+assembly is change your versions compare
+claim to GCC it's
+8c when which version of the compiler
+actually made a change to your code if
+you notice a regression now I should
+point out as well I don't know how to
+write assembly code but I do know how to
+read a little bit of assembly code and
+that's great
+so from a performance point of view I
+know that a call or a jump is going to
+be expensive I know that more machine
+code is probably more expensive than
+less machine code I know that if I have
+fewer jumps more conditional moves and
+things like that we're on to a good
+thing here now just to talk a tiny bit
+about system tuning the C files press
+conference so I can't go into this in
+too much detail but it's worth just
+pointing this out so you can have
+exactly the same hardware exactly the
+same operating system the same binary
+they're saying everything but put them
+on as slightly and a slightly different
+configuration from a bios point of view
+or a linux churning kernel turning point
+of view you'll get different results so
+the blue server is machined it is not
+running high for 3d the honor server is
+a machine that is running hyper
+threading this is sorting different size
+vectors of random integers why is the
+hyper threading oh this is a single
+threaded test running on one CPU why
+would the hyper threading slow us down
+here but what do a what's common between
+the two threads on a core if you're
+hyper threading - exactly so you're
+sharing the same cache so your cash
+either goes down to 50% or more likely
+it goes down to zero because these
+something else running on the second
+thread hyper threading is great I'm not
+here to bag on hyper threading I use it
+at home on my desktop why not it turns
+four cores into eight but for a
+production server running low latency
+trading software yeah things like that
+will catch you out
+you don't need to know about this from a
+super-fast development point of view but
+you better hope that there's someone in
+your company who can take care of that
+for you otherwise you've already lost
+unfortunately so how fast is fast the
+Burj Khalifa in Dubai 2,700 feet tall
+very tall building tallest in the world
+at the moment
+speed of light coincidentally is a round
+about one foot per nanosecond so if we
+developed a auto trading system that ran
+into n Dwight away from seeing the
+packet in to performing all of the logic
+and sending a packet back out to the
+exchange in say two and a half
+microseconds well that's actually less
+time than it takes for light to travel
+from the top of the spire of this
+building to the ground that's not a lot
+of time so when you go oh well it's
+alright the machine might be swapping a
+little bit at the moment it will go out
+to main memory or it doesn't matter that
+someone else is using our case at the
+moment well it does or all bets are off
+at this point like you've lost the game
+at this point there's such little time
+to actually execute your code
+okay so that's the introduction stunt
+I've got about 10 to 15 coding examples
+I've just low latency techniques that
+have actually helped me and production
+make the code faster this isn't just
+micro benchmarking and saying yeah this
+appears faster this is actual code
+that's being tested in production and
+it's made a serious difference most of
+these will be I speak most of these will
+be somewhat obvious to some people in
+the room other people maybe not so don't
+be too worried if some things you
+already know hopefully there's a few
+surprises in there for you still so this
+gave me about a 100 200 nanoseconds
+speed-up a couple months ago when I did
+it which was removing the code on the
+left and replacing it with the code on
+the right why would this be faster so
+indeed the compiler can optimize the hot
+path better what else yes so two answers
+at once and they were both separate and
+they were both correct once hid cash
+prediction once a branch prediction I
+think or caching branching yeah so
+branch prediction there's fewer branches
+on the right-hand side for the hardware
+branch predictor to deal with and cache
+this is good is on the right is a bitter
+for your instruction cache or your
+dedication both I don't think he's hit
+both I claim it's both yeah you've got
+fewer instructions less pressure on the
+instruction cache and also who knows
+what these error handling functions are
+actually doing maybe they're trampling
+your data cache as well where it's now
+we've only got one integer that we're
+actually reading and writing to and
+machine architectures are incredibly
+good at testing if an integer is zero or
+nonzero
+so I mean it does this seem obvious or
+it after I did it it was like why am I
+not doing this all the time but yeah
+just things like this can really make a
+difference
+hi yeah yeah
+so we're is the arrow chicken code so
+the error checking code is behind the
+scenes its miles away but if there's any
+flag that has been set by anything
+before heading this hot path we'll set a
+flag to say do not go any further
+yeah then in this handle error they can
+figure out what the actual error is deal
+with it is that kind of answer you quit
+yeah okay another quite simple example
+but I say this quite a fee a bit which
+is template based configuration so but
+the lack of template based configuration
+sometimes you don't know everything at
+compile time so maybe you're going to
+read from configuration and based on
+that you're going to instantiate one
+type of class or another type of class
+but you don't know what what class
+you're actually going to instantiate
+most people will use virtual functions
+for this virtual functions are
+absolutely fine if you don't know what
+class you're going to instantiate if you
+don't know all of the possible classes
+if you know the complete set of things
+that may be instantiated then you don't
+really need virtual function so you can
+just use templates for this and again
+this is a very simple example but I
+think it's often overlooked and I see
+virtual calls going all the way through
+code and enter the hot path and it is
+slow and it is not required you see this
+all the time in the STL and it works
+really really well so here we've got two
+classes they both send orders order
+center 1 order Center tool a and B and
+we've got an order manager which uses
+one of those two types we don't know
+which one and it doesn't know which one
+it's templated at this point in time now
+there is a virtual function call and the
+other main loop about that's just to
+start the program so that virtual calls
+going to disappear before you know about
+it but the actual calls to this order
+Center and non-virtual concrete type
+how do you hook this up just use a
+factory function yeah look at your
+configuration and then instantiate the
+correct type pass it in and you're done
+no need for virtuals you know it's not
+this is not a you know I won't win any
+awards with the slide about so many
+times I notice that people myth myth
+these sorts of things
+you know everything at compile time you
+know the complete set of things that can
+happen use that information to make your
+code fast no virtuals faster code more
+compact code more chance for the
+optimizer to optimize less pressure on
+the instruction cache this pressure on
+the data cache it's a good thing in the
+next one lambda functions this will not
+give you a speed up this slide will not
+give you a speed up but it's a nice
+example of how C++ can be fast and
+powerful but still relatively expressive
+as well so on the Left we've got a
+function called send message takes in a
+lambda prepares a message invokes the
+lender since the message on the right is
+the actual usage so here we're calling
+it send message we need to pass at Al
+and earth so here's the lambda the
+lambda takes a message and then it just
+populaces now this could very well be as
+follows
+send message on the left the prepare
+message is an allocating memory or
+anything like that it's just getting the
+network cards buffer via DMA and
+returning that the lambda will
+definitely get in line out two moves
+which is this low-level which you can
+get sent could be as simple as flipping
+one single bit on the network card to
+tell the network card to send so there's
+very very low-level very powerful very
+fast in fact the entire function there
+on the left end message will probably
+get and land as well depending on what
+you're doing with it so it's very very
+nice very very fast but still relatively
+high level language so you can see why
+so fast bus is somewhat the language of
+choice here
+quick show of hands who knows that
+memory allocation is slow good so that
+should be no surprise for you use a pool
+of objects I don't care how it's done
+you can use an alligator you can do it
+by hand I don't mind but definitely try
+to reuse and recycle objects be careful
+with distracting objects as well this
+can get expensive underneath all of this
+will be a call to free freeze actually
+relatively expensive if you go and have
+a look through G lib see it's about four
+hundred lines of code yeah you're not
+going to hit every single line of code
+each time but even the act of deleting
+objects can be relatively expensive so
+do watch that okay exceptions our
+exceptions slow if you don't drop into
+them and throw yeah so absolutely if you
+have an exception that's thrown from my
+measurement it's one or two micros but
+as far as I can tell enough measure this
+a lot I've really tried to measure this
+in many many different ways exceptions
+are claimed to be a zero cost thing as
+long as they don't throw as far as I can
+tell that is absolutely true so don't be
+afraid of exceptions of course if they
+throw it's going to be expensive but if
+an exception is thrown you've got a
+problem anyway you're not going to be
+sending in order anymore so don't use
+exceptions for control flow yeah one
+it's gonna be slow and two
+your code is going to look really really
+bad this is a little bit similar to a
+previous slide you don't really need if
+statements particularly your hot path
+branching is bad branching is expensive
+and you can remove quite a fair bit of
+it so here we've got a branching
+approach of running a strategy where we
+calculate a price checks and risk limits
+and then send the order and if you look
+at the implementation of one of these
+methods you know here's our branching if
+the site is a buy then we want
+ask for a bit of a discount enough
+otherwise it must be a sell so asking
+for a little bit of a premium it's
+pretty simple in this you know that
+should run relatively fast but we know
+at compile time
+they can either only be a buy or a sell
+there's no third value and we know what
+we want to do in both cases we know that
+we want to either ask for a premium or
+ask for a discount so you can just
+template specialize this completely away
+to the point where you have just
+completely deterministic non-branching
+code don't go crazy with this don't
+remove every single if from your code it
+will look really bad and will probably
+end up signing your code down right in
+the hot path you can go a long way with
+absolutely removing branches completely
+from your code hi often so question was
+can't the optimizer optimize this out in
+theory I guess it probably can and
+practice it normally doesn't and
+actually there is a very very good point
+so much of this is just guaranteeing
+that the compiler is going to do what
+you would expect it to do you're kind of
+locking the compiler in to say hey I
+really want you to know that there's
+only two particular branches here or two
+particular conditions so a lot of it is
+just basically taking the risk out of it
+and being very very concrete with
+telling the compiler what you want to do
+multi-threading
+I don't like multi-threading I know that
+you need it sometimes I know that you
+don't want to be doing everything in the
+hot path I know that you need to
+sometimes maybe have a second thread on
+a different CPU or a different process
+on a second CPU or a second core doing
+some heavy lifting doing some
+calculations responding to messages and
+things like that okay I get that you
+need multi-threading that keep the data
+that you share between the hot path and
+everything else to the absolute minimum
+you can do that you're going to get away
+with faster code than otherwise
+so consider not even sharing data
+consider just throwing copies of data
+across from the producer to the consumer
+maybe a lot free single router single
+reader queue yeah you're still sharing a
+little bit there you're sharing the
+atomic read and write pointers for the
+queue but there's actually not much data
+this year I think I think that's a
+reasonable approach of course sometimes
+you don't even need to worry about
+multi-threading sometimes that was hairy
+protection over multi-threading
+sometimes receiving things out of order
+is actually okay it's not the end of the
+world sometimes the machine architecture
+is so strong that it will actually avoid
+the race conditions that you've read
+about anyway so it's worth experimenting
+with that sure about halfway through now
+I think of the tips and tricks section
+the next one in data lookups so if you
+read a software engineering textbook
+it'll probably suggest that if you have
+instrument that you want to trade on and
+a market and each instrument has one
+market and a market can have many
+instruments so you can see the ER
+diagram for me you'll do a lookup so you
+go okay so this code here would make
+sense so you create your message that
+you want to seem to the exchange and
+you'll go look up the market and you'll
+get the information out of the market
+and that will be part of your
+computation so that's fine okay that's
+not a problem
+but you can do things a lot faster than
+that if you're going to read the
+instrument if you're going to read the
+price the current price of the
+instrument how many bytes have you read
+there how BIG's our float for boats okay
+so how many bytes have we read 64 why
+have we read 64 so we've read
+occasionally we can't we can't do
+anything about that that's how the
+machine works so why not put the
+information that you need into that cash
+flow so if you know that you always need
+to read say for example the quantity
+multiplier from the market and there
+hardly ever changes will they not change
+at all that day put it into the
+instrument you're going to be breeding
+that cash line anyway and then you get
+that for free no further look apps
+you're done it's denormalized might
+violate a few software engineering
+principles but that's okay you're going
+to get faster code containers containers
+are worth a handful of slides I've got
+about four slides on and ordered map so
+you need something to do block apps on
+sometimes you are going to have to look
+at data so that's fine so this is your
+likely implementation of an unordered
+map you have multiple buckets you have a
+key the key gets hashed the hash will
+corresponds to one and only one bucket
+and your key and value appear will go
+into the bucket and if you get multiple
+peers of keys and values that map to the
+same bucket then you'll get a chaining
+effect so this will be one linked list
+underneath the hood default max load
+factor of one so on average there will
+be one item per bucket order one into it
+order one find unordered map is kind of
+your go-to map if you want fast
+containers within C class plus and you
+want to just use the STL
+yeah and by the way the original
+proposal is in the bottom right really
+worth a read and it's really good
+description of how unordered maps and
+unordered sets are implemented linked
+lists are not guaranteed to be in
+contiguous memory so you really don't
+want to be jumping around to this linked
+list looking for your key you want to
+find it the first time yeah so I did an
+experiment recently where I took ten
+thousand I generated ten thousand keys
+and I generated from them from the range
+0 through to 1 trillion then I put them
+inserted all of them into a unordered
+map then I asked each node how many
+other nodes are in your bucket and this
+is a distribution that I got back most
+notes are in a bucket or by themselves
+but only just you will get collisions
+this was a uniform distribution you are
+going to get collisions unless you have
+a perfect hashing function which in this
+case I deliberately didn't have but I
+had a pretty good hashing function use
+standard uniform an inter distribution
+so if we go back you will from time to
+time have to run through your notes to
+find the key it's not always going to be
+the first one
+so let's time this this is on Google
+benchmark for the top half of this line
+anyone use Google benchmark yeah it's
+good good to see if you haven't already
+check it out as fantastic for
+parameterizing
+micro benchmarks 40 nanoseconds through
+to 24 nanoseconds so you can see that's
+reasonable
+and you can see that speed of the find
+is broadly related to the number of
+elements in the collection there's a
+Linux perf output and the second half of
+the slide there nothing too surprising
+in there instructions per cycle is a
+little bit low but these are also quite
+a few quite a few but it's stalling
+going on there as well and if you do the
+math that means that broadly one out of
+five hundred cache
+references is actually occasion as'
+so-so or you can use something like
+Google's DHS hash map fast a little bit
+of complexity around management of
+collisions but that's ok so given the
+choice I'd get for this well you can
+ignore Yuans suggestion this morning if
+not reimplemented anything can there you
+see are related to hash tables and take
+a hybrid take the best of both worlds
+that's what we do it opted for a lot of
+our speed sensitive code is we have a
+slightly different hash table lots of
+different implementations of hash tables
+plenty on the internet Peggy oh yes one
+what I'm going to do is just quickly
+describe what we use at Optima it's
+quite a neat approach maybe you do
+something similar at your company I
+don't know we have something like this
+so the keys and values are just anywhere
+they could be in a separate collection
+or it could just be heap-allocated it
+really doesn't matter too much the table
+itself is actually a pre computed hash
+and a pointer to the object and that's
+your hash table so it's like a hash
+table of metadata importantly the hash
+eight bytes the pointer eight bytes so
+each pair is sixteen bytes you can put
+four of those in occasionally which
+means that when you read one you've read
+another three more than likely as well
+which means that you've already
+prefetched in any subsequent data that
+you might need to resolve the conflict
+so we take an example if we look for key
+73 if this is an integer key thing well
+the hash is just 73 as well maybe this
+index is 2 index one don't index one the
+hash is 73 ok great we've probably found
+what we're looking for follow the
+pointer yeah the key is 73 as well okay
+great we're done if we take another
+example key 12 Maps the hash 12 maybe
+this thin indexes or heaven-sent index
+slot number 3 based on the
+implementation at least check the hash is 98 ah ok there so there's a  
+collision there
+right we'll just follow it to the right
+what's the next hash value
+okay that's hash value 12 great that's
+what we're looking for follow that
+pointer yeah
+there's our key they said value very
+case efficient don't take my word for it
+so if we micro benchmark this twice as
+fast it seems to be less susceptible to
+the size of the collection instructions
+per cycle are looking a lot healthier
+now double if not triple and only about
+one out of 1,500 case references is
+actually cache miss so just a more cache
+friendly implementation of a hash table
+there may be a talk later today about
+hash tables like this possibly by sorry
+it's a Wednesday yes there may be a talk
+on Wednesday about this okay couple more
+to go always in line and no one line the
+inline keyword is incredibly confusing
+inline does not mean please in line in
+line means there may be multiple
+definitions that's okay
+linker please overlook it if you want
+something to be inlined you're far
+better to use GCC and clanks attributes
+to say force this to be in line please
+or force us to not be in mind now
+dragon's light here you need to be
+careful about this in lining can make
+your code faster in lining can make a
+code slower not in lining can also give
+you either of those two alternatives
+again you need to measure look at this
+look at the disassembly path even get a
+actually measure and production so just
+a trivial example here but we're going
+to check the market and if we decide
+that we're not going to send the order
+cuz something's gone wrong
+do some logging otherwise seen the order
+now if this is in line if the compiler
+goes hey that's not a bad function to in
+mind it doesn't take too many parameters
+yeah sure let's inline it by not you're
+going to pollute your instruction cache
+you've got all of this logging code
+which you don't really want in the hot
+path right there in the middle of the
+hub path so this is an easy one just
+know one line this that'll drop out
+that'll turn to a call chances are the
+branch predictable
+well two things chances are the compiler
+will pick the right branch and even
+better at runtime the branch predictable
+probably be picking the right branch all
+the time for you can I talk about the
+branch predictor more very soon by the
+way the hardware branch predictor I'm
+gonna talk about the hardware branch
+predictor right now yes it turns out
+okay this is the most important slide
+out of the 15 or so tips and tricks this
+gives me a 5 microsecond speed up on my
+code or in other words whenever I screw
+this up the system's run 5 microseconds
+slower so much in fact I have a flow
+chart on my desk which basically goes
+earlier 5 microseconds slower yes did
+you screw up dummy orders yes fix it and
+go back to the start so this is what
+happens in practice you hardly ever
+execute the fast path the hot path and I
+see there's that right at the start I'm
+gonna say it again
+the fast path is very seldomly executed
+maybe you get closer than you decide
+actually I can't because of risk limits
+the next market data that comes in is an
+interesting the next is but again the
+strategy decides I've already got enough
+of that instrument I don't want to trade
+it then eventually at some point are
+great there's an order we want to go for
+let's shoot for it now on top of this
+there's other things going on which I
+haven't put on the board on the graph
+but things like you know that unordered
+map that's trampling all over occasion
+other things that are traveling over air
+cash handling other messages that are
+coming in doing background processing so
+how do we fix this how do we keep the
+cash shot well we pretend we live in a
+different universe where everything that
+we do results in an order being sent to
+the exchange here's a tip you really
+don't want to send everything to the
+exchange they'll get very annoyed with
+you very quickly but you can pretend so
+as long as you've got confidence that
+you can stop this
+before it gets to the exchange ie within
+your own software within your own
+control then pick a number from
+somewhere between a thousand to ten
+thousand and that's going to be the
+number of times that you simulate
+sending an order through your system if
+you're using your low latency network
+card such as Mellanox or Solar Flare
+chances are even the card will allow you
+to do this like it this is industry
+practice it understands that people want
+to pushed out onto the card but not
+seemed it it's just warming the card so
+network cards will support this so
+that's great so basically saturate your
+system with I'm gonna send an order I'm gonna seen an  
+order bang I did seem in order yeah
+keeps your instruction cache hot yeah
+nothing else nothing's gonna get evicted
+if you're doing that probably keeps your
+data cache hot if you're picking the
+right data and it trains your hardware
+branch predictor your branch predictor
+if it's just done the same thing ten
+thousand times before in the last second
+chances are it's going to pick the right
+path this time high yeah good questions
+do I use profile guided optimization and
+yeah sometimes in many different ways
+yeah so profile guided optimization is
+kind of a substitute for this but again
+that's only at something that you can do
+it compile time and it's not going to
+help with the hardware at runtime but
+indeed yeah profile guided optimization
+is great except you can over fit the
+model so profile gutter optimization is
+effectively you you run a simulation or
+maybe even run in production where you
+you're writing to a profiling file if
+what's actually happening with your
+system then you recompile with that
+information and then the compiler can
+use therefore branch prediction henson
+and reordering so they works that works
+relatively well but you need to make
+sure that your profiling that you're
+doing matches production and sometimes
+that means that you're very fast
+sometimes i'm way off the mark at other
+time
+so it's kind of this thing that looks
+really great and it is some of the time
+it's good question okay this is an ASEAN
+85 CPU how many cause does a said I
+claim eight and the cause are on the
+left and the right and what's in the
+middle cache glorious glorious case l3
+cache probably that 15 weeks worth of
+cash very fast this is what you want how
+many cores get access to this case all
+of them well that sounds like a problem
+because I want this case all to myself
+yeah I turn off all but one of your
+cause now you get the cash all to
+yourself it's a neat trick it's not very
+respectful for to a any Intel engineers
+in the room today and as you know a
+teenager I couldn't believe I'd be
+having eight cores and working for
+coming where I could turn all about one
+of them off or 22 cores and turning all
+one of them off it's a really effective
+way of increasing the average l3 cache
+per core Hey sorry
+have I tried using a single-core CPU ah
+interesting so have i tried using a
+single core cpu or convincing someone to
+make one that yes oh no I haven't the
+answer to both of your questions we can
+talk about that afterwards a little bit
+but I suspect their Intel and not
+necessarily going to be particularly
+interested in what I would want because
+my domain is such a small part of
+Intel's market that's just my gut feel
+yeah incidentally um they can go back
+one yeah if you do run multiple cores
+like normally you won't disable your
+course but just be careful about what
+other processes are running on other
+cores that share the same cache if they
+are noisy it's going to cost you if
+you've got noisy neighbors get rid of
+them put them on a completely different
+CPU and somewhere else they will
+probably help you out great quote
+okay these are just sort of this is
+nitpicking but this caught me out and it
+caught people from other trading
+companies out as well
+placement you can be slightly
+inefficient slightly so if you use any
+of these compilers placement you will be
+doing a null pointer check and if the
+pointer that you pass into placement you
+is no it won't construct the object I
+won't distract the object and it will
+return now back to the caller why
+because that's what regular new does and
+the spec was a little bit ambiguous as
+to what placement you was me to do
+so most compiler implementers just did
+the same thing it's regular than you but
+actually really inefficient why would
+seem to us to an additional check for
+you that's not the that's not the idea
+of C++ you don't pay for what you don't
+get right you don't pay for what you
+don't use if you're going to pass a
+pointer into a function you should make
+sure that it's not or not null
+yeah so Matt Gleeson and Jonathan
+Wakeley got the spec updated the
+standard updated so that's now undefined behavior to pass no one to  
+placement knew that means that the
+compiler can stop doing this null
+pointer check does this there's a single
+null pointer check make a difference
+actually it does yeah so if you were
+right on the border of this function
+being in lined and not being in mind in
+this additional instruction could push
+it over the top
+also with GCC JC's he was particularly
+sensitive to this and actually gave up
+on a whole bunch of optimizations so
+yeah now I'm just a small thing that
+actually made quite a big difference
+enough that several trading companies
+picked up on this the if you can't use a
+modern version of the compiler that has
+the fix there's a quick workaround that
+will work around at least in GCC
+okay another thing that caught me at is
+JCC five and below or below JCC 5.1
+standard string it wasn't a great
+implementation had copy-on-write
+semantics and no small string
+optimization that wasn't there so great
+we moved to later versions of GCC
+started using strings all over the place
+but what do you know it was slow because
+we use a standard distribution of red
+hat and CentOS and the way that GCC is
+packaged is it maintains a bi backwards
+compatibility so it doesn't do the
+standard string breaking change which
+means that we're still stuck with the
+old standard string implementation and
+that was first noticed as being a bit
+questionable by herb SATA in 1999 and
+today in 2017 I'm still stuck with
+copy-on-write strings another small
+nitpick that Civitas 11 has this um what
+we call it static local variable
+initialization guarantees that static
+will be initialized once and only once
+even if multi-threaded even if an
+exception comes in and blows away that
+routine that will go okay we've not
+initialized yet so very useful but of
+course that doesn't come for free so
+every time that you refer to that static
+variable inside that function there's
+going to be a slight cost which is
+checking the guard variable to see if
+that has been set or not so again it's a
+minor nitpick that if you're absolutely
+micro optimizing code this will have a
+slight impact as well who knows the
+standard function might allocate most
+people yeah cool so that can be a little
+bit surprising because sometimes it
+doesn't allocate it depends on the
+implementation you can do a small
+function optimization in there around
+about 16 bytes I think so this is what
+GCC 7.2 this is a silly trivial example
+but here we are we're not actually doing
+anything we're capturing 24 bytes worth
+of data but we're not doing anything
+with it
+we'll just optimize this right out GCC
+doesn't so you actually see that there's
+a allocation for this code and actually
+ad allocation which I didn't print on
+the screen that gets a little bit
+annoying because standard functions are
+actually very very useful so you'll see
+that several people have implemented nan
+allocating versions I believe there's
+talks on this again I would possibly
+claim today later on today but maybe I'm
+wrong again but yeah if you want to go
+check out this as a shameless plug by
+the way but go check out s3 fourteenth's
+and place function which doesn't
+allocate it will allocate in place which
+means that if you declare this function
+on the stack that buffer for the closure
+will be on the stack with compile time
+static asserts and also runtime checks
+if need be as well okay the very last
+point for this section and then we've
+only got a small section to go is G Lib
+C can be particularly evil if you're
+looking to do low latency stuff so
+standard power if you call it with 1 to
+the power of 1.4 you'll get the right
+answer if you call it one point zero to
+the power of one point five you're also
+going to get the right answer but one's
+gonna be way slower than the other it's
+not quite 1.0 by the way it's 1.0 with a
+little bit of rounding error in there
+but if you look at these timings if we
+go one to one point four 53 nanos on
+both an old version of G Lipsy in a new
+version of G Lib C great if you do it
+with 1.5 the pathological case you're in
+trouble
+half a millisecond to calculate one
+single computation of power reason is
+the function it's transcendental it'll
+try to be accurate if we try to be
+accurate fast if not it'll try to be
+accurate slow so this is caught us out
+this it's effectively crashed our auto
+traders because if you try to calculate
+this a thousand times quickly everything
+kind of stops yeah relatively surprising
+you can upgrade to G Lib C 2.21 which is
+a couple of years old now I think
+that'll help you out but most standard
+distros of Linux
+we'll be packaged with 2.17 so again
+something to watch out for while I'm on
+this topic another thing which isn't on
+my sights but I should mention is try to
+avoid system calls system course will
+just kill you so you don't want to be
+going to the kernel at all you want just
+your C++ code to be run you want to get
+all interrupts absolutely away from the
+core that you're running you want your
+hot path to be running on a single core
+nothing else need to know about that
+single core any sort of system calls I
+could call to select or a call to kernel
+space TCP or anything that might invoke
+a system call whatsoever you want to get
+rid of that sorry just popped into my
+head I thought I should say
+not particularly funny but very true so
+the final section I need a couple of
+slides actually hey I've got a reminder
+talk yes that is right that could have
+gone far worse okay um there's two ways
+to kind of measure things really or two
+common approaches one it's the profile
+see what your code is doing the other
+one say actually benchmarking tainment
+these three things are subtly different
+so profiling is good it can show you how
+look you're spending most of your time
+and Malik wait wait why are you even in
+Malik this makes no sense whereas
+benchmarking is actually start and stop
+right this is how fast we are if you
+make a improvement to your code based on
+profiling that's great but maybe your
+codes not faster maybe it's slower you
+know you're just guessing need to
+measure once you finish measuring
+measure again and then measure one third
+time one more time a third time okay so
+G prof a sampling profiler G prof is
+great for checking out what your code is
+doing but it's not going to work if most
+of the time your code is doing nothing
+and then for 300 or 400 nanoseconds all
+of a sudden it's doing something and
+then it goes back to being idle do proof
+is going to tell you that you're doing
+absolutely nothing
+it's going to miss the actual events
+that you care about G profs are out
+they'll ground cool great fantastic can
+tell you actually what your code is
+doing which functions it's going into
+how much memory you're using but it's
+basically a virtual machine that's
+simulating the CPU it doesn't even take
+into account IO characteristics it's
+gone as well it's too intrusive it's not
+gonna give you accurate performance
+results I've been talking about micro
+benchmarking a lot it's kind of ok but
+don't rely on it because if you're
+sitting there spinning in an absolute
+tight loop doing map looker
+that's a very different characteristic
+from what your code is going to be doing
+in production when it's doing a one-off
+map lookup once every eight trillion
+cycles so benchmarks are kind of nice
+for nap shootouts a little bit and
+things like that but you can only take
+them so far now all of these tools are
+really useful don't get me wrong I use
+all of them that great but not
+necessarily for that very last step of
+micro benchmarking of sorry of micro
+optimizing your code so we need
+something else so this is what I use and
+it's by far the most accurate
+benchmarking system I can come up with
+what you do is you actually set up a
+production system the server on the left
+here is replaying market data in real
+time across a network and my code is
+running on the server on the right
+picking up the market data and then from
+time to time sending a trade or a
+request to trade back across the wire to
+where it thinks is the exchange of
+course it's just a fake exchange what
+I've got in the middle is a switch and
+the switch is tapped into the network
+and it's unobtrusively capturing every
+packet that's going across the way and
+recording it and also putting a
+timestamp into either the header or the
+footer at the ever net packet so
+actually recording that true time that packet went across the way probably  
+within a accuracy of 5 nanoseconds or
+something like that then afterwards once
+you've done an hour or a day's worth of
+simulated trading then you can analyze
+the packets look at which packets
+triggered an event compare the timestamp
+of the corresponding packet Lee got
+seemed out how to exchange to a
+difference of the timestamps and that
+will tell you their actual true time
+that it's taking for your system to run
+and if you see a speed up in this lab
+setup you'll see a speed up in
+production if you see a slowdown in the
+lab you'll see a slowdown in production
+credibly hard to set up you have to get
+this perfect all the time you'll forget
+you know you forgot to turn off particular  
+interrupts oh you forgot to see it CPU
+affinity or someone decided it might be
+a good idea to build on that server
+because they found that it was free and
+very few people were on it so they you
+know range ECC on 24 cores but this is a real pain it's not easy to set  
+up but it's by far the most accurate way
+to do true measurement okay so the brief
+summary is you don't need to be an
+expert about C++ but you do need to know
+it relatively well if you want fast low
+latency software you have to understand
+your compiler you have to understand
+what your compilers trying to do and
+help your compiler along from time to
+time knowing the machine architecture
+will help knowing the impact of cache
+the impact of other processes it's going
+to help you make create design decisions
+ultimately aim for really really simple
+logic so not just simple logic that get
+rid of your logic if you can go first
+static asserts Const expressions
+templates you know just try to make your
+compilers life as easy as possible and
+that respect or or reduce your code as
+much the best thing about this is
+compilers optimized simple code the best
+by fast simple code runs faster than
+complex code it's just effect just as
+sometimes you don't need perfect
+precision right it's sometimes an
+approximation that's absolutely fine and
+if the approximation is fast that's
+great there's no point calculating you
+know a theoretical price to twelve
+significant digits if really only two
+digits would do and if you need to do
+expensive work don't do it on the hop
+path just do it when you think it's a
+quiet time yeah and ultimately it's
+about measurement if you can't measure
+you're basically just kissing so it's
+incredible like every time that I think
+this code is going to be faster did it
+measure it it's always slower I always
+get it wrong it's difficult
+okay so that's me this was quite
+lightweight not entirely scientific it's
+more gesture hey this is the sort of
+things that we do and I hope you found
+that somewhat useful did people learn
+something yeah a little bit so so okay
+cool
+please thank you there's got a couple
+minutes for questions if anyone feel
+second Hey hi hi can you comment in the
+use cases where you were only using one
+core on the multi-core chip do you know
+if Intel's turbo boost was helping you
+out at all or not yeah that's a yeah
+it's a good question so I could spend
+another hour or two talking about the
+actual system to any type of it won't go
+into too much detail here but
+effectively you need to be very careful
+with turbo boost and different states
+you just want things to be constant you
+don't want things to be jumping up and
+down and yeah cool hey ah so good yeah
+hi hi so one quick thing the actual
+question is on newer architecture so you
+can actually force the l3 cache
+partition okay you already know but I
+just said just recap yes sir no one
+heard that
+well I just cut you off yeah there is
+you don't just have to turn off CPUs you
+can actually lock the case with latest
+failures of latest versions of Intel
+CPUs when you describe the hash table
+the layout in memory was you had like an
+array and you had the the full hash
+which you keep and then a pointer but
+like usually in the H of T you only
+really care about access not insertion
+insertions often outside of the critical
+path current always but often so why not
+instead have if you have the key values
+in an array as well you can just use the
+index of the hash itself to access that
+and now you're only storing the hashes
+in the first lookup array so you get
+eight instead of four so why not if I
+understand the question correctly
+weren't that put more pressure on your
+cache because you actually have
+hash values pair cache line well you'll
+have more cuz you're not storing the
+pointer at all
+you're just the the first layer of the
+lookup is just into an array with
+nothing but the hashes I say we check
+you verify that the hash is correct you
+just use the index and go into the key
+value array yeah you could do that but
+that's going to also if as long as
+you're very confident that you're not
+getting too many collisions so I think
+you're gonna get to trade off I see I
+think I see what you're saying and yeah
+you could do that but that's it's huming
+a pretty damn good hash function I think
+but this these always these there's no
+right and wrong answer I think for hash
+tables it's always a bit of a sliding
+scale all right Thank You Jess hey so
+I'm interested about the way you talked
+about using only one CPU unlocking the
+others at one core do do you mean that
+you are going to use one thread as well
+oh yeah and how does that work when you
+have multiple data sources that you need
+to know to look at and everything like
+yeah yeah yeah yeah sure so this is
+getting away from the secret west side
+which I purposely didn't want to talk
+about being in Satan's press conference
+about very very briefly yeah exactly one thread on that one core that's it  
+that's the fast thread but of course you
+can from time to time poll data coming
+in once every few hundred milliseconds
+then hold the data statistically you
+should be okay at all very much depends
+on how much data is coming in if you've
+got a lot of data coming in didn't know
+you'd need a second thread but yeah
+effectively I mean though the data that
+you need to respond quickly the data
+from the market hmm so you you can't
+actually pull them because then you you
+reduce your latency I get repaid you
+could also have something ahead of you
+doing a little bit of a low pass filter
+or discarding mmm more of the data yeah
+you can you definitely have a component
+ahead filtering a lot of that out for
+you otherwise yeah you'll be saturated I
+see yeah thank you yeah you're welcome
+hi just a small point you said consider
+deleting large objects in another thread
+yeah one of the things I've been burned
+by is that will drain the TC malloc size
+class for that
+and then cause global mutex locks across
+all your threads when you allocate or
+deallocate in that size class yeah I was
+wondering if someone would pick up on
+that true
+we actually often ou allocate on that
+separate thread as well and just pass
+the pointer across yeah good point now
+it's praying no one would pick up on
+that hi hey these things like built-in
+expects to mark branches it's likely or
+unlikely yeah so this will have to be
+the last question correct yeah yeah and
+I deleted those from my slides this
+morning cuz I ran out of time as we have
+just done it as well and yeah
+----builtin expect definitely for those
+who don't know about it it's just a
+macro that's wolf force will tell the
+compiler hey this is the branch that I
+want you to take absolutely you can use
+that but it's not the Silver Bullet
+everything is about getting that
+hardware branch predictor trained up in
+saying that if you have a function which
+is called very very irregularly and you
+won that function to be fast when it's
+called the hardware branch predictor has
+zero information in that case yeah
+you're likely true and likely false
+branch prediction hints or exactly what
+you need to make sure that the correct
+path has hit good question thank you so
+we've got a we can catch up afterwards
+if maybe we have to times up now we can
+talk afterwards
+yeah okay thank you

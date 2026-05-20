@@ -1,0 +1,2437 @@
+[Music]
+Welcome to Signals and Threads, in-depth
+conversations about every layer of the
+tech stack from Jane Street. I'm Ron
+Minsky. It's my pleasure to introduce
+Ian Henry. Ian is a software engineer
+here at Chain Street who's worked
+actually on a bunch of different areas
+and we'll talk about that a little more
+in a second. I also should apologize to
+the listeners and that my voice is a
+little raw, so sorry about that, but
+hopefully it won't be too rough to
+listen to. Anyway, Ian, thanks for
+joining me. Thank you, Ron. And just to
+start off, can you tell me a little bit
+about what you did before you worked at
+Jane Street? Yeah, so I joined Jane
+Street in 2016. And before that, the
+bulk of my work experience was a company
+called Trello, project management
+software. I worked on a lot of the iOS
+app and also the web front end. I worked
+a little bit on the back end too, but
+most of my time there was doing more
+front-end engineering. After Trell, I
+worked at Warby Parker doing iOS and
+then came to Jane Street and I've worked
+on our internal exchange software and
+most recently on the options desk
+working on tools for traders. That
+transition is a little bit of like a
+record scratch moment like started off
+working on front end and iOS apps and
+now you're working on exchange software.
+Can we like just talk for a little bit?
+How did you get here? Why did you come
+here? How did you find yourself in this
+very different corner of the tech stack?
+Yeah, the thing that attracted me
+initially to Jane Street was the
+functional programming reputation. I had
+started doing functional programming in
+my spare time both in iOS using more
+functional libraries back in 2013. We
+had something called reactive coco and
+functional reactive programming and it
+was this really big wakeup call that
+just made it a lot easier to build
+complex interactive UIs using the iOS UI
+kit framework. That was just such a big
+productivity boost. And then my
+functional education continued with
+Closure. There was actually this library
+for making music in Closure. It was this
+creative coding environment called
+Overtone. And I had never used Closure
+before. I hadn't really used a
+functional programming language at all.
+But I was playing around with it and
+making music. And having a real actual
+programming language attached to the
+music software meant that I could do
+like really dumb things like have a MIDI
+keyboard hooked up that I could send web
+requests with or make a Slackbot that
+you would type a message and web hooks
+would cause it to play music using like
+a synthesizer that you programmed. And
+the experience with Closure sort of got
+me into this functional programming
+world and I started learning hasll
+because I was curious what a monad was.
+People kept talking about how it was
+this great thing that would make your
+programs easier to express and I wanted
+to know what that meant. So I was just
+doing Haskell for fun and then Jane
+Street was a company in New York City
+that was known for functional
+programming. I didn't actually think I
+could get a job at Jane Street but I had
+a friend who started working here and I
+feel like at the time it had this
+reputation for being like you have to
+have a PhD and various things in order
+to work here and like I don't know. I
+think that's like a reputation we've had
+for a long time and it's kind of never
+been true. Yeah. Like I have a PhD.
+That's true. But there's really not a
+lot of PhDs wandering around. Like if
+you go to like the Okamel language team
+and the people who are doing type theory
+stuff, it's like not everyone, but
+there's a fair number of PhDs kicking
+around there. I do think somehow our
+reputation has become more fearsome than
+is exactly accurate. Yeah. I feel like
+our public-f facing image is more on the
+o camel compiler type theory extreme
+side and like we like hiring engineers.
+This is like a little bit my fault I
+guess. Can we go back to the music thing
+for a second though cuz I've seen a lot
+of these tools. I am like basically a
+musical ignoramus and I've been to like
+fun live coding events where people are
+off writing little programs to generate
+music. I've never experienced the music
+generated this way as being particularly
+good. I'm like curious what your
+experience has been in this space. Well,
+again, MIDI keyboard that is sending web
+requests and making collaborative. I was
+definitely not making music. I'd say I
+was enjoying sound synthesis from a
+theoretical standpoint, which is most of
+my experience with music is the tools to
+make it are more interesting than
+actually trying to make music to me.
+Amazing. Okay. So, you arrived at Jane
+Street with experience as an iOS
+developer and you said we do a lot of
+that here. Yeah. you should go work on
+this Exchange software with no
+interfaces or UIs or anything. Yeah, it
+was a change of pace, but I didn't find
+the transition particularly it it was a
+good opportunity to do something
+different. It was my first time that I'd
+really thought about low latency
+programming in any capacity like we
+measure things in microsconds working in
+internet facing companies like
+everything is measured in milliseconds.
+That was a bit of a change. Three orders
+of magnitude right there. Yeah. Jean
+Street, the software I was working on,
+we would use a millisecond as sort of
+shorthand for like something has gone
+horribly wrong and it took an infinite
+amount of time. It's over a millisecond.
+We can't even measure it. It's also
+maybe worth saying exchange software.
+What are we talking about? Like Jane
+Street doesn't run an exchange. What is
+this kind of software actually for? So,
+it's not really an exchange, but it is a
+program that looks like an exchange and
+exposes an API like an exchange to other
+counterparties who can come and trade
+with us using the same roughly protocols
+that they use to trade on real
+exchanges, but it's really a single
+dealer platform, which means that people
+can come in, they can put in orders, but
+they're only necessarily trading against
+Jane Street. They're not trading against
+one another. It's not an exchange in
+that sense, but from a software
+perspective, it looks like an exchange.
+We have an order book. We send in
+orders. There's a matching engine that
+causes trades to happen. We have
+software that will print the trades to a
+public tape after the trade occurs. It
+is very exchangelike. Okay. So, we did
+all this like weird low latency, high
+performance work. Also, by the way, you
+came here for functional programming.
+That's a very imperative codebase. Yeah.
+But we use some fancy type system tricks
+to make the imperative programming very,
+very safe. We use the phantom type
+parameters in our JDTs to make sure that
+we're efficiently deserializing data,
+but we're not actually ever actually
+deserializing it. You get a little bit
+of that. You still get to leverage the
+language. I mean, I guess a general
+point is people think of Okamel as a
+functional programming language, and it
+surely is that, but it's actually a
+really good language for imperative
+programming also. And a lot of the type
+system features that are useful in the
+context of functional programming work
+perfectly well in imperative
+programming. And that's a large part of
+what we do here as well. Yeah. In
+addition to that, although most of the
+core of this application is this very
+imperative style, very low latency
+style, there's so much code surrounding
+that core tight hot loop that can be
+written in this very very high level
+style, which is something that's so nice
+about using Okamel for you can go from
+this very low-level style to this very
+very high level style in your test
+frameworks or something where you're not
+concerned about this, but you're using
+the same language, you're using the same
+types, you're doing everything in the
+same codebase. if you don't have this
+context switch from calling into a CFFI
+or something. Yeah, this is what's nice
+about having what you might call a
+broadspectctrum language. The language
+that can be used in lots of different
+styles for solving lots of different
+kinds of problems, but the whole thing
+fits together as a cohesive hole. It's
+just easy to plug things together,
+whether you're doing, as we'll talk
+about soon, web programming or testing
+systems or low latency stuff or whether
+you're doing hardware synthesis and
+having all of this kind of stuff fit
+together is really great. Okay, so now
+you're doing something very different
+again. You're no longer working on that
+exchange- like infrastructure. Tell me
+more about the spot where you are now.
+So, a few years ago, I started working
+on the options desk specifically in a
+team called Trader Tools. And we make
+tools that Jane Street's manual traders
+use to understand what's going on in the
+option markets and then also to
+manipulate different things, systems,
+configure our automated trading systems,
+send manual orders, various
+interactions, but it's mostly a data
+collection, visualization, and alerting
+and monitoring. There's options are
+weird because there's so so many of them
+and a trader who is trading Nvidia has
+one symbol that they're thinking about.
+A trader who's trading Nvidia options
+has to think about hundreds of different
+strikes and exps at different times. You
+say just what's a strike and what's an
+X? Yeah, sorry. And actually, while
+we're here, what's an option? Yeah. So
+options are Wikipedia, right? To buy or
+sell something at a price by some date,
+notably at a given price. At a given
+price, right? So the strike is the price
+that you are able to buy or sell the
+option before the expiration date which
+is when you lose the option if you have
+not exercised it. And this low-level
+description is maybe a little bit
+obscure and hard to understand. It's
+like why do I want the option to buy or
+sell a security at a given price. One
+way of thinking about what's going on in
+the options market is even though it's
+expressed through a lot of individual
+derivatives, things that are derived
+from the actual underlying say Nvidia
+options derived from Nvidia, there's a
+bunch of, you know, might be a hundred
+things in what we, you know, might call
+like the V surface or this kind of
+collection of different securities
+that's parsing out different parts of
+the space. Really, what's the thing that
+you care about in this space is actually
+a relatively lowdimensional thing of
+where in some sense trading things like
+the volatility of a given underlying,
+right? How valuable is it to have the
+option to buy something at a given price
+depends on how likely it is for the
+underlying to get to that price which is
+something about how much volatility how
+much likely movement is there in a given
+security. So in some sense it's a way of
+trading these deeper underlying
+properties of securities that go beyond
+just what is it trading at right now and
+more about various distributional
+properties of how that's going to move
+around in the future. Yeah. And this
+sort of impedance mismatch between we
+are thinking about these as these
+collection of moments and that is the
+thing that we're actually trying to
+trade but the way that we're doing this
+is trading on markets with central limit
+order books and we're trying to express
+this opinion across the entire
+individual markets which all have
+individual orders and we need software
+that sort of helps us move from the way
+that we actually want to think about the
+options and the way that we actually
+trade the options in the real world.
+Right? And it's maybe worth saying that
+this whole effort on the options desk to
+build a bunch of really highquality user
+interfaces for people is relatively new.
+It's only a few years old. And the
+options desk, like the rest of Jane
+Street, mostly spent its time acting as
+if user interfaces were not a thing. Or
+to the degree we had user interfaces
+like they might have been in Excel or a
+surprising amount of bash went into and
+probably there's still more of that bash
+kicking around the desk than maybe is
+entirely optimal. Yeah, I think bespoke
+curses app was our main UI for a long
+time. Yes, that's right. Still is.
+Right. And here curses is like a library
+from the 80s for abstracting over
+different terminal emulators,
+state-of-the-art library, right? And the
+terminal emulators were emulators for
+physical hardware that people used to
+use when using computers in the past.
+And that hardware has not existed for
+like 30 or 40 years. And here we are
+still writing terminal apps through this
+very strange pipeline of software. Yeah.
+Okay. Okay, but we kind of changed our
+approach here and even though we still
+have some of those curses apps kicking
+around, we've now gone off and built a
+bunch of different user interfaces. Can
+you maybe sketch a little bit of like
+what are the purposes of these
+interfaces? How are they trying to help
+the end users? I think there's two broad
+classes which is exploration,
+understanding what's going on in the
+markets and these are more tools for
+data aggregation. We have a lot of
+charts or graphs of how things have
+moved over the course of a day. We have
+ways to view not just an individual
+option and what it is doing but maybe an
+entire und and expiration date what's
+going on across all the options in that.
+We have tools for understanding this.
+And then the second class of application
+are tools for managing traders
+attention, tools for alerting, tools for
+getting their attention and saying,
+"Hey, something interesting is happening
+that you probably aren't thinking about
+because you have a million different
+things that you're thinking about like
+trying to get their attention, alerting
+them to interesting trading
+opportunities that we can either find
+automatically or that traders have said,
+I want to know when the following thing
+happens. I suspect this might happen. I
+want to know as soon as it does." Right?
+And the trading day is busy and part of
+what's going on is also about aortioning
+responsibility to different groups of
+people. The option desk is big and there
+are lots of different people paying
+attention to different things and being
+able to hand off responsibility between
+people and groups of like you'll pay
+attention to this and I'll pay attention
+to that. A kind of workflow aspect of
+it. Routing the interesting thing is
+happening to the correct person is a not
+very technically glamorous or
+interesting problem but is surprisingly
+hard and extremely important. Zoomed out
+way too far. your previous experience
+working on Trello and your current
+experience working on tools here like
+parts of that seem the same workflow
+parts and guiding people's attention to
+the thing that they're supposed to be
+watching and stuff maybe not as real
+time that's part of what tools like
+Trello are like how do those two
+activities feel different to you working
+at this product oriented company that's
+facing hundreds of thousands or millions
+of users versus working at Jane Street
+on tools where 150 is a pretty big
+number of people who might use the
+particular tool you build Yeah, it's
+very very different in two ways. It's
+very different socially. We're working
+on tools for Jane Street Traders.
+They're all internal and we sit near
+them. We can walk over. They're on the
+next aisle down. We can watch them using
+our tools and they can directly ask for
+features. We can understand what they
+want. We can talk about it. We can write
+code for them and ship it and see them
+use it the next day. It's not this large
+mass market software. we're making
+something that is going to be used by
+millions of people and we can't directly
+talk to millions of people at once and
+see what they're looking for. So, we
+have this immediate feedback loop which
+is really great. There's also this flip
+side to it which is we're not making
+mass market software that is going to be
+used by millions of people. We're making
+extremely niche software that's going to
+be used by a few really really smart
+people and the things that they want are
+sometimes just understanding the domain.
+We are not traders. We are engineers. We
+have to learn enough about how traders
+think about things and what they're
+trying to do in order to give them the
+features that they want. So it's in some
+sense easier because you can do this
+iterative design process to see exactly
+what features you want and get feedback
+that you have built the correct feature
+and also harder because the features
+themselves require some amount of domain
+knowledge. So in addition to just
+implementing the feature is difficult,
+understanding and designing the future
+is more difficult. I imagine there's
+just a hard generalization problem here,
+right? I think you have the usual
+experience you have with users
+everywhere. If you ask people what they
+want, they will tell you some particular
+thing which is kind of related to what
+they want, but it's some complicated mix
+of what they think is easy to achieve
+and what they have in their head and
+what narrowly solves the problem that
+they just saw. And you have to stand
+back and see something broader than that
+and see like a simpler thing which will
+solve more problems. And I guess it
+seems hard to do that in a case where
+you're to some degree at an information
+disadvantage. Yeah. Where the users
+understand more deeply what they're
+doing. How do you come to grips with
+that question? So, something that helps
+a lot is people are very patient and
+want you to understand their problems.
+They're not just saying, "I want this
+feature. Go do it." You're working with
+the traders and you can say, "Okay, you
+need to get me on the same page as you.
+You're asking for this thing. I want to
+understand this thing." This is true
+generally of Jane Street. We have a lot
+of educational resources. You want to
+understand the domain well in order to
+do your job better. But at the same time
+a huge help is we have some senior
+people on the desk who have been trading
+for a long time and also have a lot of
+UX intuition and ability to design and
+we do lean on their experience for help
+as we're working on some of the
+features. Another thing I wonder about
+in terms of like the difference between
+working on a consumerf facing product
+and working on the tools you're building
+here which are essentially tools for
+experts is whether that influences the
+way we behave down to the level of
+relatively smallcale UI decisions.
+Absolutely does. One of the strangest
+things when I started working on UI
+tools at Jan Street is a lot of your
+intuition from general what does good
+design look like? Everyone at Jane
+Street has roughly fighter pilot eyes
+and they say I want this to be about six
+pixels high because then I can fit more
+of it on my screen. And you're designing
+these tools with extremely high
+information density. If you tried to do
+something like that for a general
+product company, you'd be like, "This is
+unreadable. This is unusable. Traders
+don't ever want to touch their mouse.
+Everything is accessible from the
+keyboard, which is a good additional
+feature to have, but there's a lot of
+discoverability problems that comes from
+that. You can't hover to see more, to
+see interactions because you don't have
+a mouse to hover with because you're
+trained on using curs's apps for your
+whole career. And it's not just you're
+trained on it, like it's actually
+better, right? It is just a higher
+bandwidth input mechanism to be able to
+like quickly smash things out with your
+fingers and it is move the mouse and
+click on a thing. It's just dramatically
+different. Yeah, not that we don't have
+tools with mouse interactions, but the
+information density is a big difference
+and we don't spend as much time on
+things like discoverability of features.
+It is important, but ultimately your
+users are kind of expert users who know
+these tools and live in these tools and
+use them all the time. So, we don't have
+tutorials necessarily. We have vaguely
+written help documents and getting
+started and then the people around you
+teach you how to use the tools to the
+expert level that you have to, right?
+Although I have seen nice features come
+in. One of the great things you can have
+in a web UI as opposed to a terminal app
+is you can have tool tips and that's
+pretty good and you can have links to
+web pages. So you can have things that
+show up and then you could click a link
+and it can show up on the appropriate
+page on our wiki where someone can go in
+and in fact if the documentation isn't
+good you can just crowdsource and to
+dive in and go and modify it. And I've
+seen some of those things kind of pop up
+in the apps that you guys are building.
+As the firm grows and there are more
+people using these applications, it does
+become more sensible to lean more in the
+direction of having the tool teach you
+what to do and incrementally less have
+just the people around you always teach
+you how to use it. It's absolutely true.
+It's it's an evolving process. So, we
+just talked a bunch about how the goals
+are different and the things you're
+building and the shape of the designs
+you come up with. How about just the
+process of writing code here? How does
+that differ from things you've
+experienced in the past? So writing
+internal software there are so many
+things that we would spend time on
+making broad market internet distributed
+software that we just don't have to
+think about at all. So when we're
+writing code at Jane Street we're almost
+always thinking about the specific
+application and the application logic
+and we spend so much less time thinking
+about these ancillary things that that
+we used to spend time on at Trello for
+example. And these are just things like
+having accounts and logging in and
+signing up and forgetting your password
+or processing payments or distributing
+resources over the internet because
+everything is internal and we have these
+very fast internet connections. We can
+just download 5 megabytes of JavaScript
+and never have to think about it. So we
+can focus much more on the core
+application logic that we're working on.
+And this has this maybe unexpected good
+and bad thing which is it's very easy to
+spin up new applications as opposed to
+this is the Jane Street app and we're
+all working on the Jane Street app. We
+actually have tons of web apps and if
+you're working on a new feature maybe
+you're going to start a brand new app
+from scratch and deploy it because all
+of these surrounding infrastructure
+setting up your CDN and configuring
+domains and all of this is roughly free
+and the work that you're doing is just
+working on the application. I think
+another thing that I like about working
+at Jane Street is we don't have just npm
+update dependency constant treadmill of
+keeping up to date with all of the
+external libraries that you're using.
+Something that took a surprising amount
+of my time in a past life, right? I
+mean, there's a little bit of some good
+and bad in that. Part of what's going on
+is Jane Street has to a kind of weird
+degree been on its own parallel universe
+software adventure for the last 20 years
+where it's built lots of custom stuff
+and it doesn't hook into the outside
+ecosystem as much as you might expect.
+There are like real compromises with
+this on the JavaScript side. There are
+lots of cases we've brought in useful
+third party libraries and wrapped them
+up. But we definitely don't do this
+whole like oh just you know bring in
+whatever packages like npm decided to
+bring in. It's kind of problematic from
+a stability perspective. It's also kind
+of a security nightmare. So anyway,
+there are lots of reasons why we want
+more control over the ecosystem than
+that. Yeah. Another thing that we've
+talked about in the past that seems
+pretty different is and that I've kind
+of noticed myself in my own working just
+at the level of file formats and
+protocols and whatever. There's ways in
+which we just use different sets of
+things. Yeah. So at a very high level
+you're focusing on the application and
+then the application that you're writing
+everything is written in Okamel the
+client the back end and the front end
+and most Jane Street engineers who are
+working on these tools are really
+working on full stack back end and front
+end and there's very very blurred lines
+between the two not only blurred lines
+in the codebase sharing types but as you
+said we have automatic serializers that
+generate stable protocols between the
+client and the server such that if you
+have a value on the server it's roughly
+one line of code to have the value on
+the client. You sort of get that for
+free. So you're not spending a lot of
+time building your JSON API v1 v2 and
+then writing the parser on the client
+that consumes them and creates these
+mirror image types that are hopefully
+compatible with what your backend types
+represent. We really just have the same
+types and the same logic. This is really
+powerful. We can do things like offload
+computation from the server to the
+client to sort of parallelize something
+across all of the users who are doing
+something. And we can just run the same
+code. Oh, that's interesting. You can
+move it from the server to the client to
+parallelize it. Yeah. And you can also
+move it from the client to the server to
+make it faster and parallelizes
+depending on how you have your resources
+distributed. Yeah. Nice. Another point
+on this which has always struck me as
+just the degree to which we don't use
+HTTP for everything. It's kind of like
+this historical thing where we've had
+Okamel RTC's and client server
+communication all the time. And when we
+stuck it in the browser, we just sort of
+tried to move our existing Okamel
+ecosystem into the browser pretty
+closely. So you're immediately able to
+use all of the existing servers and talk
+to them the way that you want to. And we
+don't use HTTP, we don't use REST, we
+don't use any of these traditional
+GraphQL, like anything that you would
+see in the outside world. Instead, we
+have bespoke generated okamel protocols
+that work over these pre-existing live
+update streaming RPC things that we have
+built. when you're talking to your
+server, you open a websocket connection,
+you speak this language, and everything
+happens over this channel. If we ever
+wanted to make software for the outside
+world, and we suddenly had to like
+support the conventions that people are
+used to and expose JSON RPCs, I think
+we'd be at a pretty big disadvantage.
+But not having to think about those
+things internally and getting all of
+that for free within the tools that
+we're writing, it's a huge accelerator
+for adding a new feature. I want to add
+this new piece of data. You add it to
+the record type, you populate it, you're
+kind of done. There's no more type
+bumping or anything. We do have to think
+a lot about stability as we upgrade. And
+clients are running different versions
+of the server. And for the most part, we
+own the users, we own their browsers,
+and we can just force them to refresh
+when they're need to pick up a newer
+version. Yeah. And there's a certain
+amount of joy of not having to think
+about versioning. We care about
+versioning in lots of places. It's
+complicated and messy, but the cases
+where you can just not worry about it
+are glorious. a thing that's in some
+ways I think of as weirder about the
+outside world than about us which is
+that HTTP has become synonymous with
+network connection. Yeah. There's this
+thing underneath called TCP which you
+might have heard of which actually for a
+lot of the things that people use HTTP
+you could totally use TCP it works fine
+somewhat lower overhead you have more
+freedom there are other ports turns out
+it's not all on like port 80 there are
+other ports that you can use and other
+protocols and somehow the outside world
+has forgotten all of that and been like
+no no no there's HTTP and HTTPS and
+actually there's just HTTPS everything
+should go over that and that's just not
+the way our ecosystem is shaped at There
+are custom protocols that we build.
+There are lots of things that are just
+kind of Raleigh on top of TCP IP. Also
+TCP, you're getting high level already.
+We built our exchange protocols. This is
+all UDP multiccast. We don't have this
+TCP thing. That's right. Too fancy.
+Yeah. So another way in which the
+programming ecosystem specifically on
+the front end side is different is not
+to break out of the usual Jane Street
+doing our own different thing. We have
+built our own frameworks for building
+web UIs. This is a framework called
+Bonsai. And I'm kind of curious how you
+think of that as changing the experience
+of building user interfaces here. Yeah.
+So because we're writing Okamel, we sort
+of had this question of okay, we want to
+use Okamel to build UIs. What do we do
+UI framework-wise? Building UIs is
+pretty complicated. Managing state is
+pretty complicated. Manipulating the DOM
+is kind of fraught. And just to say,
+there's a weird fact about the world
+that you talk to kids out of school from
+fancy undergraduate institutions and
+they're like, "Ah, UI stuff. I don't
+ever want to do that UI stuff. And at
+the same time, it's actually one of the
+richest, most complicated, most
+interesting programming problems you'll
+ever run into. And it's actually really
+hard to do well. So this odd mismatch
+where it doesn't get a lot of respect
+and yet it's obviously important.
+Building user interfaces that are good
+matters to people. And it's really
+challenging and interesting. Yeah, it's
+really difficult and you end up thinking
+about so many different pieces of state
+and ongoing especially if you're
+building something that is interactive
+or building something like drag and drop
+modeling these interactions as explicit
+data types in ways that are both
+accurate and robust. It's all pretty
+difficult. I think part of the
+reputation comes from like a lot of
+front-end work is also working around
+browser differences and
+incompatibilities, learning how to do
+CSS layout that works in different
+versions of Edge or something. And like
+we are fortunate to be able to ignore a
+lot of the things that make front-end
+development less pleasant and really
+just focus on the interesting difficult
+parts of it, right? We do not support
+all the browsers in the world. Yeah.
+Just the browser we like. one version of
+Chrome then everyone's on the same
+version. So that makes it I think not to
+undercut your point of the general
+front-end reputation is low. But yeah,
+it is bizarre. I think building UIs is
+incredibly hard and there's so many
+different approaches and it kind of
+seems like no one has exactly nailed it
+and it is the reason there are so many
+different UI frameworks out there is
+that it's a very difficult problem and
+no one's like really cracked it. So, of
+course, we built our own to try to crack
+it instead of trying to write Okamel
+bindings to an off-the-shelf library and
+we use Bonsai. A lot of what makes
+writing front-end code at Jane Street
+feel very different is that we're
+writing it in Okamel. Not only this type
+sharing isomorphic server client easy
+protocol connection stuff that I was
+talking about before, but also just we
+have types. We have really really good
+types. We have some types which are
+really valuable for modeling a lot of
+the state that you have in a front-end
+application where you might have a value
+on the client that you want to sync to
+the server but it has not been synced
+yet and the server thinks that the value
+is this thing and you can build this
+composite complex type and wrap all of
+your types around it and have a
+interaction monad. I've used sum type
+several times. I was just about to say
+what is a sum type and why does it
+matter here? So many programming
+languages give you a way to say I have
+this and that and that. And more and
+more increasingly languages are giving
+you now a way to say I have this or that
+or that. And I think Rust has this as a
+big mainstream language that has
+algebraic data types for the sum or and
+product and which is just I don't know a
+fancy word for a very intuitive idea.
+But in Oakamel you can express something
+like I have got this result from the
+server or I am still loading this result
+or I got an error from the server and
+this is a sum type. It just means that I
+have this or that or that. And a lot of
+the just basic types that you're
+thinking about when you're writing
+frontends benefit immensely from being
+able to say just exactly that I want to
+load this thing and then if I get a
+response I want to load this next thing
+and expressing that as soon as I get an
+error I want that to propagate through
+the whole chain. You can make a monad to
+do this and it makes it easier. The
+monatic thing is for chaining some of
+this error handling together in a nice
+way. The basic underlying property of
+these disjunctions, these sum types is
+that they let you say this or that or
+the other in a clear way. And then maybe
+most importantly, there's a good
+language facility for doing the case
+analysis is this thing called a pattern
+match where it lets you make sure that
+you are exhaustively considering all the
+cases. And it turns out in just an
+enormous amount of programming is case
+analysis and having tools that help you
+do the case analysis and make sure you
+do the case analysis correctly
+exhaustively making sure that you don't
+mix cases from different things that
+you're actually looking at the thing
+that you should be looking at is just
+incredibly useful and comes up all the
+time and it's kind of shocking that more
+languages don't have it. You say it's
+like oh increasingly there's more of it.
+It's like sort of in the same way that
+Rust is sort of a mainstream language.
+It's just barely in the top 20 or
+something. But actually, the vast
+majority of languages don't have any
+good support for this. And it really is
+kind of a crying shame. The idea that
+one would generate a new language past
+the year 2000 without adding some types
+just seems like a disaster. You kind of
+forget when you work at Jane Street for
+a long time. How do you write software
+without this? So, a little bit spoiled
+there, but especially on the front end,
+I don't just have this string. I have
+this string that is embellished in some
+complicated way. Okay. And in order to
+actually display that to the user, I
+need to think about, well, what if it
+failed to load? What do I do? And
+depending on the tools you're using, it
+can be easy to forget about that. And
+Okamel makes you think about that every
+time. The type system reminds you
+anytime you want to use a value, well,
+what if you failed to load that? What do
+you want to do then? Right? So, there's
+a fundamental trade-off here about
+explicitness. Part of what the type
+system is doing is just forcing you to
+explicitly consider various cases. This
+goes back to like another difference in
+the language is many many languages have
+some kind of null pointer or a null
+value as an implicit part of every
+value. So you have a type system that
+tells you what's going on but it doesn't
+let you distinguish when you do and
+don't have null and you just have to
+think about it carefully on your own and
+make sure you get it right and it's all
+just kind of implicit in the code and in
+a language like Okamel this kind of
+analysis is explicitly forced for you to
+think about. Okay, so that's some ways
+in which Okamel makes the process of
+writing things different here. How about
+Bonsai itself? Are there interesting
+aspects of the design of that library
+that affect what it's like to work in?
+Yes. So, Bonsai is actually pretty
+familiar if you're used to something
+like React. It is a library that uses
+vdom patching, diffing, and patching.
+But unlike React where you have this
+component tree, Bonsai is sort of this
+pure functional core of okay, what if we
+built a library for expressing
+incremental state machines with internal
+state at any levels of this complex
+computation graph and then you put
+virtual DOM nodes as some of the values
+in that computation graph and you hook
+up a machinery to apply virtual DOM
+patching to a browser. The description
+that I just gave is like this weird
+functional programming nightmare. But
+what it actually amounts to is React but
+principled where instead of having like
+your implicit component tree which can
+sort of magically implicitly contain
+local state through something called
+hooks, instead you're just very explicit
+about okay a component is a value that
+can change over time. We have this VDOM
+structure and it can change over time.
+we have these other things over here
+that are strings and ins and they can
+change over time and we can produce UIs
+that are pure functions of those strings
+and insight and so the things I'm
+hearing you saying is one difference is
+that you have a more general computation
+model right the react stuff is in some
+sense specialized to computing a tree of
+DOM nodes and Bonsai gives you a system
+for computing any computation that you
+want and then we happen to use it for
+computing some DOM nodes or virtual DOM
+nodes I think that we did set out to
+write a good front-end framework. It's
+just that it turns out that a good way
+to solve the front-end framework is to
+solve this more general higher level
+problem. Yeah. And I think part of the
+motivation there had to do with actually
+some of the performance-driven issues,
+right? I think one of the things that
+makes building UIs in a trading
+environment different is you have this
+constantly changing stream of data
+that's coming in that changes what you
+need to display to users. And so there's
+all sorts of incremental computations
+that you want to do efficiently where
+you're just reacting to the new data and
+not having to refresh everything. React
+has a lot of work to let you not have to
+refresh the entire page. But here
+there's also a complex computation where
+you're like merging and combining and
+transforming data and you also don't
+want to redo all of that. And so I think
+part of what drove us in a more general
+direction was the desire to be able to
+optimize more deeply the computations
+that were going into what we were
+displaying in the UI. Yeah. And then you
+can also use that same mechanism by
+which you can express this computation
+graph at whatever level of granularity
+you want to break up your UI into
+whatever level of granularity you want.
+you're not necessarily limited by like
+okay this component is going to rerender
+when its internal state changes and it
+contains these subcomponents you can say
+okay I have a single logical component
+like I have a single function and it
+contains these two pieces of UI I'm not
+going to rerender the whole thing
+whenever any of my state changes instead
+this piece this particular bit of
+virtual DOM is a function of these
+inputs this other piece is a function of
+these other inputs and you can choose
+how granular you want to go with that to
+really control your rerendering and get
+better vdom
+diff even as lots and lots of things are
+changing all the time. Right? So, it's a
+more general system that gives us some
+extra powers in performance space. We
+can optimize things better. It also
+gives us some extra ability to break
+things down into meaningful components
+that are easy to think about
+independently that aren't necessarily
+just computing chunks of VDOM. So,
+that's one difference. What are the
+other differences that you see? Another
+big difference is this explicitness. I'm
+contrasting this to React because I
+think that a lot of people know React,
+but I am not really one of them. The
+last time I used React professionally
+was more than 10 years ago and I'm out
+of date. Now there are hooks and I only
+have a layman's understanding of this.
+So a lot of the things that I'm going to
+say about React are going to be probably
+wrong in subtle ways and people can
+hopefully not discount everything that
+I'm saying based on that. But React does
+a lot to give you this apparently simple
+API. When you're writing a component and
+using hooks, there's really this very
+complicated reconciliation process
+happening under the hood in order to
+associate the state with the correct
+component as you're rerendering things.
+That amounts to I can create a state
+hook that contains a string, but I just
+have a string when I'm writing my code.
+But you're sort of limited in what you
+are allowed to do with that string. You
+can't conditionally inspect the string
+and then decide to create some other
+amount of state based on the value of
+the string. There are various ways that
+you can like illegally write a React
+component if you're conditionally
+creating a hook or calling something a
+variable number of times between
+component invocations. And these are
+things that llinters can catch for you.
+And there are rules that you have to
+follow in order to use React correctly.
+and you know the rules and they're not
+super ownorous, but there are certain
+refactors that have the possibility to
+introduce bugs. Bonsai sort of does not
+try to do any of this implicit magic
+sort of make it look like you're
+creating this just regular variables
+that you can just use like their
+variables. Instead, it uses Okamel's
+type system to really enforce this
+separation of okay, you have a bit of
+state that's changing over time. Well,
+that is sort of like a promise
+essentially. It's something that you
+can't just look at it. You can't just
+put that value into some DOM node. You
+have to construct a new computation that
+explicitly takes that as an input and
+produces an output. We have very good
+notation for expressing like I have an
+input of these five computations. It's
+not quite as annoying as use memo and
+listing out every single input, but you
+do have to be explicit at the level of
+this particular computation as these
+particular inputs. We use OKML's type
+system to ensure that like you can't
+forget to do this. If you did not
+explicitly register an input, you just
+can't use it on the other side. You're
+just going to get a type error. So
+although there are things that you could
+write that would be wrong, the compiler
+will check them for you immediately. And
+you get this immediate feedback that
+like ah you have you have done this
+thing that is illegal. This sounds to me
+a little bit like the trade-off between
+C++ and Rust, which is in C++ or C for
+that matter, there's a bunch of things
+you have to do quite carefully when
+you're writing code. There's all these
+disciplines around when code is created
+and freed and shared and modified and
+how you are supposed to handle pointers
+that are to values that are on the stack
+and all of that. And there's nothing
+explicitly forcing you to do it. You
+just have to get it right. And when you
+don't get it right, you're in crazy
+undefined behavior land and you're going
+to have a bad time and things are now
+kind of hard to debug. And in Rust,
+there's a much more explicit system for
+tracking this. You essentially have
+guarantees that you're getting it right.
+And the trade-off there is there's a
+bunch of extra complexity. There's like
+a fancy type system that you have to
+wrestle with and there's just more
+typing. More characters are required
+because you have to to be explicit about
+like what is their discipline for
+managing memory between these two parts
+of the code and like what's the contract
+between them? You actually have to write
+that contract down rather than just
+hoping that people roughly infer what it
+is because they kind of know the style
+of how this particular piece of code is
+written. How well do you think that maps
+on to what you see in the kind of Bonsai
+versus React case? So the explicitness
+is definitely there. You're definitely
+typing more characters when you're using
+bonsai than when you're using React. But
+I think an important difference and I
+wouldn't want people to get the wrong
+idea is there are certain things that
+are actually just harder to do in Rust
+and they might be perfectly safe things
+like I want to create a doubly linked
+list in Rust and I want to do that
+safely using the borrow checker. It's
+like I don't know how to do that. That's
+fundamentally very difficult to do in
+Rust. And I think it's not difficult. I
+think it's impossible. Okay. You
+literally cannot create a doubly linked
+list because it violates the core
+constraints of safe rust. And so you
+need to like go off and use some of the
+extensions or explicitly use the unsafe
+extensions of Rust. So it's like it's
+doable but it is not trivial. I don't
+want people to think that we're paying
+such a high cost. Everything that you
+can do in Bonsai, you can express
+exactly what you would be doing in
+React. There's nothing that is sort of
+forbidden or offlimits. It's just that
+it all has to be extremely explicit. But
+you can model all the state. But for
+example in React a mistake you can make
+is you can render a list of components
+without giving them an explicit key and
+it'll warn you and it's not like it's
+impossible to write React code
+correctly. It's also not impossible to
+write C code directly. We have val grind
+we have lint all sorts of lers and
+stuff. It's very similar in some ways.
+The only way to render a dynamic number
+of components forces you to provide a
+key in order to do that. So it's not as
+difficult. The rules are more directly
+mapping from the rules that you are
+already following to write correct react
+code. We just have a type system for it.
+Let's leave the world of code for a
+second. I want to pop back to trading
+for a bit. So we were talking before
+about the difficulty of dealing with the
+kind of information imbalance of like
+you know a lot about software
+engineering that the traders don't know
+about. They know a lot about what they
+are trying to do that you don't know
+about. I imagine some of the process for
+you has been learning more about it. How
+has that gone? like what what has the
+process been like for you of coming to
+understand a little bit more like
+options is an especially complicated
+domain in the trading world I think for
+a variety of you know down to like even
+understanding symbology what security am
+I trading what does it mean is a
+surprisingly complicated affair and I'm
+curious how has it been coming to grips
+with everything from like how we think
+about modeling options prices to the
+details of the technology what's that
+process been like for you it's very
+humbling I would say it's definitely
+shows that I'm would not make a good
+trader and I'm better suited to stay an
+engineer. We have really good internal
+education for I think this is true for
+all desks and all specific domains that
+people have to understand at Jane Street
+but there is a lot of education a lot of
+explicit learning. The tools that we
+work on are very broad and I feel like
+at times I have to understand a lot of
+different areas of options trading at a
+sufficient level that I can program it
+but we don't go extremely deep into any
+particular small aspect of options as a
+domain and we have more specialized
+teams on the desk people who are work on
+pricing people who work on computing
+options fars or finding implied
+volatility from the markets and they go
+very deep into these more narrow domains
+and like really understand this. I wish
+that I did a little bit more of this to
+be honest. I feel like building the
+tools for understanding all of options
+trading at once requires some amount of
+like okay we have this piece of the
+domain. I have to understand that well
+enough but that is like one of the 40
+different things that we're trying to
+present to traders. So it is a little
+bit of I don't know I definitely don't
+feel like I could come out of this and
+become an options trader. Instead, I am
+have this very broad picture of all of
+the different pieces that fit together.
+But if you asked me to compute early
+exercise decisions, I'd be like, "Okay,
+hang on. I need to like go work out the
+math for a little bit because it's not
+something that I've done." So, education
+is very good, but the tools specific
+team is at this weird. You have to know
+a little bit of everything. A little bit
+of everything. And it's difficult and
+it's humbling. There's a lot of things
+to learn in this kind of environment.
+What is it like actually improving
+something? Can you give me an example of
+like a problem that you've run into of
+something where like the tools aren't
+doing quite the right thing and you need
+to work with people and with the traders
+and try and make things better? Can you
+make it a little bit more concrete what
+one of these efforts might look like? So
+something that I worked on recently is
+we have a type of alerting of an
+interesting thing is happening in the
+market. We want to tell traders and
+there's this frequent tension between we
+don't want traders to miss an
+interesting thing but we also don't want
+to annoy them with constant this thing
+is happening this thing is happening and
+they're like all right come on like I
+don't care. So balancing noisiness and
+building more complicated rules for
+whether something actually is important
+and then maybe stateful interesting
+things where conditional on the fact
+that I have already told someone about
+this how much less do I want to tell
+them about the next time this happens
+and we have timebased rules for don't
+alert on this too frequently or increase
+the threshold by which you know it's
+moved this amount it needs to move more
+in order for us to tell people again. So
+a common type of improvement is I'm
+hearing this alert too much and I would
+like to hear it less. So all of the
+things we do are very full stack. So
+it'll start with okay we need some new
+piece of data to say evaluate the
+interestingness of a certain opportunity
+and that requires learning various
+things about the market or how much it
+usually trades in order to say that this
+is more interesting than usual. And then
+ultimately we're going to do our best
+and build these heruristics and talk to
+traders and they're going to try it out
+and say like, "Yeah, this seems better.
+I'm not annoyed as much as I was
+before." But then we often have these
+thresholds or configurations. We want
+traders to be able to ultimately they
+know how often they want to hear about
+things and they want to be able to
+configure these things. So, Jane Street
+has internally a lot of trader
+configurable things and we leverage
+existing infrastructure that we have for
+traders to go in and tweak values, tweak
+parameters, edit things about how often
+they want to hear certain alerts. Yeah.
+So, there's two problems I see you
+talking about here. One is there's this
+general kind of alerting the appropriate
+amount problem like alert fatigue. It's
+kind of a fundamental issue. And
+actually I think a problem I imagine you
+run into because I feel like it's a
+problem we see everywhere with traders
+is they underco complain about this
+issue. I think they are subject to alert
+fatigue but also James Street traders
+just are socialized to have high pain
+thresholds. If every day you need to
+like come in and pick up a hammer and
+hit yourself on the head three times and
+then like slap your hand on the desk in
+order to like turn the crank and make
+the money. People will just do that over
+and over. But in the end it's actually
+not good for them and their efficacy and
+their happiness. And so there's an issue
+of actually you kind of want to
+overreact to people's concerns in the
+space. So that's like one problem. And
+then one way you can deal with that
+problem is you can give them dials. It's
+like oh I'll give you some
+configurations and you can modify it and
+then you can push things back and now
+you have another problem. Yeah. And we
+don't want to offsource all of this work
+to traders and be like all right it's
+your problem now. We do want to get it
+as close as possible but things happen
+things change. We want to be able to
+react to okay whoa whoa whoa. Because
+things are so busy today the typical
+thresholds that we've set are not
+working well. So I want some way to
+tweak that intraday and that's more why
+we give configurable knobs rather than
+just okay it's your problem you have to
+go figure out what the threshold should
+be. So do you end up taking lots of
+different kinds of data and situations
+and conditions and then packing them all
+into one interestingness number or many
+different notions of interestingness
+that float around inside of the system?
+For some systems, we do. For systems
+that are looking at lots of different
+types of interesting events and who want
+to surface those and decide which of
+those to surface, we have metrics for
+roughly sorting them by interestingness,
+sorting them by value, by how valuable
+we think telling a trader about this is.
+And then we have sort of global
+thresholds that we can set for, okay,
+because today is so interesting, I want
+to like hear half as many alerts, I want
+to double the like interestingness
+metric, the threshold by which you're
+going to actually play sounds on my
+computer. I just want to take this up or
+I want to take this up for this
+particular asset class today. So we have
+these knobs and often the thresholds get
+sort of tuned stably over time and then
+we just sort of relatively change them
+to respond to changes in the market or
+changes in busyiness. How do you avoid
+ending up with just an unbounded amount
+of configuration that persists over lots
+of different people when new trader is
+hired and they start like why is
+everything terrible? Oh it's because you
+have all the wrong knob set. How do you
+make it so that like the default
+experience of a new person is actually
+good when you give people the ability to
+adjust and tweak the system to match
+their needs? Yeah, we've gotten better
+at this over time and that is making
+fewer per user knobs and more deskwide
+knobs. So, if you particularly want to
+hear less about this thing, probably
+that means the entire desk wants to hear
+less about that thing. After having
+built too many bespoke configurable
+things such that the people sitting next
+to each other using these tools are
+using completely different tools. We try
+our best to unify these and give
+deskwide configuration more than user
+specific configuration. Some of the
+again maybe different from what you
+might see in some consumer products well
+or maybe the same but there's some
+amount of trying to make a better
+experience by constraining what people
+can do by taking away various kinds of
+choice which I guess actually has
+totally happened in consumer stuff I
+remember in the good old days when you
+used win amp or something you could have
+all the UIs any UI you wanted right and
+now the world has settled on you have
+one bit you could be in light mode or
+dark mode and that's it and everything
+else is going to be managed centrally so
+we've talked a bunch about the stuff
+you've done here. You also have done a
+bunch of interesting personal projects
+over the years. I think one I've
+personally enjoyed watching a lot is a
+thing called Bobble. Can you maybe say a
+few words about what Bobble is? Yeah, so
+Bobble is sort of a live coding
+environment. It is a website you can go
+to and type a few lines of code and you
+will get 3D images and animations from
+that code. And if you've heard of
+shaders or shader toy, it's a very
+similar idea where you're writing a
+program, it gets compiled to an OpenGL
+shader, which is essentially a function
+that runs on every pixel in an image and
+says, "What color should this pixel be?"
+And you can write very interesting
+functions that say, "Okay, depending on
+the position in the image, like I'm
+going to maybe do ray marching. I'm
+going to like do ray casting to compute
+the color." And you can do surprisingly
+complicated and intricate images just in
+this pure function from pixel to color.
+So I think of this as roughly a thing
+that has been designed to run
+efficiently on modern GPUs so that you
+can do it really fast and at real time
+and get high responsiveness doing chunks
+of pixels in parallel such that it
+happens very quickly and you can do some
+really incredible realtime rendering and
+a lot of people have if you look at
+shader toy or the work of Indigo Keilles
+it's really impressive how much you can
+get the GPU to do but doing that
+requires writing this kind of low-level
+language called GLSL the OpenGL shader
+language and then compiling it using
+WebGL and rendering it. It's very low
+level, which you'd expect for
+programming a GPU, but I wanted
+something extremely extremely high
+level. I wanted to be able to say, okay,
+I have a sphere and I want to union that
+with a cube, and then I want a 3D
+rendered version of this thing that I
+have just expressed. So, Bobble is a
+tool that gives you this very very high
+level expressionoriented functional
+language that it will then you use it to
+express 3D shapes and then it compiles
+down to hundreds of lines long shader
+that will do the ray tracing for you and
+it's based around sign distance
+functions which are this really exciting
+and really interesting way of modeling
+3D space as pure functions. Let's talk
+about this more. But what is a sign
+distance function and why is it
+interesting and why is it different from
+the way that this is not the only
+programmatic system for building 3D
+designs? There are plenty of others out
+there, but the sign distance function is
+not something that all of them do. So
+what's the point of that as an
+abstraction here? Yeah. So assigned
+distance function is literally a
+function that takes a point in 3D space
+and returns a float. And what that means
+is what is the distance from this point
+in space to the nearest point on a
+surface. So for example, if you have a
+sphere, the distance function is very
+easy. It's an easy function to write.
+You take the distance between the point
+you're asking and the center of the
+sphere and subtract the sphere's radius.
+And that's literally that's it. That's
+the function. The interesting thing
+about them is that you can compose them.
+So given two sign distance functions,
+you can call them with the same point.
+They'll give you two different values
+for the distance. And then you could
+average those two values together. And
+now you have a new shape, which is if
+you had a sphere and a box, now you have
+something that's kind of halfway in
+between the two. Or you could average
+them only when they're very close
+together in value. So the sort of edges
+of the surface, the boundaries blend
+smoothly together. And you can build a
+lot of interesting shapes using these
+just function composition, just calling
+two functions, doing something
+interesting with the value or doing
+something interesting with the input to
+the function. And you can use this to
+express like crazy interesting
+transformations in 3D space like I have
+a cube and now I want a twisted cube.
+You can just do that by manipulating the
+input coordinate that you evaluate the
+cube with at every point. It sounds very
+abstract, but it is. But it actually
+gives you something, right? It would
+gives you like a richer kind of
+composability to make it easier to take
+different things and actually smash them
+together in ways that make sense and in
+a way where you could have somewhat
+predictable visual outcomes of the
+operations that you're doing. To
+contrast this with traditional 3D
+modeling, you have points, you have
+triangles. It's kind of hard to do the
+thing that I just described. If I have
+two shapes and I want to like smoothly
+blend them together, well, okay, I have
+to like compute the surfaces of those
+points and add a bunch of additional
+points in order to express the curvature
+because everything has to be a triangle.
+And you sort of have this very different
+representation that can do operations
+that are hard to do if you were doing it
+on a 3D mesh. But the other thing that's
+weird about where you triangularize
+everything or you turn these into
+polygons is you have to kind of in
+advance decide what is the granularity
+at which you want to combine things and
+then do the operations for joining
+things together which first of all can
+lead to weird artifacts right where it's
+like you know I create a sphere over
+here and a square over there or and cube
+over there you know the sphere has some
+pretty it's not really a sphere it's now
+some weird triangulated shape and then
+the edge where the two things merge is
+going to have weird zigzag pieces
+because terms of where the two grids now
+interact is this idealized idea of a
+sphere. It is this pure function that
+represents a sphere. And if you actually
+wanted to 3D print that, you could
+materialize that function into a
+triangle mesh if you wanted to export it
+to another program or do something else
+with it. But as you're writing your
+program to produce these 3D shapes, you
+just think of it as this pure function.
+It is an infinite resolution sphere and
+I can do anything with it and compose it
+with anything else and I get things
+right. In some sense, you step away with
+these triangulation tools from the
+infinite resolution thing very early and
+in this kind of systems, you step away
+late. Yeah, actually you talked about
+these signed distance functions where
+you can now compose things together. I
+think you were lying to me because you
+said they were assigned distance
+functions and I think I don't believe
+you, which is to say I think I can write
+the sign distance function for a sphere
+and I think I could maybe write the sign
+distance function for a cube. But that
+swizzling operation you described that
+takes something and like transforms it
+together. I feel like the thing you have
+at the end probably is not literally a
+signed distance function anymore. I run.
+You're wrong. Yes, that is exactly
+right. And I probably shouldn't call
+these signed distance functions, but if
+you want to research or learn more, that
+is the literature that will describe
+these. But they are no longer assigned
+distance functions as soon as you start
+performing certain transformations to
+them. There are ways to compose signed
+distance functions and get a perfect
+distance function as a result. But a lot
+of the really fun parts of it sort of
+violate this invariant and you end up
+with
+approximations of a distance function
+assigned distance-ish. It's yeah it's
+like a signed proximity function. Maybe
+the neat thing is that you can compose
+these. But there is another really
+important aspect of this which is that
+you can ray trace them efficiently. It's
+called ray marching when you do it to
+assign distance function because you can
+say okay I am looking at this point in
+space. How close is the nearest shape?
+and you ask your sign distance function,
+it says ah you got like 60 units and
+then you can just jump ahead 60 units
+because you know that is the nearest
+shape. You don't necessarily know if
+it's in this direction but you know that
+in every possible direction you could
+travel space is empty up to a distance
+of 60. So you can ray trace these in a
+very very few number of steps which is
+what makes you able to write real-time
+animations that run on your GPU at high
+resolution of like you're not literally
+ray tracing it. You're doing this using
+the distance function information in
+order to skip parts of space when you
+don't have a perfect sign distance
+function. You can do things like skip
+past it or jump into the middle of a
+shape because ah the approximation at
+this point is not the same as the
+approximation when I actually jump
+forward. So these are things that you
+have to think about if you're using sign
+distance functions to make art and
+animations. And there's various
+mitigations that you can use to make
+evaluation slower, but at the same time
+it's more fun to play with these bizarre
+not quite distance safe shapes that
+you've constructed. So the ones that
+violate the rules are fun in their own
+right because they create weird visual
+artifacts when you render them and have
+strange behaviors all their own. Yeah.
+or like I want to take this 3D shape and
+extrude it along a bezier curve that
+produces something that is you know it's
+so close to a signed distance function
+that you can still get a good-look image
+out of it but if you then want to use
+that as the input to another operation
+now you're kind of in trouble because
+you started with an approximation and
+you did some math to it now you have
+like a really bad approximation so
+there's a lot of these rules and things
+that you learn as you play around with
+these shapes so if you go to
+bobble.studio studio. And I encourage
+people who are listening to go to
+bubble.studio. One thing you will
+immediately notice is way too nice. It's
+like a really fun, really pleasantly
+designed little app. You know, you get
+to on the left hand side of the screen
+write a little program in literally your
+Ian's favorite dialect of lisp that
+describes the image there. And I just
+wonder like how did you find the time to
+do this kind of project? It seems like
+really quite an investment. I think part
+of the fun of sign distance functions is
+that they're way easier than they look.
+It's so easy to write this sort of ray
+marcher. People have been doing this a
+lot and they've learned how to do this.
+So I am in some sense just packaging up
+a lot of different things that other
+smart people have already figured out
+into a single tool. It uses code mirror
+which gives you this very polished
+environment when I have a small amount
+of code to generate autocomplete and
+stuff but mostly that's just code mirror
+and code mirror is really good. So it
+looks polished and you can produce some
+pretty goodlook 3D renders. But I
+learned how to do all of this from
+watching what Inigo Keilles is doing and
+using a lot of his primitive functions
+that he's already figured out and a lot
+of the methods that are used by other
+people on shader toy. So I think it's
+actually looks a lot more impressive
+than it really is. I spent a lot of time
+building this highle compiler and
+there's some bits of it that are more
+bespoke things that I wanted like you
+can interactively edit numbers in the
+code editor because it's kind of hard to
+create a 3D image just by typing in
+numbers if you're writing a color. It's
+nice to just be able to drag and drop
+things or if you're positioning things
+you can just drag vector literals around
+the screen and Oh, right. There's I
+think we go to a number and click on and
+drag to the right or the left and have
+the number like interactively move and
+then also the image interactively
+changes as you do that. So you can kind
+of try and pick the number that actually
+looks right in a nice way. Yeah. So
+there's some amount of bespoke work that
+went into that. But yeah, it took a long
+time. I don't know. How long did the
+project actually take? It's hard to say
+exactly. I think I've probably worked on
+it seriously for around five months.
+It's been my main side project total.
+Hard to say. I worked on a lot of it
+while I was on parental leave. So that
+is where I found the time was during
+naps. But I don't have nearly as much
+time to improve it since. Right. And now
+you have a kid who probably naps less.
+Yep. So you've also done a bunch of fun
+physical projects. Maybe you can tell us
+a little bit about some of those. Sure.
+So a recent one is adding 3D mesh export
+to Bobble so I can do 3D printing.
+That's been kind of fun getting a little
+bit into that. I've built some musical
+instruments. That's something that I
+don't really play any musical
+instruments, but it's surprisingly easy
+to solder together a microcontroller to
+a bunch of buttons and then program it
+to do interesting MIDI things. I built a
+mechanical keyboard and it's like
+shockingly easy to do and I was like,
+"Okay, I can design and build bespoke
+MIDI instruments now just using a lot of
+the same techniques and that's one of my
+hobbies." Do you ever play them and make
+music with them or is it purely
+ridiculous, Ron?
+I try to get my baby to play them, but
+he has so far not taken to them. You
+also made a corded keyboard. One of my
+MIDI keyboards was this experimental
+corded input mechanism where holding
+down different sets of keys would give
+you different notes in a stable way that
+I don't know. It was an interesting
+experiment that doesn't really have a
+physical analog. Part of the fun of
+making electronic instruments is you're
+not constrained by like I need to put
+holes on a tube somewhere to get the
+right frequencies. You can do all these
+weird things and like have instruments
+that move relative to one another like
+this button just goes up by a semmit
+tone rather than having absolute pitch.
+There's a lot of freedom and fun design
+space to explore building custom
+instruments and then never performing
+with them. Yeah, it's fun to build them.
+Also, ask me how many things I've made
+in Bobble. It's much more fun to build
+Bobble than to actually make art with
+it. Although I've seen some of them,
+they're pretty cute. Another fun aspect
+of Bobble itself is you ended up using
+this somewhat obscure lisp variant
+called Janet as the programming language
+for Bobble. And I'm curious what got you
+there. Why did you end up using this?
+You know, I feel I often describe Okamel
+as comically obscure, but I think Janet
+is even more comically obscure than
+Okamel. Extremely obscure. Yeah, it
+seemed obvious, and I can't justify
+this, but it seemed obvious that the way
+that you should express 3D shapes in a
+programming language would be some kind
+of lisp. That's a very hipster opinion.
+Just the notational like I wanted
+something extremely concise and I wanted
+things like variatic functions. I don't
+know in contrast to Okamel. Well, is a
+little bit verbose and I like that for
+building a real application, but I
+wanted something where I could build a
+very concise notation for expressing
+different combinations. So, it clearly
+seemed like s expressions were a good
+way to do this, right? For those who are
+like not listic, just a really
+unpleasant number of parenthesis. Every
+single thing is parenthesized. That's in
+some sense almost the only syntax
+affordances like PN function arguments
+close PN and everything just kind of
+builds off of that. Bobble actually has
+a lot of lisp blasphemy built into it to
+give you sort of postfix function
+application and also infix functions. Oh
+yeah, you're not supposed to do that in
+you're not supposed to do that but it is
+very very nice for expressing GLSL
+languages. I wanted some amount of
+notational freedom also because GLSL
+despite being like relatively low level
+has surprisingly nice notational
+affordances for manipulating vectors. So
+something that you can do in GLSL is if
+you have a threedimensional vector, you
+can write
+vec.xy and you get a new vector that's
+the first component and the first
+component again and then the second
+component and there's this neat concise
+swizzling operations that you can do and
+also various operations that are
+overloaded to like do the right thing on
+vectors and that's all very nice. I
+didn't want to lose that notational
+concision even as I added more
+notational concision. So the language
+that Babel uses is really modified Janet
+with some custom macros for that makes
+it a little bit easier to type
+sequentially without having to go and
+wrap your parents and keep them
+balanced. Right. And I guess that's like
+the other thing that makes lists
+different is they have really good macro
+systems. Yeah. The fact that I could get
+this level of control over I really want
+the program to look exactly like this. I
+can get that syntax without having to
+write my own parser, without having to
+do that. That was an appealing aspect of
+it. And then you wrote a book about
+Janet. How did that happen? So I had so
+much fun building Bobble in part because
+I wanted to use Janet because Janet can
+very easily compile to web assembly. And
+I don't know, I thought it would be more
+fun to do the whole compiler in the
+language that you use to express the
+language as opposed to parse this
+notation and then execute it in
+JavaScript or in OAML or something else.
+So really all of Bobble and its compiler
+are written in Janet. I thought this was
+really fun to write this web app that is
+not heavily JavaScript. And embedding
+Janet in the web was both really nice
+and really pleasant and also very
+difficult to get started with. But I
+wanted more people to be able to do
+this. I wanted to like make it easier on
+the next person who comes along and
+says, I want to make a live coding
+environment using an obscure list in the
+browser. And so many people are in that
+position. So, I wrote a book about Janet
+because I think it's a really well
+thought out and really well-considered
+language that I just matches my personal
+taste very well. And I found I really
+liked it a lot more than I was expecting
+to when I started using it. And I wanted
+it to have more exposure. So, I wrote a
+book that no one's read about Janet. And
+it actually worked. Someone actually
+made a live music coding environment
+inspired by the live coding environment
+in the book and like based on the source
+code forked it and made a live music
+environment called train t r a ne. Is
+that named after cold train or like I
+kind of guessed that when I read it but
+I don't know the actual anomology and
+it's a delightful site. It has this very
+idiosyncratic UI that looks like a
+Windows command prompt. It's nice. It
+was nice that someone actually was like,
+"Yeah, I also want to build a weird art
+playground using this weird language."
+So, you've spent an enormous amount of
+time on lots of different kinds of
+personal projects. I'm curious to what
+degree that experience has changed how
+you think about programming in other
+contexts. So, I feel like everything
+that I have done for fun, I've
+ultimately ended up using somehow at
+work. And I think maybe part of that is
+because I've worked on a lot of
+different areas. So I like have more
+opportunities for this, but not that I
+would ever have expected this and it's
+not the reason why I'm making goofy side
+projects or art projects, but I've
+always learned something and then within
+like a year somehow unpredictably
+something comes up such that I get to
+use the knowledge that I learned. And I
+think having exposure to a lot of
+different programming languages, I've
+always been interested in programming
+languages from a theoretical standpoint.
+And I think that thinking about how
+different languages solve problems helps
+immensely for modeling problems in any
+specific language. The experience of
+using Haskell for a couple years to
+build what I thought were trivial
+applications and building them in
+completely different ways because I'm
+dealing with immutable state for the
+first time and learning how to think
+differently about that. I think that
+that's very mindexpanding and has given
+me more tools to approach like modeling
+problems. Also, I don't know, still
+learning obviously. I wouldn't say that
+I've gotten good because I've written a
+bunch of different side projects, but I
+have learned a lot of different ways to
+approach problems that have helped me
+out in real life. Have you learned
+anything from Janet in particular? Janet
+was my first experience with the
+language. I'm not a Lisp person and I
+wasn't really looking for a lisp
+language apart from this dabbling with
+closure earlier in my life. I never got
+into the macro system. I never really
+appreciated this aspect of lisp. I kind
+of thought this was like a dumb weird I
+don't know. I don't really like it and
+it seems weird. And with Janet, it was
+the first time that I'd really used a
+language with a powerful macro system
+and really embraced that and tried to
+really learn it and understand how I
+could use it to write programs better.
+And I think it's very mindexpanding to
+think about writing code that is
+executing at compile time but is
+producing code that will execute at
+runtime and this blend between the
+compile time and runtime environment.
+Janet when you compile a program it
+produces like an image which is
+something that no language that I had
+used before Janet I know that's like an
+old technique and small talks do this
+and lists have done this forever but
+Janet was my first experience to this
+type of programming where instead of
+compiling to a bunch of machine code
+that exists and is static you're sort of
+building this full runtime state and
+then writing that down to disk and then
+later when you run your program you're
+resuming from this like snapshot in time
+and And what this means is you can do
+compile time computation and produce a
+complex object graph at compile time and
+then write it down and restore it later
+and keep going. I thought that was
+really mindexpanding and a really
+powerful technique that I don't have a
+good way to apply to any other language
+because it kind of takes a lot of
+language buyin to be able to serialize
+arbitrary program state to disk. And
+this isn't just values. This is like I
+have a co- routine that is in the middle
+of executing and I'm able to suspend
+that exactly as it is and write that to
+disk and then resume it later. You can
+serialize closures over the network and
+like send them to a remote process and
+then execute the closure. Having this
+live code that you can freeze and then
+restore later is kind of a mindexpanding
+thing. I've always thought of this as
+like a terrifying feature of small talk
+because the way small talk people use it
+historically, at least the way I've
+understood it is not just I write my
+program and then there's a kind of
+multi-stage process where it does some
+stuff and then you freeze it and then
+maybe you take that thing and ship it
+and then that's your final program as
+their development environment. So they
+just have this binary soup of artifacts
+that they've just made over time as they
+have been working. It's no longer a
+program that you can read really. you
+know, there's some code and there's some
+data and it all just kind of lives
+together in this complicated soup. I
+don't know how to build careful high
+assurance software in that kind of mode.
+Yeah, it kind of sounds crazy to me and
+I haven't tried it. And you can do this
+in Janet as well. You can start running
+your program, you can modify it and then
+you can at any point save it back to
+disk. You can like take a snapshot. But
+the way that I have used it and I think
+Janet's a small enough language that I
+shouldn't say like idiomatic but like
+the normal thing that you do is this
+really two-phase thing where you are
+running your program up to a point and
+then you stop and then you're always
+resuming the program from that exact
+same point. So all of your code all of
+the things that you've written on disk
+you can always sort of deterministically
+as long as your compilation is
+deterministic like get back to that
+state. The state of your image is a
+reflection of the code as you've written
+it, as you have it in source control.
+It's not this mutable target that you're
+interactively changing. It sounds very
+errorprone. I know that small talk gives
+you like the history of every change
+that you've ever made so that you can
+like you're not like totally hosed, but
+it still sounds wild to me and I've
+never tried to program like that. Yeah.
+I mean, I feel like it could be a good
+environment for playing around with
+data, but it doesn't feel to me like a
+great environment for building a very
+careful piece of software that you need
+to make sure is actually doing the right
+thing all the time. I mean, beyond the
+image and the fact that you're like
+working on the same program
+interactively over a long period of time
+because you're able to serialize the
+entire state to disk, but a common way
+that you write list programs is this
+interactive thing as well where it's not
+maybe quite as long running, but you
+write code and then you evaluate chunks
+of your code at a time and you're like
+redefining your program at runtime.
+Yeah, I think multi-stage programming is
+a good and important thing among the
+various good ideas embedded in lisp. The
+macro system and more generally this
+kind of notion of multi-stage
+programming is something that lisps have
+done really well from a long time ago
+and very few other language ecosystems
+have done a good job of it. There's the
+whole like okml hasll world and I think
+that's a world that's been really good
+at types and very mediocre at macros and
+multi-stage programming and then the
+lisp world is one that's been the
+reverse very good at thinking about
+macro systems and how to use them
+effectively and the type story being
+much weaker and more complicated and
+harder to use. you're talking about it's
+hard to use this in other contexts. We
+are actually like literally at the
+moment working on stuff to add some of
+this power to a camel at the moment in a
+kind of more static and limited way.
+Right? I think it sounds like the Janet
+story is like fairly flexible and
+arbitrary multi-stage programming. And
+we're looking more at stuff where you
+can do runtime code generation and maybe
+do runtime code generation at multiple
+spots in your program, but not quite the
+same thing as like stopping and freezing
+your whole program and restarting it
+again with all of the state there. But
+that itself, I think, is already very
+useful. And I think having an
+understanding of how to work in that
+environment, I think, is a thing that's
+going to become more relevant as we get
+more of those language features landed.
+Okay. Okay. So anyway, that's a like
+lessons learned by working on personal
+projects that you've been able to adopt
+more generally or at least influenced
+your thinking beyond there. How about
+the other direction? Are there things
+that you've learned from the way you've
+programmed here at Jane Street that's
+influenced what you do in your personal
+projects and what you've learned beyond
+that domain? So Jane Street has this way
+of writing tests, this expect test
+workflow. Jane Street's not the only
+place that does this, but it was my
+first exposure to this. And I kind of
+just can't believe that it's not the
+industry standard thing that everyone is
+doing everywhere. It's so much better in
+so many ways that I kind of can't live
+without it. It's also like the
+image-based programming thing in that at
+first it sounds like a really bad idea.
+Yeah. A lot of people when they hear
+about this, they sort of are objecting
+to it. So what this is specifically is
+I'm going to write a test and it's going
+to do something and it's going to
+produce some output and I'm just going
+to save that output to the file. I write
+a test that edits itself. It's going to
+modify the test code itself to embed the
+output of some function or whatever into
+that test and then I can sort of use
+this like an interactive ripple where I
+write some code, I run it and then I
+have the result in my file in the exact
+same file that I wrote it. like it has
+literally patched the file on disk. It's
+not like I'm running it in a ripple and
+I see some transient result and then
+it's saved and it's when I go back if I
+run the test again it'll tell me if it
+is different. So the way that I can use
+this to write code is like very similar
+to the way that I wrote code without any
+tests at all which is I write some code
+and then I run it and then I see if it
+did what I wanted and if it did great I
+move on and if it didn't I go and I fix
+it until it is good and then once I've
+done that I sort of save it and mark it
+as okay that was the thing that I wanted
+and I use this interactive workflow when
+I'm just developing code and exploring
+it because it's just this really great
+feedback loop for seeing results. And
+maybe the most relatable analogy of this
+is it's kind of like a plain text Python
+notebook. Yeah, Python notebooks you
+write some code. There's like a block
+that has the output of the code that you
+wrote and then you kind of do that over
+and over again. Except in the Python
+notebook case, you have this sort of
+interesting property that there are no
+guarantees that the stuff that's in the
+notebook reflects what would happen if
+you reran the notebook from beginning to
+end. The experience of a notebook is
+this kind of choose your own adventure
+of which cell do I want to evaluate now
+which is I think often important in the
+Python notebook world because various of
+the steps could be really slow. So you
+kind of want to make the choice of like
+which parts you want to actually redo.
+But with expect test the idea is you
+have a file with one of these tests.
+Every time you rerun the test it just
+runs from beginning to end. It
+regenerates all of the output. It checks
+it's the same as it was last time and if
+it's the same as it was last time that's
+the test passing. And if it's different,
+that counts as a failure. And it
+rewrites it with a new data. And you can
+choose with a click of a button, do I
+want to adopt this new version of the
+output or do I want to keep with what
+was there before? Yeah. And this sounds
+a little bit crazy. It sounds crazy in a
+lot of ways. Like the description that I
+gave initially is not the best way to
+write tests, just playing around in a
+ripple. Like you kind of want to be
+thoughtful about the exact things that
+you're testing. You want to test precise
+properties. But it is both a valuable
+workflow as you're writing code, but
+then you can also produce very
+highquality tests because you're not
+just writing a traditional test where
+you're writing some assertion about some
+property, which of course we do a lot
+and is a very useful tool to have, but
+you can write something that is more a
+general observation of my program state
+like I have some property. I want to
+observe it and I want to know if this
+property is ever different. So we have
+some interesting examples of you know I
+want to do a bunch of work and I'm
+producing a side project where I've used
+this for example it's like a board game
+okay a bunch of things happen I have
+some state just print out the board game
+and that's an expect test now I can see
+I have done this too this is like an
+excellent use case it's great not only
+are you going to know when if you ever
+break your board you're going to be able
+to see that but it's useful when a bug
+happens you kind of have this
+observation of your program state that
+helps you debug it it's not just oh some
+assertion failed, some test failed. It's
+like some test failed and also here is
+the state and here's what the state was
+supposed to be. And you can sort of
+immediately be like, oh, okay, like I
+see how this happened. And this of
+course is still compatible with like
+traditional assertion based testing. We
+still write property tests, but we use
+the same technique when we write
+property tests such that you found a
+failing case. Okay, I'm going to go and
+like edit the source code of your test
+to insert the failing case and remember
+it so that future randomized runs will
+make sure that they handle like this
+interesting regression. It is this
+mechanism for writing tests that can
+modify themselves that is really useful
+for observing properties of your program
+but then is also just a really good UI
+for writing all kinds of tests. Another
+thing I like about it is I feel like it
+helps resolve what I think of as like
+one of the fundamental trade-offs in
+building programming systems. I often
+think about two extremes of you write a
+traditional program in some text file
+versus you write some computation in
+Excel, right? And I think the good thing
+about the text file version is you get
+this very compact, easy to read version
+of the code. And the downside is you
+can't see what it's doing. You can't see
+the data as it flows through the
+program. And then in something like
+Excel, the data is really easy. It's
+just like cells out there. You can just
+inspect and understand what's going on.
+and any particular computation, you can
+kind of poke at it and see where the
+data came from and what it's doing. But
+the program is like smeared over the
+spreadsheet all over these cells and
+it's like very non-compact, very hard to
+read. And this lets you resolve this
+duality and that you like both get the
+compact representation of the program.
+And you can pick custom like laying out
+of essentially program traces. So you
+can see and visualize aspects of the
+execution of the program. It's really
+cool for code review because when you
+make a change that's supposed to change
+the behavior, you get to read in the
+same commit both the change to the code
+and the delta to the program trace.
+Yeah. Which is not to say that the whole
+thing can't be abused. I think one of
+the reasons people think of this at
+first blush as kind of a bad idea is it
+just seems like you'll get a bunch of
+tests where people dump garbage and say,
+"And now I've tested it." And that's a
+real problem. It is. People in fact do
+get this wrong. A really good expect
+test is where one has really thought
+carefully about what data do I actually
+want to visualize? How do I actually
+want to represent this and kind of
+minify it so you don't have a bunch of
+distracting nonsense and the end result
+is actually readable and worth reading.
+Yeah, it's a real failure case to just
+say like, oh, okay, tell me if anything
+possibly changes, but you really need to
+be careful and diligent. But the work
+that you do, it's not just in order to
+write your test better. The work that
+you do to visualize your state better
+also makes it easier to change your
+program over time. you like get this
+virtuous feedback where you spend time
+building these test visualizers to make
+your tests clearer and easier and then
+they also just make it easier to make
+changes. So it was the first time where
+I really felt like okay I'm writing
+tests for myself like it is actually
+just making my job easier. The more
+tests I write the easier it is to build
+more and more complex interesting
+software and it doesn't feel like it's
+adding this cost where like ah okay now
+I got to like go write tests after. It's
+like but it's kind of fun. Yeah it is.
+And it just is the way that you interact
+with your program, right? In the same
+way that playing in a ripple or in a
+notebook is like a fun way to knock
+around, writing expect test is fun. So
+if you want to use Janet, first thing I
+had to write of course was a complex
+macro that does this patching of the
+source code so that I have the same
+workflow in Janet because I'm spoiled
+and I I can't write code without it
+anymore. The history of expect is kind
+of interesting in that it's definitely
+not our idea. We stole it actually very
+concretely from Mercurial which has this
+set of tests that they built internally
+which are basically like expect test for
+bash where you like write some bash
+commands and you see the output and
+there's like a little single unified
+file format. I think they called it
+their unified test because it unifies
+the output of the test and the code that
+generates it. And then somebody went off
+and built a tool called CRAM. I think
+hasn't been touched in several years but
+it's another version of this idea
+generalized beyond Mercurial. And then
+we built some version of it and did a
+lot of blogging about it because we
+thought it was kind of fun. And there's
+several Python versions of this that
+have been built. I think the idea didn't
+come from us, but I think we've been
+involved in the set of people slowly
+popularizing it and spreading it out in
+more cases. And it's kind of been nice
+to see it get out into the world. Yeah.
+It's also something that Jane Street
+does that's a little bit idiosyncratic,
+but is unlike using Okamel or using
+Bonsai for everything like something
+that anyone could do. This is an idea
+that is completely language agnostic and
+there are libraries for doing this in
+almost every language and if there's not
+you should write one because it's a very
+good workflow. I have the tooling is
+frustratingly hard like every now and
+then. Yeah. So I've now had the
+experience of teaching my kids how to
+program which I guess you're not quite
+there yet almost a few years and one of
+the frustrating things is how poor the
+testing frameworks are. you get some
+thing in class of like write the
+following system and they're often
+fairly hard assignments and they're hard
+to get right and maybe you're doing it
+in languages like C and C++ where
+there's all sorts of weird cliffs you
+can fall over and then just no good
+testing tools and ah that's no way to
+live and so I've looked around for like
+good ways of doing things like expect
+tests C programs and like h the
+landscape's not great there yeah Jane
+Street's Okiml tooling in Emacs around
+this you save the file and you
+immediately see a diff of all of your
+tests and then there's like one button
+that lets if you copy in the the output
+to promote it to this is the good
+version like that tooling is actually
+really important to making this
+pleasant. So yeah, I've had to
+reimplement that unfortunately.
+Amazing. All right. Well, thank you so
+much for joining me. This was a lot of
+fun. Thanks, Ron.
+You'll find a complete transcript of the
+episode along with show notes and links
+at
+signalsandthreads.com. One thing I
+wanted to mention is that as you may
+have noticed, the pace of releasing new
+episodes has slowed down a bit. Don't
+worry, we're not going anywhere. In
+fact, we've got a bunch of episodes
+planned that I'm really excited about.
+But things have been busy and I do
+expect the pace to be a bit slower going
+forward. Anyway, thanks for joining us.
+See you next time.

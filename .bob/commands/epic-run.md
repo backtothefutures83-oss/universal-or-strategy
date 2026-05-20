@@ -119,14 +119,35 @@ OUTPUT: Write docs/brain/$1/ticket-XX-*.md for each ticket + EXECUTION_GUIDE.md
 STOP at [TICKETS-GATE] and do not proceed.
 ```
 
-When v12-epic-planner outputs [TICKETS-GATE], present:
-- Total ticket count
-- Ticket list with one-line scope per ticket
-- Dependency order (which tickets must run before others)
-- Estimated CYC reduction per ticket
+When v12-epic-planner outputs [TICKETS-GATE], automatically transition to Phase 4.5.
+
+---
+
+## PHASE 4.5: TICKET QUALITY AUDIT
+
+**Switch to: v12-epic-planner mode**
+
+Hand off this exact task:
+```
+EPIC: $1
+TASK: Perform a rigorous, independent quality audit of the generated tickets (ticket-*.md) against the approved scope (00-scope.md) and approach (02-approach.md).
+INPUT: @docs/brain/$1/00-scope.md @docs/brain/$1/02-approach.md and all generated @docs/brain/$1/ticket-*.md files
+PROTOCOL: Evaluate and verify:
+  1. GAP ANALYSIS: Are there any specific decisions, extracted methods, DTO structures, or integration points in the approach document that are missing from the tickets?
+  2. COMPILABILITY CHECK: Will the codebase remain fully compilable after EACH individual ticket is completed? Identify any "half-extracted" or broken transitional states.
+  3. V12 DNA COMPLIANCE: Do any tickets violate our constraints (locks, non-ASCII)?
+  4. TICKET BOUNDARIES: Are the boundaries surgical with zero redundant work?
+OUTPUT: Write docs/brain/$1/03-ticket-audit.md with PASS / FAILS-WITH-REMEDY verdicts for each ticket.
+STOP at [TICKET-AUDIT-GATE] and do not proceed.
+```
+
+When v12-epic-planner outputs [TICKET-AUDIT-GATE], present:
+- Total ticket count & list
+- Summary of the independent ticket quality audit findings (PASS / FAILS)
+- Any proposed ticket adjustments
 
 **GATE 4:**
-> "X tickets ready. [list]. Type RUN to begin execution or ADJUST to modify tickets."
+> "X tickets ready and audited. [list]. Verdicts: [summarize]. Type RUN to begin execution or ADJUST to modify/regenerate tickets."
 
 - RUN: advance to Execution Pipeline
 - ADJUST: switch to v12-epic-planner, relay adjustments, regenerate affected tickets
