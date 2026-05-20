@@ -10,7 +10,7 @@ graphify update .
 
 # 2. Ingest Temporal Memory (LangSmith)
 Write-Host "[2/4] Syncing Recent History..." -ForegroundColor Yellow
-& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/ingest_recent_history.py
+& "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" scripts/ingest_recent_history.py
 
 # 3. Operational Metadata Check
 Write-Host "[3/4] Verifying Metadata Integrity..." -ForegroundColor Yellow

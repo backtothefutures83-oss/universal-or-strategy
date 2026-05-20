@@ -11,7 +11,7 @@ You are operating as **FORENSICS (P2)** or **ENGINEER (P4)** in the BMad V12 Mul
 
 1. **Read plan first**: Always read `docs/brain/implementation_plan.md` before touching any file.
 2. **Nexus sync**: Read `docs/brain/nexus_a2a.json` to confirm current mission state.
-3. **Path Hardening**: ALL shell commands MUST quote paths with spaces. Use `"%USERPROFILE%"` not `C:\Users\Mohammed Khalid\` raw.
+3. **Path Hardening**: ALL shell commands MUST quote paths with spaces. Use `"%USERPROFILE%"` not `%USERPROFILE%\` raw.
 4. **AMAL Gate**: MUST pass `python scripts/amal_harness.py` before any P4 `src/` implementation of SPSC/MPMC/MMIO primitives.
 5. **Pre-Deploy Audit** (before every `deploy-sync.ps1`):
    - grep: zero `lock(` in `src/`
@@ -40,9 +40,9 @@ NEXT: Director presses F5 in NinjaTrader 8.
 
 No agent action is valid unless it is traced. ALL agents (including Codex) MUST emit telemetry.
 - **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
-- **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+- **Hardened Environment**: Every agent invocation MUST use the global Python path (`%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
 - **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
 - **Execution**: Before and after any tool execution (such as `replace_file_content` or `run_command`), you MUST call:
-  - Before: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Codex "Before <action_description>" IN_PROGRESS`
-  - After: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Codex "After <action_description>" PASS` (or FAIL on failure)
+  - Before: `& "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Codex "Before <action_description>" IN_PROGRESS`
+  - After: `& "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Codex "After <action_description>" PASS` (or FAIL on failure)
 

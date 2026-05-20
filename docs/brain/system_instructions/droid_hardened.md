@@ -69,8 +69,8 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 
 No agent action is valid unless it is traced. ALL agents (including Droid) MUST emit telemetry.
 - **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
-- **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+- **Hardened Environment**: Every agent invocation MUST use the global Python path (`%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
 - **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.
 - **Execution**: Before and after any tool execution (such as `replace_file_content` or `run_command`), you MUST call:
-  - Before: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Droid "Before <action_description>" IN_PROGRESS`
-  - After: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Droid "After <action_description>" PASS` (or FAIL on failure)
+  - Before: `& "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Droid "Before <action_description>" IN_PROGRESS`
+  - After: `& "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" scripts/emit_fleet_telemetry.py Droid "After <action_description>" PASS` (or FAIL on failure)

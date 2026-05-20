@@ -2,7 +2,7 @@
 
 **Platform**: Multica v0.2.4 (self-hosted)  
 **Scope**: Morpheus OS Shell (Process 3 + Agent Manager) — NOT V12/NinjaTrader  
-**CLI installed**: `C:\Users\Mohammed Khalid\.multica\bin\multica.exe`
+**CLI installed**: `%USERPROFILE%\.multica\bin\multica.exe`
 
 ---
 
@@ -10,9 +10,9 @@
 
 | Agent                | CLI      | Path                                                      |
 | -------------------- | -------- | --------------------------------------------------------- |
-| Antigravity / Claude | `claude` | `C:\Users\Mohammed Khalid\AppData\Roaming\npm\claude.cmd` |
-| Codex                | `codex`  | `C:\Users\Mohammed Khalid\AppData\Roaming\npm\codex.cmd`  |
-| Gemini CLI           | `gemini` | `C:\Users\Mohammed Khalid\AppData\Roaming\npm\gemini.cmd` |
+| Antigravity / Claude | `claude` | `%USERPROFILE%\AppData\Roaming\npm\claude.cmd` |
+| Codex                | `codex`  | `%USERPROFILE%\AppData\Roaming\npm\codex.cmd`  |
+| Gemini CLI           | `gemini` | `%USERPROFILE%\AppData\Roaming\npm\gemini.cmd` |
 | Jules                | —        | On hold (ENOENT protocol)                                 |
 
 ---

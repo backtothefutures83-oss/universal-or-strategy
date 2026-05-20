@@ -1,6 +1,6 @@
 param (
     [string]$SrcPath = "C:\WSGTA\universal-or-strategy\src",
-    [string]$NtPath = "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies"
+    [string]$NtPath = "%USERPROFILE%\Documents\NinjaTrader 8\bin\Custom\Strategies"
 )
 
 Write-Host "=== HARD LINK INTEGRITY AUDIT ===" -ForegroundColor Cyan

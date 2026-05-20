@@ -18,7 +18,7 @@ To prevent "Silent Freezes" in AI agents during live trading, the local MCP envi
 All strategy files in the NinjaTrader directory MUST be hardlinks to files in `C:\WSGTA\universal-or-strategy\src`.
 
 - **Verification Command (run at session start):**
-  `fsutil hardlink list "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\V12_002.cs"`
+  `fsutil hardlink list "%USERPROFILE%\Documents\NinjaTrader 8\bin\Custom\Strategies\V12_002.cs"`
 - **Success Criteria:** The command must return both the NinjaTrader path and the matching `C:\WSGTA\universal-or-strategy\src\V12_002.cs` path. If it returns only one path, the hardlink is broken.
 
 ## 2. Deployment Protocol

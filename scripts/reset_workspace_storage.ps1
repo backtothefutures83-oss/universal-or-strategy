@@ -1,7 +1,7 @@
 # scripts/reset_workspace_storage.ps1
 # Resets the bloated SQLite database in IBM Bob's workspaceStorage to prevent event-loop freezes.
 
-$storagePath = "C:\Users\Mohammed Khalid\AppData\Roaming\IBM Bob\User\workspaceStorage\05e6c2b33f73f128ebb95431ccb812da"
+$storagePath = "%USERPROFILE%\AppData\Roaming\IBM Bob\User\workspaceStorage\05e6c2b33f73f128ebb95431ccb812da"
 $dbFile = "$storagePath\state.vscdb"
 $backupFile = "$storagePath\state.vscdb.backup"
 

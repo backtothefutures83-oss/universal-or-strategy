@@ -62,7 +62,7 @@
 >
 > ## PRODUCTION GATE: CLOSED (2026-05-15)
 >
-> **M3 = finish line.** Phases 1-7 complete. Platinum Standard. ZERO CYC > 20 across 817 methods.
+> **M3 = finish line.** Phases 1-7 complete. Platinum Standard. 54 symbols > 20 CYC across 817 methods.
 > The 24 bug bounty repairs are post-production hardening -- not a gate, a quality campaign.
 
 ---

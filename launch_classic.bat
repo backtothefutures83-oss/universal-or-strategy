@@ -4,5 +4,5 @@ taskkill /f /im AntigravityClassic.exe 2>nul
 echo Waiting for processes to exit...
 ping -n 3 127.0.0.1 >nul
 echo Launching Antigravity Classic...
-start "" "C:\WSGTA\AntigravityClassic\AntigravityClassic.exe" "C:\WSGTA\universal-or-strategy" --user-data-dir="C:\Users\Mohammed Khalid\AppData\Roaming\AntigravityClassic" --extensions-dir="C:\Users\Mohammed Khalid\.antigravity\extensions" --remote-debugging-port=9222
+start "" "C:\WSGTA\AntigravityClassic\AntigravityClassic.exe" "C:\WSGTA\universal-or-strategy" --user-data-dir="%USERPROFILE%\AppData\Roaming\AntigravityClassic" --extensions-dir="%USERPROFILE%\.antigravity\extensions" --remote-debugging-port=9222
 exit

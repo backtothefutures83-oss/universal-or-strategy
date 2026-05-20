@@ -39,7 +39,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="NinjaTrader.Custom">
-      <HintPath>C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\NinjaTrader.Custom.dll</HintPath>
+      <HintPath>%USERPROFILE%\Documents\NinjaTrader 8\bin\Custom\NinjaTrader.Custom.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="NinjaTrader.Gui">

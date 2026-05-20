@@ -126,7 +126,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // Grace expired -- log diagnostic warning
                         Print($"[REAPER][DIAGNOSTIC] Orphaned FSM position detected: {acct.Name} entry={fsm.EntryName}. " +
                               $"Broker flat but activePositions entry exists after {graceElapsed:F1}s grace. " +
-                              $"This may indicate a TOCTOU race in entry rollback logic.");
+                              "This may indicate a TOCTOU race in entry rollback logic.");
                         
                         // Clear first-seen timestamp to avoid log spam
                         _orphanedPositionFirstSeen.TryRemove(fsm.EntryName, out _);

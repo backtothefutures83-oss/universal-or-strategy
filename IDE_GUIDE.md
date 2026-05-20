@@ -35,7 +35,7 @@ cd C:\WSGTA\universal-or-strategy
 
 ### B. Launch Codex 5.3
 ```powershell
-& "C:\Users\Mohammed Khalid\.cursor\extensions\openai.chatgpt-0.4.74-universal\bin\windows-x86_64\codex.exe" --model "gpt-5.3-codex"
+& "%USERPROFILE%\.cursor\extensions\openai.chatgpt-0.4.74-universal\bin\windows-x86_64\codex.exe" --model "gpt-5.3-codex"
 ```
 
 ### C. Launch Claude Code

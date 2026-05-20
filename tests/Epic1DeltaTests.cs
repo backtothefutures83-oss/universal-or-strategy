@@ -582,12 +582,12 @@ namespace UniversalOrStrategy.Tests
                             // Atomic pattern - should never throw
                             if (stopOrders.TryGetValue(key, out var stopOrder))
                             {
-                                int qty = stopOrder.Quantity;
+                                _ = stopOrder.Quantity;
                             }
                             
                             if (entryOrders.TryGetValue(key, out var entryOrder))
                             {
-                                int qty = entryOrder.Quantity;
+                                _ = entryOrder.Quantity;
                             }
                         }
                         catch (KeyNotFoundException)

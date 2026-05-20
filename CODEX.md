@@ -21,7 +21,7 @@
 ### 3. Path & Deployment Management
 
 - **Source Truth**: All primary NinjaScript logic resides in `src/`.
-- **Deployment**: Local builds MUST be synced to `C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom\Strategies\` using the `/deploy` skill.
+- **Deployment**: Local builds MUST be synced to `%USERPROFILE%\Documents\NinjaTrader 8\bin\Custom\Strategies\` using the `/deploy` skill.
 
 ## ðŸ•¹ï¸ Director Commands ($)
 

@@ -1,4 +1,4 @@
-$downloads = "C:\Users\Mohammed Khalid\Downloads"
+$downloads = "%USERPROFILE%\Downloads"
 $dest = "C:\tmp\battle_antigravity_os"
 
 if (!(Test-Path $dest)) { New-Item -ItemType Directory -Path $dest }

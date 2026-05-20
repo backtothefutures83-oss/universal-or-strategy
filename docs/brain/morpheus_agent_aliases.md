@@ -4,8 +4,8 @@ To enable full integration of the V12 agent stack within the Multica managed sub
 
 | Official Agent | Multica Alias (Runtime) | Provider | Binary / Source                                          |
 | :------------- | :---------------------- | :------- | :------------------------------------------------------- |
-| **Droid**      | `pi`                    | `pi`     | `C:\Users\Mohammed Khalid\bin\droid.exe`                 |
-| **Jules**      | `hermes`                | `hermes` | `C:\Users\Mohammed Khalid\AppData\Roaming\npm\jules.ps1` |
+| **Droid**      | `pi`                    | `pi`     | `%USERPROFILE%\bin\droid.exe`                 |
+| **Jules**      | `hermes`                | `hermes` | `%USERPROFILE%\AppData\Roaming\npm\jules.ps1` |
 | **Claude**     | `claude`                | `claude` | Claude Code CLI                                          |
 | **Codex**      | `codex`                 | `codex`  | Codex CLI                                                |
 | **Gemini**     | `gemini`                | `gemini` | Gemini CLI                                               |

@@ -16,6 +16,7 @@ artifacts/
 .agent/
 .agents/
 .mcp/
+.antigravitycli/
 
 # JavaScript / TestSprite noise
 node_modules/

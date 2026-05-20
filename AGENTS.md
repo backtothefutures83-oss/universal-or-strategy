@@ -30,7 +30,7 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 - **Sovereign Audit**: `droid /review` (Focus on P0-P3 severity findings).
 - **Readiness Check**: `droid /readiness-report` (Maintain Level 2+).
 - **Forensic Scan**: `grep -r "lock(" src/` (Zero-match requirement).
-- **Jane Street KB Query**: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/query_kb.py "<term>"` (Retrieves HFT and high-performance system guidelines from the Firestore knowledge base).
+- **Jane Street KB Query**: `& "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" scripts/query_kb.py "<term>"` (Retrieves HFT and high-performance system guidelines from the Firestore knowledge base).
 
 ## 4. Communication & Context
 

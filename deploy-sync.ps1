@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 # --- CONFIGURATION ---
 $RepoRoot = "C:\WSGTA\universal-or-strategy"
-$NtCustomDir = "C:\Users\Mohammed Khalid\Documents\NinjaTrader 8\bin\Custom"
+$NtCustomDir = "%USERPROFILE%\Documents\NinjaTrader 8\bin\Custom"
 $NtStrategyDir = Join-Path $NtCustomDir "Strategies"
 $NtIndicatorDir = Join-Path $NtCustomDir "Indicators"
 
