@@ -1,475 +1,149 @@
-# Implementation Plan - Ticket-04: Strategy Sticky State Integration
+# Implementation Plan: Agent Readiness Level 5 Sprint (4-Task Master) — REV 2
 
-Integrate `StickyStateService` into `V12_002` to replace all legacy parsing, serialization, and atomic file write logic inside `V12_002.StickyState.cs` with the pure C# service.
+**BUILD_TAG anchor**: `1111.007-mphase-mp0` (current active) → target `1111.007-readiness-L5` (Task 4 only)
+**Worktree**: `C:\WSGTA\universal-or-strategy` (current active repository)
+**Source of truth**: `docs/brain/nexus_a2a.json` (`agent_readiness_target: "LEVEL_5"`)
+**Scope**: Exactly the four readiness tasks enumerated in the mission brief. Stress Testing, Codecov, and a release workflow are explicitly OUT of the required scope.
 
-## User Review Required
+---
 
-> [!IMPORTANT]
-> - **Zero Call-Site Changes**: The 18 call sites to `MarkStickyDirty()` across the strategy codebase remain completely unchanged.
-> - **Thread Safety (H18-FIX)**: Mutable strategy thread properties are thread-safely snapshotted on the main strategy thread BEFORE background execution, preventing race conditions or torn reads.
-> - **C# Enum Mapping**: Uses explicit underlying integer-based casting to map between Strategy enums and Service enums without duplicate definitions.
-> - **No Placeholders**: Contains fully defined code blocks for the entire updated file, ready for seamless integration.
+## Context
+
+`nexus_a2a.json` declares `agent_readiness_target: "LEVEL_5"`. While the baseline originally derived from an earlier build, our active workspace has been successfully updated with the `1111.007-mphase-mp0` core. Baseline inspection shows the repository has SonarCloud SAST, ASCII/lock() pre-commit gates, a CODEOWNERS file, and NUnit tests under `Testing.csproj` — but we must close the remaining gaps: dependency automation, CI test runner, secret scanning, CodeQL, SECURITY.md, and Sentry SDK wiring.
+
+---
+
+## Executive Summary
+
+The clean baseline is missing four pillars required for Level 5 agent readiness:
+1. **Dependabot**: Add `.github/dependabot.yml` and SHA-pin every existing GitHub Action.
+2. **CI Test Execution with SonarCloud Coverage Ingestion**: Run NUnit tests in CI and deliver `.trx` + **OpenCover** coverage reports directly to SonarCloud.
+3. **Governance & Security Hardening**: Add secret scanning (gitleaks), CodeQL, `SECURITY.md`, and remediate the committed Sentry DSN literal at `docs/brain/memory/adr019_compaction_state.md`.
+4. **Sentry SDK Integration**: Wire Sentry .NET SDK dynamically via `V12_SENTRY_DSN` environment variable and instrument five target catch/reject sites in the C# strategy.
+
+---
+
+## Master Execution Plan
+
+### Execution order and parallelism
+
+| Order | Task | Parallelizable with | Hard blockers |
+| :-- | :-- | :-- | :-- |
+| 1 | Build & Dependency Automation | 2, 3 | none |
+| 2 | Testing Infrastructure & Coverage | 1, 3 | none |
+| 3 | Governance & Security Hardening | 1, 2 | none |
+| 4 | Observability (Sentry Integration) | runs after 1/2/3 | `deploy-sync.ps1` + NT8 F5 compile; Task 3 must redact the DSN first |
+
+Tasks 1–3 touch only `.github/`, `scripts/`, root-level config, and one `docs/brain/memory/` redaction; they have **zero C# source file overlap** and will merge first. Task 4 modifies `src/` and runs last.
+
+---
 
 ## Proposed Changes
 
-### V12 Core Strategy Integration
+### Task 1 — Build & Dependency Automation
+
+**Objective**: Add Dependabot for every ecosystem in the repo and SHA-pin every existing GitHub Action.
+
+#### [NEW] [dependabot.yml](file:///C:/WSGTA/universal-or-strategy/.github/dependabot.yml)
+- version: 2
+- Ecosystems: `github-actions` (weekly) and `nuget` (weekly).
+- Directory: `/` for both.
+- Reviewers: `["mkalhitti-cloud"]`.
+- Prefix: `chore(deps)`.
+
+#### [MODIFY] [All GitHub Workflows](file:///C:/WSGTA/universal-or-strategy/.github/workflows/)
+- Pinned SHA replacements for `uses:` clauses in `dotnet-build.yml`, `gemini-pr-audit.yml`, `labeler.yml`, `sonarcloud.yml`, `stylecop-enforcement.yml`, and `upstream-sync.yml`.
 
 ---
 
-#### [MODIFY] [V12_002.StickyState.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.StickyState.cs)
+### Task 2 — Testing Infrastructure & Coverage
 
-Replace the entire contents of `src/V12_002.StickyState.cs` to leverage `Services.IStickyStateService`.
+**Objective**: Run `Testing.csproj` in CI and deliver `.trx` + **OpenCover** coverage reports directly to SonarCloud using `sonar.cs.opencover.reportsPaths`.
 
-```csharp
-// V12_002.StickyState.cs -- Build 1103: Total Persistence ("Sticky State")
-// Persists all UI-sourced config to disk on every mutation.
-// Hydrates on startup BEFORE IPC server starts.
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript.Strategies;
+#### [MODIFY] [Testing.csproj](file:///C:/WSGTA/universal-or-strategy/Testing.csproj)
+- Add `<PackageReference Include="coverlet.msbuild" Version="6.0.2" />` under the PackageReference group.
 
-namespace NinjaTrader.NinjaScript.Strategies
-{
-    public partial class V12_002 : Strategy
-    {
-        #region Sticky State Fields
+#### [NEW] [dotnet-test.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/dotnet-test.yml)
+- Run `dotnet test` with `/p:CollectCoverage=true /p:CoverletOutputFormat=opencover` on pushes to `main`/`build/**` and PRs.
+- Uses `windows-latest` for `.NET Framework 4.8` compatibility.
 
-        private string _stickyStatePath;        // Full path to .v12state file
-        private volatile bool _stickyStateDirty; // Coalescing dirty flag
-        private long _stickyWritePending;        // Interlocked gate: 0=idle, 1=write scheduled
-        private const int STICKY_DEBOUNCE_MS = 50;
-
-        private Services.IStickyStateService _stickyStateService;
-
-        private class StickyStateLogger : Services.IStickyStateLogger
-        {
-            private readonly Action<string> _print;
-            public StickyStateLogger(Action<string> print)
-            {
-                _print = print;
-            }
-            public void Log(string message)
-            {
-                _print(message);
-            }
-        }
-
-        #endregion
-
-        #region Save -- Serialize via Service
-
-        /// <summary>
-        /// Marks state as dirty. A debounced async write will fire within 50ms.
-        /// Safe to call from any thread (strategy thread via Enqueue, or IPC thread).
-        /// </summary>
-        private void MarkStickyDirty()
-        {
-            _stickyStateDirty = true;
-
-            // Coalescing gate: only one pending write at a time
-            if (Interlocked.CompareExchange(ref _stickyWritePending, 1, 0) == 0)
-            {
-                // H18-FIX: Capture snapshot of ALL mutable state on strategy thread BEFORE spawning background task.
-                // This prevents race conditions where background serialization reads state that's being mutated.
-                
-                // Map local ModeConfigProfile to Services.ModeConfigProfile
-                var modeProfilesSnapshot = new Dictionary<string, Services.ModeConfigProfile>();
-                foreach (var kvp in _modeProfiles)
-                {
-                    if (kvp.Value == null) continue;
-                    modeProfilesSnapshot[kvp.Key] = new Services.ModeConfigProfile
-                    {
-                        TargetCount = kvp.Value.TargetCount,
-                        T1 = kvp.Value.T1,
-                        T2 = kvp.Value.T2,
-                        T3 = kvp.Value.T3,
-                        T4 = kvp.Value.T4,
-                        T5 = kvp.Value.T5,
-                        T1Type = (Services.TargetMode)(int)kvp.Value.T1Type,
-                        T2Type = (Services.TargetMode)(int)kvp.Value.T2Type,
-                        T3Type = (Services.TargetMode)(int)kvp.Value.T3Type,
-                        T4Type = (Services.TargetMode)(int)kvp.Value.T4Type,
-                        T5Type = (Services.TargetMode)(int)kvp.Value.T5Type,
-                        StopMult = kvp.Value.StopMult,
-                        MaxRisk = kvp.Value.MaxRisk
-                    };
-                }
-
-                var activeFleetSnapshot = activeFleetAccounts != null
-                    ? new Dictionary<string, bool>(activeFleetAccounts)
-                    : null;
-
-                // Map local PositionInfo to Services.PositionTrailState
-                var positionStatesSnapshot = new Dictionary<string, Services.PositionTrailState>();
-                if (activePositions != null)
-                {
-                    foreach (var kvp in activePositions)
-                    {
-                        var pi = kvp.Value;
-                        if (pi == null || pi.PendingCleanup) continue;
-                        positionStatesSnapshot[kvp.Key] = new Services.PositionTrailState
-                        {
-                            ExtremePriceSinceEntry = pi.ExtremePriceSinceEntry,
-                            CurrentTrailLevel = pi.CurrentTrailLevel,
-                            ManualBreakevenArmed = pi.ManualBreakevenArmed,
-                            ManualBreakevenTriggered = pi.ManualBreakevenTriggered,
-                            InitialTargetCount = pi.InitialTargetCount
-                        };
-                    }
-                }
-
-                var snapshot = new Services.StickyStateSnapshot
-                {
-                    InstrumentFullName = Instrument != null ? Instrument.FullName : "unknown",
-                    BuildTag = BUILD_TAG,
-                    IsRMAModeActive = isRMAModeActive,
-                    IsTRENDModeActive = isTRENDModeActive,
-                    IsRetestModeActive = isRetestModeActive,
-                    IsMOMOModeActive = isMOMOModeActive,
-                    IsFFMAModeArmed = isFFMAModeArmed,
-                    ActiveTargetCount = activeTargetCount,
-                    Target1Value = Target1Value,
-                    Target2Value = Target2Value,
-                    Target3Value = Target3Value,
-                    Target4Value = Target4Value,
-                    Target5Value = Target5Value,
-                    T1Type = (Services.TargetMode)(int)T1Type,
-                    T2Type = (Services.TargetMode)(int)T2Type,
-                    T3Type = (Services.TargetMode)(int)T3Type,
-                    T4Type = (Services.TargetMode)(int)T4Type,
-                    T5Type = (Services.TargetMode)(int)T5Type,
-                    StopMultiplier = StopMultiplier,
-                    RMAStopATRMultiplier = RMAStopATRMultiplier,
-                    MaxRiskAmount = MaxRiskAmount,
-                    ChaseIfTouchPoints = ChaseIfTouchPoints,
-                    IsTrendRmaMode = isTrendRmaMode,
-                    IsRetestRmaMode = isRetestRmaMode,
-                    LeaderAccount = _stickyLeaderAccount,
-                    FleetToggles = activeFleetSnapshot,
-                    Anchor = (Services.RmaAnchorType)(int)currentRmaAnchor,
-                    ManualPrice = cachedMnlPrice,
-                    ModeProfiles = modeProfilesSnapshot,
-                    PositionStates = positionStatesSnapshot
-                };
-
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(STICKY_DEBOUNCE_MS);
-                        _stickyStateDirty = false;
-                        _stickyStateService.Serialize(snapshot, _stickyStatePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        Print("[STICKY] Save failed (best-effort): " + ex.Message);
-                    }
-                    finally
-                    {
-                        Interlocked.Exchange(ref _stickyWritePending, 0);
-                        // If dirtied again during write, schedule another
-                        if (_stickyStateDirty)
-                            MarkStickyDirty();
-                    }
-                });
-            }
-        }
-
-        // Build 1106: Captures current global config into a mode-specific profile.
-        private ModeConfigProfile SnapshotCurrentConfig()
-        {
-            return new ModeConfigProfile
-            {
-                TargetCount = activeTargetCount,
-                T1 = Target1Value,
-                T2 = Target2Value,
-                T3 = Target3Value,
-                T4 = Target4Value,
-                T5 = Target5Value,
-                T1Type = T1Type,
-                T2Type = T2Type,
-                T3Type = T3Type,
-                T4Type = T4Type,
-                T5Type = T5Type,
-                StopMult = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier,
-                MaxRisk = MaxRiskAmount
-            };
-        }
-
-        // Build 1106: Hydrates global config from a mode-specific profile.
-        private void HydrateFromProfile(ModeConfigProfile profile, string mode)
-        {
-            activeTargetCount = Math.Max(1, Math.Min(5, profile.TargetCount));
-            Target1Value = profile.T1;
-            Target2Value = profile.T2;
-            Target3Value = profile.T3;
-            Target4Value = profile.T4;
-            Target5Value = profile.T5;
-            T1Type = profile.T1Type;
-            T2Type = profile.T2Type;
-            T3Type = profile.T3Type;
-            T4Type = profile.T4Type;
-            T5Type = profile.T5Type;
-            if (string.Equals(mode, "RMA", StringComparison.OrdinalIgnoreCase))
-                RMAStopATRMultiplier = profile.StopMult;
-            else
-                StopMultiplier = profile.StopMult;
-            MaxRiskAmount = profile.MaxRisk;
-            RiskPerTrade = profile.MaxRisk;
-        }
-
-        #endregion
-
-        #region Load -- Deserialize via Service
-
-        /// <summary>
-        /// Loads persisted state from .v12state file and applies to runtime variables.
-        /// Called ONCE in State.DataLoaded, BEFORE StartIpcServer().
-        /// Returns true if state was successfully loaded.
-        /// </summary>
-        private bool LoadStickyState()
-        {
-            if (string.IsNullOrEmpty(_stickyStatePath))
-                return false;
-
-            if (!System.IO.File.Exists(_stickyStatePath))
-            {
-                Print("[STICKY] No persisted state found -- using defaults");
-                return false;
-            }
-
-            try
-            {
-                var data = _stickyStateService.Deserialize(_stickyStatePath);
-                if (data == null)
-                    return false;
-
-                // Apply config values
-                if (data.ConfigValues.TryGetValue("COUNT", out object cntObj) && cntObj is int cnt)
-                    activeTargetCount = Math.Max(1, Math.Min(5, cnt));
-
-                if (data.ConfigValues.TryGetValue("T1", out object t1Obj) && t1Obj is double t1)
-                    Target1Value = t1;
-                if (data.ConfigValues.TryGetValue("T2", out object t2Obj) && t2Obj is double t2)
-                    Target2Value = t2;
-                if (data.ConfigValues.TryGetValue("T3", out object t3Obj) && t3Obj is double t3)
-                    Target3Value = t3;
-                if (data.ConfigValues.TryGetValue("T4", out object t4Obj) && t4Obj is double t4)
-                    Target4Value = t4;
-                if (data.ConfigValues.TryGetValue("T5", out object t5Obj) && t5Obj is double t5)
-                    Target5Value = t5;
-
-                if (data.ConfigValues.TryGetValue("T1TYPE", out object t1tObj) && t1tObj is Services.TargetMode t1t)
-                    T1Type = (TargetMode)(int)t1t;
-                if (data.ConfigValues.TryGetValue("T2TYPE", out object t2tObj) && t2tObj is Services.TargetMode t2t)
-                    T2Type = (TargetMode)(int)t2t;
-                if (data.ConfigValues.TryGetValue("T3TYPE", out object t3tObj) && t3tObj is Services.TargetMode t3t)
-                    T3Type = (TargetMode)(int)t3t;
-                if (data.ConfigValues.TryGetValue("T4TYPE", out object t4tObj) && t4tObj is Services.TargetMode t4t)
-                    T4Type = (TargetMode)(int)t4t;
-                if (data.ConfigValues.TryGetValue("T5TYPE", out object t5tObj) && t5tObj is Services.TargetMode t5t)
-                    T5Type = (TargetMode)(int)t5t;
-
-                if (data.ConfigValues.TryGetValue("STR", out object strObj) && strObj is double str)
-                {
-                    // Apply to whichever stop is active based on mode
-                    if (isRMAModeActive)
-                        RMAStopATRMultiplier = str;
-                    else
-                        StopMultiplier = str;
-                }
-
-                if (data.ConfigValues.TryGetValue("MAX", out object maxObj) && maxObj is double max)
-                {
-                    MaxRiskAmount = max;
-                    RiskPerTrade = max; // Sync legacy property
-                }
-
-                if (data.ConfigValues.TryGetValue("CIT", out object citObj) && citObj is string cit)
-                    ChaseIfTouchPoints = cit;
-
-                if (data.ConfigValues.TryGetValue("TRMA", out object trmaObj) && trmaObj is bool trma)
-                    isTrendRmaMode = trma;
-
-                if (data.ConfigValues.TryGetValue("RRMA", out object rrmaObj) && rrmaObj is bool rrma)
-                    isRetestRmaMode = rrma;
-
-                // Apply profiles
-                foreach (var kvp in data.ModeProfiles)
-                {
-                    var sProfile = kvp.Value;
-                    if (sProfile == null) continue;
-                    var mode = kvp.Key;
-                    
-                    ModeConfigProfile profile;
-                    if (!_modeProfiles.TryGetValue(mode, out profile))
-                    {
-                        profile = new ModeConfigProfile();
-                        _modeProfiles[mode] = profile;
-                    }
-                    profile.TargetCount = sProfile.TargetCount;
-                    profile.T1 = sProfile.T1;
-                    profile.T2 = sProfile.T2;
-                    profile.T3 = sProfile.T3;
-                    profile.T4 = sProfile.T4;
-                    profile.T5 = sProfile.T5;
-                    profile.T1Type = (TargetMode)(int)sProfile.T1Type;
-                    profile.T2Type = (TargetMode)(int)sProfile.T2Type;
-                    profile.T3Type = (TargetMode)(int)sProfile.T3Type;
-                    profile.T4Type = (TargetMode)(int)sProfile.T4Type;
-                    profile.T5Type = (TargetMode)(int)sProfile.T5Type;
-                    profile.StopMult = sProfile.StopMult;
-                    profile.MaxRisk = sProfile.MaxRisk;
-                }
-
-                // Apply fleet
-                _stickyLeaderAccount = data.LeaderAccount;
-                foreach (var kvp in data.FleetToggles)
-                {
-                    if (_pendingStickyFleetToggles == null)
-                        _pendingStickyFleetToggles = new Dictionary<string, bool>();
-                    _pendingStickyFleetToggles[kvp.Key] = kvp.Value;
-                }
-
-                // Apply anchor
-                SetRmaAnchorFromIpc(data.Anchor.ToString());
-                cachedMnlPrice = data.ManualPrice;
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Print("[STICKY] Load failed (using defaults): " + ex.Message);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Called from SIMA hydration (after Phase 3 in V12_002.SIMA.Lifecycle.cs)
-        /// to enrich reconstructed activePositions with persisted trailing stop state.
-        /// </summary>
-        private void EnrichTrailStateFromSticky()
-        {
-            if (string.IsNullOrEmpty(_stickyStatePath) || !System.IO.File.Exists(_stickyStatePath))
-                return;
-
-            try
-            {
-                var data = _stickyStateService.Deserialize(_stickyStatePath);
-                if (data == null || data.PositionStates == null || data.PositionStates.Count == 0)
-                    return;
-
-                int enriched = 0;
-                foreach (var kvp in data.PositionStates)
-                {
-                    string posKey = kvp.Key;
-                    var state = kvp.Value;
-
-                    PositionInfo pi;
-                    if (!activePositions.TryGetValue(posKey, out pi))
-                        continue;
-
-                    pi.ExtremePriceSinceEntry = state.ExtremePriceSinceEntry;
-                    pi.CurrentTrailLevel = state.CurrentTrailLevel;
-                    pi.ManualBreakevenArmed = state.ManualBreakevenArmed;
-                    pi.ManualBreakevenTriggered = state.ManualBreakevenTriggered;
-                    pi.InitialTargetCount = state.InitialTargetCount;
-
-                    enriched++;
-                }
-
-                if (enriched > 0)
-                    Print(string.Format("[STICKY] Enriched {0} position(s) with persisted trail state", enriched));
-            }
-            catch (Exception ex)
-            {
-                Print("[STICKY] Trail enrichment failed (positions use defaults): " + ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Applies persisted fleet toggles AFTER EnumerateApexAccounts() has
-        /// initialized the activeFleetAccounts dictionary with all discovered accounts.
-        /// One-shot: clears the temp dict after application.
-        /// </summary>
-        private void ApplyPendingStickyFleetToggles()
-        {
-            if (_pendingStickyFleetToggles == null || _pendingStickyFleetToggles.Count == 0)
-                return;
-
-            int applied = 0;
-            foreach (var kvp in _pendingStickyFleetToggles)
-            {
-                if (activeFleetAccounts.ContainsKey(kvp.Key))
-                {
-                    activeFleetAccounts[kvp.Key] = kvp.Value;
-                    applied++;
-                }
-            }
-
-            Print(string.Format("[STICKY] Applied {0}/{1} persisted fleet toggles",
-                applied, _pendingStickyFleetToggles.Count));
-            _pendingStickyFleetToggles = null; // One-shot -- prevent double-apply
-        }
-
-        #endregion
-    }
-}
-```
+#### [MODIFY] [sonarcloud.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/sonarcloud.yml)
+- Add test run step generating OpenCover results.
+- Add `/d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"` to scanner initialization.
 
 ---
+
+### Task 3 — Governance & Security Hardening
+
+**Objective**: Configure secret-scanning (Gitleaks), CodeQL analysis, write `SECURITY.md`, and redact the leaked Sentry DSN literal.
+
+#### [MODIFY] [adr019_compaction_state.md](file:///C:/WSGTA/universal-or-strategy/docs/brain/memory/adr019_compaction_state.md)
+- Replace Sentry DSN literal at line 19 with: `REDACTED_SENTRY_DSN -- see V12_SENTRY_DSN env var`.
+
+#### [NEW] [.gitleaks.toml](file:///C:/WSGTA/universal-or-strategy/.gitleaks.toml)
+- Default rules configuration with a narrow allowlist for `docs/telemetry/droid_mission_01/README.md` and `check_ascii.py` canary strings.
+
+#### [NEW] [gitleaks.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/gitleaks.yml)
+- Standard Gitleaks detection pipeline on push and PR.
+
+#### [NEW] [codeql.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/codeql.yml)
+- Set up C# CodeQL analysis using manual build step `dotnet build Linting.csproj --nologo`.
+
+#### [NEW] [SECURITY.md](file:///C:/WSGTA/universal-or-strategy/SECURITY.md)
+- Governance policies, vulnerability reporting SLO, required branch protection checks, and a "Known historical exposures" subsection documenting the rotated DSN.
+
+#### [MODIFY] [install_hooks.ps1](file:///C:/WSGTA/universal-or-strategy/scripts/install_hooks.ps1)
+- Append Gitleaks staged protect command as a third hook gate.
+
+---
+
+### Task 4 — Observability (Sentry Integration)
+
+**Objective**: Wire the Sentry .NET SDK dynamically via `V12_SENTRY_DSN` environment variable and instrument the five target catch/reject sites.
+
+#### [NEW] [V12_002.Sentry.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Sentry.cs)
+- Partial class file encapsulating:
+  - `InitializeSentryIfConfigured()`
+  - `CaptureForensic(string tag, Exception ex)`
+  - `CaptureForensicMessage(string tag, string message)`
+  - `ShutdownSentry()`
+  - Uses `Interlocked.CompareExchange` for thread safety (no legacy locks).
+
+#### [MODIFY] [Linting.csproj](file:///C:/WSGTA/universal-or-strategy/Linting.csproj)
+- Add `<PackageReference Include="Sentry" Version="4.13.0" />` for compilation safety.
+
+#### [MODIFY] [V12_002.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.cs)
+- Advance `BUILD_TAG` to `"1111.007-readiness-L5"`.
 
 #### [MODIFY] [V12_002.Lifecycle.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Lifecycle.cs)
+- Init call in `State.Configure` and shutdown call in `State.Terminated`.
+- Capture site #1: `catch (Exception _mmioEx)` around MMIO mirror init.
 
-Instantiate the `StickyStateService` inside `Init_Services()`.
+#### [MODIFY] [V12_002.REAPER.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.REAPER.cs)
+- Capture site #2: `catch (Exception ex)` in REAPER main audit loop.
 
-```diff
-<<<<
-        private void Init_Services(string symbol)
-        {
-            // B984-F05: StickyState + IPC must complete BEFORE the load-complete gate flips
-            // so EnsureStartupReady() gate does not open until services are ready.
+#### [MODIFY] [V12_002.Orders.Callbacks.Propagation.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Orders.Callbacks.Propagation.cs)
+- Capture site #3: `catch (Exception submitEx)` around follower order submissions.
 
-            // Build 1103: Initialize sticky state path + hydrate persisted config.
-            // MUST run BEFORE IPC startup so GET_LAYOUT serves last-synced state.
-            string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
-            _stickyStatePath = System.IO.Path.Combine(logsDir,
-                string.Format("StickyState_{0}.v12state", symbol));
-            bool stickyLoaded = LoadStickyState();
-====
-        private void Init_Services(string symbol)
-        {
-            // B984-F05: StickyState + IPC must complete BEFORE the load-complete gate flips
-            // so EnsureStartupReady() gate does not open until services are ready.
+#### [MODIFY] [V12_002.SIMA.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.SIMA.cs)
+- Capture site #4: `catch (Exception ex)` on the SIMA mutation path.
 
-            // Build 1103: Initialize sticky state path + hydrate persisted config.
-            // MUST run BEFORE IPC startup so GET_LAYOUT serves last-synced state.
-            string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
-            _stickyStatePath = System.IO.Path.Combine(logsDir,
-                string.Format("StickyState_{0}.v12state", symbol));
+#### [MODIFY] [V12_002.UI.IPC.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.UI.IPC.cs)
+- Capture site #5: Zero-trust IPC command rejection (uses `CaptureForensicMessage` to prevent PII leakage).
 
-            // Initialize Sticky State Service
-            _stickyStateService = new Services.StickyStateService(new StickyStateLogger(Print));
+#### [NEW] [sentry_runtime_setup.md](file:///C:/WSGTA/universal-or-strategy/docs/telemetry/sentry_runtime_setup.md)
+- User instructions for dropping `Sentry.dll` into the local NinjaTrader directory and configuring the environment variable.
 
-            bool stickyLoaded = LoadStickyState();
->>>>
-```
+---
 
 ## Verification Plan
 
 ### Automated Tests
-
-- Run compile check:
-  `powershell -File .\scripts\build_readiness.ps1`
-- Run test suite:
-  `dotnet test Testing.csproj` (all 50/50 test cases must continue to pass)
+- Run `powershell -File .\scripts\build_readiness.ps1`
+- Run local unit tests: `dotnet test Testing.csproj` (ensure NUnit tests pass)
+- Run ASCII gate check: `python check_ascii.py`
 
 ### Manual Verification
-- Deploy and verify NT8 compilation.
-- Verify `BUILD_TAG` banner on NT8 startup.
+- Deploy hard links: `powershell -File .\deploy-sync.ps1`
+- Compile inside NinjaTrader (F5) and check for dynamic banner logs in output window.
+- Verify environment variable `V12_SENTRY_DSN` is read and initialized correctly.
