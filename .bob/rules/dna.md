@@ -56,4 +56,3 @@ All agents MUST perform a post-use audit after every skill or tool use:
 1. Check if any instruction was ambiguous or produced an unexpected result.
 2. Update the corresponding `SKILL.md` or persistent rule file if a gap or quirk is found.
 3. **KNOWLEDGE SYNC MANDATE**: Whenever a new agent doc ($doc), help capture, or SOP is created/modified, the agent MUST run `graphify update .` to ensure the project brain is current.
-

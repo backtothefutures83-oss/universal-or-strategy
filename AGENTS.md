@@ -30,11 +30,13 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 - **Sovereign Audit**: `droid /review` (Focus on P0-P3 severity findings).
 - **Readiness Check**: `droid /readiness-report` (Maintain Level 2+).
 - **Forensic Scan**: `grep -r "lock(" src/` (Zero-match requirement).
+- **Jane Street KB Query**: `& "C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe" scripts/query_kb.py "<term>"` (Retrieves HFT and high-performance system guidelines from the Firestore knowledge base).
 
 ## 4. Communication & Context
 
 - **Active Task**: Always check `docs/brain/task.md` before initiating work.
 - **Handoffs**: Use the `docs/brain/nexus_a2a.json` via the **Nexus Bridge** for inter-agent state synchronization.
+- **Expert Knowledge Base (RAG)**: Before starting complex design, refactoring, or performance engineering tasks, query the Jane Street Knowledge Base using `scripts/query_kb.py` to retrieve verified microsecond-latency patterns and testing standards.
 
 ## 5. Karpathy Behavioral Protocols (LLM Coding Hygiene)
 

@@ -56,6 +56,11 @@ Dynamic documents used for the current implementation cycle.
 *   F5 PASS 2026-05-15 11:58 Eastern | Logic Audit 1-9 PASS | Deploy-sync 29,938 chars.
 
 
+### Epic 1 Delta: Build 981 Concurrency Hardening (COMPLETE 2026-05-18)
+*   [epic_1_delta_plan.md](epic-1-dna/epic_1_delta_plan.md) - Verified execution plan.
+*   Tickets: H01 (Symmetry Rollback), H02 (Sideband Zero-First), H03 (Abort Drain), H06 (Top-Level Cancel Gate), H07 (Dictionary TOCTOU).
+*   F5 PASS 2026-05-18 | BUILD 984 | 5 race conditions eliminated | 5 xUnit tests added.
+
 ---
 
 ## 🛡️ Specialized Protocols & Audits
@@ -77,4 +82,4 @@ Design decisions and inspiration for the project's evolution.
 
 ---
 **Registry Status**: MAINTAINED
-**Last Update**: 2026-05-15 (MP-1 SIMA Lifecycle complete; F5 PASS 11:58 Eastern; Logic Audit 1-9 PASS; MP-2 Watch List Cluster 2 queued)
+**Last Update**: 2026-05-18 (Epic 1 Delta complete; BUILD 984 verified; Epic 2 S3 Visual queued)

@@ -1,4 +1,4 @@
-﻿# CLAUDE.md - BMad Project Standards & Safety Guide
+# CLAUDE.md - BMad Project Standards & Safety Guide
 
 ## Session Protocol (NON-NEGOTIABLE DEFAULT)
 
@@ -249,3 +249,12 @@ Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
+
+## Section 15: Mandatory Fleet Tracing (V12.16 Total Observability)
+
+No agent action is valid unless it is traced. ALL agents (Antigravity, Gemini, Qwen, Jules, Codex, Bob, Droid) MUST emit telemetry.
+
+1.  **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+2.  **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+3.  **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.

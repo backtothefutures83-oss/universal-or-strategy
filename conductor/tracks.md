@@ -15,3 +15,6 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: GTC Sweep "Friendly Fire" Logic Repair**
   *Link: [./tracks/gtc_sweep_fix_20260318/](./tracks/gtc_sweep_fix_20260318/)*
+
+- [ ] **Track: Expert Knowledge Factory (OpenRAG + Docling + Paperclip)**
+  *Link: [./tracks/expert_knowledge_factory_20260518/](./tracks/expert_knowledge_factory_20260518/)*

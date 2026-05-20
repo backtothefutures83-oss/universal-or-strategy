@@ -29,6 +29,7 @@ All tasks follow a strict multi-agent lifecycle:
     - Stage changes after the audit passes.
     - Commit using a descriptive message.
 7. **Complete Task**: Update `plan.md` task to `[x]`.
+8. **Knowledge Pipeline Sync (V12.16)**: Run `powershell -File .\scripts\sync_agent_knowledge.ps1`. This ensures that any new agent protocols or task-specific findings are indexed for the next agent.
 
 *(Note: TDD is NOT required. Safety checks and logical proofs replace test coverage requirements.)*
 
