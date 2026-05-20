@@ -1,271 +1,149 @@
-# Implementation Plan - Phase 7 Sprint 5 (T03)
-**Mission**: Hardening `ExecuteSmartDispatchEntry` via surgical extraction.
-**Target**: `src/V12_002.SIMA.Dispatch.cs`
-**DNA Gate**: CYC < 20, LOC >= 15, Zero-Locks, ASCII-Only.
+# Implementation Plan: Agent Readiness Level 5 Sprint (4-Task Master) — REV 2
 
-## Stage P3.5: Plannotator Surgical Brief
+**BUILD_TAG anchor**: `1111.007-mphase-mp0` (current active) → target `1111.007-readiness-L5` (Task 4 only)
+**Worktree**: `C:\WSGTA\universal-or-strategy` (current active repository)
+**Source of truth**: `docs/brain/nexus_a2a.json` (`agent_readiness_target: "LEVEL_5"`)
+**Scope**: Exactly the four readiness tasks enumerated in the mission brief. Stress Testing, Codecov, and a release workflow are explicitly OUT of the required scope.
 
-### Target 1: The Limit Branch Extraction
-**Action**: Replace the inlined `else` block in `ExecuteSmartDispatchEntry` with a call to the new helper.
-**Note**: `ocoId` is intentionally dropped from the signature (DEVIATION-T3-A).
+---
 
-**TargetContent** (starting around line 156):
-```csharp
-                        else
-                        {
-                            // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
-                            // REAPER runs on a background thread; if it fires between the expectedPositions
-                            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
-                            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
-                            // Registering dicts first guarantees REAPER always finds the blocking entry.
-                            // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
-                            // ConcurrentDictionary single-writes are thread-safe here.
-                            activePositions[fleetEntryName] = fleetPos;
-                            entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
-                            registeredForCleanup = true;
-                            MarkDispatchSyncPending(expectedKey);
-                            syncPending = true;
+## Context
 
-                            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
-                            if (!_followerBrackets.ContainsKey(fleetEntryName))
-                            {
-                                var proFsm = new FollowerBracketFSM
-                                {
-                                    AccountName = acct.Name,
-                                    EntryName = fleetEntryName,
-                                    State = FollowerBracketState.PendingSubmit,
-                                    RemainingContracts = followerQty,
-                                    EntryOrder = entry,
-                                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                                    LastUpdateUtc = DateTime.UtcNow
-                                };
-                                _followerBrackets.TryAdd(fleetEntryName, proFsm);
-                            }
+`nexus_a2a.json` declares `agent_readiness_target: "LEVEL_5"`. While the baseline originally derived from an earlier build, our active workspace has been successfully updated with the `1111.007-mphase-mp0` core. Baseline inspection shows the repository has SonarCloud SAST, ASCII/lock() pre-commit gates, a CODEOWNERS file, and NUnit tests under `Testing.csproj` — but we must close the remaining gaps: dependency automation, CI test runner, secret scanning, CodeQL, SECURITY.md, and Sentry SDK wiring.
 
-                            reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
-                            AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
+---
 
-                            int _poolSlotIndexLmt = -1;
-                            Order[] _proxyOrdersLmt = null;
-                            {
-                                var _claimedLmt = _photonPool.Claim();
-                                if (_claimedLmt.Orders != null)
-                                {
-                                    _proxyOrdersLmt = _claimedLmt.Orders;
-                                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
-                                }
-                                else
-                                {
-                                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
-                                    _poolSlotIndexLmt = -1;
-                                }
-                            }
-                            _proxyOrdersLmt[0] = entry;
+## Executive Summary
 
-                            if (_poolSlotIndexLmt >= 0)
-                            {
-                                _photonSideband[_poolSlotIndexLmt].Account        = acct;
-                                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
-                                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
-                                Thread.MemoryBarrier();
-                            }
+The clean baseline is missing four pillars required for Level 5 agent readiness:
+1. **Dependabot**: Add `.github/dependabot.yml` and SHA-pin every existing GitHub Action.
+2. **CI Test Execution with SonarCloud Coverage Ingestion**: Run NUnit tests in CI and deliver `.trx` + **OpenCover** coverage reports directly to SonarCloud.
+3. **Governance & Security Hardening**: Add secret scanning (gitleaks), CodeQL, `SECURITY.md`, and remediate the committed Sentry DSN literal at `docs/brain/memory/adr019_compaction_state.md`.
+4. **Sentry SDK Integration**: Wire Sentry .NET SDK dynamically via `V12_SENTRY_DSN` environment variable and instrument five target catch/reject sites in the C# strategy.
 
-                            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
-                            {
-                                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                                StopPrice     = 0,
-                                SignalTicks   = DateTime.UtcNow.Ticks,
-                                PoolSlotIndex = _poolSlotIndexLmt,
-                                OrderCount    = 1,
-                                Quantity      = followerQty,
-                                TargetCount   = 0,
-                                Action        = (int)action,
-                                ReservedDelta = reservedDelta
-                            };
-                            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
+---
 
-                            Interlocked.Increment(ref _pendingFleetDispatchCount);
+## Master Execution Plan
 
-                            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
-                            {
-                                if (_poolSlotIndexLmt >= 0 && _photonMmioMirror != null)
-                                {
-                                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
-                                }
-                            }
-                            else
-                            {
-                                if (_poolSlotIndexLmt >= 0)
-                                {
-                                    Order[] legacyOrdersLmt = new Order[] { entry };
-                                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
-                                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
-                                    _proxyOrdersLmt = legacyOrdersLmt;
-                                }
-                                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
-                                {
-                                    Account = acct,
-                                    Orders = _proxyOrdersLmt,
-                                    FleetEntryName = fleetEntryName,
-                                    ExpectedKey = expectedKey,
-                                    ReservedDelta = reservedDelta,
-                                    SignalTicks = DateTime.UtcNow.Ticks
-                                });
-                            }
-                            syncPending         = false;
-                            reservedDelta       = 0;
-                            registeredForCleanup = false;
+### Execution order and parallelism
 
-                            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
-                                acct.Name));
-                        }
-```
+| Order | Task | Parallelizable with | Hard blockers |
+| :-- | :-- | :-- | :-- |
+| 1 | Build & Dependency Automation | 2, 3 | none |
+| 2 | Testing Infrastructure & Coverage | 1, 3 | none |
+| 3 | Governance & Security Hardening | 1, 2 | none |
+| 4 | Observability (Sentry Integration) | runs after 1/2/3 | `deploy-sync.ps1` + NT8 F5 compile; Task 3 must redact the DSN first |
 
-**ReplacementContent**:
-```csharp
-                        else
-                        {
-                            Dispatch_PublishLimitEntryToPhoton(
-                                tradeType, action, quantity, entryPrice, entryOrderType, acct, i, symmetryDispatchId,
-                                fleetPos, entry, fleetEntryName, expectedKey, followerQty, ft1, ft2, ft3, ft4, ft5,
-                                stopPrice, t1TargetPrice, t2TargetPrice, t3TargetPrice, t4TargetPrice, t5TargetPrice,
-                                dispatchTargetCount,
-                                dispatchLog,
-                                ref syncPending,
-                                ref reservedDelta,
-                                ref registeredForCleanup);
-                        }
-```
+Tasks 1–3 touch only `.github/`, `scripts/`, root-level config, and one `docs/brain/memory/` redaction; they have **zero C# source file overlap** and will merge first. Task 4 modifies `src/` and runs last.
 
-### Target 2: Insertion of Helper Method
-**Action**: Insert the new helper method at the end of the `Dispatch` region.
+---
 
-**Insertion Point**: After the `Dispatch_PublishMarketBracketToPhoton` method (around line 717).
+## Proposed Changes
 
-**Content**:
-```csharp
-        /// <summary>
-        /// [V12-T03] Extraction of Limit branch for Photon ring dispatch.
-        /// Zero-allocation, thread-safe (DNA Rule 2). Signature drops ocoId (DEVIATION-T3-A).
-        /// </summary>
-        private void Dispatch_PublishLimitEntryToPhoton(
-            string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType,
-            Account acct, int i, string symmetryDispatchId, PositionInfo fleetPos, Order entry,
-            string fleetEntryName, string expectedKey, int followerQty, int ft1, int ft2, int ft3, int ft4, int ft5,
-            double stopPrice, double t1TargetPrice, double t2TargetPrice, double t3TargetPrice, double t4TargetPrice, double t5TargetPrice,
-            int dispatchTargetCount, StringBuilder dispatchLog,
-            ref bool syncPending, ref int reservedDelta, ref bool registeredForCleanup)
-        {
-            // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
-            // REAPER runs on a background thread; if it fires between the expectedPositions
-            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
-            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
-            // Registering dicts first guarantees REAPER always finds the blocking entry.
-            // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
-            // ConcurrentDictionary single-writes are thread-safe here.
-            activePositions[fleetEntryName] = fleetPos;
-            entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
-            registeredForCleanup = true;
-            MarkDispatchSyncPending(expectedKey);
-            syncPending = true;
+### Task 1 — Build & Dependency Automation
 
-            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
-            if (!_followerBrackets.ContainsKey(fleetEntryName))
-            {
-                var proFsm = new FollowerBracketFSM
-                {
-                    AccountName = acct.Name,
-                    EntryName = fleetEntryName,
-                    State = FollowerBracketState.PendingSubmit,
-                    RemainingContracts = followerQty,
-                    EntryOrder = entry,
-                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                    LastUpdateUtc = DateTime.UtcNow
-                };
-                _followerBrackets.TryAdd(fleetEntryName, proFsm);
-            }
+**Objective**: Add Dependabot for every ecosystem in the repo and SHA-pin every existing GitHub Action.
 
-            reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
-            AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
+#### [NEW] [dependabot.yml](file:///C:/WSGTA/universal-or-strategy/.github/dependabot.yml)
+- version: 2
+- Ecosystems: `github-actions` (weekly) and `nuget` (weekly).
+- Directory: `/` for both.
+- Reviewers: `["mkalhitti-cloud"]`.
+- Prefix: `chore(deps)`.
 
-            int _poolSlotIndexLmt = -1;
-            Order[] _proxyOrdersLmt = null;
-            {
-                var _claimedLmt = _photonPool.Claim();
-                if (_claimedLmt.Orders != null)
-                {
-                    _proxyOrdersLmt = _claimedLmt.Orders;
-                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
-                }
-                else
-                {
-                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
-                    _poolSlotIndexLmt = -1;
-                }
-            }
-            _proxyOrdersLmt[0] = entry;
+#### [MODIFY] [All GitHub Workflows](file:///C:/WSGTA/universal-or-strategy/.github/workflows/)
+- Pinned SHA replacements for `uses:` clauses in `dotnet-build.yml`, `gemini-pr-audit.yml`, `labeler.yml`, `sonarcloud.yml`, `stylecop-enforcement.yml`, and `upstream-sync.yml`.
 
-            if (_poolSlotIndexLmt >= 0)
-            {
-                _photonSideband[_poolSlotIndexLmt].Account        = acct;
-                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
-                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
-                Thread.MemoryBarrier();
-            }
+---
 
-            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
-            {
-                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                StopPrice     = 0,
-                SignalTicks   = DateTime.UtcNow.Ticks,
-                PoolSlotIndex = _poolSlotIndexLmt,
-                OrderCount    = 1,
-                Quantity      = followerQty,
-                TargetCount   = 0,
-                Action        = (int)action,
-                ReservedDelta = reservedDelta
-            };
-            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
+### Task 2 — Testing Infrastructure & Coverage
 
-            Interlocked.Increment(ref _pendingFleetDispatchCount);
+**Objective**: Run `Testing.csproj` in CI and deliver `.trx` + **OpenCover** coverage reports directly to SonarCloud using `sonar.cs.opencover.reportsPaths`.
 
-            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
-            {
-                if (_photonMmioMirror != null)
-                {
-                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
-                }
-            }
-            else
-            {
-                if (_poolSlotIndexLmt >= 0)
-                {
-                    Order[] legacyOrdersLmt = new Order[] { entry };
-                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
-                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
-                    _proxyOrdersLmt = legacyOrdersLmt;
-                }
-                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
-                {
-                    Account = acct,
-                    Orders = _proxyOrdersLmt,
-                    FleetEntryName = fleetEntryName,
-                    ExpectedKey = expectedKey,
-                    ReservedDelta = reservedDelta,
-                    SignalTicks = DateTime.UtcNow.Ticks
-                });
-            }
-            syncPending         = false;
-            reservedDelta       = 0;
-            registeredForCleanup = false;
+#### [MODIFY] [Testing.csproj](file:///C:/WSGTA/universal-or-strategy/Testing.csproj)
+- Add `<PackageReference Include="coverlet.msbuild" Version="6.0.2" />` under the PackageReference group.
 
-            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
-                acct.Name));
-        }
-```
+#### [NEW] [dotnet-test.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/dotnet-test.yml)
+- Run `dotnet test` with `/p:CollectCoverage=true /p:CoverletOutputFormat=opencover` on pushes to `main`/`build/**` and PRs.
+- Uses `windows-latest` for `.NET Framework 4.8` compatibility.
 
-## Stage P5: Verification & Deploy
-1. **CYC Audit**: Run `python scripts/complexity_audit.py` -> Verify CYC < 20.
-2. **MemoryBarrier Count**: Verify exactly 1 `Thread.MemoryBarrier()` in the new helper.
-3. **Hard-Link Sync**: Run `powershell -File .\deploy-sync.ps1`.
-4. **NinjaTrader Gate**: Press F5 and verify `BUILD_TAG` 1111.007.
+#### [MODIFY] [sonarcloud.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/sonarcloud.yml)
+- Add test run step generating OpenCover results.
+- Add `/d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"` to scanner initialization.
+
+---
+
+### Task 3 — Governance & Security Hardening
+
+**Objective**: Configure secret-scanning (Gitleaks), CodeQL analysis, write `SECURITY.md`, and redact the leaked Sentry DSN literal.
+
+#### [MODIFY] [adr019_compaction_state.md](file:///C:/WSGTA/universal-or-strategy/docs/brain/memory/adr019_compaction_state.md)
+- Replace Sentry DSN literal at line 19 with: `REDACTED_SENTRY_DSN -- see V12_SENTRY_DSN env var`.
+
+#### [NEW] [.gitleaks.toml](file:///C:/WSGTA/universal-or-strategy/.gitleaks.toml)
+- Default rules configuration with a narrow allowlist for `docs/telemetry/droid_mission_01/README.md` and `check_ascii.py` canary strings.
+
+#### [NEW] [gitleaks.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/gitleaks.yml)
+- Standard Gitleaks detection pipeline on push and PR.
+
+#### [NEW] [codeql.yml](file:///C:/WSGTA/universal-or-strategy/.github/workflows/codeql.yml)
+- Set up C# CodeQL analysis using manual build step `dotnet build Linting.csproj --nologo`.
+
+#### [NEW] [SECURITY.md](file:///C:/WSGTA/universal-or-strategy/SECURITY.md)
+- Governance policies, vulnerability reporting SLO, required branch protection checks, and a "Known historical exposures" subsection documenting the rotated DSN.
+
+#### [MODIFY] [install_hooks.ps1](file:///C:/WSGTA/universal-or-strategy/scripts/install_hooks.ps1)
+- Append Gitleaks staged protect command as a third hook gate.
+
+---
+
+### Task 4 — Observability (Sentry Integration)
+
+**Objective**: Wire the Sentry .NET SDK dynamically via `V12_SENTRY_DSN` environment variable and instrument the five target catch/reject sites.
+
+#### [NEW] [V12_002.Sentry.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Sentry.cs)
+- Partial class file encapsulating:
+  - `InitializeSentryIfConfigured()`
+  - `CaptureForensic(string tag, Exception ex)`
+  - `CaptureForensicMessage(string tag, string message)`
+  - `ShutdownSentry()`
+  - Uses `Interlocked.CompareExchange` for thread safety (no legacy locks).
+
+#### [MODIFY] [Linting.csproj](file:///C:/WSGTA/universal-or-strategy/Linting.csproj)
+- Add `<PackageReference Include="Sentry" Version="4.13.0" />` for compilation safety.
+
+#### [MODIFY] [V12_002.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.cs)
+- Advance `BUILD_TAG` to `"1111.007-readiness-L5"`.
+
+#### [MODIFY] [V12_002.Lifecycle.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Lifecycle.cs)
+- Init call in `State.Configure` and shutdown call in `State.Terminated`.
+- Capture site #1: `catch (Exception _mmioEx)` around MMIO mirror init.
+
+#### [MODIFY] [V12_002.REAPER.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.REAPER.cs)
+- Capture site #2: `catch (Exception ex)` in REAPER main audit loop.
+
+#### [MODIFY] [V12_002.Orders.Callbacks.Propagation.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Orders.Callbacks.Propagation.cs)
+- Capture site #3: `catch (Exception submitEx)` around follower order submissions.
+
+#### [MODIFY] [V12_002.SIMA.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.SIMA.cs)
+- Capture site #4: `catch (Exception ex)` on the SIMA mutation path.
+
+#### [MODIFY] [V12_002.UI.IPC.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.UI.IPC.cs)
+- Capture site #5: Zero-trust IPC command rejection (uses `CaptureForensicMessage` to prevent PII leakage).
+
+#### [NEW] [sentry_runtime_setup.md](file:///C:/WSGTA/universal-or-strategy/docs/telemetry/sentry_runtime_setup.md)
+- User instructions for dropping `Sentry.dll` into the local NinjaTrader directory and configuring the environment variable.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `powershell -File .\scripts\build_readiness.ps1`
+- Run local unit tests: `dotnet test Testing.csproj` (ensure NUnit tests pass)
+- Run ASCII gate check: `python check_ascii.py`
+
+### Manual Verification
+- Deploy hard links: `powershell -File .\deploy-sync.ps1`
+- Compile inside NinjaTrader (F5) and check for dynamic banner logs in output window.
+- Verify environment variable `V12_SENTRY_DSN` is read and initialized correctly.

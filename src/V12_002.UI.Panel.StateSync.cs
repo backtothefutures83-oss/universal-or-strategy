@@ -1,5 +1,7 @@
 // Build 1105: V12_001 panel port -- live state sync from strategy fields
+// H09/H11: Concurrency hardening for visual render and state sync
 using System;
+using System.Threading;
 using NinjaTrader.Cbi;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -13,7 +15,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void UpdatePanelState()
         {
             if (rootContainer == null || _isTerminating) return;
+            
+            // H09/H11 FIX: Ensure memory barrier before reading snapshot to prevent
+            // stale reads when fleet sync updates state on another thread.
+            Thread.MemoryBarrier();
             UIStateSnapshot snapshot = GetUiSnapshot();
+            
+            // H11 FIX: Validate snapshot is not null before dereferencing
+            if (snapshot == null) return;
 
             double price = snapshot.LastPrice;
             if (lastPriceText != null)
@@ -131,9 +140,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void SyncLiveTargetRows(UILivePositionSnapshot livePosition)
         {
+            // H09 FIX: Create local snapshot of targets array to prevent collection-modified
+            // exceptions if fleet sync mutates the snapshot mid-render.
+            UILiveTargetSnapshot[] targetsSnapshot = livePosition.Targets;
+            if (targetsSnapshot == null) return;
+
             for (int t = 1; t <= 5; t++)
             {
-                UILiveTargetSnapshot target = livePosition.Targets[t - 1];
+                // H09: Read from local snapshot, not volatile reference
+                UILiveTargetSnapshot target = (t - 1) < targetsSnapshot.Length
+                    ? targetsSnapshot[t - 1]
+                    : null;
                 bool active = target != null && target.IsVisible;
                 SetLiveTargetRowVisible(t, active);
                 if (!active || target == null) continue;

@@ -56,6 +56,19 @@ $lines = @(
     '    echo "[WARN] gitleaks not on PATH -- skipping secret scan. CI will catch it."',
     'fi',
     "",
+    "# Gate 4: Diff size guard on staged src/ changes",
+    'STAGED_SRC_DIFF=$(git diff --cached -- "src/" 2>/dev/null)',
+    'if [ -n "$STAGED_SRC_DIFF" ]; then',
+    '    DIFF_CHARS=$(git diff --cached -- "src/" | grep -E "^[+-]" | grep -vE "^(\+\+\+|---)" | wc -c)',
+    '    DIFF_CHARS=$(echo "$DIFF_CHARS" | tr -d "[:space:]")',
+    '    if [ -z "$DIFF_CHARS" ]; then DIFF_CHARS=0; fi',
+    '    if [ "$DIFF_CHARS" -gt "10000" ]; then',
+    '        echo "PRE-COMMIT FAIL: Staged changes in src/ ($DIFF_CHARS chars) exceed the 10,000 character limit."',
+    '        echo "Please break down this change into smaller, focused PRs to keep review smooth."',
+    '        exit 1',
+    '    fi',
+    'fi',
+    "",
     'echo "--- V12 Pre-Commit Gate: PASS ---"',
     "exit 0"
 )
@@ -65,5 +78,5 @@ $hookContent = $lines -join "`n"
 
 Write-Host ""
 Write-Host "HOOK INSTALLED : $hookTarget"
-Write-Host "Active gates   : [1] lock() ban  [2] ASCII purity  [3] gitleaks (if installed)"
+Write-Host "Active gates   : [1] lock() ban  [2] ASCII purity  [3] gitleaks (if installed)  [4] diff guard (10K limit)"
 Write-Host "To bypass (rare): git commit --no-verify"

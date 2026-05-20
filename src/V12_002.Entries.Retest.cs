@@ -170,7 +170,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 };
                 ApplyTargetLadderGuard(pos);
 
-                { var _en966 = entryName; var _p966 = pos; Enqueue(ctx => { ctx.activePositions[_en966] = _p966; }); }
+                // [BUILD 981 EXEMPTION]: Synchronous write to activePositions before broker submission.
+                // Prevents TOCTOU race where rollback (line 187) executes before queued addition.
+                // ConcurrentDictionary single-write is thread-safe (no lock required).
+                activePositions[entryName] = pos;
 
                 // Build 1102Y-V3 [MS-07]: Register Master expected BEFORE Limit entry.
                 int masterDeltaRetest = (direction == MarketPosition.Long) ? contracts : -contracts;
@@ -307,7 +310,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 };
                 ApplyTargetLadderGuard(pos);
 
-                { var _en966 = entryName; var _p966 = pos; Enqueue(ctx => { ctx.activePositions[_en966] = _p966; }); }
+                // [BUILD 981 EXEMPTION]: Synchronous write to activePositions before broker submission.
+                // Prevents TOCTOU race where rollback (line 324) executes before queued addition.
+                // ConcurrentDictionary single-write is thread-safe (no lock required).
+                activePositions[entryName] = pos;
 
                 // Build 1102Y-V3 [MS-08]: Register Master expected BEFORE Limit entry.
                 int masterDeltaRetestMnl = (direction == MarketPosition.Long) ? contracts : -contracts;

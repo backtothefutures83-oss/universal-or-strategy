@@ -1,11 +1,11 @@
-﻿# V12 Universal OR Strategy -- Master Roadmap
+# V12 Universal OR Strategy -- Master Roadmap
 
-## Build-984-SourceHardening | 12 Repairs CONFIRMED LIVE -- COMPLIANCE PASS
+## V12 Bug Bounty Campaign | 24-Defect Repair | ACTIVE
 
-**Last Synced**: 2026-05-08T00:00:00Z
-**Protocol**: V14 Alpha | **Current Build**: 1111.006-phase-6-t0
-**Status**: 🟢 **READY FOR MERGE** (StyleCop & ASCII Gates PASS)
-**Active Branch**: `build-984-source-hardening` | **Last Stable PR**: #76
+**Last Synced**: 2026-05-18T00:00:00Z
+**Protocol**: V14 Sovereign | **Current Build**: 1111.007-phase7-t1
+**Status**: 🔵 **EPIC 1 COMPLETE -- EPIC 2 NEXT** (H09-H12 queued)
+**Active Branch**: `feature/photon-spsc-hardening` | **Last Stable Merge**: #102 -> main (2026-05-15)
 
 ---
 
@@ -60,19 +60,53 @@
 
 > [!IMPORTANT]
 >
-> ## PRODUCTION GATE
+> ## PRODUCTION GATE: CLOSED (2026-05-15)
 >
-> **M3 = finish line (no Rithmic).** When Build-984 Source Hardening P7 merges to main, the project is production-complete.
-> M3 fully closes when: Build-984 implemented (P5) + validated (P6) + merged to main (P7).
+> **M3 = finish line.** Phases 1-7 complete. Platinum Standard. ZERO CYC > 20 across 817 methods.
+> The 24 bug bounty repairs are post-production hardening -- not a gate, a quality campaign.
 
-| Milestone | Title | Status | Required? |
-| :---: | :--- | :--- | :---: |
-| **M4** | Rithmic Sidecar (SovereignBridge.exe) | 🔵 DEFERRED | OPTIONAL |
-| **M5** | Zero-Allocation Hot Path | 🔵 PLANNED | OPTIONAL |
-| **M6** | Cache-Aligned Data Structures | 🔵 PLANNED | OPTIONAL |
-| **M7** | Concurrency Hardening (SPSC/MPMC) | 🟡 IN PROGRESS | OPTIONAL |
-| **M8** | Distributed Optimization (Photon Kernel) | 🔵 DEFERRED (needs M4) | OPTIONAL |
-| **M9** | Full Autonomy (AMAL Loop) | ⚪ DEFERRED (needs M4/M8) | OPTIONAL |
+---
+
+## ============================================================
+## ACTIVE TRACK: NinjaTrader 8
+## ============================================================
+
+> [!IMPORTANT]
+> We are on NinjaTrader 8. This is the ONLY active track until the Director says otherwise.
+> Do NOT surface API/Rithmic/sidecar items when discussing short-term plans.
+
+### Current Task List (ordered, nothing else exists)
+
+| # | Task | Status |
+| - | ---- | ------ |
+| **1** | Epic 1: H05 + H08 Stop Order Sync | COMPLETE (commit da3e34f) |
+| **2** | Epic 1: H21 + H22 Retest Rollback Fix | COMPLETE (commit da3e34f) |
+| **3** | Epic 1: REAPER Diagnostic + 5 tests | COMPLETE (commit da3e34f) |
+| **4** | Epic 2: Visual/Command Pipeline H09-H12 | NEXT |
+| **5** | Epic 3: REAPER & Lifecycle H13-H18, H20 | QUEUED |
+| **6** | Epic 4: Signal & State H21-H24, H26 | QUEUED |
+| **7** | PR -- merge all 24 repairs to main | QUEUED |
+| **8** | Live trading & system testing | NEXT PHASE |
+
+---
+
+## ============================================================
+## DEFERRED TRACK: Future Direct Broker API
+## ============================================================
+
+> [!CAUTION]
+> All items below require leaving NT8's native adapter. Do NOT raise in short-term planning.
+> Director must explicitly re-open this track before any work begins.
+
+| Item | Title | Dependency |
+| :--- | :--- | :--- |
+| M4 | Rithmic Sidecar (SovereignBridge.exe) | Director decision to leave NT8 |
+| M5 | Zero-Allocation Hot Path (cross-process) | M4 |
+| M6 | Cache-Aligned Data Structures | M4 |
+| M7 / GAP-2 | SPSC Ring Buffer Full Integration | M4 |
+| M8 | Distributed Photon Kernel | M4 |
+| M9 | Full Autonomy / AMAL Loop | M4 + M8 |
+| GAP-5 | CRC16 sequence counter | CLOSED -- superseded by XorShadow 64-bit (live) |
 
 ---
 

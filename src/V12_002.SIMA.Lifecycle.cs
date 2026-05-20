@@ -125,9 +125,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                         ClearDispatchSyncPending(_expectedKey);
                     if (_sbIdx >= 0)
                     {
-                        _photonPool.ReleaseByIndex(_sbIdx);
                         if (_sbIdx < _photonSideband.Length)
                             _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                        Thread.MemoryBarrier();
+                        _photonPool.ReleaseByIndex(_sbIdx);
                     }
                 }
                 Print("[SIMA] Photon ring cleared on shutdown with delta rollback.");

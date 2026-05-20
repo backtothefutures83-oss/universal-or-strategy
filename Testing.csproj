@@ -5,20 +5,45 @@
     <LangVersion>8.0</LangVersion>
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <DefineConstants>TESTING_MOCKS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="NUnit" Version="3.13.3" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.4.2" />
+    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="coverlet.msbuild" Version="6.0.2" />
     <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <PackageReference Include="FsCheck" Version="2.16.6" />
+    <PackageReference Include="FsCheck.NUnit" Version="2.16.6" />
+    <PackageReference Include="FsCheck.Xunit" Version="2.16.6" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- We only include the PureLogic file to avoid NinjaTrader assembly dependencies in the test runner -->
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Mocks to satisfy NinjaTrader dependencies on hosted CI -->
+    <Compile Include="tests\NinjaTrader.Mocks.cs" />
+    
+    <!-- Test Files -->
+    <Compile Include="tests\**\*.cs" />
+    
+    <!-- Strategy Logic Kernels -->
     <Compile Include="src\V12_002.PureLogic.cs" />
-    <Compile Include="tests\*.cs" />
+    <Compile Include="src\V12_002.StickyState.cs" />
+    <Compile Include="src\V12_002.PositionInfo.cs" />
+    
+    <!-- Services (Pure C# - no NinjaTrader dependencies) -->
+    <Compile Include="src\Services\*.cs" />
   </ItemGroup>
 
 </Project>

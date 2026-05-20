@@ -1,4 +1,4 @@
-﻿# NinjaScript V12 Project Standards (Codex Mirror)
+# NinjaScript V12 Project Standards (Codex Mirror)
 
 - **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).
 - **No Internal Locks**: `lock(stateLock)` is **BANNED**. All state mutations MUST use `Enqueue(ctx => ...)` by default. Exception: Build 981 direct-write for `stopOrders` during bracket submission.
@@ -31,6 +31,13 @@
   before recommending approval to the Director.
 - **$MISSION**: Initialize a new project phase via a Mission Brief artifact.
 - **$AUDIT**: Trigger the `/audit` skill to scan the `src/` directory.
+
+## ðŸš€ Knowledge Hardening (V12.16 Mandate)
+Codex agents MUST ensure their threat models and security tools are indexed for the rest of the fleet.
+
+1. **Threat Model Sync**: After updating `docs/brain/codex_threat_modeling.md`, you MUST run `graphify update .`.
+2. **CLI Veracity**: Ensure `docs/brain/live_codex_help.txt` reflects the current `--sandbox` and `--approval` policies.
+3. **P5 Red-Team Knowledge**: All forensic findings must be pipelined into the `docs/brain/memory/` folder for long-term project recall.
 
 ## Agent Synchronization
 
@@ -132,7 +139,7 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 - Touch only what you must. Clean up only your own mess.
 - Do NOT "improve" adjacent code, comments, or formatting.
 - **WHITESPACE MUTATION BANNED**: Never mutate whitespace, line endings, or indentation across files. This creates bloated diffs that obscure logic and break CI limits.
-- **STRICT DIFF LIMIT**: Pull Request diffs MUST remain under 150,000 characters. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
+- **STRICT DIFF LIMIT**: Pull Request diffs MUST target less than 10,000 characters of source code changes (in `src/`). Split larger epics into smaller, focused PRs. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
 - Do NOT refactor things that aren't broken. Match existing style.
 - If you notice unrelated dead code, MENTION it -- do not delete it.
 - Every changed line must trace directly to the Mission Brief.

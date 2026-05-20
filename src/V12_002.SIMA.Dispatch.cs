@@ -648,8 +648,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("[PHOTON] Ring full -- fallback to ConcurrentQueue");
                     Order[] legacyOrders = new Order[_orderIdx];
                     Array.Copy(_proxyOrders, legacyOrders, _orderIdx);
-                    _photonPool.ReleaseByIndex(_poolSlotIndex);
                     _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
+                    Thread.MemoryBarrier();
+                    _photonPool.ReleaseByIndex(_poolSlotIndex);
                     _proxyOrders = legacyOrders;
                 }
                 _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
@@ -774,8 +775,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (_poolSlotIndexLmt >= 0)
                 {
                     Order[] legacyOrdersLmt = new Order[] { entry };
-                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
                     _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
+                    Thread.MemoryBarrier();
+                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
                     _proxyOrdersLmt = legacyOrdersLmt;
                 }
                 _pendingFleetDispatches.Enqueue(new FleetDispatchRequest

@@ -67,6 +67,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             finally
             {
+                // H02: Clear sideband BEFORE pool release to prevent stale-read race
+                if (poolSlotIndex >= 0 && poolSlotIndex < _photonSideband.Length)
+                {
+                    _photonSideband[poolSlotIndex].Account = null;
+                    _photonSideband[poolSlotIndex].FleetEntryName = string.Empty;
+                    _photonSideband[poolSlotIndex].ExpectedKey = string.Empty;
+                }
+                Thread.MemoryBarrier(); // Enforce write ordering
+                
                 if (poolSlotIndex >= 0)
                     _photonPool.ReleaseByIndex(poolSlotIndex);
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
@@ -238,6 +247,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12 Phase 7 [T13]: Drain both Photon ring and legacy queue when SIMA disabled or flatten running.
         /// Performs sideband-aware delta rollback and pool release for all pending dispatches.
+        /// H02: Sideband zero + MemoryBarrier BEFORE pool release.
+        /// H03: Unsubscribe from fleet accounts after drain to prevent handler accumulation.
         /// </summary>
         private void DrainAllDispatchQueuesOnAbort()
         {
@@ -255,9 +266,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ClearDispatchSyncPending(_expectedKey);
                 if (_sbIdx >= 0)
                 {
-                    _photonPool.ReleaseByIndex(_sbIdx);
+                    // H02: Zero sideband FIRST, fence, THEN release pool
                     if (_sbIdx < _photonSideband.Length)
-                        _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    {
+                        _photonSideband[_sbIdx].Account = null;
+                        _photonSideband[_sbIdx].FleetEntryName = string.Empty;
+                        _photonSideband[_sbIdx].ExpectedKey = string.Empty;
+                    }
+                    Thread.MemoryBarrier();
+                    _photonPool.ReleaseByIndex(_sbIdx);
                 }
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
             }
@@ -270,6 +287,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ClearDispatchSyncPending(stale.ExpectedKey);
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
             }
+            // H03: Unsubscribe from fleet accounts (idempotent via V12.1101E [A-4] guard)
+            UnsubscribeFromFleetAccounts();
         }
 
         /// <summary>
@@ -307,9 +326,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 if (_sbIdx >= 0)
                 {
-                    _photonPool.ReleaseByIndex(_sbIdx);
                     if (_sbIdx < _photonSideband.Length)
-                        _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+                    {
+                        _photonSideband[_sbIdx].Account = null;
+                        _photonSideband[_sbIdx].FleetEntryName = string.Empty;
+                        _photonSideband[_sbIdx].ExpectedKey = string.Empty;
+                    }
+                    Thread.MemoryBarrier();
+                    _photonPool.ReleaseByIndex(_sbIdx);
                 }
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
                 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
@@ -327,18 +351,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V12 Phase 7 [T13]: Process valid Photon ring slot after integrity verification passes.
         /// Retrieves Order[] from pool, calls ProcessFleetSlot, and clears sideband refs.
+        /// H02: Sideband zero + MemoryBarrier BEFORE pool release (happens in ProcessFleetSlot finally).
         /// </summary>
         private void ProcessValidPhotonSlot(FleetDispatchSlot _ringSlot, FleetDispatchSideband _sb, int _sbIdx)
         {
             // Valid slot -- retrieve Order[] from pool via PoolSlotIndex
             Order[] ringOrders = _photonPool.GetByIndex(_sbIdx);
+            
+            // H02: Zero sideband FIRST, fence, THEN ProcessFleetSlot (which releases pool in finally)
+            if (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
+            {
+                _photonSideband[_sbIdx].Account = null;
+                _photonSideband[_sbIdx].FleetEntryName = string.Empty;
+                _photonSideband[_sbIdx].ExpectedKey = string.Empty;
+            }
+            Thread.MemoryBarrier();
+            
             ProcessFleetSlot(_sb.Account, ringOrders, _ringSlot.OrderCount,
                 _sb.FleetEntryName, _sb.ExpectedKey, _ringSlot.ReservedDelta,
                 _ringSlot.SignalTicks, _sbIdx);
-
-            // Clear sideband to release refs (avoid stale retention across ring wraps)
-            if (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
-                _photonSideband[_sbIdx] = default(FleetDispatchSideband);
         }
 
         // Build 935 [SIMA-B935-001]: Skip-logic extracted from ExecuteSmartDispatchEntry fleet loop.

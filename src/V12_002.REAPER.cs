@@ -60,6 +60,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>Build 946: Track consecutive failed repair attempts per account where PositionInfo is missing.</summary>
         private readonly ConcurrentDictionary<string, int> _reaperOrphanRepairCount = new ConcurrentDictionary<string, int>();
 
+        // [BUILD 981 DIAGNOSTIC]: Tracks when an orphaned FSM position was first detected.
+        // Key = entry name; Value = UTC time of first detection.
+        private readonly ConcurrentDictionary<string, DateTime> _orphanedPositionFirstSeen
+            = new ConcurrentDictionary<string, DateTime>();
+
         // Stamps per-account fill grace. Call from SetExpectedPositionLocked when applying a non-zero delta.
         private void StampAccountFillGrace(string expKey)
         {

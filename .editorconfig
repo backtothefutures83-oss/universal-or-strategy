@@ -7,3 +7,10 @@ dotnet_analyzer_diagnostic.severity = warning
 # StyleCop specific configurations (optional, can be expanded as needed)
 dotnet_diagnostic.SA1633.severity = none # File must have header
 dotnet_diagnostic.SA1200.severity = none # Using directives must be placed correctly
+# Suppress all StyleCop warnings (formatting deferred to Run 5)
+dotnet_diagnostic.SA1025.severity = none # Multiple whitespace
+dotnet_diagnostic.SA1028.severity = none # Trailing whitespace
+dotnet_diagnostic.SA1208.severity = none # Using directive ordering (System before NinjaTrader)
+dotnet_diagnostic.SA1210.severity = none # Using directives alphabetical
+dotnet_diagnostic.SA1513.severity = none # Closing brace blank line
+dotnet_diagnostic.SA1515.severity = none # Comment blank line

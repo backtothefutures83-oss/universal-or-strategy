@@ -1,0 +1,82 @@
+# [SENTINEL] V12 Autonomous Testing Pyramid
+# Implements Unit, Property, and TDD validation suites on hosted CI.
+# Bypasses NinjaTrader DLL dependency via tests/NinjaTrader.Mocks.cs
+
+name: "Sentinel Testing Pyramid"
+
+on:
+  push:
+    branches: ["main", "build/**"]
+    paths:
+      - "src/**.cs"
+      - "tests/**.cs"
+      - "Testing.csproj"
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test-pyramid:
+    name: Build & Run Pyramid Suites
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9  # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore Testing.csproj --nologo
+        shell: pwsh
+
+      - name: 1. Unit Tests (Pure Logic)
+        # Validates math, sizing, and rounding kernels.
+        run: dotnet test Testing.csproj --filter "FullyQualifiedName~UniversalOrStrategy.Tests.LogicTests" --no-restore --nologo --logger "trx;LogFileName=unit-results.trx"
+        shell: pwsh
+
+      - name: 2. TDD Concurrency Suites (Epic 1 Delta)
+        # Validates lock-free patterns and atomic FSM transitions.
+        run: dotnet test Testing.csproj --filter "FullyQualifiedName~UniversalOrStrategy.Tests.Epic1DeltaTests" --no-restore --nologo --logger "trx;LogFileName=tdd-results.trx"
+        shell: pwsh
+
+      - name: 3. Property-Based Testing (FsCheck)
+        # [FUTURE] This will run FsCheck properties once defined in tests.
+        run: |
+          Write-Host "Searching for property tests..."
+          dotnet test Testing.csproj --filter "Category=Property" --no-restore --nologo
+        shell: pwsh
+
+      - name: Check for non-ASCII characters (ASCII Gate)
+        # [MANIFESTO] Section 7: Mandatory ASCII check for NT8 compiler safety.
+        run: |
+          $files = Get-ChildItem -Path "src" -Filter "*.cs" -Recurse
+          $violations = @()
+          foreach ($f in $files) {
+            $content = [System.IO.File]::ReadAllBytes($f.FullName)
+            foreach ($byte in $content) {
+              if ($byte -gt 127) {
+                $violations += $f.FullName
+                break
+              }
+            }
+          }
+          if ($violations.Count -gt 0) {
+            Write-Host "ASCII GATE FAILED -- non-ASCII bytes found in:"
+            $violations | ForEach-Object { Write-Host "  - $_" }
+            exit 1
+          } else {
+            Write-Host "ASCII Gate PASSED."
+          }
+        shell: pwsh
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: test-results
+          path: "**/TestResults/*.trx"

@@ -19,6 +19,7 @@
   <ItemGroup>
     <!-- Include all Strategy source files for analysis -->
     <Compile Include="src\*.cs" />
+    <Compile Include="src\Services\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

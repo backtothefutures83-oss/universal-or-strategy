@@ -1,0 +1,18 @@
+---
+exclude_paths:
+  - "docs/**"
+  - "**/*.md"
+  - "scripts/**"
+  - ".agent/**"
+  - ".agents/**"
+  - ".bob/**"
+  - ".codex/**"
+  - ".cursor/**"
+  - ".gemini/**"
+  - "Traycerrefactor/**"
+  - "artifacts/**"
+  - "deploy-sync.ps1"
+  - "check_ascii.py"
+  - "Testing.csproj"
+  - "Linting.csproj"
+  - "StyleCop.Analyzers.ruleset"

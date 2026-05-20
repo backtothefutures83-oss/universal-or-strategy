@@ -1,4 +1,4 @@
-﻿# NinjaScript V12 Project Standards (Jules CLI Mirror)
+# NinjaScript V12 Project Standards (Jules CLI Mirror)
 
 # Jules CLI = BACKUP ENGINEER #2 (identical twin to Gemini CLI)
 
@@ -35,6 +35,7 @@ Jules CLI is workflow-aware and MUST follow these patterns from `.agent/workflow
 | `/coordinator`       | `.agent/workflows/coordinator.md`       | Antigravity routes to FORENSICS / ARCHITECT / ENGINEER    |
 | `/agent-as-tool`     | `.agent/workflows/agent_as_tool.md`     | Stateless single-use diagnostic or surgical edit          |
 | `/multi-agent-audit` | `.agent/workflows/multi_agent_audit.md` | Red-team multi-agent cross-audit                          |
+| `/bug-bounty`        | `.agent/workflows/bug-bounty.md`        | Parallel 7-agent focused bug hunt, consolidation, and `/epic-tdd` prep |
 
 **Source of truth**: `.agent/workflows/` is the canonical workflow directory. Jules MUST NOT
 deviate from workflow steps without Director authorization.
@@ -124,7 +125,7 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 - Touch only what you must. Clean up only your own mess.
 - Do NOT "improve" adjacent code, comments, or formatting.
 - **WHITESPACE MUTATION BANNED**: Never mutate whitespace, line endings, or indentation across files. This creates bloated diffs that obscure logic and break CI limits.
-- **STRICT DIFF LIMIT**: Pull Request diffs MUST remain under 150,000 characters. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
+- **STRICT DIFF LIMIT**: Pull Request diffs MUST target less than 10,000 characters of source code changes (in `src/`). Split larger epics into smaller, focused PRs. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
 - Do NOT refactor things that aren't broken. Match existing style.
 - If you notice unrelated dead code, MENTION it -- do not delete it.
 - Every changed line must trace directly to the Mission Brief.
@@ -143,3 +144,11 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 - **Check First**: Before deep architectural exploration, always check for `graphify-out/graph.json` or `graphify-out/GRAPH_REPORT.md`.
 - **Update**: Use `graphify update .` to refresh the repo knowledge graph after major structural changes.
 - **Efficiency**: Use the graph to navigate codebase relationships with 71x fewer tokens than raw file reading.
+
+## Section 15: Mandatory Fleet Tracing (V12.16 Total Observability)
+
+No agent action is valid unless it is traced. ALL agents (Antigravity, Gemini, Qwen, Jules, Codex, Bob, Droid) MUST emit telemetry.
+
+1.  **Universal Sink**: All scripts and tool calls MUST use `python scripts/emit_fleet_telemetry.py` to record execution status.
+2.  **Hardened Environment**: Every agent invocation MUST use the global Python path (`C:\Users\Mohammed Khalid\AppData\Local\Programs\Python\Python312\python.exe`) for telemetry-enabled scripts to prevent module-not-found failures.
+3.  **Trace Integrity**: If a trace fails to emit, the agent MUST report the failure to the Director immediately.

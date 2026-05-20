@@ -21,7 +21,7 @@
     ```
 
 ## References
-- **Audit Findings**: `docs/brain/prreport_audit_results.md` ([LD-002], [LD-003]).
+- **Audit Findings**: `docs/brain/pr_report.md` ([LD-002], [LD-003]).
 - **Target Methods**: `ManageTrailingStops()`, `ManageTrail_RunPerTradeBranches()`.
 
 ## Guardrails

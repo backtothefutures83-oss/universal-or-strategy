@@ -55,3 +55,9 @@ tmp/
 .gemini/
 .agent/
 graphify-out/
+
+# Project pollution ignore rules
+infrastructure/
+experts/
+docs/brain/run2-stickystate/
+agy_log.txt
