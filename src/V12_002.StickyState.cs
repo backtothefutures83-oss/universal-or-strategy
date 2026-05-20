@@ -228,33 +228,67 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return false;
 
                 // Apply config values
-                if (data.ConfigValues.TryGetValue("COUNT", out object cntObj) && cntObj is int cnt)
-                    activeTargetCount = Math.Max(1, Math.Min(5, cnt));
-
-                if (data.ConfigValues.TryGetValue("T1", out object t1Obj) && t1Obj is double t1)
-                    Target1Value = t1;
-                if (data.ConfigValues.TryGetValue("T2", out object t2Obj) && t2Obj is double t2)
-                    Target2Value = t2;
-                if (data.ConfigValues.TryGetValue("T3", out object t3Obj) && t3Obj is double t3)
-                    Target3Value = t3;
-                if (data.ConfigValues.TryGetValue("T4", out object t4Obj) && t4Obj is double t4)
-                    Target4Value = t4;
-                if (data.ConfigValues.TryGetValue("T5", out object t5Obj) && t5Obj is double t5)
-                    Target5Value = t5;
-
-                if (data.ConfigValues.TryGetValue("T1TYPE", out object t1tObj) && t1tObj is Services.TargetMode t1t)
-                    T1Type = (TargetMode)(int)t1t;
-                if (data.ConfigValues.TryGetValue("T2TYPE", out object t2tObj) && t2tObj is Services.TargetMode t2t)
-                    T2Type = (TargetMode)(int)t2t;
-                if (data.ConfigValues.TryGetValue("T3TYPE", out object t3tObj) && t3tObj is Services.TargetMode t3t)
-                    T3Type = (TargetMode)(int)t3t;
-                if (data.ConfigValues.TryGetValue("T4TYPE", out object t4tObj) && t4tObj is Services.TargetMode t4t)
-                    T4Type = (TargetMode)(int)t4t;
-                if (data.ConfigValues.TryGetValue("T5TYPE", out object t5tObj) && t5tObj is Services.TargetMode t5t)
-                    T5Type = (TargetMode)(int)t5t;
-
-                if (data.ConfigValues.TryGetValue("STR", out object strObj) && strObj is double str)
+                if (data.ConfigValues.TryGetValue("COUNT", out object cntObj) && cntObj is int)
                 {
+                    int cnt = (int)cntObj;
+                    activeTargetCount = Math.Max(1, Math.Min(5, cnt));
+                }
+
+                if (data.ConfigValues.TryGetValue("T1", out object t1Obj) && t1Obj is double)
+                {
+                    double t1 = (double)t1Obj;
+                    Target1Value = t1;
+                }
+                if (data.ConfigValues.TryGetValue("T2", out object t2Obj) && t2Obj is double)
+                {
+                    double t2 = (double)t2Obj;
+                    Target2Value = t2;
+                }
+                if (data.ConfigValues.TryGetValue("T3", out object t3Obj) && t3Obj is double)
+                {
+                    double t3 = (double)t3Obj;
+                    Target3Value = t3;
+                }
+                if (data.ConfigValues.TryGetValue("T4", out object t4Obj) && t4Obj is double)
+                {
+                    double t4 = (double)t4Obj;
+                    Target4Value = t4;
+                }
+                if (data.ConfigValues.TryGetValue("T5", out object t5Obj) && t5Obj is double)
+                {
+                    double t5 = (double)t5Obj;
+                    Target5Value = t5;
+                }
+
+                if (data.ConfigValues.TryGetValue("T1TYPE", out object t1tObj) && t1tObj is Services.TargetMode)
+                {
+                    Services.TargetMode t1t = (Services.TargetMode)t1tObj;
+                    T1Type = (TargetMode)(int)t1t;
+                }
+                if (data.ConfigValues.TryGetValue("T2TYPE", out object t2tObj) && t2tObj is Services.TargetMode)
+                {
+                    Services.TargetMode t2t = (Services.TargetMode)t2tObj;
+                    T2Type = (TargetMode)(int)t2t;
+                }
+                if (data.ConfigValues.TryGetValue("T3TYPE", out object t3tObj) && t3tObj is Services.TargetMode)
+                {
+                    Services.TargetMode t3t = (Services.TargetMode)t3tObj;
+                    T3Type = (TargetMode)(int)t3t;
+                }
+                if (data.ConfigValues.TryGetValue("T4TYPE", out object t4tObj) && t4tObj is Services.TargetMode)
+                {
+                    Services.TargetMode t4t = (Services.TargetMode)t4tObj;
+                    T4Type = (TargetMode)(int)t4t;
+                }
+                if (data.ConfigValues.TryGetValue("T5TYPE", out object t5tObj) && t5tObj is Services.TargetMode)
+                {
+                    Services.TargetMode t5t = (Services.TargetMode)t5tObj;
+                    T5Type = (TargetMode)(int)t5t;
+                }
+
+                if (data.ConfigValues.TryGetValue("STR", out object strObj) && strObj is double)
+                {
+                    double str = (double)strObj;
                     // Apply to whichever stop is active based on mode
                     if (isRMAModeActive)
                         RMAStopATRMultiplier = str;
@@ -262,20 +296,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                         StopMultiplier = str;
                 }
 
-                if (data.ConfigValues.TryGetValue("MAX", out object maxObj) && maxObj is double max)
+                if (data.ConfigValues.TryGetValue("MAX", out object maxObj) && maxObj is double)
                 {
+                    double max = (double)maxObj;
                     MaxRiskAmount = max;
                     RiskPerTrade = max; // Sync legacy property
                 }
 
-                if (data.ConfigValues.TryGetValue("CIT", out object citObj) && citObj is string cit)
+                if (data.ConfigValues.TryGetValue("CIT", out object citObj) && citObj is string)
+                {
+                    string cit = (string)citObj;
                     ChaseIfTouchPoints = cit;
+                }
 
-                if (data.ConfigValues.TryGetValue("TRMA", out object trmaObj) && trmaObj is bool trma)
+                if (data.ConfigValues.TryGetValue("TRMA", out object trmaObj) && trmaObj is bool)
+                {
+                    bool trma = (bool)trmaObj;
                     isTrendRmaMode = trma;
+                }
 
-                if (data.ConfigValues.TryGetValue("RRMA", out object rrmaObj) && rrmaObj is bool rrma)
+                if (data.ConfigValues.TryGetValue("RRMA", out object rrmaObj) && rrmaObj is bool)
+                {
+                    bool rrma = (bool)rrmaObj;
                     isRetestRmaMode = rrma;
+                }
 
                 // Apply profiles
                 foreach (var kvp in data.ModeProfiles)
