@@ -1,17 +1,35 @@
 ---
+engines:
+  csharp: true
+  markdown: false
+  python: false
+  shell: false
+  duplication: false
+  prospector: false
+  pylint: false
+  bandit: false
+  remark-lint: false
+
 exclude_paths:
+  - "scripts/**"
   - "docs/**"
-  - ".github/**"
-  - "**/*.md"
+  - "testsprite_tests/**"
   - ".agent/**"
   - ".agents/**"
   - ".bob/**"
   - ".codex/**"
   - ".cursor/**"
   - ".gemini/**"
+  - ".antigravitycli/**"
   - "Traycerrefactor/**"
   - "artifacts/**"
-  - "benchmarks/**"
-  - "node_modules/**"
-  - "obj/**"
-  - "bin/**"
+  - "**/*.md"
+  - "**/*.py"
+  - "**/*.ps1"
+  - "**/*.bat"
+  - "**/*.json"
+  - "**/*.yaml"
+  - "**/*.yml"
+  - "deploy-sync.ps1"
+  - "check_ascii.py"
+  - "fix_skills.py"

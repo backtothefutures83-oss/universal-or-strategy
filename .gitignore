@@ -16,6 +16,7 @@ artifacts/
 .agent/
 .agents/
 .mcp/
+.antigravitycli/
 
 # JavaScript / TestSprite noise
 node_modules/
@@ -55,3 +56,9 @@ tmp/
 .gemini/
 .agent/
 graphify-out/
+
+# Project pollution ignore rules
+infrastructure/
+experts/
+docs/brain/run2-stickystate/
+agy_log.txt
