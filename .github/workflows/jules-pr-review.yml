@@ -43,33 +43,40 @@ jobs:
           const fs = require('fs');
           const { execSync } = require('child_process');
 
-          async function request(options, data) {
+          async function githubRequest(path, method, data, token) {
+            const options = {
+              hostname: 'api.github.com',
+              path: path,
+              method: method,
+              headers: {
+                'Authorization': `token ${token}`,
+                'User-Agent': 'jules-auditor',
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+              }
+            };
             return new Promise((resolve, reject) => {
               const req = https.request(options, (res) => {
                 let body = '';
                 res.on('data', (chunk) => body += chunk);
                 res.on('end', () => {
-                  if (res.statusCode >= 200 && res.statusCode < 300) {
-                    resolve(body ? JSON.parse(body) : {});
-                  } else {
-                    reject(new Error(`Request failed (${res.statusCode}): ${body}`));
-                  }
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(body ? JSON.parse(body) : {});
+                  else reject(new Error(`GitHub Error (${res.statusCode}): ${body}`));
                 });
               });
               req.on('error', reject);
-              if (data) req.write(data);
+              if (data) req.write(JSON.stringify(data));
               req.end();
             });
           }
 
           async function run() {
-            const apiKey = process.env.JULES_API_KEY;
+            const apiKey = (process.env.JULES_API_KEY || "").trim();
             const githubToken = process.env.GITHUB_TOKEN;
             const repo = process.env.REPO;
             const sha = process.env.SHA;
             const prTitle = process.env.PR_TITLE;
-            const eventPath = process.env.GITHUB_EVENT_PATH;
-            const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+            const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
 
             let prNumber = process.env.PR_NUMBER;
             let branch = process.env.BRANCH;
@@ -82,25 +89,14 @@ jobs:
             }
 
             // 1. Create Native Check Run
-            const checkOptions = {
-              hostname: 'api.github.com',
-              path: `/repos/${repo}/check-runs`,
-              method: 'POST',
-              headers: {
-                'Authorization': `token ${githubToken}`,
-                'User-Agent': 'jules-auditor',
-                'Accept': 'application/vnd.github+json'
-              }
-            };
-            
-            const checkRun = await request(checkOptions, JSON.stringify({
+            const checkRun = await githubRequest(`/repos/${repo}/check-runs`, 'POST', {
               name: 'Jules Forensic Audit',
               head_sha: sha,
               status: 'in_progress',
               started_at: new Date().toISOString()
-            }));
+            }, githubToken);
 
-            // 2. Trigger Jules AI
+            // 2. Trigger Jules AI (Using exact previous auth pattern)
             const prompt = `Perform a forensic logic audit of PR "${prTitle || branch}" on branch "${branch}". Rules: 1. Lock-Free Actor Pattern (Enqueue). 2. ASCII-Only strings. Identify specific line numbers for any violations.`;
             const triggerData = JSON.stringify({
               prompt: prompt,
@@ -112,15 +108,31 @@ jobs:
               hostname: 'jules.googleapis.com',
               path: '/v1alpha/sessions',
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey
+              }
             };
 
-            const session = await request(triggerOptions, triggerData);
+            const session = await new Promise((resolve, reject) => {
+              const req = https.request(triggerOptions, (res) => {
+                let body = '';
+                res.on('data', (chunk) => body += chunk);
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(body));
+                  else reject(new Error(`Jules Trigger Failed (${res.statusCode}): ${body}`));
+                });
+              });
+              req.on('error', reject);
+              req.write(triggerData);
+              req.end();
+            });
+
             console.log(`Jules Session: ${session.url}`);
 
             // 3. Poll for Completion
             let finished = false;
-            let finalSummary = "";
+            let finalSummary = "Audit complete. Check trace for details.";
             let conclusion = "success";
             const pollOptions = {
               hostname: 'jules.googleapis.com',
@@ -130,35 +142,31 @@ jobs:
             };
 
             while (!finished) {
-              const activities = await request(pollOptions);
-              const completed = activities.activities.find(a => a.sessionCompleted);
-              const failed = activities.activities.find(a => a.sessionFailed);
-              
-              for (const act of activities.activities) {
-                if (act.progressUpdated) finalSummary = act.progressUpdated.description;
+              const activities = await new Promise((resolve) => {
+                https.get(pollOptions, (res) => {
+                  let body = '';
+                  res.on('data', (chunk) => body += chunk);
+                  res.on('end', () => resolve(JSON.parse(body)));
+                });
+              });
+
+              if (activities && activities.activities) {
+                const completed = activities.activities.find(a => a.sessionCompleted);
+                const failed = activities.activities.find(a => a.sessionFailed);
+                for (const act of activities.activities) {
+                  if (act.progressUpdated) finalSummary = act.progressUpdated.description;
+                }
+                if (completed || failed) {
+                  finished = true;
+                  conclusion = failed ? "failure" : (finalSummary.includes('FAIL') ? "failure" : "success");
+                }
               }
 
-              if (completed || failed) {
-                finished = true;
-                conclusion = failed ? "failure" : (finalSummary.includes('FAIL') ? "failure" : "success");
-              } else {
-                await new Promise(r => setTimeout(r, 15000));
-              }
+              if (!finished) await new Promise(r => setTimeout(r, 20000));
             }
 
-            // 4. Update Check Run (Native UI)
-            const updateOptions = {
-              hostname: 'api.github.com',
-              path: `/repos/${repo}/check-runs/${checkRun.id}`,
-              method: 'PATCH',
-              headers: {
-                'Authorization': `token ${githubToken}`,
-                'User-Agent': 'jules-auditor',
-                'Accept': 'application/vnd.github+json'
-              }
-            };
-
-            await request(updateOptions, JSON.stringify({
+            // 4. Update Check Run
+            await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
               status: 'completed',
               conclusion: conclusion,
               completed_at: new Date().toISOString(),
@@ -167,7 +175,7 @@ jobs:
                 summary: finalSummary,
                 text: `[Full Forensic Trace](${session.url})`
               }
-            }));
+            }, githubToken);
 
             console.log(`Audit complete: ${conclusion}`);
           }
