@@ -200,7 +200,14 @@ if (Test-Path $ServicesDir) {
         
         if (Test-Path $dstPath) {
             $item = Get-Item $dstPath
-            if ($item.LinkType -eq "HardLink") { Remove-Item $dstPath -Force }
+            if ($item.LinkType -eq "HardLink") {
+                Remove-Item $dstPath -Force
+            } else {
+                $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+                $backup = $dstPath + ".bak_" + $timestamp
+                Write-Host "BACKUP (Service): Archiving existing NT file -> $(Split-Path $backup -Leaf)" -ForegroundColor Yellow
+                Move-Item $dstPath $backup -Force
+            }
         }
         Write-Host "LINKING (Service): $($file.Name) -> NT8" -ForegroundColor Green
         New-Item -ItemType HardLink -Path $dstPath -Value $srcPath | Out-Null

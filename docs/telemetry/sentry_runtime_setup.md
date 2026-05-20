@@ -18,7 +18,7 @@ Sentry initialization is completely dynamic and resolves via the system environm
 
 *Alternatively, set it via PowerShell before launching NinjaTrader:*
 ```powershell
-[System.Environment]::SetEnvironmentVariable("V12_SENTRY_DSN", "https://your-dsn-here@sentry.io/project", "User")
+[System.Environment]::SetEnvironmentVariable("V12_SENTRY_DSN", "https://sentry.io/your-project-id", "User")
 ```
 
 ### Rotating the DSN
