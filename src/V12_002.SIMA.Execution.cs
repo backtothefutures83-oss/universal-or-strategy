@@ -590,6 +590,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 catch (Exception localEx)
                 {
                     // V12.H01: Rollback symmetry dispatch on local entry failure to prevent orphaned followers
+                    // Specific handling for local submission exceptions (margin, tick size, etc.)
                     SymmetryGuardRollbackDispatch(symmetryDispatchId);
                     Print(string.Format("[SIMA RMA V2] LOCAL ENTRY FAILED: {0} - Dispatch rolled back", localEx.Message));
                     return;

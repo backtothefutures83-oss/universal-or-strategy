@@ -615,7 +615,7 @@ namespace UniversalOrStrategy.Tests
             public int ReservedDelta;
         }
 
-        private class MockFollowerPosition
+        private sealed class MockFollowerPosition
         {
             public string EntryName { get; set; }
             public string EntryOrderType { get; set; }
@@ -623,13 +623,13 @@ namespace UniversalOrStrategy.Tests
             public bool IsActive { get; set; }
         }
 
-        private class MockOrderUpdate
+        private sealed class MockOrderUpdate
         {
             public string OrderState { get; set; }
             public string Name { get; set; }
         }
 
-        private class MockOrder
+        private sealed class MockOrder
         {
             public int Quantity { get; set; }
         }

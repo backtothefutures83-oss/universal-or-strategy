@@ -364,7 +364,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool ProcessFollowerCancellationSafe(string matchedEntry, PositionInfo matchedPos, Order order, string acctName, string reason)
         {
             if (order == null || order.OrderState != OrderState.Cancelled)
+            {
                 return false;
+            }
 
             // Check 1: PendingCancel entry replacement FSM
             FollowerReplaceSpec fsm;

@@ -325,7 +325,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 foreach (var kvp in data.ModeProfiles)
                 {
                     var sProfile = kvp.Value;
-                    if (sProfile == null) continue;
+                    if (sProfile == null)
+                    {
+                        continue;
+                    }
                     var mode = kvp.Key;
                     
                     ModeConfigProfile profile;
