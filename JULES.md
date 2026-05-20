@@ -125,7 +125,7 @@ Bias toward caution over speed. For trivial tasks, use judgment.
 - Touch only what you must. Clean up only your own mess.
 - Do NOT "improve" adjacent code, comments, or formatting.
 - **WHITESPACE MUTATION BANNED**: Never mutate whitespace, line endings, or indentation across files. This creates bloated diffs that obscure logic and break CI limits.
-- **STRICT DIFF LIMIT**: Pull Request diffs MUST remain under 150,000 characters. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
+- **STRICT DIFF LIMIT**: Pull Request diffs MUST target less than 10,000 characters of source code changes (in `src/`). Split larger epics into smaller, focused PRs. If your formatting or logic pushes the diff over this limit, you must revert and isolate the logic changes.
 - Do NOT refactor things that aren't broken. Match existing style.
 - If you notice unrelated dead code, MENTION it -- do not delete it.
 - Every changed line must trace directly to the Mission Brief.
