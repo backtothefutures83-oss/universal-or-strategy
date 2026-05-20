@@ -305,8 +305,353 @@ namespace NinjaTrader.NinjaScript.Strategies.Services
 
         public StickyStateData Deserialize(string filePath)
         {
-            // TODO: Implement in ticket-03
-            throw new NotImplementedException();
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
+            {
+                _logger.Log("[STICKY] No persisted state found -- using defaults");
+                return null;
+            }
+
+            try
+            {
+                string[] lines = System.IO.File.ReadAllLines(filePath, Encoding.UTF8);
+                var data = new StickyStateData();
+                string section = "";
+
+                foreach (string rawLine in lines)
+                {
+                    string line = rawLine.Trim();
+                    if (string.IsNullOrEmpty(line) || line.StartsWith("#"))
+                        continue;
+
+                    // Section header
+                    if (line.StartsWith("[") && line.EndsWith("]"))
+                    {
+                        section = line.Substring(1, line.Length - 2).ToUpperInvariant();
+                        continue;
+                    }
+
+                    ParseSection(section, line, data);
+                }
+
+                _logger.Log(string.Format("[STICKY] Loaded settings from {0}", System.IO.Path.GetFileName(filePath)));
+                return data;
+            }
+            catch (Exception ex)
+            {
+                _logger.Log("[STICKY] Load failed (using defaults): " + ex.Message);
+                return null;
+            }
+        }
+
+        private void ParseSection(string section, string line, StickyStateData data)
+        {
+            if (section == "CONFIG")
+            {
+                ParseConfig(line, data);
+            }
+            else if (section.StartsWith("CONFIG_") && section.Length > 7)
+            {
+                string profileMode = section.Substring(7);
+                ParseModeProfile(profileMode, line, data);
+            }
+            else if (section == "FLEET")
+            {
+                ParseFleet(line, data);
+            }
+            else if (section == "ANCHOR")
+            {
+                ParseAnchor(line, data);
+            }
+            else if (section == "POSITIONS")
+            {
+                ParsePosition(line, data);
+            }
+        }
+
+        // [PORT: Lines 444-551 from V12_002.StickyState.cs]
+        // Converted from ApplyStickyConfig() to populate DTO instead of mutating strategy
+        private void ParseConfig(string line, StickyStateData data)
+        {
+            int eq = line.IndexOf('=');
+            if (eq < 1) return;
+            string key = line.Substring(0, eq).ToUpperInvariant();
+            string val = line.Substring(eq + 1);
+
+            // MODE - Build 1108.002 SAFETY GATE: Click-trader modes never auto-rearm on startup
+            if (key == "MODE")
+            {
+                // Always force to OR (safety gate) - store original value for logging
+                data.ConfigValues["MODE_ORIGINAL"] = val;
+                data.ConfigValues["MODE"] = "OR";
+                return;
+            }
+
+            // Target count
+            if (key == "COUNT")
+            {
+                if (int.TryParse(val, out int cnt))
+                    data.ConfigValues["COUNT"] = Math.Max(1, Math.Min(5, cnt));
+                return;
+            }
+
+            // Target values
+            if (key == "T1" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t1))
+            {
+                data.ConfigValues["T1"] = t1;
+                return;
+            }
+            if (key == "T2" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t2))
+            {
+                data.ConfigValues["T2"] = t2;
+                return;
+            }
+            if (key == "T3" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t3))
+            {
+                data.ConfigValues["T3"] = t3;
+                return;
+            }
+            if (key == "T4" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t4))
+            {
+                data.ConfigValues["T4"] = t4;
+                return;
+            }
+            if (key == "T5" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t5))
+            {
+                data.ConfigValues["T5"] = t5;
+                return;
+            }
+
+            // Target types
+            if (key == "T1TYPE")
+            {
+                data.ConfigValues["T1TYPE"] = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T2TYPE")
+            {
+                data.ConfigValues["T2TYPE"] = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T3TYPE")
+            {
+                data.ConfigValues["T3TYPE"] = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T4TYPE")
+            {
+                data.ConfigValues["T4TYPE"] = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T5TYPE")
+            {
+                data.ConfigValues["T5TYPE"] = ParseTargetMode(val);
+                return;
+            }
+
+            // Risk and flags
+            if (key == "STR" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double str))
+            {
+                data.ConfigValues["STR"] = str;
+                return;
+            }
+            if (key == "MAX" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double max))
+            {
+                data.ConfigValues["MAX"] = max;
+                return;
+            }
+            if (key == "CIT")
+            {
+                data.ConfigValues["CIT"] = val;
+                return;
+            }
+            if (key == "TRMA")
+            {
+                data.ConfigValues["TRMA"] = (val == "1");
+                return;
+            }
+            if (key == "RRMA")
+            {
+                data.ConfigValues["RRMA"] = (val == "1");
+                return;
+            }
+        }
+
+        // [PORT: Lines 554-636 from V12_002.StickyState.cs]
+        // Converted from ApplyStickyModeProfile() to populate DTO
+        private void ParseModeProfile(string mode, string line, StickyStateData data)
+        {
+            int eq = line.IndexOf('=');
+            if (eq < 1) return;
+            string key = line.Substring(0, eq).ToUpperInvariant();
+            string val = line.Substring(eq + 1);
+
+            ModeConfigProfile profile;
+            if (!data.ModeProfiles.TryGetValue(mode, out profile))
+            {
+                profile = new ModeConfigProfile();
+                data.ModeProfiles[mode] = profile;
+            }
+
+            // Target count
+            if (key == "COUNT" && int.TryParse(val, out int cnt))
+            {
+                profile.TargetCount = Math.Max(1, Math.Min(5, cnt));
+                return;
+            }
+
+            // Target values
+            if (key == "T1" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t1))
+            {
+                profile.T1 = t1;
+                return;
+            }
+            if (key == "T2" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t2))
+            {
+                profile.T2 = t2;
+                return;
+            }
+            if (key == "T3" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t3))
+            {
+                profile.T3 = t3;
+                return;
+            }
+            if (key == "T4" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t4))
+            {
+                profile.T4 = t4;
+                return;
+            }
+            if (key == "T5" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double t5))
+            {
+                profile.T5 = t5;
+                return;
+            }
+
+            // Target types
+            if (key == "T1TYPE")
+            {
+                profile.T1Type = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T2TYPE")
+            {
+                profile.T2Type = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T3TYPE")
+            {
+                profile.T3Type = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T4TYPE")
+            {
+                profile.T4Type = ParseTargetMode(val);
+                return;
+            }
+            if (key == "T5TYPE")
+            {
+                profile.T5Type = ParseTargetMode(val);
+                return;
+            }
+
+            // Risk
+            if (key == "STR" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double str))
+            {
+                profile.StopMult = str;
+                return;
+            }
+            if (key == "MAX" && double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double max))
+            {
+                profile.MaxRisk = max;
+                return;
+            }
+        }
+
+        // [PORT: Lines 638-657 from V12_002.StickyState.cs]
+        private void ParseFleet(string line, StickyStateData data)
+        {
+            int eq = line.IndexOf('=');
+            if (eq < 1) return;
+            string key = line.Substring(0, eq);
+            string val = line.Substring(eq + 1);
+
+            if (key.ToUpperInvariant() == "LEADER")
+            {
+                data.LeaderAccount = val;
+                return;
+            }
+
+            // Account toggle: "Apex_F01_12345=1"
+            data.FleetToggles[key] = (val == "1");
+        }
+
+        // [PORT: Lines 659-678 from V12_002.StickyState.cs]
+        private void ParseAnchor(string line, StickyStateData data)
+        {
+            int eq = line.IndexOf('=');
+            if (eq < 1) return;
+            string key = line.Substring(0, eq).ToUpperInvariant();
+            string val = line.Substring(eq + 1);
+
+            if (key == "TYPE")
+            {
+                data.Anchor = ParseAnchorType(val);
+                return;
+            }
+            if (key == "MNL_PRICE")
+            {
+                if (double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out double p))
+                    data.ManualPrice = p;
+                return;
+            }
+        }
+
+        private static RmaAnchorType ParseAnchorType(string val)
+        {
+            string upper = val.ToUpperInvariant();
+            if (upper == "EMA30") return RmaAnchorType.Ema30;
+            if (upper == "EMA65") return RmaAnchorType.Ema65;
+            if (upper == "EMA200") return RmaAnchorType.Ema200;
+            if (upper == "OR_HIGH") return RmaAnchorType.OrHigh;
+            if (upper == "OR_LOW") return RmaAnchorType.OrLow;
+            if (upper == "MANUAL") return RmaAnchorType.Manual;
+            return RmaAnchorType.Ema65; // Default
+        }
+
+        // [PORT: Lines 684-730 from V12_002.StickyState.cs]
+        // Converted from EnrichTrailStateFromSticky() to populate DTO
+        private void ParsePosition(string line, StickyStateData data)
+        {
+            if (line.StartsWith("#")) return; // Skip comment line
+
+            // Format: key|extremePrice|trailLevel|beArmed|beTriggered|initialTargetCount
+            string[] parts = line.Split('|');
+            if (parts.Length < 6) return;
+
+            string posKey = parts[0];
+            var state = new PositionTrailState();
+
+            if (double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double extreme))
+                state.ExtremePriceSinceEntry = extreme;
+            if (int.TryParse(parts[2], out int trail))
+                state.CurrentTrailLevel = trail;
+            state.ManualBreakevenArmed = (parts[3] == "1");
+            state.ManualBreakevenTriggered = (parts[4] == "1");
+            if (int.TryParse(parts[5], out int itc))
+                state.InitialTargetCount = itc;
+
+            data.PositionStates[posKey] = state;
+        }
+
+        // [PORT: Lines 760-769 from V12_002.StickyState.cs]
+        private static TargetMode ParseTargetMode(string val)
+        {
+            if (val == null) return TargetMode.ATR;
+            string upper = val.ToUpperInvariant();
+            if (upper == "ATR") return TargetMode.ATR;
+            if (upper == "TICKS") return TargetMode.Ticks;
+            if (upper == "POINTS") return TargetMode.Points;
+            if (upper == "RUNNER") return TargetMode.Runner;
+            return TargetMode.ATR;
         }
     }
 }
