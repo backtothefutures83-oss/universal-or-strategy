@@ -671,6 +671,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
             _stickyStatePath = System.IO.Path.Combine(logsDir,
                 string.Format("StickyState_{0}.v12state", symbol));
+
+            // Initialize Sticky State Service
+            _stickyStateService = new Services.StickyStateService(new StickyStateLogger(Print));
+
             bool stickyLoaded = LoadStickyState();
             if (stickyLoaded)
                 Print("[STICKY] Persisted state hydrated -- GET_LAYOUT will serve last-synced config");

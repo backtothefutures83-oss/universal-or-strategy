@@ -1,271 +1,475 @@
-# Implementation Plan - Phase 7 Sprint 5 (T03)
-**Mission**: Hardening `ExecuteSmartDispatchEntry` via surgical extraction.
-**Target**: `src/V12_002.SIMA.Dispatch.cs`
-**DNA Gate**: CYC < 20, LOC >= 15, Zero-Locks, ASCII-Only.
+# Implementation Plan - Ticket-04: Strategy Sticky State Integration
 
-## Stage P3.5: Plannotator Surgical Brief
+Integrate `StickyStateService` into `V12_002` to replace all legacy parsing, serialization, and atomic file write logic inside `V12_002.StickyState.cs` with the pure C# service.
 
-### Target 1: The Limit Branch Extraction
-**Action**: Replace the inlined `else` block in `ExecuteSmartDispatchEntry` with a call to the new helper.
-**Note**: `ocoId` is intentionally dropped from the signature (DEVIATION-T3-A).
+## User Review Required
 
-**TargetContent** (starting around line 156):
+> [!IMPORTANT]
+> - **Zero Call-Site Changes**: The 18 call sites to `MarkStickyDirty()` across the strategy codebase remain completely unchanged.
+> - **Thread Safety (H18-FIX)**: Mutable strategy thread properties are thread-safely snapshotted on the main strategy thread BEFORE background execution, preventing race conditions or torn reads.
+> - **C# Enum Mapping**: Uses explicit underlying integer-based casting to map between Strategy enums and Service enums without duplicate definitions.
+> - **No Placeholders**: Contains fully defined code blocks for the entire updated file, ready for seamless integration.
+
+## Proposed Changes
+
+### V12 Core Strategy Integration
+
+---
+
+#### [MODIFY] [V12_002.StickyState.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.StickyState.cs)
+
+Replace the entire contents of `src/V12_002.StickyState.cs` to leverage `Services.IStickyStateService`.
+
 ```csharp
-                        else
-                        {
-                            // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
-                            // REAPER runs on a background thread; if it fires between the expectedPositions
-                            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
-                            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
-                            // Registering dicts first guarantees REAPER always finds the blocking entry.
-                            // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
-                            // ConcurrentDictionary single-writes are thread-safe here.
-                            activePositions[fleetEntryName] = fleetPos;
-                            entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
-                            registeredForCleanup = true;
-                            MarkDispatchSyncPending(expectedKey);
-                            syncPending = true;
+// V12_002.StickyState.cs -- Build 1103: Total Persistence ("Sticky State")
+// Persists all UI-sourced config to disk on every mutation.
+// Hydrates on startup BEFORE IPC server starts.
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.Strategies;
 
-                            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
-                            if (!_followerBrackets.ContainsKey(fleetEntryName))
-                            {
-                                var proFsm = new FollowerBracketFSM
-                                {
-                                    AccountName = acct.Name,
-                                    EntryName = fleetEntryName,
-                                    State = FollowerBracketState.PendingSubmit,
-                                    RemainingContracts = followerQty,
-                                    EntryOrder = entry,
-                                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                                    LastUpdateUtc = DateTime.UtcNow
-                                };
-                                _followerBrackets.TryAdd(fleetEntryName, proFsm);
-                            }
+namespace NinjaTrader.NinjaScript.Strategies
+{
+    public partial class V12_002 : Strategy
+    {
+        #region Sticky State Fields
 
-                            reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
-                            AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
+        private string _stickyStatePath;        // Full path to .v12state file
+        private volatile bool _stickyStateDirty; // Coalescing dirty flag
+        private long _stickyWritePending;        // Interlocked gate: 0=idle, 1=write scheduled
+        private const int STICKY_DEBOUNCE_MS = 50;
 
-                            int _poolSlotIndexLmt = -1;
-                            Order[] _proxyOrdersLmt = null;
-                            {
-                                var _claimedLmt = _photonPool.Claim();
-                                if (_claimedLmt.Orders != null)
-                                {
-                                    _proxyOrdersLmt = _claimedLmt.Orders;
-                                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
-                                }
-                                else
-                                {
-                                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
-                                    _poolSlotIndexLmt = -1;
-                                }
-                            }
-                            _proxyOrdersLmt[0] = entry;
+        private Services.IStickyStateService _stickyStateService;
 
-                            if (_poolSlotIndexLmt >= 0)
-                            {
-                                _photonSideband[_poolSlotIndexLmt].Account        = acct;
-                                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
-                                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
-                                Thread.MemoryBarrier();
-                            }
-
-                            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
-                            {
-                                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                                StopPrice     = 0,
-                                SignalTicks   = DateTime.UtcNow.Ticks,
-                                PoolSlotIndex = _poolSlotIndexLmt,
-                                OrderCount    = 1,
-                                Quantity      = followerQty,
-                                TargetCount   = 0,
-                                Action        = (int)action,
-                                ReservedDelta = reservedDelta
-                            };
-                            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
-
-                            Interlocked.Increment(ref _pendingFleetDispatchCount);
-
-                            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
-                            {
-                                if (_poolSlotIndexLmt >= 0 && _photonMmioMirror != null)
-                                {
-                                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
-                                }
-                            }
-                            else
-                            {
-                                if (_poolSlotIndexLmt >= 0)
-                                {
-                                    Order[] legacyOrdersLmt = new Order[] { entry };
-                                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
-                                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
-                                    _proxyOrdersLmt = legacyOrdersLmt;
-                                }
-                                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
-                                {
-                                    Account = acct,
-                                    Orders = _proxyOrdersLmt,
-                                    FleetEntryName = fleetEntryName,
-                                    ExpectedKey = expectedKey,
-                                    ReservedDelta = reservedDelta,
-                                    SignalTicks = DateTime.UtcNow.Ticks
-                                });
-                            }
-                            syncPending         = false;
-                            reservedDelta       = 0;
-                            registeredForCleanup = false;
-
-                            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
-                                acct.Name));
-                        }
-```
-
-**ReplacementContent**:
-```csharp
-                        else
-                        {
-                            Dispatch_PublishLimitEntryToPhoton(
-                                tradeType, action, quantity, entryPrice, entryOrderType, acct, i, symmetryDispatchId,
-                                fleetPos, entry, fleetEntryName, expectedKey, followerQty, ft1, ft2, ft3, ft4, ft5,
-                                stopPrice, t1TargetPrice, t2TargetPrice, t3TargetPrice, t4TargetPrice, t5TargetPrice,
-                                dispatchTargetCount,
-                                dispatchLog,
-                                ref syncPending,
-                                ref reservedDelta,
-                                ref registeredForCleanup);
-                        }
-```
-
-### Target 2: Insertion of Helper Method
-**Action**: Insert the new helper method at the end of the `Dispatch` region.
-
-**Insertion Point**: After the `Dispatch_PublishMarketBracketToPhoton` method (around line 717).
-
-**Content**:
-```csharp
-        /// <summary>
-        /// [V12-T03] Extraction of Limit branch for Photon ring dispatch.
-        /// Zero-allocation, thread-safe (DNA Rule 2). Signature drops ocoId (DEVIATION-T3-A).
-        /// </summary>
-        private void Dispatch_PublishLimitEntryToPhoton(
-            string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType,
-            Account acct, int i, string symmetryDispatchId, PositionInfo fleetPos, Order entry,
-            string fleetEntryName, string expectedKey, int followerQty, int ft1, int ft2, int ft3, int ft4, int ft5,
-            double stopPrice, double t1TargetPrice, double t2TargetPrice, double t3TargetPrice, double t4TargetPrice, double t5TargetPrice,
-            int dispatchTargetCount, StringBuilder dispatchLog,
-            ref bool syncPending, ref int reservedDelta, ref bool registeredForCleanup)
+        private class StickyStateLogger : Services.IStickyStateLogger
         {
-            // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
-            // REAPER runs on a background thread; if it fires between the expectedPositions
-            // update and the dict commit (the old T1->T3 race), it observes non-zero expected
-            // with no entry in entryOrders -> hasWorkingEntry=false -> phantom repair queued.
-            // Registering dicts first guarantees REAPER always finds the blocking entry.
-            // B966: Enqueue NOT applied -- ordering invariant: dict BEFORE expectedPositions update (Phantom-Fix).
-            // ConcurrentDictionary single-writes are thread-safe here.
-            activePositions[fleetEntryName] = fleetPos;
-            entryOrders[fleetEntryName] = entry; // V12.3: Track entry for CIT chase
-            registeredForCleanup = true;
-            MarkDispatchSyncPending(expectedKey);
-            syncPending = true;
-
-            // Phase 6 [FSM-P1]: Proactive FSM for limit entry (entry-only, no brackets).
-            if (!_followerBrackets.ContainsKey(fleetEntryName))
+            private readonly Action<string> _print;
+            public StickyStateLogger(Action<string> print)
             {
-                var proFsm = new FollowerBracketFSM
+                _print = print;
+            }
+            public void Log(string message)
+            {
+                _print(message);
+            }
+        }
+
+        #endregion
+
+        #region Save -- Serialize via Service
+
+        /// <summary>
+        /// Marks state as dirty. A debounced async write will fire within 50ms.
+        /// Safe to call from any thread (strategy thread via Enqueue, or IPC thread).
+        /// </summary>
+        private void MarkStickyDirty()
+        {
+            _stickyStateDirty = true;
+
+            // Coalescing gate: only one pending write at a time
+            if (Interlocked.CompareExchange(ref _stickyWritePending, 1, 0) == 0)
+            {
+                // H18-FIX: Capture snapshot of ALL mutable state on strategy thread BEFORE spawning background task.
+                // This prevents race conditions where background serialization reads state that's being mutated.
+                
+                // Map local ModeConfigProfile to Services.ModeConfigProfile
+                var modeProfilesSnapshot = new Dictionary<string, Services.ModeConfigProfile>();
+                foreach (var kvp in _modeProfiles)
                 {
-                    AccountName = acct.Name,
-                    EntryName = fleetEntryName,
-                    State = FollowerBracketState.PendingSubmit,
-                    RemainingContracts = followerQty,
-                    EntryOrder = entry,
-                    ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                    LastUpdateUtc = DateTime.UtcNow
+                    if (kvp.Value == null) continue;
+                    modeProfilesSnapshot[kvp.Key] = new Services.ModeConfigProfile
+                    {
+                        TargetCount = kvp.Value.TargetCount,
+                        T1 = kvp.Value.T1,
+                        T2 = kvp.Value.T2,
+                        T3 = kvp.Value.T3,
+                        T4 = kvp.Value.T4,
+                        T5 = kvp.Value.T5,
+                        T1Type = (Services.TargetMode)(int)kvp.Value.T1Type,
+                        T2Type = (Services.TargetMode)(int)kvp.Value.T2Type,
+                        T3Type = (Services.TargetMode)(int)kvp.Value.T3Type,
+                        T4Type = (Services.TargetMode)(int)kvp.Value.T4Type,
+                        T5Type = (Services.TargetMode)(int)kvp.Value.T5Type,
+                        StopMult = kvp.Value.StopMult,
+                        MaxRisk = kvp.Value.MaxRisk
+                    };
+                }
+
+                var activeFleetSnapshot = activeFleetAccounts != null
+                    ? new Dictionary<string, bool>(activeFleetAccounts)
+                    : null;
+
+                // Map local PositionInfo to Services.PositionTrailState
+                var positionStatesSnapshot = new Dictionary<string, Services.PositionTrailState>();
+                if (activePositions != null)
+                {
+                    foreach (var kvp in activePositions)
+                    {
+                        var pi = kvp.Value;
+                        if (pi == null || pi.PendingCleanup) continue;
+                        positionStatesSnapshot[kvp.Key] = new Services.PositionTrailState
+                        {
+                            ExtremePriceSinceEntry = pi.ExtremePriceSinceEntry,
+                            CurrentTrailLevel = pi.CurrentTrailLevel,
+                            ManualBreakevenArmed = pi.ManualBreakevenArmed,
+                            ManualBreakevenTriggered = pi.ManualBreakevenTriggered,
+                            InitialTargetCount = pi.InitialTargetCount
+                        };
+                    }
+                }
+
+                var snapshot = new Services.StickyStateSnapshot
+                {
+                    InstrumentFullName = Instrument != null ? Instrument.FullName : "unknown",
+                    BuildTag = BUILD_TAG,
+                    IsRMAModeActive = isRMAModeActive,
+                    IsTRENDModeActive = isTRENDModeActive,
+                    IsRetestModeActive = isRetestModeActive,
+                    IsMOMOModeActive = isMOMOModeActive,
+                    IsFFMAModeArmed = isFFMAModeArmed,
+                    ActiveTargetCount = activeTargetCount,
+                    Target1Value = Target1Value,
+                    Target2Value = Target2Value,
+                    Target3Value = Target3Value,
+                    Target4Value = Target4Value,
+                    Target5Value = Target5Value,
+                    T1Type = (Services.TargetMode)(int)T1Type,
+                    T2Type = (Services.TargetMode)(int)T2Type,
+                    T3Type = (Services.TargetMode)(int)T3Type,
+                    T4Type = (Services.TargetMode)(int)T4Type,
+                    T5Type = (Services.TargetMode)(int)T5Type,
+                    StopMultiplier = StopMultiplier,
+                    RMAStopATRMultiplier = RMAStopATRMultiplier,
+                    MaxRiskAmount = MaxRiskAmount,
+                    ChaseIfTouchPoints = ChaseIfTouchPoints,
+                    IsTrendRmaMode = isTrendRmaMode,
+                    IsRetestRmaMode = isRetestRmaMode,
+                    LeaderAccount = _stickyLeaderAccount,
+                    FleetToggles = activeFleetSnapshot,
+                    Anchor = (Services.RmaAnchorType)(int)currentRmaAnchor,
+                    ManualPrice = cachedMnlPrice,
+                    ModeProfiles = modeProfilesSnapshot,
+                    PositionStates = positionStatesSnapshot
                 };
-                _followerBrackets.TryAdd(fleetEntryName, proFsm);
-            }
 
-            reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
-            AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
-
-            int _poolSlotIndexLmt = -1;
-            Order[] _proxyOrdersLmt = null;
-            {
-                var _claimedLmt = _photonPool.Claim();
-                if (_claimedLmt.Orders != null)
+                Task.Run(async () =>
                 {
-                    _proxyOrdersLmt = _claimedLmt.Orders;
-                    _poolSlotIndexLmt = _claimedLmt.SlotIndex;
-                }
-                else
-                {
-                    _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
-                    _poolSlotIndexLmt = -1;
-                }
-            }
-            _proxyOrdersLmt[0] = entry;
-
-            if (_poolSlotIndexLmt >= 0)
-            {
-                _photonSideband[_poolSlotIndexLmt].Account        = acct;
-                _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
-                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
-                Thread.MemoryBarrier();
-            }
-
-            FleetDispatchSlot _slotLmt = new FleetDispatchSlot
-            {
-                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                StopPrice     = 0,
-                SignalTicks   = DateTime.UtcNow.Ticks,
-                PoolSlotIndex = _poolSlotIndexLmt,
-                OrderCount    = 1,
-                Quantity      = followerQty,
-                TargetCount   = 0,
-                Action        = (int)action,
-                ReservedDelta = reservedDelta
-            };
-            _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
-
-            Interlocked.Increment(ref _pendingFleetDispatchCount);
-
-            if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
-            {
-                if (_photonMmioMirror != null)
-                {
-                    try { _photonMmioMirror.TryPublish(ref _slotLmt); } catch { }
-                }
-            }
-            else
-            {
-                if (_poolSlotIndexLmt >= 0)
-                {
-                    Order[] legacyOrdersLmt = new Order[] { entry };
-                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
-                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
-                    _proxyOrdersLmt = legacyOrdersLmt;
-                }
-                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
-                {
-                    Account = acct,
-                    Orders = _proxyOrdersLmt,
-                    FleetEntryName = fleetEntryName,
-                    ExpectedKey = expectedKey,
-                    ReservedDelta = reservedDelta,
-                    SignalTicks = DateTime.UtcNow.Ticks
+                    try
+                    {
+                        await Task.Delay(STICKY_DEBOUNCE_MS);
+                        _stickyStateDirty = false;
+                        _stickyStateService.Serialize(snapshot, _stickyStatePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[STICKY] Save failed (best-effort): " + ex.Message);
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _stickyWritePending, 0);
+                        // If dirtied again during write, schedule another
+                        if (_stickyStateDirty)
+                            MarkStickyDirty();
+                    }
                 });
             }
-            syncPending         = false;
-            reservedDelta       = 0;
-            registeredForCleanup = false;
-
-            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
-                acct.Name));
         }
+
+        // Build 1106: Captures current global config into a mode-specific profile.
+        private ModeConfigProfile SnapshotCurrentConfig()
+        {
+            return new ModeConfigProfile
+            {
+                TargetCount = activeTargetCount,
+                T1 = Target1Value,
+                T2 = Target2Value,
+                T3 = Target3Value,
+                T4 = Target4Value,
+                T5 = Target5Value,
+                T1Type = T1Type,
+                T2Type = T2Type,
+                T3Type = T3Type,
+                T4Type = T4Type,
+                T5Type = T5Type,
+                StopMult = isRMAModeActive ? RMAStopATRMultiplier : StopMultiplier,
+                MaxRisk = MaxRiskAmount
+            };
+        }
+
+        // Build 1106: Hydrates global config from a mode-specific profile.
+        private void HydrateFromProfile(ModeConfigProfile profile, string mode)
+        {
+            activeTargetCount = Math.Max(1, Math.Min(5, profile.TargetCount));
+            Target1Value = profile.T1;
+            Target2Value = profile.T2;
+            Target3Value = profile.T3;
+            Target4Value = profile.T4;
+            Target5Value = profile.T5;
+            T1Type = profile.T1Type;
+            T2Type = profile.T2Type;
+            T3Type = profile.T3Type;
+            T4Type = profile.T4Type;
+            T5Type = profile.T5Type;
+            if (string.Equals(mode, "RMA", StringComparison.OrdinalIgnoreCase))
+                RMAStopATRMultiplier = profile.StopMult;
+            else
+                StopMultiplier = profile.StopMult;
+            MaxRiskAmount = profile.MaxRisk;
+            RiskPerTrade = profile.MaxRisk;
+        }
+
+        #endregion
+
+        #region Load -- Deserialize via Service
+
+        /// <summary>
+        /// Loads persisted state from .v12state file and applies to runtime variables.
+        /// Called ONCE in State.DataLoaded, BEFORE StartIpcServer().
+        /// Returns true if state was successfully loaded.
+        /// </summary>
+        private bool LoadStickyState()
+        {
+            if (string.IsNullOrEmpty(_stickyStatePath))
+                return false;
+
+            if (!System.IO.File.Exists(_stickyStatePath))
+            {
+                Print("[STICKY] No persisted state found -- using defaults");
+                return false;
+            }
+
+            try
+            {
+                var data = _stickyStateService.Deserialize(_stickyStatePath);
+                if (data == null)
+                    return false;
+
+                // Apply config values
+                if (data.ConfigValues.TryGetValue("COUNT", out object cntObj) && cntObj is int cnt)
+                    activeTargetCount = Math.Max(1, Math.Min(5, cnt));
+
+                if (data.ConfigValues.TryGetValue("T1", out object t1Obj) && t1Obj is double t1)
+                    Target1Value = t1;
+                if (data.ConfigValues.TryGetValue("T2", out object t2Obj) && t2Obj is double t2)
+                    Target2Value = t2;
+                if (data.ConfigValues.TryGetValue("T3", out object t3Obj) && t3Obj is double t3)
+                    Target3Value = t3;
+                if (data.ConfigValues.TryGetValue("T4", out object t4Obj) && t4Obj is double t4)
+                    Target4Value = t4;
+                if (data.ConfigValues.TryGetValue("T5", out object t5Obj) && t5Obj is double t5)
+                    Target5Value = t5;
+
+                if (data.ConfigValues.TryGetValue("T1TYPE", out object t1tObj) && t1tObj is Services.TargetMode t1t)
+                    T1Type = (TargetMode)(int)t1t;
+                if (data.ConfigValues.TryGetValue("T2TYPE", out object t2tObj) && t2tObj is Services.TargetMode t2t)
+                    T2Type = (TargetMode)(int)t2t;
+                if (data.ConfigValues.TryGetValue("T3TYPE", out object t3tObj) && t3tObj is Services.TargetMode t3t)
+                    T3Type = (TargetMode)(int)t3t;
+                if (data.ConfigValues.TryGetValue("T4TYPE", out object t4tObj) && t4tObj is Services.TargetMode t4t)
+                    T4Type = (TargetMode)(int)t4t;
+                if (data.ConfigValues.TryGetValue("T5TYPE", out object t5tObj) && t5tObj is Services.TargetMode t5t)
+                    T5Type = (TargetMode)(int)t5t;
+
+                if (data.ConfigValues.TryGetValue("STR", out object strObj) && strObj is double str)
+                {
+                    // Apply to whichever stop is active based on mode
+                    if (isRMAModeActive)
+                        RMAStopATRMultiplier = str;
+                    else
+                        StopMultiplier = str;
+                }
+
+                if (data.ConfigValues.TryGetValue("MAX", out object maxObj) && maxObj is double max)
+                {
+                    MaxRiskAmount = max;
+                    RiskPerTrade = max; // Sync legacy property
+                }
+
+                if (data.ConfigValues.TryGetValue("CIT", out object citObj) && citObj is string cit)
+                    ChaseIfTouchPoints = cit;
+
+                if (data.ConfigValues.TryGetValue("TRMA", out object trmaObj) && trmaObj is bool trma)
+                    isTrendRmaMode = trma;
+
+                if (data.ConfigValues.TryGetValue("RRMA", out object rrmaObj) && rrmaObj is bool rrma)
+                    isRetestRmaMode = rrma;
+
+                // Apply profiles
+                foreach (var kvp in data.ModeProfiles)
+                {
+                    var sProfile = kvp.Value;
+                    if (sProfile == null) continue;
+                    var mode = kvp.Key;
+                    
+                    ModeConfigProfile profile;
+                    if (!_modeProfiles.TryGetValue(mode, out profile))
+                    {
+                        profile = new ModeConfigProfile();
+                        _modeProfiles[mode] = profile;
+                    }
+                    profile.TargetCount = sProfile.TargetCount;
+                    profile.T1 = sProfile.T1;
+                    profile.T2 = sProfile.T2;
+                    profile.T3 = sProfile.T3;
+                    profile.T4 = sProfile.T4;
+                    profile.T5 = sProfile.T5;
+                    profile.T1Type = (TargetMode)(int)sProfile.T1Type;
+                    profile.T2Type = (TargetMode)(int)sProfile.T2Type;
+                    profile.T3Type = (TargetMode)(int)sProfile.T3Type;
+                    profile.T4Type = (TargetMode)(int)sProfile.T4Type;
+                    profile.T5Type = (TargetMode)(int)sProfile.T5Type;
+                    profile.StopMult = sProfile.StopMult;
+                    profile.MaxRisk = sProfile.MaxRisk;
+                }
+
+                // Apply fleet
+                _stickyLeaderAccount = data.LeaderAccount;
+                foreach (var kvp in data.FleetToggles)
+                {
+                    if (_pendingStickyFleetToggles == null)
+                        _pendingStickyFleetToggles = new Dictionary<string, bool>();
+                    _pendingStickyFleetToggles[kvp.Key] = kvp.Value;
+                }
+
+                // Apply anchor
+                SetRmaAnchorFromIpc(data.Anchor.ToString());
+                cachedMnlPrice = data.ManualPrice;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Print("[STICKY] Load failed (using defaults): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Called from SIMA hydration (after Phase 3 in V12_002.SIMA.Lifecycle.cs)
+        /// to enrich reconstructed activePositions with persisted trailing stop state.
+        /// </summary>
+        private void EnrichTrailStateFromSticky()
+        {
+            if (string.IsNullOrEmpty(_stickyStatePath) || !System.IO.File.Exists(_stickyStatePath))
+                return;
+
+            try
+            {
+                var data = _stickyStateService.Deserialize(_stickyStatePath);
+                if (data == null || data.PositionStates == null || data.PositionStates.Count == 0)
+                    return;
+
+                int enriched = 0;
+                foreach (var kvp in data.PositionStates)
+                {
+                    string posKey = kvp.Key;
+                    var state = kvp.Value;
+
+                    PositionInfo pi;
+                    if (!activePositions.TryGetValue(posKey, out pi))
+                        continue;
+
+                    pi.ExtremePriceSinceEntry = state.ExtremePriceSinceEntry;
+                    pi.CurrentTrailLevel = state.CurrentTrailLevel;
+                    pi.ManualBreakevenArmed = state.ManualBreakevenArmed;
+                    pi.ManualBreakevenTriggered = state.ManualBreakevenTriggered;
+                    pi.InitialTargetCount = state.InitialTargetCount;
+
+                    enriched++;
+                }
+
+                if (enriched > 0)
+                    Print(string.Format("[STICKY] Enriched {0} position(s) with persisted trail state", enriched));
+            }
+            catch (Exception ex)
+            {
+                Print("[STICKY] Trail enrichment failed (positions use defaults): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Applies persisted fleet toggles AFTER EnumerateApexAccounts() has
+        /// initialized the activeFleetAccounts dictionary with all discovered accounts.
+        /// One-shot: clears the temp dict after application.
+        /// </summary>
+        private void ApplyPendingStickyFleetToggles()
+        {
+            if (_pendingStickyFleetToggles == null || _pendingStickyFleetToggles.Count == 0)
+                return;
+
+            int applied = 0;
+            foreach (var kvp in _pendingStickyFleetToggles)
+            {
+                if (activeFleetAccounts.ContainsKey(kvp.Key))
+                {
+                    activeFleetAccounts[kvp.Key] = kvp.Value;
+                    applied++;
+                }
+            }
+
+            Print(string.Format("[STICKY] Applied {0}/{1} persisted fleet toggles",
+                applied, _pendingStickyFleetToggles.Count));
+            _pendingStickyFleetToggles = null; // One-shot -- prevent double-apply
+        }
+
+        #endregion
+    }
+}
 ```
 
-## Stage P5: Verification & Deploy
-1. **CYC Audit**: Run `python scripts/complexity_audit.py` -> Verify CYC < 20.
-2. **MemoryBarrier Count**: Verify exactly 1 `Thread.MemoryBarrier()` in the new helper.
-3. **Hard-Link Sync**: Run `powershell -File .\deploy-sync.ps1`.
-4. **NinjaTrader Gate**: Press F5 and verify `BUILD_TAG` 1111.007.
+---
+
+#### [MODIFY] [V12_002.Lifecycle.cs](file:///C:/WSGTA/universal-or-strategy/src/V12_002.Lifecycle.cs)
+
+Instantiate the `StickyStateService` inside `Init_Services()`.
+
+```diff
+<<<<
+        private void Init_Services(string symbol)
+        {
+            // B984-F05: StickyState + IPC must complete BEFORE the load-complete gate flips
+            // so EnsureStartupReady() gate does not open until services are ready.
+
+            // Build 1103: Initialize sticky state path + hydrate persisted config.
+            // MUST run BEFORE IPC startup so GET_LAYOUT serves last-synced state.
+            string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
+            _stickyStatePath = System.IO.Path.Combine(logsDir,
+                string.Format("StickyState_{0}.v12state", symbol));
+            bool stickyLoaded = LoadStickyState();
+====
+        private void Init_Services(string symbol)
+        {
+            // B984-F05: StickyState + IPC must complete BEFORE the load-complete gate flips
+            // so EnsureStartupReady() gate does not open until services are ready.
+
+            // Build 1103: Initialize sticky state path + hydrate persisted config.
+            // MUST run BEFORE IPC startup so GET_LAYOUT serves last-synced state.
+            string logsDir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "NinjaTrader 8", "SIMA_Logs");
+            _stickyStatePath = System.IO.Path.Combine(logsDir,
+                string.Format("StickyState_{0}.v12state", symbol));
+
+            // Initialize Sticky State Service
+            _stickyStateService = new Services.StickyStateService(new StickyStateLogger(Print));
+
+            bool stickyLoaded = LoadStickyState();
+>>>>
+```
+
+## Verification Plan
+
+### Automated Tests
+
+- Run compile check:
+  `powershell -File .\scripts\build_readiness.ps1`
+- Run test suite:
+  `dotnet test Testing.csproj` (all 50/50 test cases must continue to pass)
+
+### Manual Verification
+- Deploy and verify NT8 compilation.
+- Verify `BUILD_TAG` banner on NT8 startup.
