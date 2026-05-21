@@ -76,39 +76,39 @@ jobs:
               status: 'in_progress',
               started_at: new Date().toISOString()
             }, githubToken);
+try {
+  console.log(`Starting Official SDK Audit for branch: ${branch}...`);
 
-            try {
-              console.log(`Starting Official SDK Audit for branch: ${branch}...`);
-              
-              // 2. Execute Audit via Official SDK
-              const agent = jules.with({ apiKey });
-              const session = await agent.createSession({
-                title: `Audit: ${prTitle || branch}`,
-                prompt: `Perform a forensic logic audit of branch "${branch}". Rules: 1. Lock-Free Actor Pattern (Enqueue). 2. ASCII-Only strings. identify specific lines for any violations. Output a summary.`,
-                sourceContext: {
-                  source: `sources/github/${repo}`,
-                  githubRepoContext: { startingBranch: branch }
-                }
-              });
+  // 2. Execute Audit via Official SDK (Verified API: session() and result())
+  const agent = jules.with({ apiKey });
+  const session = await agent.session({
+    prompt: `Perform a forensic logic audit of branch "${branch}". Rules: 1. Lock-Free Actor Pattern (Enqueue). 2. ASCII-Only strings. identify specific lines for any violations. Output a summary.`,
+    source: {
+      github: repo,
+      baseBranch: branch
+    }
+  });
 
-              const outcome = await session.wait();
-              const finalSummary = outcome.summary || "Audit complete.";
-              
-              console.log(`Audit finished with status: ${outcome.status}`);
+  // Official SDK result() is the correct wait method
+  const outcome = await session.result();
+  const finalSummary = outcome.summary || "Audit complete.";
 
-              // 3. Finalize Check Run
-              await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
-                status: 'completed',
-                conclusion: outcome.status === 'SUCCESS' ? 'success' : 'failure',
-                completed_at: new Date().toISOString(),
-                output: {
-                  title: 'Jules Forensic Audit Result',
-                  summary: finalSummary,
-                  text: `[View Native Trace](${session.url})`
-                }
-              }, githubToken);
+  console.log(`Audit finished with state: ${outcome.state}`);
 
-            } catch (e) {
+  // 3. Finalize Check Run
+  await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
+    status: 'completed',
+    conclusion: outcome.state === 'COMPLETED' ? 'success' : 'failure',
+    completed_at: new Date().toISOString(),
+    output: {
+      title: 'Jules Forensic Audit Result',
+      summary: finalSummary,
+      text: `[View Native Trace](${session.url})`
+    }
+  }, githubToken);
+
+} catch (e) {
+
               console.error(`Audit Error: ${e.message}`);
               await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
                 status: 'completed',
