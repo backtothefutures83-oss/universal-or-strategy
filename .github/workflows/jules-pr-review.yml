@@ -41,10 +41,10 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cat << 'EOF' > jules_sdk_audit.js
-          const { jules } = require('@google/jules-sdk');
-          const fs = require('fs');
-          const { execSync } = require('child_process');
+          cat << 'EOF' > jules_sdk_audit.mjs
+          import { jules } from '@google/jules-sdk';
+          import fs from 'fs';
+          import { execSync } from 'child_process';
 
           async function githubRequest(path, method, data, token) {
             const res = await fetch(`https://api.github.com${path}`, {
@@ -91,7 +91,6 @@ jobs:
                 }
               });
 
-              // Official SDK wait() ensures Bob isn't left polling
               const outcome = await session.wait();
               const finalSummary = outcome.summary || "Audit complete.";
               
@@ -125,4 +124,4 @@ jobs:
 
           run().catch(e => { console.error(e); process.exit(1); });
           EOF
-          node jules_sdk_audit.js
+          node jules_sdk_audit.mjs
