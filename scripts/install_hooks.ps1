@@ -5,8 +5,9 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot   = Split-Path -Parent $PSScriptRoot
-$hooksDir   = (& git -C "$repoRoot" rev-parse --git-path hooks).Trim()
-$hookTarget = Join-Path $hooksDir "pre-commit"
+$hooksDir        = (& git -C "$repoRoot" rev-parse --git-path hooks).Trim()
+$preCommitHook   = Join-Path $hooksDir "pre-commit"
+$prePushHook     = Join-Path $hooksDir "pre-push"
 
 Write-Host "--- V12 Hook Installer ---"
 Write-Host "Repo root : $repoRoot"
@@ -61,9 +62,50 @@ $lines = @(
 )
 
 $hookContent = $lines -join "`n"
-[System.IO.File]::WriteAllText($hookTarget, $hookContent + "`n", (New-Object System.Text.UTF8Encoding $false))
+[System.IO.File]::WriteAllText($preCommitHook, $hookContent + "`n", (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host ""
-Write-Host "HOOK INSTALLED : $hookTarget"
-Write-Host "Active gates   : [1] lock() ban  [2] ASCII purity  [3] gitleaks (if installed)"
-Write-Host "To bypass (rare): git commit --no-verify"
+Write-Host "PRE-COMMIT HOOK INSTALLED : $preCommitHook"
+Write-Host "Active gates              : [1] lock() ban  [2] ASCII purity  [3] gitleaks (if installed)"
+
+# ============================================================================
+# PRE-PUSH HOOK - Comprehensive Validation Suite
+# ============================================================================
+Write-Host ""
+Write-Host "Installing pre-push hook..."
+
+$prePushLines = @(
+    "#!/bin/sh",
+    "# V12 Pre-Push Validation Hook -- installed by scripts/install_hooks.ps1",
+    "# Runs comprehensive validation suite before push",
+    "",
+    'echo "--- V12 Pre-Push Validation ---"',
+    "",
+    'REPO_ROOT=$(git rev-parse --show-toplevel)',
+    "",
+    "# Run the PowerShell validation script",
+    'if command -v powershell >/dev/null 2>&1; then',
+    '    powershell -File "$REPO_ROOT/scripts/pre_push_validation.ps1" -Fast',
+    '    if [ $? -ne 0 ]; then',
+    '        echo "PRE-PUSH FAIL: Validation suite detected issues."',
+    '        echo "Fix the issues above or use --no-verify to bypass (not recommended)."',
+    '        exit 1',
+    '    fi',
+    'else',
+    '    echo "[WARN] PowerShell not found -- skipping pre-push validation."',
+    '    echo "       Install PowerShell or run manually: powershell -File ./scripts/pre_push_validation.ps1"',
+    'fi',
+    "",
+    'echo "--- V12 Pre-Push Validation: PASS ---"',
+    "exit 0"
+)
+
+$prePushContent = $prePushLines -join "`n"
+[System.IO.File]::WriteAllText($prePushHook, $prePushContent + "`n", (New-Object System.Text.UTF8Encoding $false))
+
+Write-Host "PRE-PUSH HOOK INSTALLED   : $prePushHook"
+Write-Host "Validation suite          : scripts/pre_push_validation.ps1 -Fast"
+Write-Host ""
+Write-Host "To bypass hooks (rare)    : git commit --no-verify  OR  git push --no-verify"
+Write-Host ""
+Write-Host "[SUCCESS] V12 Git hooks installed successfully!"
