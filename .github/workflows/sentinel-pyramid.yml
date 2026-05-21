@@ -13,6 +13,11 @@ on:
       - "Testing.csproj"
   pull_request:
     branches: ["main"]
+    paths:
+      - "src/**.cs"
+      - "tests/**.cs"
+      - "Testing.csproj"
+      - ".github/workflows/**"
 
 jobs:
   test-pyramid:

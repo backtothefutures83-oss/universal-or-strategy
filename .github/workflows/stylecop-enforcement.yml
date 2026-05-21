@@ -6,11 +6,13 @@ on:
     paths:
       - 'src/**/*.cs'
       - 'tests/**/*.cs'
+      - '.github/workflows/**'
   pull_request:
     branches: ["main"]
     paths:
       - 'src/**/*.cs'
       - 'tests/**/*.cs'
+      - '.github/workflows/**'
 
 jobs:
   lint:

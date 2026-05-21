@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**/*.cs'
       - 'tests/**/*.cs'
+      - '.github/workflows/**'
   issue_comment:
     types: [created]
 
