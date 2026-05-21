@@ -97,14 +97,14 @@ jobs:
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey
+                'Authorization': `Bearer ${apiKey}`
               },
               body: JSON.stringify(triggerData)
             });
 
             if (!triggerRes.ok) {
               const errText = await triggerRes.text();
-              console.error(`Jules Trigger Failed (401):\n${errText}`);
+              console.error(`Jules Trigger Failed (${triggerRes.status}):\n${errText}`);
               process.exit(1);
             }
 
@@ -119,7 +119,7 @@ jobs:
             while (!finished) {
               const pollRes = await fetch(`https://jules.googleapis.com/v1alpha/${session.name}/activities?pageSize=100`, {
                 method: 'GET',
-                headers: { 'x-goog-api-key': apiKey }
+                headers: { 'Authorization': `Bearer ${apiKey}` }
               });
               
               if (!pollRes.ok) throw new Error(`Polling failed: ${await pollRes.text()}`);
