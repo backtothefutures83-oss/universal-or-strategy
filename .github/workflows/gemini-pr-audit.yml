@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**/*.cs'
       - 'tests/**/*.cs'
+      - '.github/workflows/gemini-pr-audit.yml'
 
 jobs:
   gemini-audit:
