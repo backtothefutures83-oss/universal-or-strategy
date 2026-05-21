@@ -3,10 +3,6 @@ name: Gemini Standards Auditor (Vertex AI)
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - 'src/**/*.cs'
-      - 'tests/**/*.cs'
-      - '.github/workflows/gemini-pr-audit.yml'
 
 jobs:
   gemini-audit:

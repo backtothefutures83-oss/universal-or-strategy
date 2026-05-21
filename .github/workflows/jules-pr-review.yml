@@ -3,10 +3,6 @@ name: Jules PR Review (Sovereign Auditor)
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - 'src/**/*.cs'
-      - 'tests/**/*.cs'
-      - '.github/workflows/**'
   issue_comment:
     types: [created]
 
@@ -27,6 +23,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: "20"
+
+      - name: Diagnostic Environment
+        run: |
+          node -v
+          npm -v
 
       - name: Install Jules SDK
         run: npm install @google/jules-sdk
@@ -63,12 +64,15 @@ jobs:
           }
 
           async function run() {
+            console.log("Jules Auditor Starting...");
             const apiKey = (process.env.JULES_API_KEY || "").trim();
             const githubToken = process.env.GITHUB_TOKEN;
             const repo = process.env.REPO;
             const sha = process.env.SHA;
             const prTitle = process.env.PR_TITLE;
             const branch = process.env.BRANCH;
+
+            if (!apiKey) throw new Error("JULES_API_KEY is missing!");
 
             // 1. Create Native Check Run
             const checkRun = await githubRequest(`/repos/${repo}/check-runs`, 'POST', {
@@ -77,39 +81,38 @@ jobs:
               status: 'in_progress',
               started_at: new Date().toISOString()
             }, githubToken);
-try {
-  console.log(`Starting Official SDK Audit for branch: ${branch}...`);
 
-  // 2. Execute Audit via Official SDK (Verified API: session() and result())
-  const agent = jules.with({ apiKey });
-  const session = await agent.session({
-    prompt: `Perform a forensic logic audit of branch "${branch}". Rules: 1. Lock-Free Actor Pattern (Enqueue). 2. ASCII-Only strings. identify specific lines for any violations. Output a summary.`,
-    source: {
-      github: repo,
-      baseBranch: branch
-    }
-  });
+            try {
+              console.log(`Starting Official SDK Audit for branch: ${branch}...`);
+              
+              // 2. Execute Audit via Official SDK
+              const agent = jules.with({ apiKey });
+              const session = await agent.session({
+                prompt: `Perform a forensic logic audit of branch "${branch}". Rules: 1. Lock-Free Actor Pattern (Enqueue). 2. ASCII-Only strings. identify specific lines for any violations. Output a summary.`,
+                source: {
+                  github: repo,
+                  baseBranch: branch
+                }
+              });
 
-  // Official SDK result() is the correct wait method
-  const outcome = await session.result();
-  const finalSummary = outcome.summary || "Audit complete.";
+              const outcome = await session.result();
+              const finalSummary = outcome.summary || "Audit complete.";
+              
+              console.log(`Audit finished with state: ${outcome.state}`);
 
-  console.log(`Audit finished with state: ${outcome.state}`);
+              // 3. Finalize Check Run
+              await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
+                status: 'completed',
+                conclusion: outcome.state === 'COMPLETED' ? 'success' : 'failure',
+                completed_at: new Date().toISOString(),
+                output: {
+                  title: 'Jules Forensic Audit Result',
+                  summary: finalSummary,
+                  text: `[View Native Trace](${session.url})`
+                }
+              }, githubToken);
 
-  // 3. Finalize Check Run
-  await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
-    status: 'completed',
-    conclusion: outcome.state === 'COMPLETED' ? 'success' : 'failure',
-    completed_at: new Date().toISOString(),
-    output: {
-      title: 'Jules Forensic Audit Result',
-      summary: finalSummary,
-      text: `[View Native Trace](${session.url})`
-    }
-  }, githubToken);
-
-} catch (e) {
-
+            } catch (e) {
               console.error(`Audit Error: ${e.message}`);
               await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
                 status: 'completed',
