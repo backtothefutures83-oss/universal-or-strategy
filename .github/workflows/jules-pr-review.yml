@@ -39,35 +39,23 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           cat << 'EOF' > jules_audit.js
-          const https = require('https');
           const fs = require('fs');
           const { execSync } = require('child_process');
 
           async function githubRequest(path, method, data, token) {
-            const options = {
-              hostname: 'api.github.com',
-              path: path,
-              method: method,
+            const url = `https://api.github.com${path}`;
+            const res = await fetch(url, {
+              method,
               headers: {
-                'Authorization': `token ${token}`,
+                'Authorization': `Bearer ${token}`,
                 'User-Agent': 'jules-auditor',
                 'Accept': 'application/vnd.github+json',
                 'Content-Type': 'application/json'
-              }
-            };
-            return new Promise((resolve, reject) => {
-              const req = https.request(options, (res) => {
-                let body = '';
-                res.on('data', (chunk) => body += chunk);
-                res.on('end', () => {
-                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(body ? JSON.parse(body) : {});
-                  else reject(new Error(`GitHub Error (${res.statusCode}): ${body}`));
-                });
-              });
-              req.on('error', reject);
-              if (data) req.write(JSON.stringify(data));
-              req.end();
+              },
+              body: data ? JSON.stringify(data) : undefined
             });
+            if (!res.ok) throw new Error(`GitHub Error (${res.status}): ${await res.text()}`);
+            return await res.json();
           }
 
           async function run() {
@@ -76,7 +64,8 @@ jobs:
             const repo = process.env.REPO;
             const sha = process.env.SHA;
             const prTitle = process.env.PR_TITLE;
-            const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+            const eventPath = process.env.GITHUB_EVENT_PATH;
+            const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
 
             let prNumber = process.env.PR_NUMBER;
             let branch = process.env.BRANCH;
@@ -96,60 +85,46 @@ jobs:
               started_at: new Date().toISOString()
             }, githubToken);
 
-            // 2. Trigger Jules AI (Using exact previous auth pattern)
+            // 2. Trigger Jules AI (Isolated fetch to prevent header bleeding)
             const prompt = `Perform a forensic logic audit of PR "${prTitle || branch}" on branch "${branch}". Rules: 1. Lock-Free Actor Pattern (Enqueue). 2. ASCII-Only strings. Identify specific line numbers for any violations.`;
-            const triggerData = JSON.stringify({
+            const triggerData = {
               prompt: prompt,
               sourceContext: { source: `sources/github/${repo}`, githubRepoContext: { startingBranch: branch } },
               title: `Audit: ${prTitle || `PR #${prNumber}`}`
-            });
+            };
 
-            const triggerOptions = {
-              hostname: 'jules.googleapis.com',
-              path: '/v1alpha/sessions',
+            const triggerRes = await fetch('https://jules.googleapis.com/v1alpha/sessions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'x-goog-api-key': apiKey
-              }
-            };
-
-            const session = await new Promise((resolve, reject) => {
-              const req = https.request(triggerOptions, (res) => {
-                let body = '';
-                res.on('data', (chunk) => body += chunk);
-                res.on('end', () => {
-                  if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(body));
-                  else reject(new Error(`Jules Trigger Failed (${res.statusCode}): ${body}`));
-                });
-              });
-              req.on('error', reject);
-              req.write(triggerData);
-              req.end();
+              },
+              body: JSON.stringify(triggerData)
             });
 
+            if (!triggerRes.ok) {
+              const errText = await triggerRes.text();
+              console.error(`Jules Trigger Failed (401):\n${errText}`);
+              process.exit(1);
+            }
+
+            const session = await triggerRes.json();
             console.log(`Jules Session: ${session.url}`);
 
             // 3. Poll for Completion
             let finished = false;
             let finalSummary = "Audit complete. Check trace for details.";
             let conclusion = "success";
-            const pollOptions = {
-              hostname: 'jules.googleapis.com',
-              path: `/v1alpha/${session.name}/activities?pageSize=100`,
-              method: 'GET',
-              headers: { 'x-goog-api-key': apiKey }
-            };
 
             while (!finished) {
-              const activities = await new Promise((resolve) => {
-                https.get(pollOptions, (res) => {
-                  let body = '';
-                  res.on('data', (chunk) => body += chunk);
-                  res.on('end', () => resolve(JSON.parse(body)));
-                });
+              const pollRes = await fetch(`https://jules.googleapis.com/v1alpha/${session.name}/activities?pageSize=100`, {
+                method: 'GET',
+                headers: { 'x-goog-api-key': apiKey }
               });
-
+              
+              if (!pollRes.ok) throw new Error(`Polling failed: ${await pollRes.text()}`);
+              
+              const activities = await pollRes.json();
               if (activities && activities.activities) {
                 const completed = activities.activities.find(a => a.sessionCompleted);
                 const failed = activities.activities.find(a => a.sessionFailed);
@@ -165,7 +140,7 @@ jobs:
               if (!finished) await new Promise(r => setTimeout(r, 20000));
             }
 
-            // 4. Update Check Run
+            // 4. Update Check Run (Native UI)
             await githubRequest(`/repos/${repo}/check-runs/${checkRun.id}`, 'PATCH', {
               status: 'completed',
               conclusion: conclusion,
