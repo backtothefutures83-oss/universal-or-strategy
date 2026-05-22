@@ -375,6 +375,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _photonSideband[_sbIdx] = default(FleetDispatchSideband);
                 }
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
+
+                // REAPER-EXPANSION P0 FIX: Circuit breaker reset logic (integrity failure path)
+                int currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
+                if (
+                    currentCount < (REAPER_MAX_PENDING_DISPATCHES * 8 / 10)
+                    && Volatile.Read(ref _reaperCircuitBreakerTripped) == 1
+                )
+                {
+                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
+                    {
+                        Print(
+                            string.Format(
+                                "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} (integrity path) -- accepting dispatches",
+                                currentCount,
+                                REAPER_MAX_PENDING_DISPATCHES * 8 / 10
+                            )
+                        );
+                    }
+                }
+
                 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
                     try
                     {
