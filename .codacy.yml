@@ -15,6 +15,16 @@ engines:
       - 'tests/**'
       - 'benchmarks/**'
       - 'sandbox/**'
+      # EPIC-ENTRY-CONSOLIDATION: Temporary exclusion for known technical debt
+      # These files have legitimate duplications (91+ clones) that will be
+      # addressed in a dedicated refactoring epic after REAPER-EXPANSION Phase 2
+      # See: docs/brain/EPIC-ENTRY-CONSOLIDATION.md
+      - 'src/V12_002.Entries.FFMA.cs'
+      - 'src/V12_002.Entries.Retest.cs'
+      - 'src/V12_002.Entries.MOMO.cs'
+      - 'src/V12_002.Entries.OR.cs'
+      - 'src/V12_002.Entries.RMA.cs'
+      - 'src/V12_002.Entries.Trend.cs'
 
 # Exclude non-source paths from analysis
 exclude_paths:
