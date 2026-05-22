@@ -1,0 +1,2 @@
+"import os\nimport json\nimport glob\nimport re\n\ndef extract_rag_metadata(filepath):\n    \"\"\"\n    Extracts the JSON RAG Metadata block from a processed markdown file.\n    \"\"\"\n    with open(filepath, 'r', encoding='utf-8') as f:\n        content 
+<truncated 4042 bytes>

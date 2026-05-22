@@ -21,6 +21,14 @@ Custom rules: `.bob/rules-{mode-slug}/` (directory, alphabetical load order).
 
 ---
 
+## V12.20: Documentation & Output Hardening (MANDATORY)
+... (existing content) ...
+
+## V12.21: Internal Sentinel Protocol (MANDATORY)
+- **Role Separation**: Bob's Orchestrator mode MUST spawn an independent sub-agent (Internal Sentinel) for Phase 2.3 (Planning Scan) and Phase 5 (Implementation Verification).
+- **Sovereign Loop**: Verification tasks must be handled internally by spawned agents. Never delegate verification to external CLI instances.
+- **PHS Authority**: Only the spawned Internal Sentinel can award a 100/100 PHS.
+
 ## 1. Modes
 
 Bob has five built-in modes plus custom modes.

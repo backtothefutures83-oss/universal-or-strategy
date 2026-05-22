@@ -2,8 +2,15 @@
   "mcpServers": {
     "jcodemunch": {
       "type": "stdio",
-      "command": "uvx",
-      "args": ["jcodemunch-mcp"]
+      "command": "jcodemunch-mcp.exe",
+      "args": []
+    },
+    "greptile": {
+      "type": "http",
+      "url": "https://api.greptile.com/mcp",
+      "headers": {
+        "Authorization": "Bearer GKZ5piB2DLIr22NtSOF/afDCpA6MT3YiAjpsEkbI6Fx88DK9"
+      }
     }
   }
 }

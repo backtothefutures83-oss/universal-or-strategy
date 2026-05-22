@@ -27,6 +27,12 @@
 4. **REAPER Bounds**: Repairs must be capped by both ATR-volatility and hard tick fences.
 5. **Symmetry Gating**: Follower brackets must wait for the master "Anchor" price before submission.
 
+## V12.20: Documentation & Output Hardening (MANDATORY)
+- **500-Line Threshold**: Any documentation or planning artifact exceeding 500 lines MUST be modularized into subgraph-specific sub-files.
+- **Master Index Pattern**: Use a parent index file (e.g., `02-approach.md`) pointing to child modules.
+- **Buffer Flush Verification**: After writing any artifact > 200 lines, verify the file size on disk (`ls`) before reporting completion.
+- **Skipping modularization for large scopes is a protocol violation.**
+
 ## ðŸ·ï¸ Naming Conventions
 
 - **Build Tags**: Must be incremented in `V12_002.Properties.cs` for every production delivery.

@@ -75,8 +75,31 @@ When v12-epic-planner outputs [PLAN-GATE], present a concise summary of:
 **GATE 2:**
 > "Plan ready. Key decisions: [top 3]. Type APPROVED to proceed or provide feedback."
 
-- APPROVED: advance to Phase 3
+- APPROVED: advance to Phase 2.3
 - Feedback: switch to v12-epic-planner, relay feedback, re-run plan
+
+---
+
+## PHASE 2.3: SCAN (SENTINEL AUDIT)
+
+**Switch to: v12-epic-planner mode**
+
+Hand off this exact task:
+```
+EPIC: $1
+TASK: Run /epic-scan
+INPUT: @docs/brain/$1/01-analysis.md @docs/brain/$1/02-approach.md
+OUTPUT: Write docs/brain/$1/02-greptile-report.md
+STOP at [SENTINEL-GATE] and do not proceed.
+```
+
+When v12-epic-planner outputs [SENTINEL-GATE], present the **Sentinel Verdict** and any critical semantic gaps found.
+
+**GATE 2.3:**
+> "Sentinel Audit complete. Verdict: [PASSED/REVISION REQUIRED]. Gaps found: [list]. Reply GO to proceed to Phase 3 or REVISE to update the plan."
+
+- GO: advance to Phase 3
+- REVISE: switch to v12-epic-planner, relay scan results, re-run /epic-plan
 
 ---
 

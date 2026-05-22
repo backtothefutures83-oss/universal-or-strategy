@@ -1,0 +1,2 @@
+"import os\nimport sys\nimport json\nimport firebase_admin\nfrom firebase_admin import credentials\nfrom firebase_admin import firestore\n\ndef init_firestore():\n    \"\"\"\n    Initializes Firebase using local or env credentials.\n    \"\"\"\n    cred_pa
+<truncated 3063 bytes>

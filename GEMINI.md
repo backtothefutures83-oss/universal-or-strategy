@@ -186,13 +186,22 @@ Bias toward caution over speed. For trivial tasks, use judgment.
     3. Execute task following Jane Street Alignment.
 
 ## Section 18: Nested Autonomous Perfection Loops (V12.19)
+... (existing content) ...
 
-**To achieve 100/100 PHS without manual intervention, all Epic execution workflows MUST integrate `/pr-loop` as a nested sub-routine.**
+## Section 19: Documentation & Output Hardening (V12.20)
+... (existing content) ...
 
-- **Trigger**: Every `git commit` within an Epic (automatic or manual) must be followed by a handoff to the **PR Perfection Loop**.
-- **Scope**: The loop remains active until the PR reaches 100/100 PHS.
-- **Commands Involved**: `/epic-run`, `/epic-tdd`, `/repair-pr`.
-- **Handoff Requirement**: The Orchestrator must provide the `<PR_NUMBER>` to the nested loop to ensure it targets the correct branch.
+## Section 20: The Sentinel-Adversary Protocol (V12.21)
+
+**Mandate**: To ensure 100/100 PHS, review and validation tasks MUST be performed by an independent review run within the Orchestrator loop.
+
+**Internal Sovereignty**:
+1. **Orchestrator Spawning**: The primary Orchestrator (e.g., Bob in Orchestrator mode) must trigger independent review runs via formal slash commands.
+2. **Phase 2.3 (Planning Scan)**: Mandatory use of the **`/epic-scan`** command. This executes an independent Semantic Scan (via Greptile or jCodemunch) to verify the approach before validation.
+3. **Phase 5 (Implementation Verification)**: Verification tasks must remain within the internal orchestration loop. External CLI agents are BANNED from the internal verification loop unless the Orchestrator is completely unavailable.
+4. **PHS Adjudication**: The `/epic-scan` result and subsequent `/pr-loop` are the sole authorities for awarding the PERFECT HEALTH SCORE (PHS).
+
+**Skipping /epic-scan for planning verification is a protocol violation.**
 
 ## graphify
 

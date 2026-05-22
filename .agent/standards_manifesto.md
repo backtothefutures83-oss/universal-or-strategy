@@ -218,5 +218,20 @@ Before an Engineer (P4) hands off a mission for architectural sign-off, they MUS
 
 ---
 
+## 16. Documentation & Output Hardening (V12.20) (MANDATORY)
+
+**Root Cause**: LLM output truncation and tool buffer limits can result in 0-byte files or corrupted blueprints.
+
+**The Surgical Doc Limit**:
+1. **500-Line Threshold**: Any single documentation artifact (Analysis, Approach, Spec) exceeding 500 lines MUST be modularized into subgraph-specific sub-files.
+2. **Master Index Pattern**: Use a parent index file (e.g., `02-approach.md`) pointing to child modules.
+3. **Proactive Modularization**: Agents must choose the modular path *during the INTAKE phase* if the scope suggests high-density detail (>3 subgraphs or >10 safety gaps).
+4. **Buffer Flush Verification**: After writing any artifact > 200 lines, agents MUST verify the file size on disk using `ls` or `run_shell_command` before reporting completion to the Director.
+
+**Skipping modularization for large documentation artifacts is a protocol violation.**
+
+---
+
+
 > [!NOTE]
 > This document defines **Permanent Standards**. For current active refactoring goals, refer to the specific **Implementation Plan** or **Refactoring Roadmap** files.

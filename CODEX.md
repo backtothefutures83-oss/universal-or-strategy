@@ -41,6 +41,12 @@
 
 **Clipboard Mandate**: All cross-agent handoff prompts, implementation plans, and commands MUST be automatically copied to the Director's clipboard (e.g., via PowerShell `Set-Clipboard`) so manual copying is never required.
 
+## V12.20: Documentation & Output Hardening (MANDATORY)
+- **500-Line Threshold**: Any documentation or planning artifact exceeding 500 lines MUST be modularized into subgraph-specific sub-files.
+- **Master Index Pattern**: Use a parent index file pointing to child modules.
+- **Buffer Flush Verification**: After writing any artifact > 200 lines, verify the file size on disk (`ls`) before reporting completion.
+- **Skipping modularization for large scopes is a protocol violation.**
+
 ## MOVE-SYNC / Follower Order Replace Pattern (Build 947+)
 
 - **FSM Required**: Any follower order cancel+resubmit MUST use the two-phase Replace FSM (`_followerReplaceSpecs` dict).

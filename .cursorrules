@@ -13,4 +13,12 @@ You must read, ingest, and strictly adhere to the permanent project standards de
     - **Graphify**: `graphify update .` (sync knowledge graph).
     - **Hard-Link Sync**: `powershell -File .\deploy-sync.ps1` (MANDATORY after `src/` edits).
 
+## V12.20: Documentation & Output Hardening (MANDATORY)
+- **500-Line Threshold**: Any documentation or planning artifact exceeding 500 lines MUST be modularized into subgraph-specific sub-files.
+- **Master Index Pattern**: Use a parent index file pointing to child modules.
+- **Buffer Flush Verification**: After writing any artifact > 200 lines, verify the file size on disk (`ls`) before reporting completion.
+- **Skipping modularization for large scopes is a protocol violation.**
+
+## V12 Project DNA
+
 Do not deviate from those rules. The manifesto is the absolute single source of truth for architecture, locking, repo hygiene, and multi-agent parity.
