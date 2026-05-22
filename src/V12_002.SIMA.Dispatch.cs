@@ -785,56 +785,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             _slot.Shadow = ComputeFleetDispatchShadow(ref _slot, _photonShadowSalt);
 
             // REAPER-EXPANSION Ticket 2: Circuit breaker check with atomic CAS loop
-            int currentCount;
-            int newCount;
-            do
+            if (
+                !TryIncrementDispatchCountWithCircuitBreaker(
+                    syncPending,
+                    expectedKey,
+                    reservedDelta,
+                    _poolSlotIndex,
+                    fleetEntryName,
+                    out bool circuitBreakerTripped
+                )
+            )
             {
-                currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
-                if (currentCount >= REAPER_MAX_PENDING_DISPATCHES)
-                {
-                    // Trip circuit breaker if not already tripped
-                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 1, 0) == 0)
-                    {
-                        Print(
-                            string.Format(
-                                "[REAPER][CIRCUIT_BREAKER] TRIPPED: Queue depth={0} exceeds threshold={1} -- rejecting dispatch",
-                                currentCount,
-                                REAPER_MAX_PENDING_DISPATCHES
-                            )
-                        );
-                    }
-                    // Rollback state and return early
-                    if (syncPending)
-                        ClearDispatchSyncPending(expectedKey);
-                    if (reservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-                    if (_poolSlotIndex >= 0)
-                    {
-                        _photonPool.ReleaseByIndex(_poolSlotIndex);
-                        _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
-                    }
-                    return;
-                }
-                // Circuit breaker already tripped - reject silently
-                if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
-                {
-                    if (syncPending)
-                        ClearDispatchSyncPending(expectedKey);
-                    if (reservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-                    if (_poolSlotIndex >= 0)
-                    {
-                        _photonPool.ReleaseByIndex(_poolSlotIndex);
-                        _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
-                    }
-                    return;
-                }
-                newCount = currentCount + 1;
-            } while (
-                Interlocked.CompareExchange(ref _pendingFleetDispatchCount, newCount, currentCount) != currentCount
-            );
-
-            // If we get here, we successfully incremented and are below threshold
+                return; // Circuit breaker tripped, state already rolled back
+            }
 
             // v28.0 blittable slot + sideband-first publish
             if (_poolSlotIndex >= 0)
@@ -991,57 +954,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
 
             // REAPER-EXPANSION Ticket 2: Circuit breaker check with atomic CAS loop
-            int currentCountLmt;
-            int newCountLmt;
-            do
+            if (
+                !TryIncrementDispatchCountWithCircuitBreaker(
+                    syncPending,
+                    expectedKey,
+                    reservedDelta,
+                    _poolSlotIndexLmt,
+                    fleetEntryName,
+                    out bool circuitBreakerTrippedLmt
+                )
+            )
             {
-                currentCountLmt = Volatile.Read(ref _pendingFleetDispatchCount);
-                if (currentCountLmt >= REAPER_MAX_PENDING_DISPATCHES)
-                {
-                    // Trip circuit breaker if not already tripped
-                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 1, 0) == 0)
-                    {
-                        Print(
-                            string.Format(
-                                "[REAPER][CIRCUIT_BREAKER] TRIPPED: Queue depth={0} exceeds threshold={1} -- rejecting dispatch",
-                                currentCountLmt,
-                                REAPER_MAX_PENDING_DISPATCHES
-                            )
-                        );
-                    }
-                    // Rollback state and return early
-                    if (syncPending)
-                        ClearDispatchSyncPending(expectedKey);
-                    if (reservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-                    if (_poolSlotIndexLmt >= 0)
-                    {
-                        _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
-                        _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
-                    }
-                    return;
-                }
-                // Circuit breaker already tripped - reject silently
-                if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
-                {
-                    if (syncPending)
-                        ClearDispatchSyncPending(expectedKey);
-                    if (reservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-                    if (_poolSlotIndexLmt >= 0)
-                    {
-                        _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
-                        _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
-                    }
-                    return;
-                }
-                newCountLmt = currentCountLmt + 1;
-            } while (
-                Interlocked.CompareExchange(ref _pendingFleetDispatchCount, newCountLmt, currentCountLmt)
-                != currentCountLmt
-            );
-
-            // If we get here, we successfully incremented and are below threshold
+                return; // Circuit breaker tripped, state already rolled back
+            }
 
             if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
             {
@@ -1084,6 +1009,95 @@ namespace NinjaTrader.NinjaScript.Strategies
             registeredForCleanup = false;
 
             dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING", acct.Name));
+        }
+
+        /// <summary>
+        /// P2-3: Circuit breaker helper to reduce cyclomatic complexity.
+        /// Attempts to increment pending dispatch count with CAS loop.
+        /// Returns true if enqueued successfully, false if circuit breaker tripped.
+        /// </summary>
+        private bool TryIncrementDispatchCountWithCircuitBreaker(
+            bool syncPending,
+            string expectedKey,
+            int reservedDelta,
+            int poolSlotIndex,
+            string fleetEntryName,
+            out bool circuitBreakerTripped
+        )
+        {
+            circuitBreakerTripped = false;
+            int currentCount;
+            int newCount;
+            do
+            {
+                currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
+                if (currentCount >= REAPER_MAX_PENDING_DISPATCHES)
+                {
+                    // Trip circuit breaker if not already tripped
+                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 1, 0) == 0)
+                    {
+                        Print(
+                            string.Format(
+                                "[REAPER][CIRCUIT_BREAKER] TRIPPED: Queue depth={0} exceeds threshold={1} -- rejecting dispatch",
+                                currentCount,
+                                REAPER_MAX_PENDING_DISPATCHES
+                            )
+                        );
+                    }
+                    // Rollback state
+                    RollbackCircuitBreakerState(syncPending, expectedKey, reservedDelta, poolSlotIndex, fleetEntryName);
+                    circuitBreakerTripped = true;
+                    return false;
+                }
+                // Circuit breaker already tripped - reject silently
+                if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
+                {
+                    RollbackCircuitBreakerState(syncPending, expectedKey, reservedDelta, poolSlotIndex, fleetEntryName);
+                    circuitBreakerTripped = true;
+                    return false;
+                }
+                newCount = currentCount + 1;
+            } while (
+                Interlocked.CompareExchange(ref _pendingFleetDispatchCount, newCount, currentCount) != currentCount
+            );
+
+            return true; // Successfully incremented
+        }
+
+        /// <summary>
+        /// P2-3: Rollback helper for circuit breaker state cleanup.
+        /// </summary>
+        private void RollbackCircuitBreakerState(
+            bool syncPending,
+            string expectedKey,
+            int reservedDelta,
+            int poolSlotIndex,
+            string fleetEntryName
+        )
+        {
+            if (syncPending)
+                ClearDispatchSyncPending(expectedKey);
+            if (reservedDelta != 0)
+                AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+            if (poolSlotIndex >= 0)
+            {
+                _photonPool.ReleaseByIndex(poolSlotIndex);
+                _photonSideband[poolSlotIndex] = default(FleetDispatchSideband);
+            }
+            // P2-4 Fix: Complete state rollback
+            if (fleetEntryName != null)
+            {
+                activePositions.TryRemove(fleetEntryName, out _);
+                entryOrders.TryRemove(fleetEntryName, out _);
+                stopOrders.TryRemove(fleetEntryName, out _);
+                for (int tNum = 1; tNum <= 5; tNum++)
+                {
+                    var targetDict = GetTargetOrdersDictionary(tNum);
+                    if (targetDict != null)
+                        targetDict.TryRemove(fleetEntryName, out _);
+                }
+                _followerBrackets.TryRemove(fleetEntryName, out _);
+            }
         }
 
         #endregion

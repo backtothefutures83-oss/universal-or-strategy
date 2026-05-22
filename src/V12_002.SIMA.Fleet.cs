@@ -66,7 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print(string.Format("[PUMP] Submit FAILED for {0} ({1}): {2}", fleetEntryName, acct.Name, ex.Message));
+                Print(string.Format("[PUMP] Submit FAILED for {0}: {1}", fleetEntryName, ex.Message));
                 if (!syncCleared)
                     ClearDispatchSyncPending(expectedKey);
                 if (reservedDelta != 0)
@@ -280,25 +280,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             FleetDispatchRequest req;
             if (!_pendingFleetDispatches.TryDequeue(out req))
                 return;
-
-            // REAPER-EXPANSION Ticket 2: Circuit breaker reset logic
-            int currentCountLegacy = Volatile.Read(ref _pendingFleetDispatchCount);
-            if (
-                currentCountLegacy < (REAPER_MAX_PENDING_DISPATCHES * 8 / 10)
-                && Volatile.Read(ref _reaperCircuitBreakerTripped) == 1
-            )
-            {
-                if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
-                {
-                    Print(
-                        string.Format(
-                            "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
-                            currentCountLegacy,
-                            REAPER_MAX_PENDING_DISPATCHES * 8 / 10
-                        )
-                    );
-                }
-            }
 
             ProcessFleetSlot(
                 req.Account,
