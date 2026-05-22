@@ -26,7 +26,19 @@ jobs:
       - name: Install Coverlet.Console
         run: dotnet tool install --global coverlet.console
       
+      - name: Check for test projects
+        id: check_tests
+        run: |
+          if (Test-Path "tests/*.csproj") {
+            echo "has_tests=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "has_tests=false" >> $env:GITHUB_OUTPUT
+            echo "No test projects found - skipping coverage"
+          }
+        shell: powershell
+      
       - name: Run tests with coverage
+        if: steps.check_tests.outputs.has_tests == 'true'
         run: |
           coverlet ".\bin\Release\Linting.dll" `
             --target "dotnet" `
@@ -36,12 +48,18 @@ jobs:
         shell: powershell
       
       - name: Upload coverage to Codacy
+        if: steps.check_tests.outputs.has_tests == 'true'
         env:
           CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         run: |
           $ProgressPreference = 'SilentlyContinue'
           Invoke-WebRequest -Uri "https://coverage.codacy.com/get.sh" -OutFile "codacy-coverage.sh"
           bash codacy-coverage.sh report -r ./coverage/coverage.cobertura.xml
+        shell: powershell
+      
+      - name: Skip coverage (no tests)
+        if: steps.check_tests.outputs.has_tests == 'false'
+        run: echo "Skipping coverage - no test projects found"
         shell: powershell
 
 # Made with Bob
