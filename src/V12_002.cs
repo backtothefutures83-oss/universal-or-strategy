@@ -679,6 +679,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             new ConcurrentQueue<FleetDispatchRequest>();
         private volatile int _pendingFleetDispatchCount = 0;
 
+        // REAPER-EXPANSION Ticket 2: Circuit breaker to prevent unbounded queue growth
+        private int _reaperCircuitBreakerTripped = 0; // 0=open, 1=tripped
+        private const int REAPER_MAX_PENDING_DISPATCHES = 1000; // Threshold
+
         // D7: _dispatchInvocationCount / _dispatchPeakElapsedTicks / _dispatchTotalElapsedTicks
         // removed (Build-983). Fields were declared but never wired into EmitMetricsSummary.
         // Re-introduce if/when FleetDispatch performance telemetry is instrumented (M5).

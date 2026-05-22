@@ -1,14 +1,16 @@
 // Build 971: SIMA Fleet -- PumpFleetDispatch, ShouldSkipFleetAccount, UnsubscribeFromFleetAccounts
 // V12 SIMA Module (Extracted)
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Globalization;
 using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -18,16 +20,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -41,14 +41,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Guarantees identical invariants on both paths.
         /// </summary>
         /// <param name="poolSlotIndex">Index into PhotonOrderPool. -1 for legacy path (no pool release).</param>
-        private void ProcessFleetSlot(Account acct, Order[] orders, int orderCount,
-            string fleetEntryName, string expectedKey, int reservedDelta, long signalTicks,
-            int poolSlotIndex)
+        private void ProcessFleetSlot(
+            Account acct,
+            Order[] orders,
+            int orderCount,
+            string fleetEntryName,
+            string expectedKey,
+            int reservedDelta,
+            long signalTicks,
+            int poolSlotIndex
+        )
         {
             bool syncCleared = false;
             try
             {
-                if (!ValidateDispatchTimestamp(signalTicks, fleetEntryName, expectedKey, reservedDelta, ref syncCleared))
+                if (
+                    !ValidateDispatchTimestamp(signalTicks, fleetEntryName, expectedKey, reservedDelta, ref syncCleared)
+                )
                     return;
 
                 InitializeFollowerBracketFSM(orders, orderCount, fleetEntryName, acct.Name, reservedDelta);
@@ -57,8 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print(string.Format("[PUMP] Submit FAILED for {0} ({1}): {2}",
-                    fleetEntryName, acct.Name, ex.Message));
+                Print(string.Format("[PUMP] Submit FAILED for {0} ({1}): {2}", fleetEntryName, acct.Name, ex.Message));
                 if (!syncCleared)
                     ClearDispatchSyncPending(expectedKey);
                 if (reservedDelta != 0)
@@ -70,9 +78,31 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (poolSlotIndex >= 0)
                     _photonPool.ReleaseByIndex(poolSlotIndex);
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
-                if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty)
-                    || !_pendingFleetDispatches.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+
+                // REAPER-EXPANSION Ticket 2: Circuit breaker reset logic
+                int currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
+                if (
+                    currentCount < (REAPER_MAX_PENDING_DISPATCHES * 8 / 10)
+                    && Volatile.Read(ref _reaperCircuitBreakerTripped) == 1
+                )
+                {
+                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
+                    {
+                        Print(
+                            string.Format(
+                                "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
+                                currentCount,
+                                REAPER_MAX_PENDING_DISPATCHES * 8 / 10
+                            )
+                        );
+                    }
+                }
+
+                if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
+                    try
+                    {
+                        TriggerCustomEvent(o => PumpFleetDispatch(), null);
+                    }
                     catch (Exception ex)
                     {
                         if (_diagFleet)
@@ -81,8 +111,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool ValidateDispatchTimestamp(long signalTicks, string fleetEntryName,
-            string expectedKey, int reservedDelta, ref bool syncCleared)
+        private bool ValidateDispatchTimestamp(
+            long signalTicks,
+            string fleetEntryName,
+            string expectedKey,
+            int reservedDelta,
+            ref bool syncCleared
+        )
         {
             if (signalTicks > 0 && !MetadataGuardTimestamp(signalTicks, "Pump:" + fleetEntryName))
             {
@@ -97,8 +132,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             return true;
         }
 
-        private void InitializeFollowerBracketFSM(Order[] orders, int orderCount,
-            string fleetEntryName, string accountName, int reservedDelta)
+        private void InitializeFollowerBracketFSM(
+            Order[] orders,
+            int orderCount,
+            string fleetEntryName,
+            string accountName,
+            int reservedDelta
+        )
         {
             if (!_followerBrackets.ContainsKey(fleetEntryName))
             {
@@ -108,13 +148,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryName = fleetEntryName,
                     State = FollowerBracketState.Submitted,
                     RemainingContracts = Math.Abs(reservedDelta),
-                    LastUpdateUtc = DateTime.UtcNow
+                    LastUpdateUtc = DateTime.UtcNow,
                 };
 
                 for (int i = 0; i < orderCount; i++)
                 {
                     var ord = orders[i];
-                    if (ord == null || string.IsNullOrEmpty(ord.Name)) continue;
+                    if (ord == null || string.IsNullOrEmpty(ord.Name))
+                        continue;
 
                     if (ord.Name == fleetEntryName)
                     {
@@ -145,8 +186,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void SubmitAndRegisterFleetOrders(Account acct, Order[] orders, int orderCount,
-            string fleetEntryName, string expectedKey, ref bool syncCleared)
+        private void SubmitAndRegisterFleetOrders(
+            Account acct,
+            Order[] orders,
+            int orderCount,
+            string fleetEntryName,
+            string expectedKey,
+            ref bool syncCleared
+        )
         {
             Order[] submitOrders = orders;
             if (orders != null && orderCount > 0 && orderCount < orders.Length)
@@ -160,9 +207,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             syncCleared = true;
 
             FollowerBracketFSM pFsm;
-            if (_followerBrackets.TryGetValue(fleetEntryName, out pFsm)
+            if (
+                _followerBrackets.TryGetValue(fleetEntryName, out pFsm)
                 && pFsm != null
-                && pFsm.State == FollowerBracketState.PendingSubmit)
+                && pFsm.State == FollowerBracketState.PendingSubmit
+            )
             {
                 pFsm.State = FollowerBracketState.Submitted;
                 pFsm.LastUpdateUtc = DateTime.UtcNow;
@@ -179,8 +228,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
 
-            Print(string.Format("[PUMP] Submitted {0} orders for {1} | {2}",
-                orderCount, fleetEntryName, acct.Name));
+            Print(string.Format("[PUMP] Submitted {0} orders for {1} | {2}", orderCount, fleetEntryName, acct.Name));
         }
 
         private void RollbackFleetDispatchState(string fleetEntryName)
@@ -191,7 +239,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             for (int tNum = 1; tNum <= 5; tNum++)
             {
                 var td = GetTargetOrdersDictionary(tNum);
-                if (td != null) td.TryRemove(fleetEntryName, out _);
+                if (td != null)
+                    td.TryRemove(fleetEntryName, out _);
             }
             _followerBrackets.TryRemove(fleetEntryName, out _);
         }
@@ -213,9 +262,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int _sbIdx = _ringSlot.PoolSlotIndex;
 
                 // Sideband read (BEFORE shadow verify -- sideband is required for rollback logs)
-                FleetDispatchSideband _sb = (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
-                    ? _photonSideband[_sbIdx]
-                    : default(FleetDispatchSideband);
+                FleetDispatchSideband _sb =
+                    (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
+                        ? _photonSideband[_sbIdx]
+                        : default(FleetDispatchSideband);
 
                 // Verify integrity
                 if (!VerifyPhotonSlotIntegrity(ref _ringSlot, _sb, _sbIdx))
@@ -230,9 +280,37 @@ namespace NinjaTrader.NinjaScript.Strategies
             FleetDispatchRequest req;
             if (!_pendingFleetDispatches.TryDequeue(out req))
                 return;
-            ProcessFleetSlot(req.Account, req.Orders, req.Orders.Length,
-                req.FleetEntryName, req.ExpectedKey, req.ReservedDelta,
-                req.SignalTicks, -1);  // -1 = no pool release
+            Interlocked.Decrement(ref _pendingFleetDispatchCount);
+
+            // REAPER-EXPANSION Ticket 2: Circuit breaker reset logic
+            int currentCountLegacy = Volatile.Read(ref _pendingFleetDispatchCount);
+            if (
+                currentCountLegacy < (REAPER_MAX_PENDING_DISPATCHES * 8 / 10)
+                && Volatile.Read(ref _reaperCircuitBreakerTripped) == 1
+            )
+            {
+                if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
+                {
+                    Print(
+                        string.Format(
+                            "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
+                            currentCountLegacy,
+                            REAPER_MAX_PENDING_DISPATCHES * 8 / 10
+                        )
+                    );
+                }
+            }
+
+            ProcessFleetSlot(
+                req.Account,
+                req.Orders,
+                req.Orders.Length,
+                req.FleetEntryName,
+                req.ExpectedKey,
+                req.ReservedDelta,
+                req.SignalTicks,
+                -1
+            ); // -1 = no pool release
         }
 
         /// <summary>
@@ -246,9 +324,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             while (_photonDispatchRing != null && _photonDispatchRing.TryDequeue(out abortSlot))
             {
                 int _sbIdx = abortSlot.PoolSlotIndex;
-                string _expectedKey = (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
-                    ? _photonSideband[_sbIdx].ExpectedKey
-                    : null;
+                string _expectedKey =
+                    (_sbIdx >= 0 && _sbIdx < _photonSideband.Length) ? _photonSideband[_sbIdx].ExpectedKey : null;
                 if (abortSlot.ReservedDelta != 0 && _expectedKey != null)
                     AddExpectedPositionDeltaLocked(_expectedKey, -abortSlot.ReservedDelta);
                 if (_expectedKey != null)
@@ -279,16 +356,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool VerifyPhotonSlotIntegrity(ref FleetDispatchSlot _ringSlot, FleetDispatchSideband _sb, int _sbIdx)
         {
             // XorShadow integrity verification (defense-in-depth, structurally stronger than CRC16)
-            ulong _stored   = _ringSlot.Shadow;
-            _ringSlot.Shadow = 0UL;                             // zero before recompute (compute excludes Shadow by construction, but this is belt-and-braces)
+            ulong _stored = _ringSlot.Shadow;
+            _ringSlot.Shadow = 0UL; // zero before recompute (compute excludes Shadow by construction, but this is belt-and-braces)
             ulong _recomputed = ComputeFleetDispatchShadow(ref _ringSlot, _photonShadowSalt);
-            _ringSlot.Shadow = _stored;                         // restore for downstream logging
+            _ringSlot.Shadow = _stored; // restore for downstream logging
             if (_recomputed != _stored)
             {
                 Interlocked.Increment(ref _photonCrcFailures);
-                Print(string.Format(
-                    "[PHOTON_SHADOW] INTEGRITY FAILURE: expected=0x{0:X16} got=0x{1:X16} entry={2} -- SKIPPING",
-                    _stored, _recomputed, _sb.FleetEntryName));
+                Print(
+                    string.Format(
+                        "[PHOTON_SHADOW] INTEGRITY FAILURE: expected=0x{0:X16} got=0x{1:X16} entry={2} -- SKIPPING",
+                        _stored,
+                        _recomputed,
+                        _sb.FleetEntryName
+                    )
+                );
                 if (_ringSlot.ReservedDelta != 0 && _sb.ExpectedKey != null)
                     AddExpectedPositionDeltaLocked(_sb.ExpectedKey, -_ringSlot.ReservedDelta);
                 if (_sb.ExpectedKey != null)
@@ -301,7 +383,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     for (int tNum = 1; tNum <= 5; tNum++)
                     {
                         var td = GetTargetOrdersDictionary(tNum);
-                        if (td != null) td.TryRemove(_sb.FleetEntryName, out _);
+                        if (td != null)
+                            td.TryRemove(_sb.FleetEntryName, out _);
                     }
                     _followerBrackets.TryRemove(_sb.FleetEntryName, out _);
                 }
@@ -313,7 +396,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
                 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
-                    try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+                    try
+                    {
+                        TriggerCustomEvent(o => PumpFleetDispatch(), null);
+                    }
                     catch (Exception ex)
                     {
                         if (_diagFleet)
@@ -332,9 +418,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // Valid slot -- retrieve Order[] from pool via PoolSlotIndex
             Order[] ringOrders = _photonPool.GetByIndex(_sbIdx);
-            ProcessFleetSlot(_sb.Account, ringOrders, _ringSlot.OrderCount,
-                _sb.FleetEntryName, _sb.ExpectedKey, _ringSlot.ReservedDelta,
-                _ringSlot.SignalTicks, _sbIdx);
+            ProcessFleetSlot(
+                _sb.Account,
+                ringOrders,
+                _ringSlot.OrderCount,
+                _sb.FleetEntryName,
+                _sb.ExpectedKey,
+                _ringSlot.ReservedDelta,
+                _ringSlot.SignalTicks,
+                _sbIdx
+            );
 
             // Clear sideband to release refs (avoid stale retention across ring wraps)
             if (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
@@ -350,8 +443,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Threading: strategy thread only. stateLock usage identical to original inline code.
         /// T-W1: Refactored to thin dispatcher (CYC <= 10) with two private helpers.
         /// </summary>
-        private bool ShouldSkipFleetAccount(Account acct, AccountRankInfo rankInfo,
-            System.Collections.Generic.HashSet<string> activeAccountSnapshot, System.Text.StringBuilder dispatchLog)
+        private bool ShouldSkipFleetAccount(
+            Account acct,
+            AccountRankInfo rankInfo,
+            System.Collections.Generic.HashSet<string> activeAccountSnapshot,
+            System.Text.StringBuilder dispatchLog
+        )
         {
             // Step 1: Inactive check -- prevents UI toggle race.
             if (!activeAccountSnapshot.Contains(acct.Name))
@@ -385,7 +482,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 for (int _pi = 0; _pi < _posSnapshot.Length; _pi++)
                 {
                     if (_posSnapshot[_pi] != null && _posSnapshot[_pi].Instrument.FullName == Instrument.FullName)
-                    { brokerPos = _posSnapshot[_pi]; break; }
+                    {
+                        brokerPos = _posSnapshot[_pi];
+                        break;
+                    }
                 }
                 bool brokerFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
 
@@ -394,31 +494,54 @@ namespace NinjaTrader.NinjaScript.Strategies
                 foreach (var _fkvp in _followerBrackets)
                 {
                     var f = _fkvp.Value;
-                    if (f != null && f.AccountName == acct.Name
-                        && (f.State == FollowerBracketState.Active
+                    if (
+                        f != null
+                        && f.AccountName == acct.Name
+                        && (
+                            f.State == FollowerBracketState.Active
                             || f.State == FollowerBracketState.Accepted
                             || f.State == FollowerBracketState.Submitted
-                            || f.State == FollowerBracketState.Replacing))
-                    { hasActiveFsmForAcct = true; break; }
+                            || f.State == FollowerBracketState.Replacing
+                        )
+                    )
+                    {
+                        hasActiveFsmForAcct = true;
+                        break;
+                    }
                 }
                 bool hasActivePositionForAcct = false;
                 foreach (var _pkvp in activePositions)
                 {
                     var p = _pkvp.Value;
                     if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name)
-                    { hasActivePositionForAcct = true; break; }
+                    {
+                        hasActivePositionForAcct = true;
+                        break;
+                    }
                 }
                 bool hasDispatchPending = _dispatchSyncPendingExpKeys.ContainsKey(ExpKey(acct.Name));
 
                 if (brokerFlat && !hasActiveFsmForAcct && !hasActivePositionForAcct && !hasDispatchPending)
                 {
                     // Truly stale: broker flat, no FSM, no position, no dispatch in flight. No-op (nothing to reset).
-                    dispatchLog.AppendLine(string.Format("[DISPATCH] H-13: {0} broker flat, no FSM/position/dispatch -- no action", acct.Name));
+                    dispatchLog.AppendLine(
+                        string.Format(
+                            "[DISPATCH] H-13: {0} broker flat, no FSM/position/dispatch -- no action",
+                            acct.Name
+                        )
+                    );
                 }
                 else if (brokerFlat && (hasActiveFsmForAcct || hasActivePositionForAcct || hasDispatchPending))
                 {
-                    dispatchLog.AppendLine(string.Format("[DISPATCH] H-13 SKIP: {0} Flat but {1} -- not resetting",
-                        acct.Name, hasActiveFsmForAcct ? "FSM active" : (hasDispatchPending ? "dispatch pending" : "activePos present")));
+                    dispatchLog.AppendLine(
+                        string.Format(
+                            "[DISPATCH] H-13 SKIP: {0} Flat but {1} -- not resetting",
+                            acct.Name,
+                            hasActiveFsmForAcct
+                                ? "FSM active"
+                                : (hasDispatchPending ? "dispatch pending" : "activePos present")
+                        )
+                    );
                 }
             }
             catch (Exception ex)
@@ -435,16 +558,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <param name="acct">Fleet account (for log output)</param>
         /// <param name="dispatchLog">Batch log buffer for forensic output</param>
         /// <returns>True if consistency lock fires (skip account), false otherwise</returns>
-        private bool ShouldSkipFleet_IsConsistencyLockHit(AccountRankInfo rankInfo, Account acct, StringBuilder dispatchLog)
+        private bool ShouldSkipFleet_IsConsistencyLockHit(
+            AccountRankInfo rankInfo,
+            Account acct,
+            StringBuilder dispatchLog
+        )
         {
             if (EnableConsistencyLock && rankInfo.DailyPL >= MaxDailyProfitCap)
             {
-                dispatchLog.AppendLine(string.Format("[DISPATCH] {0} SKIPPED - Consistency Lock ({1:C})", acct.Name, rankInfo.DailyPL));
+                dispatchLog.AppendLine(
+                    string.Format("[DISPATCH] {0} SKIPPED - Consistency Lock ({1:C})", acct.Name, rankInfo.DailyPL)
+                );
                 return true;
             }
             return false;
         }
-
 
         /// <summary>
         /// V12.1101E [A-4]: Idempotent unsubscribe -- removes all SIMA event handlers before
@@ -466,7 +594,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (acct.Name == acctName)
                     {
                         acct.ExecutionUpdate -= OnAccountExecutionUpdate;
-                        acct.OrderUpdate     -= OnAccountOrderUpdate;
+                        acct.OrderUpdate -= OnAccountOrderUpdate;
                         break;
                     }
                 }
@@ -477,12 +605,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (IsFleetAccount(acct))
                 {
                     acct.ExecutionUpdate -= OnAccountExecutionUpdate;
-                    acct.OrderUpdate     -= OnAccountOrderUpdate;
+                    acct.OrderUpdate -= OnAccountOrderUpdate;
                 }
             }
             _subscribedAccountNames.Clear();
         }
-
 
         #endregion
     }

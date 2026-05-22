@@ -1,14 +1,16 @@
 // Build 971: SIMA Dispatch -- ExecuteSmartDispatchEntry
 // V12 SIMA Module (Extracted)
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Globalization;
 using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -18,16 +20,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -42,7 +42,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         ///   - Signal = RMA/OR/MOMO: All accounts get RMA targets.
         /// Accounts use FIXED brackets (Path B) for zero trail lag.
         /// </summary>
-        private void ExecuteSmartDispatchEntry(string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType = OrderType.Market, params string[] masterEntryNames)
+        private void ExecuteSmartDispatchEntry(
+            string tradeType,
+            OrderAction action,
+            int quantity,
+            double entryPrice,
+            OrderType entryOrderType = OrderType.Market,
+            params string[] masterEntryNames
+        )
         {
             // V12.Phase8 [F-03]: Lock-free gate guard -- non-blocking (Build 1109 freeze-proof).
             // Interlocked.CompareExchange returns instantly. If contended, defer to next strategy-thread cycle.
@@ -57,15 +64,32 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string[] _defMasterNames = masterEntryNames;
                 try
                 {
-                    TriggerCustomEvent(o => ExecuteSmartDispatchEntry(
-                        _defTradeType, _defAction, _defQty, _defPrice,
-                        _defOrderType, _defMasterNames), null);
+                    TriggerCustomEvent(
+                        o =>
+                            ExecuteSmartDispatchEntry(
+                                _defTradeType,
+                                _defAction,
+                                _defQty,
+                                _defPrice,
+                                _defOrderType,
+                                _defMasterNames
+                            ),
+                        null
+                    );
                 }
-                catch { Print("[DISPATCH] Deferred retry scheduling failed"); }
+                catch
+                {
+                    Print("[DISPATCH] Deferred retry scheduling failed");
+                }
                 return;
             }
 
-            Dispatch_InitializeLatencyTracking(out var sw, out var t0Ticks, out var tLoopStartTicks, out var dispatchLog);
+            Dispatch_InitializeLatencyTracking(
+                out var sw,
+                out var t0Ticks,
+                out var tLoopStartTicks,
+                out var dispatchLog
+            );
 
             try
             {
@@ -73,14 +97,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
 
                 Dispatch_ResolveFleetSnapshot(
-                    tradeType, action, quantity, entryPrice, masterEntryNames,
-                    out var fleet, out var activeAccountSnapshot, out var dispatchTargetCount, out var symmetryDispatchId);
-                if (fleet.Count == 0) return;
+                    tradeType,
+                    action,
+                    quantity,
+                    entryPrice,
+                    masterEntryNames,
+                    out var fleet,
+                    out var activeAccountSnapshot,
+                    out var dispatchTargetCount,
+                    out var symmetryDispatchId
+                );
+                if (fleet.Count == 0)
+                    return;
 
                 Dispatch_ProcessFleetLoop(
-                    fleet, activeAccountSnapshot, dispatchTargetCount, symmetryDispatchId,
-                    tradeType, action, quantity, entryPrice, entryOrderType,
-                    sw, tLoopStartTicks, dispatchLog);
+                    fleet,
+                    activeAccountSnapshot,
+                    dispatchTargetCount,
+                    symmetryDispatchId,
+                    tradeType,
+                    action,
+                    quantity,
+                    entryPrice,
+                    entryOrderType,
+                    sw,
+                    tLoopStartTicks,
+                    dispatchLog
+                );
 
                 Dispatch_FinalizeAndReport(sw, t0Ticks, tLoopStartTicks, dispatchLog);
             }
@@ -95,7 +138,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool Dispatch_ValidatePreconditions(string tradeType, OrderAction action, int quantity, double entryPrice)
+        private bool Dispatch_ValidatePreconditions(
+            string tradeType,
+            OrderAction action,
+            int quantity,
+            double entryPrice
+        )
         {
             // V12.2: Diagnostic logging for copy trading troubleshooting
             Print($"[DISPATCH] ExecuteSmartDispatchEntry called: {tradeType} | EnableSIMA={EnableSIMA}");
@@ -126,15 +174,23 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         private void Dispatch_InitializeLatencyTracking(
-            out Stopwatch sw, out long t0Ticks, out long tLoopStartTicks, out StringBuilder dispatchLog)
+            out Stopwatch sw,
+            out long t0Ticks,
+            out long tLoopStartTicks,
+            out StringBuilder dispatchLog
+        )
         {
             // [Phase 7.2 LATENCY] T0: Start immediately after semaphore acquired, before any work.
             sw = Stopwatch.StartNew();
             t0Ticks = sw.ElapsedTicks;
             tLoopStartTicks = sw.ElapsedTicks;
             dispatchLog = new StringBuilder(512);
-            dispatchLog.AppendLine(string.Format("[LATENCY] Loop start at {0:F3} ms from entry",
-                (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency));
+            dispatchLog.AppendLine(
+                string.Format(
+                    "[LATENCY] Loop start at {0:F3} ms from entry",
+                    (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency
+                )
+            );
         }
 
         private int Dispatch_ProcessFleetLoop(
@@ -149,7 +205,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             OrderType entryOrderType,
             Stopwatch sw,
             long tLoopStartTicks,
-            StringBuilder dispatchLog)
+            StringBuilder dispatchLog
+        )
         {
             int rmaCount = 0;
 
@@ -158,10 +215,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Account acct = fleet[i].Account;
 
                 // V12.1: Skip Master account if its order was already placed by the caller
-                if (acct == this.Account) continue;
+                if (acct == this.Account)
+                    continue;
 
                 // Build 935 [SIMA-B935-001]: Inactive + H-13 + consistency lock delegated to ShouldSkipFleetAccount.
-                if (ShouldSkipFleetAccount(acct, fleet[i], activeAccountSnapshot, dispatchLog)) continue;
+                if (ShouldSkipFleetAccount(acct, fleet[i], activeAccountSnapshot, dispatchLog))
+                    continue;
 
                 int reservedDelta = 0;
                 bool registeredForCleanup = false;
@@ -171,10 +230,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                 try
                 {
                     bool _builtOk = Dispatch_BuildFollowerOrders(
-                        tradeType, action, quantity, entryPrice, entryOrderType, acct, i, symmetryDispatchId, dispatchTargetCount, dispatchLog,
-                        out PositionInfo fleetPos, out Order entry, out fleetEntryName, out expectedKey, out string ocoId, out int followerQty, out int ft1, out int ft2, out int ft3, out int ft4, out int ft5,
-                        out double stopPrice, out double t1TargetPrice, out double t2TargetPrice, out double t3TargetPrice, out double t4TargetPrice, out double t5TargetPrice);
-                    if (!_builtOk) continue;
+                        tradeType,
+                        action,
+                        quantity,
+                        entryPrice,
+                        entryOrderType,
+                        acct,
+                        i,
+                        symmetryDispatchId,
+                        dispatchTargetCount,
+                        dispatchLog,
+                        out PositionInfo fleetPos,
+                        out Order entry,
+                        out fleetEntryName,
+                        out expectedKey,
+                        out string ocoId,
+                        out int followerQty,
+                        out int ft1,
+                        out int ft2,
+                        out int ft3,
+                        out int ft4,
+                        out int ft5,
+                        out double stopPrice,
+                        out double t1TargetPrice,
+                        out double t2TargetPrice,
+                        out double t3TargetPrice,
+                        out double t4TargetPrice,
+                        out double t5TargetPrice
+                    );
+                    if (!_builtOk)
+                        continue;
                     bool isMarketEntry = (entryOrderType == OrderType.Market);
 
                     // V12.7: Submit only entry for Limit; market entries include stop + non-runner targets.
@@ -195,7 +280,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             dispatchLog,
                             ref syncPending,
                             ref reservedDelta,
-                            ref registeredForCleanup);
+                            ref registeredForCleanup
+                        );
                     }
                     else
                     {
@@ -210,7 +296,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             dispatchLog,
                             ref syncPending,
                             ref reservedDelta,
-                            ref registeredForCleanup);
+                            ref registeredForCleanup
+                        );
                     }
 
                     rmaCount++;
@@ -250,11 +337,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             return rmaCount;
         }
 
-        private void Dispatch_FinalizeAndReport(Stopwatch sw, long t0Ticks, long tLoopStartTicks, StringBuilder dispatchLog)
+        private void Dispatch_FinalizeAndReport(
+            Stopwatch sw,
+            long t0Ticks,
+            long tLoopStartTicks,
+            StringBuilder dispatchLog
+        )
         {
             // V14.2 FIX-F7: Pump prime checks BOTH ring and legacy queue
             if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
-                try { TriggerCustomEvent(o => PumpFleetDispatch(), null); }
+                try
+                {
+                    TriggerCustomEvent(o => PumpFleetDispatch(), null);
+                }
                 catch (Exception ex)
                 {
                     if (_diagFleet)
@@ -264,9 +359,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) -- stop clock, flush forensic report.
             sw.Stop();
             long tFinalTicks = sw.ElapsedTicks;
-            double totalMs  = tFinalTicks        * 1000.0 / Stopwatch.Frequency;
-            double setupMs  = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
-            double loopMs   = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
+            double totalMs = tFinalTicks * 1000.0 / Stopwatch.Frequency;
+            double setupMs = (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency;
+            double loopMs = (tFinalTicks - tLoopStartTicks) * 1000.0 / Stopwatch.Frequency;
 
             var report = new StringBuilder(1024);
             report.AppendLine("+==============================================================+");
@@ -278,14 +373,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             report.AppendLine("+--------------------------------------------------------------+");
             report.AppendLine("|  TIMING SUMMARY                                              |");
             report.AppendLine("+--------------------------------------------------------------+");
-            report.AppendLine(string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs));
-            report.AppendLine(string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs));
+            report.AppendLine(
+                string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs)
+            );
+            report.AppendLine(
+                string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs)
+            );
             report.AppendLine("+==============================================================+");
             Print(report.ToString().TrimEnd());
         }
 
-
-        private void Dispatch_ResolveFleetSnapshot(string tradeType, OrderAction action, int quantity, double entryPrice, string[] masterEntryNames, out List<AccountRankInfo> fleet, out HashSet<string> activeAccountSnapshot, out int dispatchTargetCount, out string symmetryDispatchId)
+        private void Dispatch_ResolveFleetSnapshot(
+            string tradeType,
+            OrderAction action,
+            int quantity,
+            double entryPrice,
+            string[] masterEntryNames,
+            out List<AccountRankInfo> fleet,
+            out HashSet<string> activeAccountSnapshot,
+            out int dispatchTargetCount,
+            out string symmetryDispatchId
+        )
         {
             // V12.Audit [Q3-002]: Snapshot fleet active state under stateLock to prevent UI race.
             // The UI/IPC thread can toggle activeFleetAccounts between TryGetValue and Submit,
@@ -296,9 +404,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             // different accounts. Capturing once here ensures all fleet accounts submit identical
             // target counts for this dispatch.
             activeAccountSnapshot = new HashSet<string>(
-                activeFleetAccounts
-                    .Where(kvp => kvp.Value)
-                    .Select(kvp => kvp.Key));
+                activeFleetAccounts.Where(kvp => kvp.Value).Select(kvp => kvp.Key)
+            );
             dispatchTargetCount = Math.Max(1, Math.Min(5, activeTargetCount));
 
             fleet = GetSortedAccountFleet();
@@ -330,9 +437,34 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         private bool Dispatch_BuildFollowerOrders(
-            string tradeType, OrderAction action, int quantity, double entryPrice, OrderType entryOrderType, Account acct, int i, string symmetryDispatchId, int dispatchTargetCount, StringBuilder dispatchLog,
-            out PositionInfo fleetPos, out Order entry, out string fleetEntryName, out string expectedKey, out string ocoId, out int followerQty, out int ft1, out int ft2, out int ft3, out int ft4, out int ft5,
-            out double stopPrice, out double t1TargetPrice, out double t2TargetPrice, out double t3TargetPrice, out double t4TargetPrice, out double t5TargetPrice)
+            string tradeType,
+            OrderAction action,
+            int quantity,
+            double entryPrice,
+            OrderType entryOrderType,
+            Account acct,
+            int i,
+            string symmetryDispatchId,
+            int dispatchTargetCount,
+            StringBuilder dispatchLog,
+            out PositionInfo fleetPos,
+            out Order entry,
+            out string fleetEntryName,
+            out string expectedKey,
+            out string ocoId,
+            out int followerQty,
+            out int ft1,
+            out int ft2,
+            out int ft3,
+            out int ft4,
+            out int ft5,
+            out double stopPrice,
+            out double t1TargetPrice,
+            out double t2TargetPrice,
+            out double t3TargetPrice,
+            out double t4TargetPrice,
+            out double t5TargetPrice
+        )
         {
             fleetEntryName = "Fleet_" + acct.Name + "_" + tradeType + "_" + i;
             expectedKey = ExpKey(acct.Name);
@@ -378,7 +510,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (OverflowException)
             {
-                Print(string.Format("[923A-OVF] SIMA parity overflow qty={0} x mult={1} -- clamping to maxContracts ({2})", quantity, FleetParityMultiplier, maxContracts));
+                Print(
+                    string.Format(
+                        "[923A-OVF] SIMA parity overflow qty={0} x mult={1} -- clamping to maxContracts ({2})",
+                        quantity,
+                        FleetParityMultiplier,
+                        maxContracts
+                    )
+                );
                 followerQty = maxContracts;
             }
 
@@ -392,11 +531,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V12.3: Entry uses caller-specified order type (Limit for RMA, Market for MOMO/TREND)
             // [FIX-PP-01]: For StopMarket/StopLimit entries the activation price lives in stopPrice,
             // not limitPrice. Passing stopPx=0 caused the follower to fire immediately at market.
-            double limitPx = (entryOrderType == OrderType.Limit || entryOrderType == OrderType.StopLimit) ? entryPrice : 0;
-            double stopPx  = (entryOrderType == OrderType.StopMarket || entryOrderType == OrderType.StopLimit) ? entryPrice : 0;
+            double limitPx =
+                (entryOrderType == OrderType.Limit || entryOrderType == OrderType.StopLimit) ? entryPrice : 0;
+            double stopPx =
+                (entryOrderType == OrderType.StopMarket || entryOrderType == OrderType.StopLimit) ? entryPrice : 0;
             bool isMarketEntry = (entryOrderType == OrderType.Market);
             // StopMarket stays isMarketEntry=false: bracket handled by SymmetryGuardOnFollowerFill anchor flow.
-            entry = acct.CreateOrder(Instrument, action, entryOrderType, TimeInForce.Gtc, followerQty, limitPx, stopPx, ocoId, fleetEntryName, null);
+            entry = acct.CreateOrder(
+                Instrument,
+                action,
+                entryOrderType,
+                TimeInForce.Gtc,
+                followerQty,
+                limitPx,
+                stopPx,
+                ocoId,
+                fleetEntryName,
+                null
+            );
             if (entry == null)
             {
                 dispatchLog.AppendLine($"[DISPATCH] Entry create failed on {acct.Name} for {fleetEntryName}");
@@ -426,7 +578,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 T5Contracts = ft5,
                 ExecutingAccount = acct,
                 IsFollower = true,
-                IsRMATrade = true,          // Enforce Point-Based Trailing for all followers
+                IsRMATrade = true, // Enforce Point-Based Trailing for all followers
                 IsTRENDTrade = (tradeType == "TREND"),
                 IsRetestTrade = (tradeType == "RETEST"),
                 EntryOrderType = entryOrderType,
@@ -457,7 +609,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             StringBuilder dispatchLog,
             ref bool syncPending,
             ref int reservedDelta,
-            ref bool registeredForCleanup)
+            ref bool registeredForCleanup
+        )
         {
             var ordersToSubmit = new List<Order> { entry };
             OrderAction exitAction = action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover;
@@ -474,7 +627,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 validatedStop,
                 ocoId,
                 stopSig,
-                null);
+                null
+            );
 
             ordersToSubmit.Add(stop);
 
@@ -487,7 +641,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             for (int targetNum = 1; targetNum <= dispatchTargetCount; targetNum++)
             {
                 int targetQty = GetTargetContracts(fleetPos, targetNum);
-                if (targetQty <= 0) continue;
+                if (targetQty <= 0)
+                    continue;
 
                 if (IsRunnerTarget(targetNum))
                 {
@@ -498,8 +653,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double targetPrice = GetTargetPrice(fleetPos, targetNum);
                 if (targetPrice <= 0)
                 {
-                    dispatchLog.AppendLine(string.Format("[SIMA TARGET_SKIP] T{0} for {1} has qty={2} but invalid price={3:F2}; skipped",
-                        targetNum, fleetEntryName, targetQty, targetPrice));
+                    dispatchLog.AppendLine(
+                        string.Format(
+                            "[SIMA TARGET_SKIP] T{0} for {1} has qty={2} but invalid price={3:F2}; skipped",
+                            targetNum,
+                            fleetEntryName,
+                            targetQty,
+                            targetPrice
+                        )
+                    );
                     continue;
                 }
 
@@ -514,10 +676,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     0,
                     ocoId,
                     targetSig,
-                    null);
+                    null
+                );
 
                 // V12.Phase8 [F-01/F-02]: Stage target orders locally; commit after Submit.
-                stagedTargets.Add(new StagedTarget { Num = targetNum, Price = targetPrice, Order = target });
+                stagedTargets.Add(
+                    new StagedTarget
+                    {
+                        Num = targetNum,
+                        Price = targetPrice,
+                        Order = target,
+                    }
+                );
 
                 ordersToSubmit.Add(target);
                 nonRunnerLimitQty += targetQty;
@@ -559,7 +729,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     StopOrder = stop,
                     ExpectedStopPrice = stop != null ? stop.StopPrice : 0,
                     OcoGroupId = ocoId,
-                    LastUpdateUtc = DateTime.UtcNow
+                    LastUpdateUtc = DateTime.UtcNow,
                 };
                 foreach (var st in stagedTargets)
                 {
@@ -602,26 +772,68 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             FleetDispatchSlot _slot = new FleetDispatchSlot
             {
-                EntryPrice    = entryPrice,
-                StopPrice     = stopPrice,
-                SignalTicks   = DateTime.UtcNow.Ticks,
+                EntryPrice = entryPrice,
+                StopPrice = stopPrice,
+                SignalTicks = DateTime.UtcNow.Ticks,
                 PoolSlotIndex = _poolSlotIndex,
-                OrderCount    = _orderIdx,
-                Quantity      = followerQty,
-                TargetCount   = dispatchTargetCount,
-                Action        = (int)action,
-                ReservedDelta = reservedDelta
+                OrderCount = _orderIdx,
+                Quantity = followerQty,
+                TargetCount = dispatchTargetCount,
+                Action = (int)action,
+                ReservedDelta = reservedDelta,
             };
             _slot.Shadow = ComputeFleetDispatchShadow(ref _slot, _photonShadowSalt);
+
+            // REAPER-EXPANSION Ticket 2: Circuit breaker check
+            int currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
+            if (currentCount >= REAPER_MAX_PENDING_DISPATCHES)
+            {
+                // Trip circuit breaker if not already tripped
+                if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 1, 0) == 0)
+                {
+                    Print(
+                        string.Format(
+                            "[REAPER][CIRCUIT_BREAKER] TRIPPED: Queue depth={0} exceeds threshold={1} -- rejecting dispatch",
+                            currentCount,
+                            REAPER_MAX_PENDING_DISPATCHES
+                        )
+                    );
+                }
+                // Rollback state and return early
+                if (syncPending)
+                    ClearDispatchSyncPending(expectedKey);
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                if (_poolSlotIndex >= 0)
+                {
+                    _photonPool.ReleaseByIndex(_poolSlotIndex);
+                    _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
+                }
+                return;
+            }
+            // Circuit breaker already tripped - reject silently
+            if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
+            {
+                if (syncPending)
+                    ClearDispatchSyncPending(expectedKey);
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                if (_poolSlotIndex >= 0)
+                {
+                    _photonPool.ReleaseByIndex(_poolSlotIndex);
+                    _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
+                }
+                return;
+            }
 
             Interlocked.Increment(ref _pendingFleetDispatchCount);
 
             // v28.0 blittable slot + sideband-first publish
             if (_poolSlotIndex >= 0)
             {
-                _photonSideband[_poolSlotIndex].Account        = acct;
+                _photonSideband[_poolSlotIndex].Account = acct;
                 _photonSideband[_poolSlotIndex].FleetEntryName = fleetEntryName;
-                _photonSideband[_poolSlotIndex].ExpectedKey    = expectedKey;
+                _photonSideband[_poolSlotIndex].ExpectedKey = expectedKey;
                 Thread.MemoryBarrier(); // sideband writes visible before ring publish
             }
 
@@ -631,7 +843,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // MMIO mirror is a best-effort write-through -- never blocks or fails hot path.
                 if (_photonMmioMirror != null)
                 {
-                    try { _photonMmioMirror.TryPublish(ref _slot); }
+                    try
+                    {
+                        _photonMmioMirror.TryPublish(ref _slot);
+                    }
                     catch (Exception ex)
                     {
                         if (_diagIpc)
@@ -652,25 +867,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                     _photonSideband[_poolSlotIndex] = default(FleetDispatchSideband);
                     _proxyOrders = legacyOrders;
                 }
-                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
-                {
-                    Account = acct,
-                    Orders = _proxyOrders,
-                    FleetEntryName = fleetEntryName,
-                    ExpectedKey = expectedKey,
-                    ReservedDelta = reservedDelta,
-                    SignalTicks = DateTime.UtcNow.Ticks
-                });
+                _pendingFleetDispatches.Enqueue(
+                    new FleetDispatchRequest
+                    {
+                        Account = acct,
+                        Orders = _proxyOrders,
+                        FleetEntryName = fleetEntryName,
+                        ExpectedKey = expectedKey,
+                        ReservedDelta = reservedDelta,
+                        SignalTicks = DateTime.UtcNow.Ticks,
+                    }
+                );
             }
-            syncPending         = false;
-            reservedDelta       = 0;
+            syncPending = false;
+            reservedDelta = 0;
             registeredForCleanup = false;
 
-            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Market+{1}orders | PENDING",
-                acct.Name, ordersToSubmit.Count));
-            dispatchLog.AppendLine(string.Format("[SIMA STOP_AUDIT] QUEUED {0}: StopQty={1} NonRunnerLimits={2} RunnerQty={3}",
-                fleetEntryName, fleetPos.TotalContracts, nonRunnerLimitQty, runnerQty));
+            dispatchLog.AppendLine(
+                string.Format("  QUEUE | {0,-28} | Market+{1}orders | PENDING", acct.Name, ordersToSubmit.Count)
+            );
+            dispatchLog.AppendLine(
+                string.Format(
+                    "[SIMA STOP_AUDIT] QUEUED {0}: StopQty={1} NonRunnerLimits={2} RunnerQty={3}",
+                    fleetEntryName,
+                    fleetPos.TotalContracts,
+                    nonRunnerLimitQty,
+                    runnerQty
+                )
+            );
         }
+
         private void Dispatch_PublishLimitEntryToPhoton(
             Account acct,
             OrderAction action,
@@ -682,7 +908,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             StringBuilder dispatchLog,
             ref bool syncPending,
             ref int reservedDelta,
-            ref bool registeredForCleanup)
+            ref bool registeredForCleanup
+        )
         {
             // V12.Phantom-Fix [FIX-1]: Register tracking dicts BEFORE updating expectedPositions.
             // REAPER runs on a background thread; if it fires between the expectedPositions
@@ -708,7 +935,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RemainingContracts = followerQty,
                     EntryOrder = entry,
                     ExpectedEntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                    LastUpdateUtc = DateTime.UtcNow
+                    LastUpdateUtc = DateTime.UtcNow,
                 };
                 _followerBrackets.TryAdd(fleetEntryName, proFsm);
             }
@@ -735,25 +962,67 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (_poolSlotIndexLmt >= 0)
             {
-                _photonSideband[_poolSlotIndexLmt].Account        = acct;
+                _photonSideband[_poolSlotIndexLmt].Account = acct;
                 _photonSideband[_poolSlotIndexLmt].FleetEntryName = fleetEntryName;
-                _photonSideband[_poolSlotIndexLmt].ExpectedKey    = expectedKey;
+                _photonSideband[_poolSlotIndexLmt].ExpectedKey = expectedKey;
                 Thread.MemoryBarrier();
             }
 
             FleetDispatchSlot _slotLmt = new FleetDispatchSlot
             {
-                EntryPrice    = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
-                StopPrice     = 0,
-                SignalTicks   = DateTime.UtcNow.Ticks,
+                EntryPrice = entry.LimitPrice > 0 ? entry.LimitPrice : 0,
+                StopPrice = 0,
+                SignalTicks = DateTime.UtcNow.Ticks,
                 PoolSlotIndex = _poolSlotIndexLmt,
-                OrderCount    = 1,
-                Quantity      = followerQty,
-                TargetCount   = 0,
-                Action        = (int)action,
-                ReservedDelta = reservedDelta
+                OrderCount = 1,
+                Quantity = followerQty,
+                TargetCount = 0,
+                Action = (int)action,
+                ReservedDelta = reservedDelta,
             };
             _slotLmt.Shadow = ComputeFleetDispatchShadow(ref _slotLmt, _photonShadowSalt);
+
+            // REAPER-EXPANSION Ticket 2: Circuit breaker check
+            int currentCountLmt = Volatile.Read(ref _pendingFleetDispatchCount);
+            if (currentCountLmt >= REAPER_MAX_PENDING_DISPATCHES)
+            {
+                // Trip circuit breaker if not already tripped
+                if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 1, 0) == 0)
+                {
+                    Print(
+                        string.Format(
+                            "[REAPER][CIRCUIT_BREAKER] TRIPPED: Queue depth={0} exceeds threshold={1} -- rejecting dispatch",
+                            currentCountLmt,
+                            REAPER_MAX_PENDING_DISPATCHES
+                        )
+                    );
+                }
+                // Rollback state and return early
+                if (syncPending)
+                    ClearDispatchSyncPending(expectedKey);
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                if (_poolSlotIndexLmt >= 0)
+                {
+                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
+                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
+                }
+                return;
+            }
+            // Circuit breaker already tripped - reject silently
+            if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
+            {
+                if (syncPending)
+                    ClearDispatchSyncPending(expectedKey);
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                if (_poolSlotIndexLmt >= 0)
+                {
+                    _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
+                    _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
+                }
+                return;
+            }
 
             Interlocked.Increment(ref _pendingFleetDispatchCount);
 
@@ -761,7 +1030,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (_photonMmioMirror != null)
                 {
-                    try { _photonMmioMirror.TryPublish(ref _slotLmt); }
+                    try
+                    {
+                        _photonMmioMirror.TryPublish(ref _slotLmt);
+                    }
                     catch (Exception ex)
                     {
                         if (_diagIpc)
@@ -778,25 +1050,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                     _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
                     _proxyOrdersLmt = legacyOrdersLmt;
                 }
-                _pendingFleetDispatches.Enqueue(new FleetDispatchRequest
-                {
-                    Account = acct,
-                    Orders = _proxyOrdersLmt,
-                    FleetEntryName = fleetEntryName,
-                    ExpectedKey = expectedKey,
-                    ReservedDelta = reservedDelta,
-                    SignalTicks = DateTime.UtcNow.Ticks
-                });
+                _pendingFleetDispatches.Enqueue(
+                    new FleetDispatchRequest
+                    {
+                        Account = acct,
+                        Orders = _proxyOrdersLmt,
+                        FleetEntryName = fleetEntryName,
+                        ExpectedKey = expectedKey,
+                        ReservedDelta = reservedDelta,
+                        SignalTicks = DateTime.UtcNow.Ticks,
+                    }
+                );
             }
-            syncPending         = false;
-            reservedDelta       = 0;
+            syncPending = false;
+            reservedDelta = 0;
             registeredForCleanup = false;
 
-            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING",
-                acct.Name));
+            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING", acct.Name));
         }
-
-
 
         #endregion
     }
