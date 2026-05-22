@@ -29,11 +29,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Diagnostic only - logs warning but does NOT trigger flatten (non-fatal assertion).
         /// Jane Street Alignment: Atomic state transitions via GetOrAdd (TOCTOU-safe).
         /// </summary>
-        /// <param name="entryName">FSM entry name (key in activePositions)</param>
-        /// <param name="accountName">Account name</param>
-        /// <param name="actualQty">Broker position quantity (should be 0 for orphan detection)</param>
-        /// <param name="activePositions">Position info dictionary</param>
-        /// <returns>True if orphan detected and logged, false if grace active or position live</returns>
+        /// <param name="entryName">FSM entry name (key in activePositions).</param>
+        /// <param name="accountName">Account name.</param>
+        /// <param name="actualQty">Broker position quantity (should be 0 for orphan detection).</param>
+        /// <param name="activePositions">Position info dictionary.</param>
+        /// <returns>True if orphan detected and logged, false if grace active or position live.</returns>
         private bool DetectOrphanFSM(
             string entryName,
             string accountName,
@@ -81,11 +81,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Triggers force-zero self-heal after 3 failed attempts.
         /// Jane Street Alignment: Atomic state transitions via AddOrUpdate (CAS operation).
         /// </summary>
-        /// <param name="accountName">Account name</param>
-        /// <param name="activePositions">Position info dictionary</param>
-        /// <param name="repairPos">Output: PositionInfo if found</param>
-        /// <param name="repairEntryName">Output: Entry name if found</param>
-        /// <returns>True if PositionInfo found (repair can proceed), false if orphaned</returns>
+        /// <param name="accountName">Account name.</param>
+        /// <param name="activePositions">Position info dictionary.</param>
+        /// <param name="repairPos">Output: PositionInfo if found.</param>
+        /// <param name="repairEntryName">Output: Entry name if found.</param>
+        /// <returns>True if PositionInfo found (repair can proceed), false if orphaned.</returns>
         private bool ValidateRepairEligibility_OrphanCheck(
             string accountName,
             ConcurrentDictionary<string, PositionInfo> activePositions,
@@ -138,7 +138,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// SCOPE: Account-level (clears expected position for entire account, not per-FSM).
         /// Jane Street Alignment: Atomic state transition via SetExpectedPositionLocked.
         /// </summary>
-        /// <param name="accountName">Account name</param>
+        /// <param name="accountName">Account name.</param>
         /// <remarks>
         /// SCOPE BLAST: This method clears the expected position for the ENTIRE ACCOUNT,
         /// not just the orphaned FSM entry. This is INTENTIONAL. Rationale:

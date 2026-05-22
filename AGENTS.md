@@ -1,6 +1,11 @@
 # AGENTS.md - Sovereign Agent Protocol
 
 Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repository. This environment is optimized for autonomous multi-agent development under the **Sovereign Droid Protocol (SDP)**.
+## ⚠️ CRITICAL: CodeFactor Protocol
+**MANDATORY READING**: Before accepting ANY automated fixes from CodeFactor or similar tools, read `docs/protocol/CODEFACTOR_PROTOCOL.md`. 
+
+**TL;DR**: NEVER use CodeFactor's "Apply fixes" button. It caused 320 compilation errors and required emergency rollback. Manual fixes only, with build verification after every batch.
+
 
 ## 1. Agent Hierarchy (The Director's Gate)
 
