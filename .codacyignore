@@ -1,6 +1,11 @@
-scripts/**
-docs/**
-testsprite_tests/**
+# ============================================================================
+# Codacy PR Review Exclusions
+# ============================================================================
+# MASTER POLICY: See .pr-review-ignore for full rationale
+# FOCUS: Review ONLY src/*.cs production code changes
+# ============================================================================
+
+# Agent Infrastructure
 .agent/**
 .agents/**
 .bob/**
@@ -8,15 +13,70 @@ testsprite_tests/**
 .cursor/**
 .gemini/**
 .antigravitycli/**
-Traycerrefactor/**
-artifacts/**
+.fallow/**
+.github/**
+.idea/**
+.kilocode/**
+.superpowers/**
+.traycer/**
+.vscode/**
+mcp-servers/**
+node_modules/**
+
+# Documentation
+docs/**
+conductor/**
 **/*.md
+
+# Scripts & Automation
+scripts/**
 **/*.py
 **/*.ps1
 **/*.bat
+**/*.sh
+
+# Configuration Files
 **/*.json
 **/*.yaml
 **/*.yml
-deploy-sync.ps1
-check_ascii.py
-fix_skills.py
+**/*.toml
+**/*.config
+
+# Build Artifacts & Logs
+bin/**
+obj/**
+artifacts/**
+benchmarks/**
+**/*.bak*
+**/*.tmp
+**/*.log
+**/*.txt
+
+# Legacy & Deprecated
+Traycerrefactor/**
+sandbox/**
+scaffolds/**
+plugins/**
+AntigravityMobile/**
+
+# Test Files
+tests/**
+testsprite_tests/**
+
+# Templates & Media
+docs/templates/**
+**/*.template.txt
+**/*.example
+**/*.jpg
+**/*.png
+**/*.gif
+**/*.svg
+**/*.ico
+**/*.html
+**/*.css
+**/*.docx
+**/*.pdf
+
+# ============================================================================
+# REVIEW FOCUS: ONLY src/**/*.cs
+# ============================================================================

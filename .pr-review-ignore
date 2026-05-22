@@ -1,0 +1,152 @@
+# ============================================================================
+# PR Review Exclusion Policy - V12 Universal OR Strategy
+# ============================================================================
+# PURPOSE: Focus PR reviews ONLY on production code changes (src/*.cs)
+# APPLIES TO: Codacy, CodeFactor, Greptile, Sourcery, all GitHub PR bots
+# RATIONALE: Prevent noise from docs, scripts, configs, and tooling changes
+# ============================================================================
+
+# ============================================================================
+# AGENT INFRASTRUCTURE (Never review)
+# ============================================================================
+.agent/**
+.agents/**
+.bob/**
+.codex/**
+.cursor/**
+.gemini/**
+.antigravitycli/**
+.fallow/**
+.github/**
+.idea/**
+.kilocode/**
+.superpowers/**
+.traycer/**
+.vscode/**
+mcp-servers/**
+node_modules/**
+
+# ============================================================================
+# DOCUMENTATION (Never review)
+# ============================================================================
+docs/**
+conductor/**
+README.md
+*.md
+AGENTS.md
+BOB.md
+CLAUDE.md
+CODEX.md
+GEMINI.md
+JULES.md
+REVIEW.md
+IDE_GUIDE.md
+INFRASTRUCTURE_PROTOCOL.md
+
+# ============================================================================
+# SCRIPTS & AUTOMATION (Never review)
+# ============================================================================
+scripts/**
+*.py
+*.ps1
+*.bat
+*.sh
+deploy-sync.ps1
+deploy-vm-safe.ps1
+AutoAcceptLauncher.ps1
+check_ascii.py
+extract.py
+query_kb.extracted.py
+resolve_comments.ps1
+
+# ============================================================================
+# CONFIGURATION FILES (Never review)
+# ============================================================================
+*.json
+*.yaml
+*.yml
+*.toml
+*.config
+*.csproj
+*.sln
+.editorconfig
+.gitignore
+.claudeignore
+.cursorignore
+.codacyignore
+.pr_agent.toml
+.gitleaks.toml
+.deepsource.toml
+.codacy.yaml
+.jcodemunch.jsonc
+.mcp.json
+bob.config.yaml
+dotnet-tools.json
+firebase-credentials.json
+mint.json
+package.json
+recipes-test.yaml
+
+# ============================================================================
+# BUILD ARTIFACTS & LOGS (Never review)
+# ============================================================================
+bin/**
+obj/**
+artifacts/**
+benchmarks/**
+*.bak*
+*.tmp
+*.log
+*.txt
+build_*.txt
+bench_*.txt
+diff_*.txt
+errors.txt
+lint_errors.txt
+readiness_report.txt
+complexity_audit_report.txt
+
+# ============================================================================
+# LEGACY & DEPRECATED (Never review)
+# ============================================================================
+Traycerrefactor/**
+sandbox/**
+scaffolds/**
+plugins/**
+AntigravityMobile/**
+
+# ============================================================================
+# TEST FILES (Review separately, not in PR)
+# ============================================================================
+tests/**
+testsprite_tests/**
+
+# ============================================================================
+# TEMPLATES & EXAMPLES (Never review)
+# ============================================================================
+docs/templates/**
+*.template.txt
+*.example
+
+# ============================================================================
+# MEDIA & ASSETS (Never review)
+# ============================================================================
+*.jpg
+*.png
+*.gif
+*.svg
+*.ico
+*.html
+*.css
+*.docx
+*.pdf
+
+# ============================================================================
+# REVIEW FOCUS: ONLY src/*.cs FILES
+# ============================================================================
+# All PR reviews should ONLY analyze:
+# - src/**/*.cs (C# production code)
+# - SignalBroadcaster.cs (if modified)
+#
+# Everything else is infrastructure, documentation, or tooling.
+# ============================================================================
