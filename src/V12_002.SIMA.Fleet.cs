@@ -280,7 +280,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             FleetDispatchRequest req;
             if (!_pendingFleetDispatches.TryDequeue(out req))
                 return;
-            Interlocked.Decrement(ref _pendingFleetDispatchCount);
 
             // REAPER-EXPANSION Ticket 2: Circuit breaker reset logic
             int currentCountLegacy = Volatile.Read(ref _pendingFleetDispatchCount);
