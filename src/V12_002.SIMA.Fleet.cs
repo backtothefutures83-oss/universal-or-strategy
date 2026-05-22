@@ -312,6 +312,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ClearDispatchSyncPending(stale.ExpectedKey);
                 Interlocked.Decrement(ref _pendingFleetDispatchCount);
             }
+
+            // REAPER-EXPANSION P0 FIX: Reset circuit breaker after drain completes
+            // After flatten drains both queues to zero, CB must reset to accept future dispatches
+            int finalCount = Volatile.Read(ref _pendingFleetDispatchCount);
+            TryResetCircuitBreakerIfBelow(finalCount);
         }
 
         /// <summary>

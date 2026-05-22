@@ -1,5 +1,24 @@
 name: StyleCop Enforcement Pipeline
 
+# PROTOCOL HARDENING (V12.17 - REAPER-EXPANSION Phase 2.3)
+# =========================================================
+# This workflow enforces P3 style violations as BLOCKING per CODEFACTOR_PROTOCOL.md
+#
+# REPAIR COMMANDS:
+# - `/pr-loop <pr-number>` - Autonomous PR perfection loop (Orchestrator mode)
+# - `/repair-pr <pr-number>` - Manual repair workflow for failed checks
+# - `epic-tdd <epic> <ticket> <pr>` - Manual TDD execution with autonomous hardening
+#
+# FAILURE HANDLING:
+# 1. StyleCop failures are P3 BLOCKING - PR cannot merge until fixed
+# 2. Use `/repair-pr <pr-number>` to diagnose and fix style violations
+# 3. After fix, `/pr-loop <pr-number>` drives to 100/100 PHS
+#
+# PROTOCOL REFERENCES:
+# - docs/protocol/CODEFACTOR_PROTOCOL.md - Automated fix safety rules
+# - docs/protocol/MASTER_HANDOFF_PROTOCOL.md - Agent handoff procedures
+# - AGENTS.md - Agent hierarchy and routing logic
+
 on:
   push:
     branches: ["main"]
@@ -30,8 +49,14 @@ jobs:
         run: dotnet restore Linting.csproj
 
       - name: Run StyleCop Analysis
+        # HARDENED: P3 style issues are now BLOCKING per CODEFACTOR_PROTOCOL.md
         # Treat warnings as errors to enforce strict pass/fail status on PRs
         # -clp:ErrorsOnly minimizes output noise to just surface the errors
-        # [NOTE] continue-on-error: true handles missing NT8 assemblies in hosted runners.
-        continue-on-error: true
+        # [REMOVED] continue-on-error: true - P3 violations now fail the build
+        #
+        # REPAIR WORKFLOW:
+        # 1. If this check fails, run: `/repair-pr <pr-number>`
+        # 2. Fix reported style violations manually (NEVER use automated fix tools)
+        # 3. Commit fixes with: git commit -m "style(p3): Fix StyleCop violations"
+        # 4. Push and run: `/pr-loop <pr-number>` to drive to 100/100 PHS
         run: dotnet build Linting.csproj -warnaserror -clp:ErrorsOnly
