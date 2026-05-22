@@ -81,22 +81,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // REAPER-EXPANSION Ticket 2: Circuit breaker reset logic
                 int currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
-                if (
-                    currentCount < (REAPER_MAX_PENDING_DISPATCHES * 8 / 10)
-                    && Volatile.Read(ref _reaperCircuitBreakerTripped) == 1
-                )
-                {
-                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
-                    {
-                        Print(
-                            string.Format(
-                                "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
-                                currentCount,
-                                REAPER_MAX_PENDING_DISPATCHES * 8 / 10
-                            )
-                        );
-                    }
-                }
+                TryResetCircuitBreakerIfBelow(currentCount);
 
                 if ((_photonDispatchRing != null && !_photonDispatchRing.IsEmpty) || !_pendingFleetDispatches.IsEmpty)
                     try
@@ -378,22 +363,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // REAPER-EXPANSION P0 FIX: Circuit breaker reset logic (integrity failure path)
                 int currentCount = Volatile.Read(ref _pendingFleetDispatchCount);
-                if (
-                    currentCount < (REAPER_MAX_PENDING_DISPATCHES * 8 / 10)
-                    && Volatile.Read(ref _reaperCircuitBreakerTripped) == 1
-                )
-                {
-                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
-                    {
-                        Print(
-                            string.Format(
-                                "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} (integrity path) -- accepting dispatches",
-                                currentCount,
-                                REAPER_MAX_PENDING_DISPATCHES * 8 / 10
-                            )
-                        );
-                    }
-                }
+                TryResetCircuitBreakerIfBelow(currentCount);
 
                 if (!_photonDispatchRing.IsEmpty || !_pendingFleetDispatches.IsEmpty)
                     try
@@ -432,6 +402,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Clear sideband to release refs (avoid stale retention across ring wraps)
             if (_sbIdx >= 0 && _sbIdx < _photonSideband.Length)
                 _photonSideband[_sbIdx] = default(FleetDispatchSideband);
+        }
+
+        /// <summary>
+        /// REAPER-EXPANSION: Circuit breaker reset helper.
+        /// Resets circuit breaker when pending count drops to or below 80% threshold.
+        /// Thread-safe via atomic operations.
+        /// </summary>
+        private void TryResetCircuitBreakerIfBelow(int currentCount)
+        {
+            if (currentCount <= (REAPER_MAX_PENDING_DISPATCHES * 8 / 10))
+            {
+                if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
+                {
+                    Print(
+                        string.Format(
+                            "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
+                            currentCount,
+                            REAPER_MAX_PENDING_DISPATCHES * 8 / 10
+                        )
+                    );
+                }
+            }
         }
 
         // Build 935 [SIMA-B935-001]: Skip-logic extracted from ExecuteSmartDispatchEntry fleet loop.
