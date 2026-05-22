@@ -1,5 +1,14 @@
 name: Codacy Coverage
 
+# DISABLED: No test project exists yet (orphaned .cs files without .csproj)
+# This workflow will be re-enabled in EPIC-CI-COMPILATION when:
+# 1. Test project is created with proper .csproj
+# 2. NinjaTrader assemblies are available in CI environment
+# 3. Coverage infrastructure is properly configured
+#
+# Current Status: Tests exist as standalone .cs files but cannot be compiled/run in CI
+# Tracked in: docs/brain/EPIC-QUALITY-DEBT.md
+
 on:
   push:
     branches: [main, develop]
@@ -9,57 +18,10 @@ on:
 jobs:
   coverage:
     runs-on: windows-latest
+    if: false  # DISABLED - No test project exists
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Setup .NET Framework
-        uses: microsoft/setup-msbuild@v1.1
-      
-      - name: Restore NuGet packages
-        run: nuget restore Linting.csproj
-      
-      - name: Build project
-        run: msbuild Linting.csproj /p:Configuration=Release
-      
-      - name: Install Coverlet.Console
-        run: dotnet tool install --global coverlet.console
-      
-      - name: Check for test projects
-        id: check_tests
-        run: |
-          if (Test-Path "tests/*.csproj") {
-            echo "has_tests=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "has_tests=false" >> $env:GITHUB_OUTPUT
-            echo "No test projects found - skipping coverage"
-          }
-        shell: powershell
-      
-      - name: Run tests with coverage
-        if: steps.check_tests.outputs.has_tests == 'true'
-        run: |
-          coverlet ".\bin\Release\Linting.dll" `
-            --target "dotnet" `
-            --targetargs "test Linting.csproj --no-build --configuration Release" `
-            --format cobertura `
-            --output "./coverage/coverage.cobertura.xml"
-        shell: powershell
-      
-      - name: Upload coverage to Codacy
-        if: steps.check_tests.outputs.has_tests == 'true'
-        env:
-          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          Invoke-WebRequest -Uri "https://coverage.codacy.com/get.sh" -OutFile "codacy-coverage.sh"
-          bash codacy-coverage.sh report -r ./coverage/coverage.cobertura.xml
-        shell: powershell
-      
-      - name: Skip coverage (no tests)
-        if: steps.check_tests.outputs.has_tests == 'false'
-        run: echo "Skipping coverage - no test projects found"
-        shell: powershell
+      - name: Placeholder
+        run: echo "Coverage workflow disabled - no test project"
 
 # Made with Bob
