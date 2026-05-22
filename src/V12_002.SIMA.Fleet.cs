@@ -66,7 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                Print(string.Format("[PUMP] Submit FAILED for {0}: {1}", fleetEntryName, ex.Message));
+                Print(string.Format("[PUMP] Submit FAILED for {0} ({1}): {2}", fleetEntryName, acct.Name, ex.Message));
                 if (!syncCleared)
                     ClearDispatchSyncPending(expectedKey);
                 if (reservedDelta != 0)
