@@ -280,6 +280,39 @@ This epic tracks ALL code quality issues identified during REAPER-EXPANSION Phas
 - `AGENTS.md` Section 9 - Codacy integration protocol
 
 ---
+## CI Workflow Strategy (Updated 2026-05-22)
+
+### Disabled Workflows (Deferred to EPIC-CI-COMPILATION)
+
+**StyleCop Enforcement** (`.github/workflows/stylecop-enforcement.yml`):
+- **Status**: ENABLED but FAILING (expected)
+- **Root Cause**: Missing NinjaTrader assemblies in GitHub Actions environment
+- **Impact**: Workflow fails with 804 compilation errors (CS0234: namespace not found)
+- **Strategy**: Accept failure as technical debt until EPIC-CI-COMPILATION
+- **Rationale**: Disabling contradicts 5-epic goal of enabling GitHub compilation
+- **Local Validation**: `dotnet build Linting.csproj -warnaserror` PASSES locally
+- **Documentation**: `docs/brain/REAPER-EXPANSION/10-stylecop-ci-strategy.md`
+
+**Codacy Coverage** (`.github/workflows/codacy-coverage.yml`):
+- **Status**: DISABLED (`if: false`)
+- **Root Cause**: No test project exists (orphaned .cs files without .csproj)
+- **Impact**: Workflow would fail attempting to build non-existent test project
+- **Strategy**: Disable until test infrastructure is created
+- **Commit**: a7e8dde
+- **Re-enable When**: Test project created + NinjaTrader DLLs available in CI
+
+### Active Workflows (Passing)
+
+All other CI checks remain active and passing:
+- ✅ Gitleaks (secret scanning)
+- ✅ CodeQL (security analysis)
+- ✅ Codacy Analysis (static analysis)
+- ✅ CodeFactor (code quality)
+- ✅ PR hygiene checks
+- ✅ Hard link integrity
+
+---
+
 
 ## Tracking
 
