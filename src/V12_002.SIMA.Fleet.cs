@@ -413,15 +413,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (currentCount <= (REAPER_MAX_PENDING_DISPATCHES * 8 / 10))
             {
-                if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
+                // Volatile pre-check to avoid unnecessary CAS in steady state
+                if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
                 {
-                    Print(
-                        string.Format(
-                            "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
-                            currentCount,
-                            REAPER_MAX_PENDING_DISPATCHES * 8 / 10
-                        )
-                    );
+                    if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 0, 1) == 1)
+                    {
+                        Print(
+                            string.Format(
+                                "[REAPER][CIRCUIT_BREAKER] RESET: Queue depth={0} below threshold={1} -- accepting dispatches",
+                                currentCount,
+                                REAPER_MAX_PENDING_DISPATCHES * 8 / 10
+                            )
+                        );
+                    }
                 }
             }
         }
