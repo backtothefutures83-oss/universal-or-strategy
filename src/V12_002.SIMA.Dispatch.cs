@@ -222,6 +222,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (ShouldSkipFleetAccount(acct, fleet[i], activeAccountSnapshot, dispatchLog))
                     continue;
 
+                // [GREPTILE-P0]: Circuit breaker fast-exit BEFORE allocation.
+                // Prevents wasteful CreateOrder + PositionInfo heap allocations when breaker is tripped.
+                // Jane Street Alignment: Zero-tolerance for allocation-before-guard patterns.
+                if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
+                {
+                    dispatchLog.AppendLine($"[DISPATCH] CB tripped - skipping {acct.Name} (no allocation)");
+                    continue;
+                }
+
                 int reservedDelta = 0;
                 bool registeredForCleanup = false;
                 bool syncPending = false;
