@@ -35,10 +35,6 @@ on:
 
 jobs:
   lint:
-    # DISABLED: CI environment lacks NinjaTrader DLLs required for compilation.
-    # StyleCop enforcement still active via local pre-push hook.
-    # See: docs/brain/REAPER-EXPANSION/10-ci-status-update.md
-    if: false
     runs-on: windows-latest
 
     steps:
