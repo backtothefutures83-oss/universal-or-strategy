@@ -1,0 +1,47 @@
+name: Codacy Coverage
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  coverage:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup .NET Framework
+        uses: microsoft/setup-msbuild@v1.1
+      
+      - name: Restore NuGet packages
+        run: nuget restore Linting.csproj
+      
+      - name: Build project
+        run: msbuild Linting.csproj /p:Configuration=Release
+      
+      - name: Install Coverlet.Console
+        run: dotnet tool install --global coverlet.console
+      
+      - name: Run tests with coverage
+        run: |
+          coverlet ".\bin\Release\Linting.dll" `
+            --target "dotnet" `
+            --targetargs "test Linting.csproj --no-build --configuration Release" `
+            --format cobertura `
+            --output "./coverage/coverage.cobertura.xml"
+        shell: powershell
+      
+      - name: Upload coverage to Codacy
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://coverage.codacy.com/get.sh" -OutFile "codacy-coverage.sh"
+          bash codacy-coverage.sh report -r ./coverage/coverage.cobertura.xml
+        shell: powershell
+
+# Made with Bob

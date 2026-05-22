@@ -1,0 +1,55 @@
+---
+# Codacy Configuration for V12 Universal OR Strategy
+# Created: 2026-05-22
+# Purpose: Enforce V12 DNA principles (Jane Street alignment, complexity <=15, lock-free patterns)
+
+engines:
+  # Enable Roslyn analyzer for C# code quality
+  roslyn:
+    enabled: true
+    
+  # Duplication detection (exclude tests and benchmarks)
+  duplication:
+    enabled: true
+    exclude_paths:
+      - 'tests/**'
+      - 'benchmarks/**'
+      - 'sandbox/**'
+
+# Exclude non-source paths from analysis
+exclude_paths:
+  - 'docs/**'
+  - 'scripts/**'
+  - '.github/**'
+  - 'conductor/**'
+  - 'Traycerrefactor/**'
+  - '.bob/**'
+  - '.codex/**'
+  - '.cursor/**'
+  - '.fallow/**'
+  - '.idea/**'
+  - '.kilocode/**'
+  - '.superpowers/**'
+  - '.traycer/**'
+  - '.vscode/**'
+  - '_agents/**'
+  - 'AntigravityMobile/**'
+  - 'plugins/**'
+  - 'scaffolds/**'
+  - 'graphify-out/**'
+
+# Complexity threshold (Jane Street alignment: keep functions simple)
+# Functions exceeding this threshold will be flagged for refactoring
+complexity:
+  threshold: 15
+
+# Ignore patterns for legacy files (to be refactored separately)
+# These files have known technical debt and are tracked separately
+ignore:
+  # Legacy drawing helpers (high complexity, scheduled for refactor)
+  - 'src/V12_002.DrawingHelpers.cs'
+  
+  # Legacy ATM module (scheduled for SIMA extraction)
+  - 'src/V12_002.Atm.cs'
+
+# Made with Bob

@@ -214,6 +214,85 @@ This protocol governs the **SIMA Subgraph Extraction** and all complex refactori
 - **Binary**: `bob` (via alias or path)
 - **Mode**: `v12-engineer` (custom mode defined in `.bob/custom_modes.yaml`)
 - **Rules**: Enforced via `.bob/rules-v12-engineer/`
+
+## 9. Codacy Quality Integration
+
+**Purpose**: Automated code quality tracking and technical debt management aligned with V12 DNA principles.
+
+### Configuration Overview
+
+The repository uses `.codacy.yml` to enforce V12 architectural standards:
+
+**Key Settings**:
+- **Complexity Threshold**: 15 (Jane Street alignment - keep functions simple)
+- **Roslyn Analyzer**: Enabled for C# code quality checks
+- **Duplication Detection**: Enabled (excludes tests/benchmarks)
+- **Excluded Paths**: docs/, scripts/, .github/, conductor/, Traycerrefactor/, and tool directories
+
+### Complexity Threshold Rationale
+
+**Why 15?** (Jane Street Alignment)
+- Jane Street's HFT systems prioritize **cognitive simplicity** over clever abstractions
+- Functions with cyclomatic complexity >15 are harder to:
+  - Reason about under microsecond latency constraints
+  - Test exhaustively (exponential path growth)
+  - Audit for race conditions in lock-free code
+- V12 DNA mandates: "Make illegal states unrepresentable" - this requires simple, verifiable logic
+
+**Enforcement**:
+- Codacy flags functions exceeding threshold 15
+- Refactor into smaller, single-purpose functions
+- Use the Actor/FSM pattern to decompose complex state machines
+
+### Validating Configuration
+
+**After pushing `.codacy.yml` to GitHub**:
+
+1. **Check Codacy Dashboard**:
+   - Navigate to: https://app.codacy.com/gh/mdasdispatch-hash/universal-or-strategy/settings
+   - Verify "Configuration file" shows `.codacy.yml` detected
+   - Confirm complexity threshold displays as 15
+
+2. **Verify Exclusions**:
+   - Go to "Ignored Files" tab
+   - Confirm docs/, scripts/, .github/ are excluded
+   - Verify tests/ and benchmarks/ excluded from duplication checks
+
+3. **Test on PR**:
+   - Create a test PR with a function exceeding complexity 15
+   - Verify Codacy flags it as "Code complexity" issue
+   - Confirm PR shows "Up to quality standards" if no new issues
+
+### Current Baseline (2026-05-22)
+
+- **Total Issues**: 3,100 (technical debt)
+- **Grade**: B
+- **Coverage**: 0% (coverage integration pending)
+- **Complexity**: 32% of files (31/207 exceed threshold)
+
+**Strategy**: Boy Scout Rule - fix issues in files you touch, chip away at debt incrementally.
+
+### Integration with V12 Workflows
+
+**Before Surgery** (P4/P5 tasks):
+- Check Codacy dashboard for file-specific issues
+- Prioritize: Security (29) > Error-prone (1k) > Complexity (288) > Style (1k)
+
+**After Surgery**:
+- Verify PR shows "Up to quality standards" (no new issues)
+- If new issues appear: fix before merge (quality gate enforcement)
+
+**Debt Reduction**:
+- Dedicate 20% of sprint capacity to debt reduction
+- Target high-complexity files first (V12_002.DrawingHelpers.cs, V12_002.Atm.cs)
+- Use `scripts/complexity_audit.py` for local pre-checks
+
+### Commands
+
+- **Local Complexity Audit**: `python scripts/complexity_audit.py`
+- **View Codacy Dashboard**: https://app.codacy.com/gh/mdasdispatch-hash/universal-or-strategy/dashboard
+- **Check PR Quality**: Codacy bot comments on every PR with issue delta
+
 - **Checkpointing**: Always enabled via `.bob/settings.json`. Restore via `/restore`.
 
 ## graphify
