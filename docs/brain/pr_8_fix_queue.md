@@ -1,14 +1,67 @@
 ﻿# PR #8 Fix Queue
-Generated: 2026-05-23 13:44:20
+Generated: 2026-05-23 14:57:39
 
 ## Instructions for v12-engineer
 
 Process these issues in priority order. Mark each as FIXED after applying the fix.
 
 ### Fix #1 - [P0] CRITICAL
-[x] **Bot:** coderabbitai
-[x] **File:** pr_8_raw.json
-[x] **Issue:** **Actionable comments posted: 17** - FIXED: Removed pr_8_raw.json from repository
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** <!-- This is an auto-generated comment: summarize by coderabbit.ai -->
+<!-- walkthrough_start -->
+
+## Walkthrough
+
+Adds EPIC-6 testing infrastructure: BenchmarkDotNet harnesses, xUnit suites with Ninj...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290704
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #2 - [P0] CRITICAL
+[ ] **Bot:** amazon-q-developer  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## Review Summary
+
+This PR adds EPIC-6 documentation and testing infrastructure. The changes are primarily documentation (nexus-sync command definitions, testing guides) with a new CI/CD workflow and ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #3 - [P0] CRITICAL
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **Actionable comments posted: 7**
+
+<details>
+<summary>­ƒñû Prompt for all review comments with AI agents</summary>
+
+```
+Verify each finding against current code. Fix only still-valid issues, skip the
+...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #4 - [P0] CRITICAL
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **Actionable comments posted: 17**
 
 > [!CAUTION]
 > Some comments are outside the diff and canÔÇÖt be posted inline due to platform limitations.
@@ -26,10 +79,25 @@ Process these issues in priority order. Mark each as FIXED after applying the fi
 
 ---
 
-### Fix #2 - [P0] CRITICAL
-[x] **Bot:** coderabbitai
-[x] **File:** .cursor/rules/nexus-sync.mdc
-[x] **Issue:** **Actionable comments posted: 7** - FIXED: Added alwaysApply: true to frontmatter
+### Fix #5 - [P1] REVIEW
+[ ] **Bot:** sourcery-ai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** Hey - I've found 3 issues, and left some high level feedback:
+
+- The newly added `_proxTagCache` and `PROX_TAG_CACHE_LIMIT` in `V12_002` are currently unused; consider either wiring them into the RMA ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #6 - [P1] REVIEW
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **Actionable comments posted: 4**
 
 <details>
 <summary>­ƒñû Prompt for all review comments with AI agents</summary>
@@ -46,37 +114,7 @@ Verify each finding against current code. Fix only still-valid issues, skip the
 
 ---
 
-### Fix #3 - [P0] CRITICAL
-[x] **Bot:** amazon-q-developer
-[x] **File:** .github/workflows/epic6-testing.yml
-[x] **Issue:** ## Review Summary - FIXED: Corrected Lock-Free Audit regex to use Get-ChildItem
-
-This PR adds EPIC-6 documentation and testing infrastructure. The changes are primarily documentation (nexus-sync command definitions, testing guides) with a new CI/CD workflow and ...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #4 - [P1] REVIEW
-[ ] **Bot:** codacy-production  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** ### Pull Request Overview
-
-This PR presents a significant misalignment between its stated intent and the actual changes provided. Although the title and description claim a 'documentation-only' update...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #5 - [P1] REVIEW
+### Fix #7 - [P1] REVIEW
 [ ] **Bot:** gemini-code-assist  
 [ ] **File:** (extract from body)  
 [ ] **Issue:** ## Code Review
@@ -91,30 +129,12 @@ This pull request establishes the automated testing infrastructure for EPIC-6, a
 
 ---
 
-### Fix #6 - [P1] SECURITY
-[ ] **Bot:** pr-insights-tagger  
+### Fix #8 - [P1] REVIEW
+[ ] **Bot:** codacy-production  
 [ ] **File:** (extract from body)  
-[ ] **Issue:** ## PR Analysis Summary
+[ ] **Issue:** ### Pull Request Overview
 
-<div align="center">
-
-<!-- Badges for GitHub web view -->
-![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290265
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #7 - [P1] REVIEW
-[ ] **Bot:** sourcery-ai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** Hey - I've found 3 issues, and left some high level feedback:
-
-- The newly added `_proxTagCache` and `PROX_TAG_CACHE_LIMIT` in `V12_002` are currently unused; consider either wiring them into the RMA ...
+This PR presents a significant misalignment between its stated intent and the actual changes provided. Although the title and description claim a 'documentation-only' update...
 
 **Action Required:**
 1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
@@ -124,7 +144,7 @@ This pull request establishes the automated testing infrastructure for EPIC-6, a
 
 ---
 
-### Fix #8 - [P1] SECURITY
+### Fix #9 - [P1] SECURITY
 [ ] **Bot:** pr-insights-tagger  
 [ ] **File:** (extract from body)  
 [ ] **Issue:** ## PR Analysis Summary
@@ -142,17 +162,17 @@ This pull request establishes the automated testing infrastructure for EPIC-6, a
 
 ---
 
-### Fix #9 - [P2] PERFORMANCE
+### Fix #10 - [P1] SECURITY
 [ ] **Bot:** codacy-production  
 [ ] **File:** (extract from body)  
 [ ] **Issue:** ## Not up to standards Ôøö
-<details><summary><strong>­ƒö┤ Issues</strong>  <code>1 high ┬À 48 medium ┬À 8 minor</code></summary>
+<details><summary><strong>­ƒö┤ Issues</strong>  <code>8 high ┬À 51 medium ┬À 16 minor</code></summary>
 
 > <br/>
 >
 > 
 > **Alerts:**
-> ÔÜá 57 issues (Ôëñ 0 issues of at least m...
+> ÔÜá 75 issues (Ôëñ 0 issues of at least ...
 
 **Action Required:**
 1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290709
@@ -162,7 +182,79 @@ This pull request establishes the automated testing infrastructure for EPIC-6, a
 
 ---
 
-### Fix #10 - [P2] PERFORMANCE
+### Fix #11 - [P1] SECURITY
+[ ] **Bot:** pr-insights-tagger  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## PR Analysis Summary
+
+<div align="center">
+
+<!-- Badges for GitHub web view -->
+![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290265
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #12 - [P1] SECURITY
+[ ] **Bot:** pr-insights-tagger  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## PR Analysis Summary
+
+<div align="center">
+
+<!-- Badges for GitHub web view -->
+![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526562155
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #13 - [P1] SECURITY
+[ ] **Bot:** pr-insights-tagger  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## PR Analysis Summary
+
+<div align="center">
+
+<!-- Badges for GitHub web view -->
+![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526535138
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #14 - [P1] SECURITY
+[ ] **Bot:** pr-insights-tagger  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## PR Analysis Summary
+
+<div align="center">
+
+<!-- Badges for GitHub web view -->
+![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526496159
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #15 - [P2] PERFORMANCE
 [ ] **Bot:** sourcery-ai  
 [ ] **File:** (extract from body)  
 [ ] **Issue:** <!-- Generated by sourcery-ai[bot]: start review_guide -->

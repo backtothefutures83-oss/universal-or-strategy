@@ -27,9 +27,121 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 - **ASCII-Only Compliance**: NEVER use Unicode, emoji, or curly quotes in C# string literals.
 - **Jane Street Alignment (V12.17)**: ALL agents (Bob, Codex, Qwen, Antigravity, Jules, Rovo Dev, Cursor, etc.) MUST load and apply the ingested Jane Street Intel from `docs/intel/jane-street/` for every architectural decision.
 - **Hard-Link Integrity**: Every `src/` modification MUST be followed by `powershell -File .\deploy-sync.ps1` to re-synchronize NinjaTrader hard links.
+- **Routa CLI Integration**: ALL agents MUST use Routa CLI for architecture analysis, multi-file refactoring, and cross-repository coordination. See [Universal Agent Protocol](docs/protocol/UNIVERSAL_AGENT_PROTOCOL.md) for details.
 
+## 3. Mandatory Knowledge Base Consultation
 
-## 3. Standard Commands
+**CRITICAL PROTOCOL:** ALL agents MUST query the Jane Street Knowledge Base before ANY task involving:
+- Architecture decisions
+- Performance optimization
+- Concurrency patterns
+- Lock-free design
+- State management
+- ANY src/ file modification
+
+**Command:**
+```powershell
+python scripts/query_kb.py "<your query>"
+```
+
+**Examples:**
+```powershell
+# Before implementing lock-free pattern
+python scripts/query_kb.py "lock-free queue implementation"
+
+# Before refactoring state management
+python scripts/query_kb.py "actor model state mutations"
+
+# Before performance optimization
+python scripts/query_kb.py "microsecond latency patterns"
+```
+
+**Enforcement:** Agents that skip KB consultation violate V12 DNA protocol.
+
+## 4. Routa CLI Integration (MANDATORY)
+
+**CRITICAL RULE:** ALL agents MUST use Routa CLI for:
+- Architecture analysis
+- Multi-file refactoring planning
+- Cross-repository coordination
+- Feature tree generation
+- Kanban workflow automation
+
+**Installation:**
+```powershell
+# Via npm
+npm install -g routa-cli
+
+# Or via Cargo
+cargo install routa-cli
+
+# Verify installation
+routa --version
+```
+
+**Examples:**
+```powershell
+# Before any src/ refactoring
+routa -p "Analyze the architecture of the SIMA subgraph"
+
+# Before implementing a feature
+routa -p "Plan the implementation of RMA proximity monitoring"
+
+# For multi-file changes
+routa -p "Identify all files affected by changing the FSM state machine"
+
+# Kanban workflow
+routa kanban card create --title "Implement feature X" --workspace-id default
+routa kanban card move --card-id <id> --target-column-id in-progress
+```
+
+## 5. LangSmith Tracing (MANDATORY for Multi-Agent Sessions)
+
+**Configuration:** `.env` file (create from `.env.example`)
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=ls__your_key_here
+LANGSMITH_PROJECT=V12-Universal-OR-Strategy
+```
+
+**Agent Handoff Protocol:**
+```powershell
+# When handing off to another agent
+python scripts/nexus_relay.py <agent_name> "<instructions>"
+
+# This emits a LangSmith trace linking the handoff
+```
+
+**Verification:**
+```powershell
+python scripts/langsmith_bridge.py --test
+# Expected: "[+] Trace emitted successfully."
+```
+
+## 6. PR Separation Protocol (MANDATORY)
+
+**CRITICAL RULE:** NEVER mix src/ and non-src/ files in the same PR.
+
+**Two-PR Model:**
+1. **src/ PR:** Production code changes only
+   - Full bot audit (CodeRabbit, Codacy, Semgrep)
+   - CI verification required
+   - `/pr-loop` to 85+ PHS
+   
+2. **non-src/ PR:** Documentation, tests, workflows, scripts
+   - Lightweight review or direct merge
+   - No bot audit required
+   - Fast-track merge
+
+**Verification Command:**
+```powershell
+powershell -File .\scripts\verify_pr_separation.ps1 -PrNumber <PR_NUMBER>
+```
+
+**Enforcement:** Any PR mixing src/ and non-src/ will be rejected.
+
+## 7. Standard Commands
 
 - **Build & Sync** (Build Pillar): `powershell -File .\scripts\build_readiness.ps1`
 - **Lint Audit** (Style Pillar): `powershell -File .\scripts\lint.ps1`
@@ -302,4 +414,83 @@ This project has a graphify knowledge graph at graphify-out/.
 Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+
+## 18. Available Tools
+
+### Code Navigation (jCodemunch MCP)
+- `resolve_repo`, `index_folder`
+- `search_symbols`, `search_text`, `search_columns`
+- `get_file_outline`, `get_symbol_source`, `get_context_bundle`
+- `find_importers`, `find_references`, `check_references`
+- `get_dependency_graph`, `get_blast_radius`, `get_changed_symbols`
+- `find_dead_code`, `get_class_hierarchy`
+- `plan_turn`, `get_session_context`, `announce_model`
+
+### Architecture & Planning (Routa CLI)
+- `routa -p "<query>"` - Architecture analysis
+- `routa kanban card create` - Kanban workflow
+- `routa team run` - Multi-specialist coordination
+- `routa fitness fluency` - Harness fluency assessment
+
+### Knowledge Graph (graphify)
+- `graphify update .`
+- `graphify-out/GRAPH_REPORT.md`
+- 71x token efficiency vs raw file reading
+
+### Knowledge Base (RAG)
+- `python scripts/query_kb.py "<query>"`
+- Firestore Jane Street intel
+- HFT patterns, lock-free designs, microsecond-latency optimizations
+
+### Testing & Quality
+- **Unit Tests**: `dotnet test tests/V12_Performance.Tests/`
+- **Benchmarks**: `dotnet run --project benchmarks`
+- **AMAL Harness**: `python scripts/amal_harness_v26.py`
+- **Semgrep**: `powershell -File .\scripts\run_semgrep.ps1`
+- **Complexity Audit**: `python scripts/complexity_audit.py`
+- **Dead Code Scan**: `python scripts/dead_code_scan.py`
+
+### Build & Deployment
+- **Build**: `dotnet build .\Linting.csproj`
+- **Deploy Sync**: `powershell -File .\deploy-sync.ps1` (MANDATORY after src/ edits)
+- **Format**: `powershell -File .\scripts\format_all_csharp.ps1`
+- **Build Readiness**: `powershell -File .\scripts\build_readiness.ps1`
+
+### PR Workflow
+- **PR Hygiene**: `powershell -File .\scripts\verify_pr_hygiene.ps1`
+- **PR Separation**: `powershell -File .\scripts\verify_pr_separation.ps1 -PrNumber <N>`
+- **PR Forensics**: `powershell -File .\scripts\extract_pr_forensics.ps1 -PrNumber <N>`
+- **CI Logs**: `powershell -File .\scripts\extract_ci_logs.ps1 -PrNumber <N>`
+- **Fleet Score**: `powershell -File .\scripts\calculate_fleet_score.ps1 -PrNumber <N>`
+- **CodeRabbit CLI**: `coderabbit review` (local AI review)
+
+### GitHub Apps (Active on PRs)
+- **CodeRabbit AI**: V12 DNA alignment, CAS bug detection
+- **Sourcery AI**: Architectural feedback, JIT analysis
+- **Codacy**: Static analysis, complexity metrics
+- **cubic-dev-ai**: Jane Street alignment, atomic operation audits
+- **Amazon Q Developer**: Struct semantics, atomic operations
+- **Semgrep**: V12 DNA pattern matching
+- **CodeQL**: Security scanning
+- **Snyk**: Dependency vulnerabilities
+- **Gitleaks**: Secret detection
+- **SonarCloud**: Code quality platform
+
+## 19. Universal Agent Protocol
+
+**For complete tool integration, workflow protocols, and enforcement rules, see:**
+
+📘 **[Universal Agent Protocol](docs/protocol/UNIVERSAL_AGENT_PROTOCOL.md)**
+
+This comprehensive document covers:
+- Mandatory tool stack (Routa, jCodemunch, Jane Street KB, LangSmith)
+- Quality gates (Semgrep, CodeRabbit CLI, build readiness)
+- Testing tools (xUnit, BenchmarkDotNet, AMAL Harness)
+- LangSmith tracing configuration and continuity
+- PR separation protocol enforcement
+- MCP configuration (centralized)
+- Prompt caching configuration
+- Workflow integration (pre-push checklist, PR loop, epic run)
+- Tool access matrix by agent and task type
+- Enforcement & verification procedures
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

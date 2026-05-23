@@ -1,0 +1,37 @@
+{
+  "enabled": true,
+  "cache_control": {
+    "type": "ephemeral",
+    "ttl_seconds": 300
+  },
+  "cacheable_prompts": [
+    "AGENTS.md",
+    ".bob/rules/**/*.md",
+    "docs/protocol/**/*.md",
+    "docs/setup/**/*.md",
+    ".cursorrules",
+    "CLAUDE.md",
+    "BOB.md",
+    "CODEX.md",
+    "GEMINI.md",
+    "JULES.md"
+  ],
+  "estimated_savings": {
+    "tokens_per_session": 50000,
+    "sessions_per_day": 10,
+    "cost_per_1M_tokens": 3.00,
+    "daily_savings_tokens": 500000,
+    "daily_savings_usd": 1.50,
+    "monthly_savings_usd": 45.00,
+    "annual_savings_usd": 547.50
+  },
+  "notes": [
+    "Prompt caching reduces costs by caching frequently-used context (AGENTS.md, protocol docs, rules)",
+    "300-second TTL balances cache freshness with cost savings",
+    "Estimated 50k tokens cached per session × 10 sessions/day = 500k tokens/day",
+    "At $3/1M tokens, this saves ~$1.50/day or $547.50/year",
+    "Actual savings depend on session frequency and context reuse patterns"
+  ],
+  "version": "1.0.0",
+  "last_updated": "2026-05-23"
+}
