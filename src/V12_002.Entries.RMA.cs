@@ -295,7 +295,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             weightedEntryPrice = Instrument.MasterInstrument.RoundToTickSize(weightedEntryPrice);
 
             Print(
-                string.Format(
+                LogBuffer.Format(
                     "TREND RMA SPLIT: {0} | Qty={1} (EMA9={2}, EMA15={3}) | EMA9={4:F2} EMA15={5:F2} | Anchor={6:F2}",
                     levels.Direction == MarketPosition.Long ? "LONG" : "SHORT",
                     levels.FinalTotalQty,
@@ -355,7 +355,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             isRMAButtonClicked = false;
 
             // V12.14: Broadcast RMA deactivation to panel
-            string deactivateConfig = string.Format(
+            string deactivateConfig = LogBuffer.Format(
                 "CONFIG|OR|COUNT:{0};T1:{1};T1TYPE:{2};T2:{3};T2TYPE:{4};T3:{5};T3TYPE:{6};T4:{7};T4TYPE:{8};T5:{9};T5TYPE:{10};STR:{11};MAX:{12};",
                 minContracts,
                 Target1Value,
@@ -418,7 +418,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             pos.WasInProximity = true;
                             pos.ProximityProbeCount++;
                             Print(
-                                string.Format(
+                                LogBuffer.Format(
                                     "[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
                                     pos.ProximityProbeCount,
                                     kvp.Key,
@@ -444,7 +444,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
                             {
                                 Print(
-                                    string.Format(
+                                    LogBuffer.Format(
                                         "[SENTINEL] EXHAUSTION: {0} probed {1}x (max={2}), closest={3:F1}t. Cancelling.",
                                         kvp.Key,
                                         pos.ProximityProbeCount,
@@ -459,7 +459,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             else
                             {
                                 Print(
-                                    string.Format(
+                                    LogBuffer.Format(
                                         "[SENTINEL] Retreat for {0} (probe #{1}, closest={2:F1}t). Monitoring.",
                                         kvp.Key,
                                         pos.ProximityProbeCount,

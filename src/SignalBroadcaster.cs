@@ -227,7 +227,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (micros > 1000)
             {
                 NinjaTrader.Code.Output.Process(
-                    string.Format(
+                    LogBuffer.Format(
                         "[LATENCY_FANOUT] {0}: {1:F2}ms across {2} subscribers",
                         typeof(T).Name,
                         micros / 1000.0,

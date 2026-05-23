@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ResetOR();
                 lastResetDate = barTimeInZone.Date;
                 Print(
-                    string.Format(
+                    LogBuffer.Format(
                         "Session Reset: {0} at {1} {2}",
                         barTimeInZone.Date.ToShortDateString(),
                         currentTime,
@@ -136,7 +136,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (!isInORWindow)
                 {
                     Print(
-                        string.Format(
+                        LogBuffer.Format(
                             "OR WINDOW START: {0} (Bar time in {1})",
                             barTimeInZone.ToString("MM/dd/yyyy HH:mm:ss"),
                             SelectedTimeZone
@@ -155,7 +155,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     orStartDateTime = Time[0];
                     sessionStartDateTime = Time[0];
                     orStartBarIndex = CurrentBar;
-                    Print(string.Format("OR Start tracked - Bar {0}", CurrentBar));
+                    Print(LogBuffer.Format("OR Start tracked - Bar {0}", CurrentBar));
                 }
             }
         }
@@ -175,7 +175,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 orEndBarIndex = CurrentBar;
 
                 Print(
-                    string.Format(
+                    LogBuffer.Format(
                         "OR COMPLETE at {0}: H={1:F2} L={2:F2} M={3:F2} R={4:F2}",
                         barTimeInZone.ToString("HH:mm:ss"),
                         sessionHigh,
@@ -185,7 +185,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     )
                 );
                 Print(
-                    string.Format(
+                    LogBuffer.Format(
                         "OR Targets: T1={0}({1}) T2={2}({3}) Stop=-{4:F2}",
                         Target1Value,
                         T1Type,

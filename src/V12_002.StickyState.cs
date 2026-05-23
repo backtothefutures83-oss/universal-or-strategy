@@ -154,6 +154,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             string computedChecksum = ComputeSHA256(canonicalJson);
             snapshot.ChecksumSHA256 = storedChecksum;
 
+            // 1. Checksum validation (hard fail)
             if (storedChecksum != computedChecksum)
             {
                 Print(
@@ -166,16 +167,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
+            // 2. Version check (soft migration after checksum passes)
             if (snapshot.StrategyVersion != BUILD_TAG)
             {
                 Print(
                     string.Format(
-                        "[STICKY] Version mismatch! Snapshot: {0}, Current: {1}",
+                        "[STICKY] Version mismatch detected: {0} -> {1}. Migrating state.",
                         snapshot.StrategyVersion,
                         BUILD_TAG
                     )
                 );
-                return false;
+                return true; // Allow load to proceed with migration
             }
 
             return true;

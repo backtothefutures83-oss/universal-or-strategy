@@ -163,7 +163,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // Phase 6 [MG-D1]: MetadataGuard -- reject duplicate dispatch signals.
             // Composite fingerprint prevents the same trade from dispatching twice within 10s.
-            string dispatchSig = string.Format("SD_{0}_{1}_{2}_{3:F2}", tradeType, action, quantity, entryPrice);
+            string dispatchSig = LogBuffer.Format("SD_{0}_{1}_{2}_{3:F2}", tradeType, action, quantity, entryPrice);
             if (!MetadataGuardDuplicate(dispatchSig, "SmartDispatch"))
             {
                 Print("[DISPATCH] (!) Duplicate dispatch rejected by MetadataGuard");
@@ -186,7 +186,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             tLoopStartTicks = sw.ElapsedTicks;
             dispatchLog = new StringBuilder(512);
             dispatchLog.AppendLine(
-                string.Format(
+                LogBuffer.Format(
                     "[LATENCY] Loop start at {0:F3} ms from entry",
                     (tLoopStartTicks - t0Ticks) * 1000.0 / Stopwatch.Frequency
                 )
@@ -383,10 +383,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             report.AppendLine("|  TIMING SUMMARY                                              |");
             report.AppendLine("+--------------------------------------------------------------+");
             report.AppendLine(
-                string.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs)
+                LogBuffer.Format("|  Setup Phase:  {0,8:F3} ms  |  Fleet Loop:  {1,8:F3} ms       |", setupMs, loopMs)
             );
             report.AppendLine(
-                string.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs)
+                LogBuffer.Format("|  Total Elapsed: {0,8:F3} ms                                  |", totalMs)
             );
             report.AppendLine("+==============================================================+");
             Print(report.ToString().TrimEnd());
@@ -520,7 +520,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (OverflowException)
             {
                 Print(
-                    string.Format(
+                    LogBuffer.Format(
                         "[923A-OVF] SIMA parity overflow qty={0} x mult={1} -- clamping to maxContracts ({2})",
                         quantity,
                         FleetParityMultiplier,
@@ -663,7 +663,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (targetPrice <= 0)
                 {
                     dispatchLog.AppendLine(
-                        string.Format(
+                        LogBuffer.Format(
                             "[SIMA TARGET_SKIP] T{0} for {1} has qty={2} but invalid price={3:F2}; skipped",
                             targetNum,
                             fleetEntryName,
@@ -864,10 +864,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             registeredForCleanup = false;
 
             dispatchLog.AppendLine(
-                string.Format("  QUEUE | {0,-28} | Market+{1}orders | PENDING", acct.Name, ordersToSubmit.Count)
+                LogBuffer.Format("  QUEUE | {0,-28} | Market+{1}orders | PENDING", acct.Name, ordersToSubmit.Count)
             );
             dispatchLog.AppendLine(
-                string.Format(
+                LogBuffer.Format(
                     "[SIMA STOP_AUDIT] QUEUED {0}: StopQty={1} NonRunnerLimits={2} RunnerQty={3}",
                     fleetEntryName,
                     fleetPos.TotalContracts,
@@ -1017,7 +1017,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             reservedDelta = 0;
             registeredForCleanup = false;
 
-            dispatchLog.AppendLine(string.Format("  QUEUE | {0,-28} | Limit        | PENDING", acct.Name));
+            dispatchLog.AppendLine(LogBuffer.Format("  QUEUE | {0,-28} | Limit        | PENDING", acct.Name));
         }
 
         /// <summary>
@@ -1046,7 +1046,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (Interlocked.CompareExchange(ref _reaperCircuitBreakerTripped, 1, 0) == 0)
                     {
                         Print(
-                            string.Format(
+                            LogBuffer.Format(
                                 "[REAPER][CIRCUIT_BREAKER] TRIPPED: Queue depth={0} exceeds threshold={1} -- rejecting dispatch",
                                 currentCount,
                                 REAPER_MAX_PENDING_DISPATCHES

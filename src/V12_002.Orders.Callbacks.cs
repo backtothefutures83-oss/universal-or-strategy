@@ -306,7 +306,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         pos.EntryFilled = true;
                         pos.InitialTargetCount = activeTargetCount;
                         Print(
-                            string.Format(
+                            LogBuffer.Format(
                                 "[PRICE_GUARD] CRITICAL: averageFillPrice=0 for {0}. Keeping intended price {1:F2}. NOT re-anchoring.",
                                 kvp.Key,
                                 pos.EntryPrice
@@ -338,7 +338,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ApplyTargetLadderGuard(pos);
 
                     Print(
-                        string.Format(
+                        LogBuffer.Format(
                             "{0} ENTRY FILLED: {1} {2} @ {3:F2}",
                             pos.IsRMATrade ? "RMA" : "OR",
                             pos.Direction,
@@ -384,7 +384,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                 out int rem
                             );
                             Print(
-                                string.Format(
+                                LogBuffer.Format(
                                     "T{0} FILLED ({1}): {2} contracts @ {3:F2} | Remaining: {4}",
                                     tNum,
                                     kvp.Key,
@@ -412,7 +412,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
                         Print(
-                            string.Format(
+                            LogBuffer.Format(
                                 "STOP FILLED: {0} contracts @ {1:F2}",
                                 kvp.Value.RemainingContracts,
                                 averageFillPrice
@@ -427,7 +427,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (activePositions.TryGetValue(entryName, out var pos))
                 {
                     Print(
-                        string.Format(
+                        LogBuffer.Format(
                             "STOP FILLED (by name): {0} contracts @ {1:F2}",
                             pos.RemainingContracts,
                             averageFillPrice
@@ -467,7 +467,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool HandleOrderRejected(Order order, string nativeError)
         {
             string orderName = order.Name;
-            Print(string.Format("ORDER REJECTED: {0} | Error: {1}", orderName, nativeError));
+            Print(LogBuffer.Format("ORDER REJECTED: {0} | Error: {1}", orderName, nativeError));
 
             // T04: Single snapshot for both stop and entry rejection paths
             var snapshot = activePositions.ToArray();
@@ -480,7 +480,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         continue;
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
-                        Print(string.Format("(!) CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
+                        Print(LogBuffer.Format("(!) CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
                         stopOrders.TryRemove(kvp.Key, out _);
                         CreateNewStopOrder(
                             kvp.Key,
@@ -501,7 +501,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         continue;
                     if (entryOrders.TryGetValue(kvp.Key, out var eOrder) && eOrder == order && !kvp.Value.EntryFilled)
                     {
-                        Print(string.Format("[ZOMBIE-FIX] Entry REJECTED: {0}. Tearing down.", orderName));
+                        Print(LogBuffer.Format("[ZOMBIE-FIX] Entry REJECTED: {0}. Tearing down.", orderName));
                         RollbackExpectedPosition(kvp.Key, kvp.Value);
                         CleanupPosition(kvp.Key);
                         return true;
@@ -635,7 +635,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (newPrice > 0 && Math.Abs(newPrice - kvp.Value.EntryPrice) > tickSize * 0.5)
                         {
                             kvp.Value.EntryPrice = newPrice;
-                            Print(string.Format("V12: Entry order MOVED: {0} to {1:F2}", kvp.Key, newPrice));
+                            Print(LogBuffer.Format("V12: Entry order MOVED: {0} to {1:F2}", kvp.Key, newPrice));
                         }
                         int _totalContracts;
                         _totalContracts = kvp.Value.TotalContracts;
@@ -651,7 +651,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             int expDelta = (kvp.Value.Direction == MarketPosition.Long) ? qtyDiff : -qtyDiff;
                             DeltaExpectedPositionLocked(ExpKey(fixAcct), expDelta);
                             Print(
-                                string.Format(
+                                LogBuffer.Format(
                                     "[937-FIX] expectedPositions adjusted on qty change: {0} delta={1}",
                                     fixAcct,
                                     expDelta
