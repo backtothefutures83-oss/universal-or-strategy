@@ -1,0 +1,14 @@
+---
+description: Initiates a new mission by synchronizing with the V12 Nexus Blackboard. Loads architectural state, active epics, and mandatory DNA rules before execution.
+argument-hint: <mission-brief>
+---
+# NEXUS SYNC (/nexus:sync)
+
+**Target:** Blackboard State Synchronization
+
+When this command is invoked, you MUST immediately perform the following steps before answering the user or writing code:
+
+1. **Load Protocol:** Acknowledge that you are operating under the **V12 Photon Kernel DNA** (No internal locks, 100% ASCII, lock-free Actor patterns).
+2. **Read State:** Implicitly read `docs/brain/V12-ROADMAP.md` and `docs/brain/nexus_a2a.json` (if present) to establish current epoch and active epics.
+3. **Acknowledge:** Output a brief status report confirming synchronization and your current identity/role for the mission.
+4. **Handoff:** Present a high-level execution plan based on the provided `<mission-brief>` and await Director approval.

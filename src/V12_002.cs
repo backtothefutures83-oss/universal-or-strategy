@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        public const string BUILD_TAG = "1111.010-epic5-perf"; // EPIC-5 Ticket 04: Order Array Pooling
+        public const string BUILD_TAG = "1111.011-epic6-testing"; // EPIC-6 Phase 1: Performance Lock-In (Automated Testing)
 
         public class UILiveTargetSnapshot
         {
@@ -250,6 +250,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // [EPIC-5-PERF T04] Order array pool for zero-allocation SIMA propagation
         private OrderArrayPool _orderArrayPool;
+
+        // [EPIC-5-PERF T06] Proximity tag cache for RMA sentinel draw object management
+        private readonly HashSet<string> _proxTagCache = new HashSet<string>();
+        private const int PROX_TAG_CACHE_LIMIT = 1000;
 
         // ADR-019: One-shot guard replacing the legacy CSV-header lock around file creation.
         // 0 = not yet ensured, 1 = header ensured (or file pre-existed). Reset to 0 on I/O failure
