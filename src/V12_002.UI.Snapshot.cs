@@ -215,36 +215,38 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
-                string mode = GetCurrentPanelMode();
-                double ema9Value = SafeEmaValue(ema9);
+                // Capture old snapshot for return to pool
+                UIStateSnapshot oldSnapshot = _uiSnapshot;
 
-                UIStateSnapshot snapshot = new UIStateSnapshot
-                {
-                    EmaValue = ema9Value,
-                    AtrValue = currentATR > 0 ? currentATR : 0,
-                    LastUpdateTicks = DateTime.UtcNow.Ticks,
-                    LastPrice = lastKnownPrice,
-                    Mode = mode,
-                    TargetCount = Math.Max(1, Math.Min(5, activeTargetCount)),
-                    IsRmaModeActive = isRMAModeActive,
-                    IsTrendRmaMode = isTrendRmaMode,
-                    IsRetestRmaMode = isRetestRmaMode,
-                    ConfigRevision = Volatile.Read(ref _uiConfigRevision),
-                    OrHigh = sessionHigh != double.MinValue ? sessionHigh : 0,
-                    OrLow = sessionLow != double.MaxValue ? sessionLow : 0,
-                    OrRange =
-                        (sessionHigh != double.MinValue && sessionLow != double.MaxValue)
-                            ? (sessionHigh - sessionLow)
-                            : 0,
-                    Ema9Value = ema9Value,
-                    Ema15Value = SafeEmaValue(ema15),
-                    Ema30Value = SafeEmaValue(ema30),
-                    Ema65Value = SafeEmaValue(ema65),
-                    Ema200Value = SafeEmaValue(ema200),
-                    Config = BuildUiConfigSnapshot(mode),
-                    Compliance = BuildUiComplianceSnapshot(),
-                    LivePosition = BuildUiLivePositionSnapshot(),
-                };
+                // Acquire snapshot from pool (zero allocation if pool has instances)
+                UIStateSnapshot snapshot = GetPooledSnapshot();
+
+                // Update nested objects IN-PLACE (zero allocation)
+                string mode = GetCurrentPanelMode();
+                UpdateConfigSnapshot(snapshot.Config, mode);
+                UpdateComplianceSnapshot(snapshot.Compliance);
+                UpdateLivePositionSnapshot(snapshot.LivePosition);
+
+                // Update primitive fields
+                snapshot.EmaValue = SafeEmaValue(ema9);
+                snapshot.AtrValue = currentATR > 0 ? currentATR : 0;
+                snapshot.LastUpdateTicks = DateTime.UtcNow.Ticks;
+                snapshot.LastPrice = lastKnownPrice;
+                snapshot.Mode = mode;
+                snapshot.TargetCount = Math.Max(1, Math.Min(5, activeTargetCount));
+                snapshot.IsRmaModeActive = isRMAModeActive;
+                snapshot.IsTrendRmaMode = isTrendRmaMode;
+                snapshot.IsRetestRmaMode = isRetestRmaMode;
+                snapshot.ConfigRevision = Volatile.Read(ref _uiConfigRevision);
+                snapshot.OrHigh = sessionHigh != double.MinValue ? sessionHigh : 0;
+                snapshot.OrLow = sessionLow != double.MaxValue ? sessionLow : 0;
+                snapshot.OrRange =
+                    (sessionHigh != double.MinValue && sessionLow != double.MaxValue) ? (sessionHigh - sessionLow) : 0;
+                snapshot.Ema9Value = snapshot.EmaValue;
+                snapshot.Ema15Value = SafeEmaValue(ema15);
+                snapshot.Ema30Value = SafeEmaValue(ema30);
+                snapshot.Ema65Value = SafeEmaValue(ema65);
+                snapshot.Ema200Value = SafeEmaValue(ema200);
 
                 snapshot.MasterMarketPosition =
                     snapshot.LivePosition != null && snapshot.LivePosition.HasLivePosition
@@ -252,7 +254,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         : (Position != null ? Position.MarketPosition : MarketPosition.Flat);
                 snapshot.StatusMessage = BuildUiStatusMessage(snapshot);
 
+                // Publish new snapshot
                 _uiSnapshot = snapshot;
+
+                // Return old snapshot to pool
+                if (oldSnapshot != null)
+                    ReturnPooledSnapshot(oldSnapshot);
             }
             finally
             {

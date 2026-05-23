@@ -465,7 +465,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void OnStateChangeDataLoaded()
         {
             // CRITICAL: Initialization sequence MUST be preserved exactly.
-            // Order: InstrumentConfig -> TargetConfig -> Indicators -> SessionLogging -> Services
+            // Order: InstrumentConfig -> TargetConfig -> Indicators -> SessionLogging -> Services -> SnapshotPool
             _dataLoadedComplete = false;
 
             string symbol = Instrument.MasterInstrument.Name;
@@ -474,6 +474,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             Init_Indicators();
             Init_SessionLogging(symbol);
             Init_Services(symbol);
+
+            // [EPIC-5-PERF T03] Pre-warm UI snapshot pool for zero-allocation publishing
+            PreWarmSnapshotPool();
 
             _dataLoadedComplete = true;
         }
