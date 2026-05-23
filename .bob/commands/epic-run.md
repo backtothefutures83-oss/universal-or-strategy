@@ -252,6 +252,7 @@ After the commit, immediately trigger the autonomous perfection gate:
 EPIC: $1
 TASK: Run /pr-loop <PR_NUMBER>
 GOAL: Drive the current branch to 100/100 PHS.
+NOTE: /pr-loop includes CI log extraction (Step 1.5) for ground truth verification.
 STOP when /pr-loop outputs [PHS-PERFECT].
 ```
 
@@ -289,6 +290,11 @@ Hand off this exact task:
 EPIC: $1
 TASK: Run /pr-loop <PR_NUMBER>
 GOAL: Drive the current branch to 100/100 PHS.
+NOTE: /pr-loop includes:
+  - Step 1: Bot Forensics (extract_pr_forensics.ps1)
+  - Step 1.5: CI Log Extraction (extract_ci_logs.ps1) - NEW
+  - Step 2: Local Repair
+  - Step 3: Global Push & Monitor
 STOP when /pr-loop outputs [PHS-PERFECT].
 ```
 

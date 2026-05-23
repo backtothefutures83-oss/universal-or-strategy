@@ -203,7 +203,20 @@ NOTE: Use -Fast to skip slow checks (complexity audit, dead code scan).
 Full validation: `powershell -File .\scripts\pre_push_validation.ps1`
 ```
 
-### Step 1: Local Integrity (Goal: 15/15)
+### Step 1: Bot Forensics (MANDATORY)
+Extract and categorize ALL bot findings:
+```
+powershell -File .\scripts\extract_pr_forensics.ps1 -PrNumber <PR_NUMBER>
+```
+
+### Step 1.5: CI Log Extraction (NEW - Phase 2)
+Extract actual CI failure logs (ground truth):
+```
+powershell -File .\scripts\extract_ci_logs.ps1 -PrNumber <PR_NUMBER>
+```
+**Critical**: Read CI logs BEFORE bot comments. Bots interpret; logs show truth.
+
+### Step 2: Local Integrity (Goal: 15/15)
 ... (continues with existing steps)
 ```
 
