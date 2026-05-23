@@ -35,93 +35,56 @@ This epic eliminates ALL heap allocations in V12's hot paths and hardens state/l
 ## EXECUTION ORDER
 
 ### Phase 1: Foundation (Days 1-5)
-```
-T01 (Baseline + Stopwatch Migration) [4 days]
-  ↓
-T01B (Thread Model Analysis) [1 day]
-```
-
-**Gate 1:** Baseline metrics established, ThreadStatic safety validated.
+- **T01** (Baseline + Stopwatch Migration)
+- **T01B** (Thread Model Analysis)
 
 ### Phase 2: Parallel Optimization & Hardening (Days 6-13)
-```
-T02 (String.Format) [2 days] ← depends on T01B
-T03 (UISnapshot Pool) [3 days]
-T04 (.ToArray()) [2 days]
-T05 (Order Pool) [1 day]
-T06 (MonitorRma) [2 days]
-T08 (StickyState Migration) [0.5 day]
-```
-
-**Gate 2:** All optimizations complete, build migration enabled, individual F5 gates passed.
+- **T02** (String.Format Fixes)
+- **T03** (UISnapshot Pool)
+- **T04** (.ToArray() Elimination)
+- **T05** (Order Pool)
+- **T06** (MonitorRma Refactor)
+- **T08** (StickyState Migration)
 
 ### Phase 3: Verification (Days 14-17)
-```
-T07 (Verification & Stress Testing) [2 days]
-```
-
-**Gate 3:** p99 <100μs validated, zero GC pauses confirmed.
+- **T07** (Verification & Stress Testing)
 
 ---
 
 ## TICKET DETAILS
 
+### T01: Baseline Instrumentation & Stopwatch Migration
+*Details in `ticket-01-latency-probe.md`*
+
+### T01B: Thread Model Analysis & ThreadStatic Validation
+*Details in `ticket-01B-thread-model.md`*
+
 ### T02: String.Format Elimination (LogBuffer)
-
 **Goal:** Replace all hot-path `string.Format()` with pre-allocated char[] buffers.
+- **DIRECTOR FIX**: Update FormatInternal to detect format specifiers (e.g., "{0:F2}") and return -1 to trigger fallback.
+- Replaced 57+ string.Format() calls.
+- Included ValidateThreadAffinity telemetry.
 
-**Scope:**
-1. Implement `LogBuffer` class (ThreadStatic based on T01B verdict).
-2. **DIRECTOR FIX**: Update FormatInternal to detect format specifiers (e.g., "{0:F2}") and return -1 to trigger a fallback to `string.Format`. This ensures correctness for prices while maintaining performance for simple indices.
-3. Add overflow counter (validation mitigation).
-4. Replace string.Format in 30+ instances across 7 files.
-5. Include `ValidateThreadAffinity` telemetry per T01B recommendation.
-6. Verify zero allocation via ETW trace for simple placeholders.
+### T03: UIStateSnapshot Object Pooling
+*Details in `ticket-03-ui-snapshot-pool-REVISED.md`*
 
-**Success Criteria:**
-- LogBuffer.Format returns correct strings (no literal "{1:F2}" in logs).
-- ETW trace shows zero allocations in LogBuffer.Format for simple placeholders.
+### T04: .ToArray() Elimination
+*Details in `ticket-04-toarray-elimination.md`*
 
----
+### T05: Order Array Pooling
+*Details in `ticket-05-order-array-pooling.md`*
+
+### T06: MonitorRmaProximity Refactoring
+*Details in `ticket-06-monitor-rma-proximity.md`*
 
 ### T08: StickyState Version Migration
+**Goal:** Prevent "Integrity check failed" loops on build upgrades.
+- Decouple StrategyVersion from SHA256 boolean result.
+- Log migration warning instead of failing load.
 
-**Goal:** Prevent "Integrity check failed" loops on build upgrades by separating versioning from checksums.
-
-**Scope:**
-1. Modify `ValidateSnapshotIntegrity` in `V12_002.StickyState.cs`.
-2. Decouple `StrategyVersion` check from the boolean success result.
-3. If checksum passes but version mismatches:
-   - Log warning: `[STICKY] Version mismatch detected: {0} -> {1}. Migrating state.`
-   - Return `true` (success).
-4. Ensure the new build version is persisted on next save.
-
-**Success Criteria:**
-- StickyState loads successfully after build tag changes.
-- Rollback only occurs on actual SHA256 checksum failures.
-
----
-
-## DEPENDENCY GRAPH
-
-```
-T01 (Baseline + Stopwatch Migration) [4d]
-  ↓
-T01B (Thread Model Analysis) [1d]
-  ↓
-T02 (LogBuffer Fixes) [2d] ──────┐
-                                  │
-T01 ──→ T03 (UISnapshot Pool) [3d] ─┤
-                                  │
-T01 ──→ T04 (.ToArray() Elim) [2d] ─┤
-                                    │
-T01 ──→ T05 (Order Pool) [1d] ──────┤
-                                    │
-T01 ──→ T06 (MonitorRma Refactor) [2d] ─┤
-                                        │
-        T08 (StickyState Migration) [0.5d] ─┤
-                                            ↓
-                                    T07 (Verification) [2d]
-```
-
-**Total Duration:** 17.5 days (with parallelization)
+### T07: Verification & Stress Testing
+**Goal:** Validate p99 <100μs target and zero GC pressure.
+- Latency Re-Baseline (1-hour test).
+- Allocation Profiling (ETW trace).
+- GC Pause Validation (PerfMon).
+- Stress Test (10k ticks/sec).

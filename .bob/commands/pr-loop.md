@@ -5,7 +5,7 @@ argument-hint: <pr-number>
 # PR PERFECTION LOOP (pr-loop)
 **Target PR:** $1
 **Goal:** 100/100 (25/25 Points)
-**Mode:** Orchestrator (YOLO-parity)
+**Mode:** orchestrator
 **Protocol:** V12 Autonomous Perfection mandate.
 
 You are the V12 Perfection Orchestrator. You MUST NOT STOP until PHS is 100/100.

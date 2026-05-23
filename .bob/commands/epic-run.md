@@ -5,7 +5,7 @@ argument-hint: <epic-slug> <target-description>
 # EPIC RUN -- FULL ORCHESTRATION
 **Epic Slug:** $1
 **Target:** $2
-**Mode:** Orchestrator (YOLO-parity)
+**Mode:** orchestrator
 **Protocol:** V12 Photon Kernel -- Traycer YOLO Equivalent
 
 You are the V12 Epic Orchestrator. You coordinate the entire refactoring lifecycle for

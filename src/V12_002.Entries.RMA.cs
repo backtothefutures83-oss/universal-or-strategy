@@ -379,6 +379,89 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region RMA Intelligence (Phase 9.2)
 
 
+        private void UpdateClosestApproach(PositionInfo pos, double distTicks)
+        {
+            // Phase 9.2: Initialize ClosestApproachTicks on first observation.
+            if (pos.ClosestApproachTicks <= 0)
+                pos.ClosestApproachTicks = double.MaxValue;
+
+            // Phase 9.2: Track closest approach as a monotonic minimum.
+            if (distTicks < pos.ClosestApproachTicks)
+                pos.ClosestApproachTicks = distTicks;
+        }
+
+        private void CheckProximityEntry(PositionInfo pos, string entryKey, double distTicks, double level)
+        {
+            if (!pos.WasInProximity)
+            {
+                pos.WasInProximity = true;
+                pos.ProximityProbeCount++;
+
+                // _proxTagCache enforcement (NEW)
+                string proxTag = "Prox_" + entryKey;
+                if (_proxTagCache.Count < PROX_TAG_CACHE_LIMIT)
+                {
+                    _proxTagCache.Add(proxTag);
+                    Draw.Dot(this, proxTag, true, 0, level, Brushes.Cyan);
+                }
+
+                Print(
+                    LogBuffer.Format(
+                        "[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
+                        pos.ProximityProbeCount,
+                        entryKey,
+                        distTicks,
+                        level
+                    )
+                );
+
+                SendResponseToRemote(string.Format("PROXIMITY_ENTRY|{0}|{1}", entryKey, distTicks.ToString("F1")));
+            }
+        }
+
+        private void CheckProximityExit(PositionInfo pos, string entryKey, Order order)
+        {
+            if (pos.WasInProximity)
+            {
+                // Exhaustion detection
+                if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
+                {
+                    Print(
+                        LogBuffer.Format(
+                            "[EXHAUSTION] {0} reached {1} probes. Cancelling RMA entry.",
+                            entryKey,
+                            pos.ProximityProbeCount
+                        )
+                    );
+
+                    CancelOrderSafe(order, pos);
+                    PlaySound(@"C:\Windows\Media\Windows Proximity Notification.wav");
+
+                    // Remove from cache
+                    string proxTagExhaust = "Prox_" + entryKey;
+                    _proxTagCache.Remove(proxTagExhaust);
+                    RemoveDrawObject(proxTagExhaust);
+
+                    return;
+                }
+
+                // Retreat logging
+                pos.WasInProximity = false;
+                Print(
+                    LogBuffer.Format(
+                        "[RETREAT] {0} retreated from proximity zone. Closest: {1:F1} ticks",
+                        entryKey,
+                        pos.ClosestApproachTicks
+                    )
+                );
+
+                // Cleanup
+                string proxTag = "Prox_" + entryKey;
+                _proxTagCache.Remove(proxTag);
+                RemoveDrawObject(proxTag);
+            }
+        }
+
         private void MonitorRmaProximity()
         {
             // [EPIC-5-PERF] Latency instrumentation
@@ -403,78 +486,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     double level = pos.EntryPrice;
                     double distTicks = Math.Abs(currentPrice - level) / tickSize;
 
-                    // Phase 9.2: Initialize ClosestApproachTicks on first observation.
-                    if (pos.ClosestApproachTicks <= 0)
-                        pos.ClosestApproachTicks = double.MaxValue;
-
-                    // Phase 9.2: Track closest approach as a monotonic minimum.
-                    if (distTicks < pos.ClosestApproachTicks)
-                        pos.ClosestApproachTicks = distTicks;
+                    UpdateClosestApproach(pos, distTicks);
 
                     if (distTicks <= RmaProximityTicks)
                     {
-                        if (!pos.WasInProximity)
-                        {
-                            pos.WasInProximity = true;
-                            pos.ProximityProbeCount++;
-                            Print(
-                                LogBuffer.Format(
-                                    "[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
-                                    pos.ProximityProbeCount,
-                                    kvp.Key,
-                                    distTicks,
-                                    level
-                                )
-                            );
-                        }
-
-                        // Visual feedback only. Draw state is not logic state.
-                        Draw.Dot(this, "Prox_" + kvp.Key, false, 0, level, Brushes.Cyan);
+                        CheckProximityEntry(pos, kvp.Key, distTicks, level);
                     }
                     else if (distTicks < RmaCancellationTicks)
                     {
-                        // Dead zone hysteresis. No state transition.
+                        // Dead zone hysteresis
                     }
                     else
                     {
-                        if (pos.WasInProximity)
-                        {
-                            pos.WasInProximity = false;
-
-                            if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
-                            {
-                                Print(
-                                    LogBuffer.Format(
-                                        "[SENTINEL] EXHAUSTION: {0} probed {1}x (max={2}), closest={3:F1}t. Cancelling.",
-                                        kvp.Key,
-                                        pos.ProximityProbeCount,
-                                        RmaMaxProbeCount,
-                                        pos.ClosestApproachTicks
-                                    )
-                                );
-                                CancelOrderSafe(order, pos);
-                                RemoveDrawObject("Prox_" + kvp.Key);
-                                SendResponseToRemote("SOUND|SENTINEL_EXHAUSTION_CANCEL");
-                            }
-                            else
-                            {
-                                Print(
-                                    LogBuffer.Format(
-                                        "[SENTINEL] Retreat for {0} (probe #{1}, closest={2:F1}t). Monitoring.",
-                                        kvp.Key,
-                                        pos.ProximityProbeCount,
-                                        pos.ClosestApproachTicks
-                                    )
-                                );
-                                RemoveDrawObject("Prox_" + kvp.Key);
-                                SendResponseToRemote("SOUND|SENTINEL_PROXIMITY_RETREAT");
-                            }
-                        }
-                        else
-                        {
-                            if (GetDrawObject("Prox_" + kvp.Key) != null)
-                                RemoveDrawObject("Prox_" + kvp.Key);
-                        }
+                        CheckProximityExit(pos, kvp.Key, order);
                     }
                 }
             }
