@@ -5,6 +5,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Optimize>true</Optimize>
     <LangVersion>latest</LangVersion>
+    <StartupObject>V12_Performance.Benchmarks.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>

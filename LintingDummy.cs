@@ -1,5 +1,5 @@
-// <copyright file="LintingDummy.cs" company="V12 Strategy">
-// Copyright (c) V12 Strategy. All rights reserved.
+// <copyright file="LintingDummy.cs" company="BMad">
+// Copyright (c) BMad. All rights reserved.
 // </copyright>
 
 namespace Linting
