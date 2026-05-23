@@ -1,0 +1,8 @@
+NinjaScript File,Error,Code,Line,Column,
+V12_002\Orders\Callbacks\Propagation.cs,Type 'V12_002' already defines a member called 'PropagateMaster_IdentifyMove' with the same parameter types,CS0111,472,22,
+V12_002\Orders\Callbacks\Propagation.cs,The call is ambiguous between the following methods or properties: 'V12_002.PropagateMaster_IdentifyMove(Order out string out bool out bool out bool out int)' and 'V12_002.PropagateMaster_IdentifyMove(Order out string out bool out bool out bool out int)',CS0121,52,22,
+V12_002\Orders\Callbacks\Propagation.cs,Since 'V12_002.PropagateMaster_IdentifyMove(Order out string out bool out bool out bool out int)' returns void a return keyword must not be followed by an object expression,CS0127,488,17,
+V12_002\Orders\Callbacks\Propagation.cs,Since 'V12_002.PropagateMaster_IdentifyMove(Order out string out bool out bool out bool out int)' returns void a return keyword must not be followed by an object expression,CS0127,492,17,
+V12_002\Orders\Callbacks\Propagation.cs,The name 'targetNum' does not exist in the current context,CS0103,500,25,
+V12_002\Orders\Callbacks\Propagation.cs,The name 'fleetEntryName' does not exist in the current context,CS0103,501,25,
+V12_002\Orders\Callbacks\Propagation.cs,The name 'ex' does not exist in the current context,CS0103,502,25,

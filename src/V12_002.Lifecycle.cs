@@ -449,6 +449,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             _executionIdRing = new ExecutionIdRing(512, 1024);
             _executionIdFallbackRing = new ExecutionIdRing(512, 1024);
 
+            // [EPIC-5-PERF T04] Initialize order array pool for zero-allocation SIMA propagation
+            _orderArrayPool = new OrderArrayPool();
+
             // V12.1: Initialize Compliance Hub -- create log directory early (idempotent).
             // Build 935 [Fix-2/3]: Symbol-specific log paths and LogicAudit moved to DataLoaded.
             string logsDirInit = System.IO.Path.Combine(
