@@ -1,3 +1,14 @@
+# Cursor IDE Rules
+
+**SCOPE:** This file applies ONLY to Cursor IDE, NOT to Bob CLI.
+
+**For Bob CLI rules, see:**
+- [AGENTS.md](AGENTS.md) - Primary source of truth
+- [.bob/PROTOCOL.md](.bob/PROTOCOL.md) - Bob-specific protocols
+- [.bob/rules/](.bob/rules/) - Bob rule files
+
+---
+
 # Cursor Rules: Universal OR Strategy V12
 
 **CRITICAL INSTRUCTION FOR CURSOR AI:**

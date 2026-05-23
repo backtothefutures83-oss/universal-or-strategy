@@ -268,35 +268,100 @@ If all complete: advance to PHASE 6: PR SUBMISSION & PERFECTION.
 
 ## PHASE 6: PR SUBMISSION & PERFECTION
 
+**CRITICAL:** Create TWO separate PRs following the PR Separation Protocol.
+
+### Step 6A: Categorize Changes
+
 **Switch to: Advanced mode**
 
 Hand off this exact task:
 ```
 EPIC: $1
-TASK: Submit PR and start /pr-loop
+TASK: Categorize changed files
 PROTOCOL:
-  1. git fetch origin main && git rebase origin/main
-  2. gh pr create --title "[$1] EPIC COMPLETE" --body "Automated PR for epic $1 implementation." --label "epic-run"
-  3. Extract the <PR_NUMBER> from the `gh pr create` output.
-  4. Emit: [PR-SUBMITTED] PR #<PR_NUMBER>
+  1. Run: git diff --name-only origin/main
+  2. Categorize files:
+     - src_files: Files matching src/**
+     - non_src_files: Files matching docs/, tests/, benchmarks/, scripts/, .github/, *.md
+  3. Report counts:
+     - src/ files: [N]
+     - non-src/ files: [M]
+  4. Emit: [FILES-CATEGORIZED] src=[N] non-src=[M]
 ```
 
-When Advanced mode outputs [PR-SUBMITTED] PR #<PR_NUMBER>:
+### Step 6B: Create src/ PR (if applicable)
 
-**Switch to: Orchestrator mode**
+**If src_files > 0, switch to: Advanced mode**
 
 Hand off this exact task:
 ```
 EPIC: $1
-TASK: Run /pr-loop <PR_NUMBER>
-GOAL: Drive the current branch to 100/100 PHS.
-NOTE: /pr-loop includes:
-  - Step 1: Bot Forensics (extract_pr_forensics.ps1)
-  - Step 1.5: CI Log Extraction (extract_ci_logs.ps1) - NEW
-  - Step 2: Local Repair
-  - Step 3: Global Push & Monitor
-STOP when /pr-loop outputs [PHS-PERFECT].
+TASK: Create src-only PR
+PROTOCOL:
+  1. git fetch origin main && git rebase origin/main
+  2. git add src/
+  3. gh pr create --title "[$1] src/ changes" --body "Production code changes for epic $1." --label "src-only,epic-run"
+  4. Extract <PR_NUMBER> from output
+  5. Emit: [SRC-PR-SUBMITTED] PR #<PR_NUMBER>
 ```
+
+**Verification:**
+```bash
+powershell -File .\scripts\verify_pr_separation.ps1 -PrNumber <PR_NUMBER>
+```
+
+Expected: `[PASS] PR contains ONLY src/ files`
+
+### Step 6C: Create non-src/ PR (if applicable)
+
+**If non_src_files > 0, switch to: Advanced mode**
+
+Hand off this exact task:
+```
+EPIC: $1
+TASK: Create non-src-only PR
+PROTOCOL:
+  1. git add docs/ tests/ benchmarks/ scripts/ .github/ *.md
+  2. gh pr create --title "[$1] non-src/ changes" --body "Documentation, tests, and workflow changes for epic $1." --label "non-src-only,epic-run"
+  3. Extract <PR_NUMBER> from output
+  4. Emit: [NON-SRC-PR-SUBMITTED] PR #<PR_NUMBER>
+```
+
+**Verification:**
+```bash
+powershell -File .\scripts\verify_pr_separation.ps1 -PrNumber <PR_NUMBER>
+```
+
+Expected: `[PASS] PR contains ONLY non-src/ files`
+
+### Step 6D: PR Loop for src/ PR
+
+**If src/ PR was created, switch to: Orchestrator mode**
+
+Hand off this exact task:
+```
+EPIC: $1
+TASK: Run /pr-loop <SRC_PR_NUMBER>
+GOAL: Drive src/ PR to 100/100 PHS
+NOTE: Full bot audit required for src/ changes
+STOP when /pr-loop outputs [PHS-PERFECT]
+```
+
+### Step 6E: Fast-Track non-src/ PR
+
+**If non-src/ PR was created, switch to: Advanced mode**
+
+Hand off this exact task:
+```
+EPIC: $1
+TASK: Fast-track merge non-src/ PR
+PROTOCOL:
+  1. Verify basic CI passes
+  2. gh pr merge <NON_SRC_PR_NUMBER> --squash --auto
+  3. Emit: [NON-SRC-MERGED] PR #<NON_SRC_PR_NUMBER>
+```
+
+**Note:** Non-src/ PRs skip bot audit and use fast-track merge.
 
 ---
 
