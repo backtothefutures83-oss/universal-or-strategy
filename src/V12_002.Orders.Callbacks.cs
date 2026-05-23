@@ -126,8 +126,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (dict == null || order == null)
                 return false;
-            foreach (var kvp in dict.ToArray())
+            // [EPIC-5-PERF-T02] Single snapshot allocation at method start
+            var snapshot = dict.ToArray();
+            foreach (var kvp in snapshot)
             {
+                // Re-check existence (mutation safety)
+                if (!dict.ContainsKey(kvp.Key))
+                    continue;
                 if (kvp.Value == order)
                 {
                     dict.TryRemove(kvp.Key, out _);
@@ -266,7 +271,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime time
         )
         {
-            foreach (var kvp in activePositions.ToArray())
+            // [EPIC-5-PERF-T02] Single snapshot allocation at method start
+            var snapshot = activePositions.ToArray();
+            foreach (var kvp in snapshot)
             {
                 if (!activePositions.ContainsKey(kvp.Key))
                     continue;
@@ -350,14 +357,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             string orderName = order.Name;
 
+            // [EPIC-5-PERF-T02] Single snapshot allocation at method start
+            var snapshot = activePositions.ToArray();
+
             // Targets 1-5
             for (int tNum = 1; tNum <= 5; tNum++)
             {
                 var tDict = GetTargetOrdersDictionary(tNum);
                 if (tDict != null && tDict.Values.Contains(order))
                 {
-                    foreach (var kvp in activePositions.ToArray())
+                    foreach (var kvp in snapshot)
                     {
+                        // Re-check existence (mutation safety)
+                        if (!activePositions.ContainsKey(kvp.Key))
+                            continue;
                         if (tDict.TryGetValue(kvp.Key, out var tOrder) && tOrder == order)
                         {
                             PositionInfo pos = kvp.Value;
@@ -391,8 +404,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Stop filled
             if (orderName.StartsWith("Stop_") || orderName.StartsWith("S_"))
             {
-                foreach (var kvp in activePositions.ToArray())
+                foreach (var kvp in snapshot)
                 {
+                    // Re-check existence (mutation safety)
+                    if (!activePositions.ContainsKey(kvp.Key))
+                        continue;
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
                         Print(
@@ -453,10 +469,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             string orderName = order.Name;
             Print(string.Format("ORDER REJECTED: {0} | Error: {1}", orderName, nativeError));
 
+            // T04: Single snapshot for both stop and entry rejection paths
+            var snapshot = activePositions.ToArray();
+
             if (stopOrders.Values.Contains(order))
             {
-                foreach (var kvp in activePositions.ToArray())
+                foreach (var kvp in snapshot)
                 {
+                    if (!activePositions.ContainsKey(kvp.Key))
+                        continue;
                     if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                     {
                         Print(string.Format("(!) CRITICAL: Stop REJECTED for {0}. Re-submitting...", kvp.Key));
@@ -474,8 +495,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (entryOrders.Values.Contains(order))
             {
-                foreach (var kvp in activePositions.ToArray())
+                foreach (var kvp in snapshot)
                 {
+                    if (!activePositions.ContainsKey(kvp.Key))
+                        continue;
                     if (entryOrders.TryGetValue(kvp.Key, out var eOrder) && eOrder == order && !kvp.Value.EntryFilled)
                     {
                         Print(string.Format("[ZOMBIE-FIX] Entry REJECTED: {0}. Tearing down.", orderName));
