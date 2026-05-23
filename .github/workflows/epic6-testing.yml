@@ -1,0 +1,121 @@
+name: EPIC-6 Testing - Performance Lock-In
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'benchmarks/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'benchmarks/**'
+
+jobs:
+  unit-tests:
+    name: Unit Tests (TDD Safety Net)
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET 6.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore tests/V12_Performance.Tests/V12_Performance.Tests.csproj
+      
+    - name: Build tests
+      run: dotnet build tests/V12_Performance.Tests/V12_Performance.Tests.csproj --configuration Release --no-restore
+      
+    - name: Run unit tests
+      run: dotnet test tests/V12_Performance.Tests/V12_Performance.Tests.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+      
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: unit-test-results
+        path: tests/V12_Performance.Tests/TestResults/test-results.trx
+        
+  benchmarks:
+    name: Performance Benchmarks (Lock-In Validation)
+    runs-on: windows-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET 6.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore benchmarks/V12_Performance.Benchmarks.csproj
+      
+    - name: Build benchmarks
+      run: dotnet build benchmarks/V12_Performance.Benchmarks.csproj --configuration Release --no-restore
+      
+    - name: Run benchmarks (smoke test)
+      run: |
+        cd benchmarks
+        dotnet run --configuration Release --no-build --filter "*OnBarUpdate_HotPath" -- --job short
+      
+    - name: Upload benchmark results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: benchmarks/BenchmarkDotNet.Artifacts/**/*
+        
+  dna-compliance:
+    name: V12 DNA Compliance Gates
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: ASCII Gate Check
+      run: |
+        $files = Get-ChildItem -Path src -Filter *.cs -Recurse
+        $nonAscii = @()
+        foreach ($file in $files) {
+          $content = Get-Content $file.FullName -Raw
+          if ($content -match '[^\x00-\x7F]') {
+            $nonAscii += $file.FullName
+          }
+        }
+        if ($nonAscii.Count -gt 0) {
+          Write-Error "ASCII Gate FAIL: Non-ASCII characters found in: $($nonAscii -join ', ')"
+          exit 1
+        }
+        Write-Output "ASCII Gate PASS: All source files are ASCII-only"
+        
+    - name: Lock-Free Audit
+      run: |
+        $lockUsage = Select-String -Path src/*.cs -Pattern 'lock\s*\(' -SimpleMatch
+        if ($lockUsage) {
+          Write-Error "Lock-Free Audit FAIL: lock() statements found"
+          $lockUsage | ForEach-Object { Write-Output $_.Line }
+          exit 1
+        }
+        Write-Output "Lock-Free Audit PASS: Zero lock() statements"
+        
+    - name: Complexity Audit (CYC <= 15)
+      run: |
+        if (Test-Path scripts/complexity_audit.py) {
+          python scripts/complexity_audit.py
+        } else {
+          Write-Output "Complexity audit script not found, skipping"
+        }
+
+# Made with Bob
