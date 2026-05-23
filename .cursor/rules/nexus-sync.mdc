@@ -1,5 +1,6 @@
 ---
 description: Initiates a new mission by synchronizing with the V12 Nexus Blackboard. Loads architectural state, active epics, and mandatory DNA rules before execution.
+alwaysApply: true
 ---
 # NEXUS SYNC (/nexus:sync)
 

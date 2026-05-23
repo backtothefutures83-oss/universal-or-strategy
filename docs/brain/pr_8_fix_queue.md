@@ -1,5 +1,5 @@
 ﻿# PR #8 Fix Queue
-Generated: 2026-05-23 12:23:32
+Generated: 2026-05-23 13:44:20
 
 ## Instructions for v12-engineer
 
@@ -7,73 +7,175 @@ Process these issues in priority order. Mark each as FIXED after applying the fi
 
 ### Fix #1 - [P0] CRITICAL
 [x] **Bot:** coderabbitai
-[x] **File:** N/A (Walkthrough comment)
-[x] **Issue:** Auto-generated walkthrough comment - no action required
+[x] **File:** pr_8_raw.json
+[x] **Issue:** **Actionable comments posted: 17** - FIXED: Removed pr_8_raw.json from repository
 
-**Status:** FIXED - No actionable items in walkthrough comment
+> [!CAUTION]
+> Some comments are outside the diff and canÔÇÖt be posted inline due to platform limitations.
+> 
+> 
+> 
+> <details>
+> <summary>ÔÜá´©Å Outside diff rang...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
 ### Fix #2 - [P0] CRITICAL
 [x] **Bot:** coderabbitai
-[x] **File:** .bob/commands/nexus-sync.md
-[x] **Issue:** Missing argument-hint in YAML frontmatter
+[x] **File:** .cursor/rules/nexus-sync.mdc
+[x] **Issue:** **Actionable comments posted: 7** - FIXED: Added alwaysApply: true to frontmatter
 
-**Status:** FIXED - Verified argument-hint already present at line 3
+<details>
+<summary>­ƒñû Prompt for all review comments with AI agents</summary>
+
+```
+Verify each finding against current code. Fix only still-valid issues, skip the
+...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
 ### Fix #3 - [P0] CRITICAL
 [x] **Bot:** amazon-q-developer
 [x] **File:** .github/workflows/epic6-testing.yml
-[x] **Issue:** Lock-Free Audit regex pattern broken (only scans src/*.cs, not subdirectories)
+[x] **Issue:** ## Review Summary - FIXED: Corrected Lock-Free Audit regex to use Get-ChildItem
 
-**Status:** FIXED - Changed to `Select-String -Path src/**/*.cs -Pattern 'lock\s*\(' -Recurse`
+This PR adds EPIC-6 documentation and testing infrastructure. The changes are primarily documentation (nexus-sync command definitions, testing guides) with a new CI/CD workflow and ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
 ### Fix #4 - [P1] REVIEW
-[x] **Bot:** codacy-production
-[x] **File:** src/V12_002.cs
-[x] **Issue:** Unused production fields (_proxTagCache, PROX_TAG_CACHE_LIMIT)
+[ ] **Bot:** codacy-production  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ### Pull Request Overview
 
-**Status:** FIXED - Removed unused fields (lines 255-256)
+This PR presents a significant misalignment between its stated intent and the actual changes provided. Although the title and description claim a 'documentation-only' update...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
 ### Fix #5 - [P1] REVIEW
-[N/A] **Bot:** gemini-code-assist
-[N/A] **File:** General review
-[N/A] **Issue:** General positive review of testing infrastructure
+[ ] **Bot:** gemini-code-assist  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## Code Review
 
-**Status:** NO ACTION REQUIRED - Positive review with no specific issues
+This pull request establishes the automated testing infrastructure for EPIC-6, aiming to lock in performance gains from previous epics. It introduces a two-tier testing strategy using ...
 
----
-
-### Fix #6 - [P1] REVIEW
-[x] **Bot:** sourcery-ai
-[x] **File:** src/V12_002.cs + .github/workflows/epic6-testing.yml
-[x] **Issue:** Unused fields + Lock-Free Audit scope gap
-
-**Status:** FIXED - Both issues addressed in Fix #3 and Fix #4
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-### Fix #7 - [P1] SECURITY
-[N/A] **Bot:** pr-insights-tagger
-[N/A] **File:** General risk assessment
-[N/A] **Issue:** High risk rating due to workflow changes
+### Fix #6 - [P1] SECURITY
+[ ] **Bot:** pr-insights-tagger  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## PR Analysis Summary
 
-**Status:** MITIGATED - Technical issues fixed, risk reduced to acceptable level
+<div align="center">
+
+<!-- Badges for GitHub web view -->
+![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290265
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-### Fix #8 - [P2] PERFORMANCE
-[N/A] **Bot:** sourcery-ai
-[N/A] **File:** General review guide
-[N/A] **Issue:** Reviewer's guide with sequence diagram
+### Fix #7 - [P1] REVIEW
+[ ] **Bot:** sourcery-ai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** Hey - I've found 3 issues, and left some high level feedback:
 
-**Status:** NO ACTION REQUIRED - Informational only
+- The newly added `_proxTagCache` and `PROX_TAG_CACHE_LIMIT` in `V12_002` are currently unused; consider either wiring them into the RMA ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #8 - [P1] SECURITY
+[ ] **Bot:** pr-insights-tagger  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## PR Analysis Summary
+
+<div align="center">
+
+<!-- Badges for GitHub web view -->
+![Risk Level](https://img.shields.io/badge/Risk-HIGH-red?style=flat-square) ![Complexity](https://img.shields.io/badge...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526342519
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #9 - [P2] PERFORMANCE
+[ ] **Bot:** codacy-production  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## Not up to standards Ôøö
+<details><summary><strong>­ƒö┤ Issues</strong>  <code>1 high ┬À 48 medium ┬À 8 minor</code></summary>
+
+> <br/>
+>
+> 
+> **Alerts:**
+> ÔÜá 57 issues (Ôëñ 0 issues of at least m...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290709
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #10 - [P2] PERFORMANCE
+[ ] **Bot:** sourcery-ai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** <!-- Generated by sourcery-ai[bot]: start review_guide -->
+
+## Reviewer's Guide
+
+EPIC-6 updates the V12 build tag, adds a GitHub Actions CI workflow for EPIC-6 testing, and introduces an extensive set...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/mdasdispatch-hash/universal-or-strategy/pull/8#issuecomment-4526290310
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
