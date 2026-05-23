@@ -7,6 +7,8 @@ lang_version = "8.0"
 
 exclude_patterns = [
     "docs/**",
+    "tests/**",
+    "benchmarks/**",
     ".github/**",
     "scripts/**",
     "**/*.md",
@@ -25,7 +27,7 @@ exclude_patterns = [
     ".antigravitycli/**",
     "Traycerrefactor/**",
     "artifacts/**",
-    "benchmarks/**",
+    "conductor/**",
     "src/V12_002.UI.*.cs",
     "src/V12_002.StickyState.cs",
     "src/V12_002.SIMA.*.cs"

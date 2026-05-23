@@ -12,6 +12,10 @@
 # - Code (SAST): Custom V12 DNA rules + C# best practices
 # - Secrets: Credential leak detection
 # - Supply Chain: Vulnerable dependency detection
+#
+# SCOPE RESTRICTION: This config scans src/ directory only.
+# Run with: semgrep --config .semgrep.yml src/
+# GitHub App is configured via Semgrep Cloud to scan src/ only.
 
 rules:
   # ==========================================================================

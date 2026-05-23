@@ -1,0 +1,20 @@
+# Sourcery Configuration for V12 Universal OR Strategy
+# Created: 2026-05-23
+# Purpose: Restrict Sourcery analysis to src/ directory only
+# Documentation: https://docs.sourcery.ai/
+
+# Ignore non-src directories
+ignore:
+  - "tests/**"
+  - "benchmarks/**"
+  - "docs/**"
+  - "scripts/**"
+  - ".github/**"
+  - "conductor/**"
+  - "Traycerrefactor/**"
+  - ".bob/**"
+  - ".codex/**"
+  - ".cursor/**"
+  - ".vscode/**"
+
+# Made with Bob

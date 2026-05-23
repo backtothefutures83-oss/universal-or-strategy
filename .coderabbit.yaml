@@ -24,10 +24,13 @@ reviews:
   
   path_filters:
     - "!docs/**"
+    - "!tests/**"
+    - "!benchmarks/**"
     - "!scripts/**"
     - "!.github/**"
     - "!conductor/**"
     - "!Traycerrefactor/**"
+    - "src/**"
 
 chat:
   auto_reply: true
