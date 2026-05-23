@@ -102,7 +102,7 @@ jobs:
         
     - name: Lock-Free Audit
       run: |
-        $lockUsage = Select-String -Path src/*.cs -Pattern 'lock\s*\(' -SimpleMatch
+        $lockUsage = Select-String -Path src/**/*.cs -Pattern 'lock\s*\(' -Recurse
         if ($lockUsage) {
           Write-Error "Lock-Free Audit FAIL: lock() statements found"
           $lockUsage | ForEach-Object { Write-Output $_.Line }
