@@ -117,40 +117,42 @@ namespace SpscBench
         }
     }
 
-    class Program
-    {
-        static void Main()
-        {
-            try
-            {
-                var ring = new SpscRingV148(1024);
-                const int warmUp = 100_000;
-                const int iterations = 5_000_000;
-
-                // Warm-up
-                for (int i = 0; i < warmUp; i++)
-                {
-                    ring.TryEnqueue(i);
-                    ring.TryDequeue(out _);
-                }
-
-                var sw = Stopwatch.StartNew();
-                for (int i = 0; i < iterations; i++)
-                {
-                    if (!ring.TryEnqueue(i))
-                        throw new Exception("Enqueue failed");
-                    if (!ring.TryDequeue(out _))
-                        throw new Exception("Dequeue failed");
-                }
-                sw.Stop();
-
-                double mean = sw.Elapsed.TotalMilliseconds * 1000000.0 / iterations;
-                Console.WriteLine($"| RoundTrip | {mean:F3} ns | 0 B |");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("ERROR: " + ex.Message);
-            }
-        }
-    }
+    // NOTE: Main() commented out to avoid CS0017 (multiple entry points)
+    // Use benchmarks/Program.cs as the BenchmarkDotNet entry point instead
+    // class Program
+    // {
+    //     static void Main()
+    //     {
+    //         try
+    //         {
+    //             var ring = new SpscRingV148(1024);
+    //             const int warmUp = 100_000;
+    //             const int iterations = 5_000_000;
+    //
+    //             // Warm-up
+    //             for (int i = 0; i < warmUp; i++)
+    //             {
+    //                 ring.TryEnqueue(i);
+    //                 ring.TryDequeue(out _);
+    //             }
+    //
+    //             var sw = Stopwatch.StartNew();
+    //             for (int i = 0; i < iterations; i++)
+    //             {
+    //                 if (!ring.TryEnqueue(i))
+    //                     throw new Exception("Enqueue failed");
+    //                 if (!ring.TryDequeue(out _))
+    //                     throw new Exception("Dequeue failed");
+    //             }
+    //             sw.Stop();
+    //
+    //             double mean = sw.Elapsed.TotalMilliseconds * 1000000.0 / iterations;
+    //             Console.WriteLine($"| RoundTrip | {mean:F3} ns | 0 B |");
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Console.WriteLine("ERROR: " + ex.Message);
+    //         }
+    //     }
+    // }
 }
