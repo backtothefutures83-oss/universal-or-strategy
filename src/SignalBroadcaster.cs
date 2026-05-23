@@ -17,22 +17,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         public class TradeSignal
         {
             public string SignalId { get; set; }
-            public string Instrument { get; set; }        // V7.1: For instrument filtering
+            public string Instrument { get; set; } // V7.1: For instrument filtering
             public MarketPosition Direction { get; set; }
             public double EntryPrice { get; set; }
             public double StopPrice { get; set; }
             public double Target1Price { get; set; }
             public double Target2Price { get; set; }
-            public double Target3Price { get; set; }      // V8: T3 price
+            public double Target3Price { get; set; } // V8: T3 price
             public int T1Contracts { get; set; }
             public int T2Contracts { get; set; }
             public int T3Contracts { get; set; }
-            public int T4Contracts { get; set; }          // V8: Runner contracts
+            public int T4Contracts { get; set; } // V8: Runner contracts
             public bool IsRMA { get; set; }
             public DateTime Timestamp { get; set; }
-            public double SessionRange { get; set; }  // For reference
-            public double CurrentATR { get; set; }    // For RMA trades
-            
+            public double SessionRange { get; set; } // For reference
+            public double CurrentATR { get; set; } // For RMA trades
+
             // V8: Trail settings so slave can use master's configuration
             public double BeTrigger { get; set; }
             public double BeOffset { get; set; }
@@ -51,7 +51,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             public string SignalId { get; set; }
             public double NewStopPrice { get; set; }
-            public int TrailLevel { get; set; }  // BE=0, 1=Trail1, 2=Trail2, 3=Trail3
+            public int TrailLevel { get; set; } // BE=0, 1=Trail1, 2=Trail2, 3=Trail3
             public DateTime Timestamp { get; set; }
         }
 
@@ -61,9 +61,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public class StopUpdateSignal
         {
-            public string TradeId { get; set; }        // Links to original entry
-            public double NewStopPrice { get; set; }   // Master's new stop price
-            public string StopLevel { get; set; }      // "BE", "T1", "T2", "T3" for logging
+            public string TradeId { get; set; } // Links to original entry
+            public double NewStopPrice { get; set; } // Master's new stop price
+            public string StopLevel { get; set; } // "BE", "T1", "T2", "T3" for logging
             public DateTime Timestamp { get; set; }
         }
 
@@ -73,8 +73,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public class EntryUpdateSignal
         {
-            public string TradeId { get; set; }        // Links to original entry
-            public double NewEntryPrice { get; set; }  // Master's new entry price
+            public string TradeId { get; set; } // Links to original entry
+            public double NewEntryPrice { get; set; } // Master's new entry price
             public DateTime Timestamp { get; set; }
         }
 
@@ -84,8 +84,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public class OrderCancelSignal
         {
-            public string TradeId { get; set; }        // Links to original entry
-            public string Reason { get; set; }         // Why cancelled
+            public string TradeId { get; set; } // Links to original entry
+            public string Reason { get; set; } // Why cancelled
             public DateTime Timestamp { get; set; }
         }
 
@@ -95,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public class TargetActionSignal
         {
             public string SignalId { get; set; }
-            public TargetType Target { get; set; }  // T1, T2, or Runner
+            public TargetType Target { get; set; } // T1, T2, or Runner
             public TargetAction Action { get; set; }
             public DateTime Timestamp { get; set; }
         }
@@ -104,7 +104,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             T1,
             T2,
-            Runner
+            Runner,
         }
 
         public enum TargetAction
@@ -112,7 +112,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             FillAtMarket,
             MoveToBreakeven,
             MoveStopToEntry,
-            CancelTarget
+            CancelTarget,
         }
 
         /// <summary>
@@ -129,7 +129,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public class BreakevenSignal
         {
-            public string SignalId { get; set; }  // Empty = all positions
+            public string SignalId { get; set; } // Empty = all positions
             public DateTime Timestamp { get; set; }
         }
 
@@ -205,8 +205,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private static void SafeInvoke<T>(EventHandler<T> handler, T args)
         {
-            if (handler == null) return;
-            var sw = System.Diagnostics.Stopwatch.StartNew();
+            if (handler == null)
+                return;
+            var probe = LatencyProbe.Start();
             var invocationList = handler.GetInvocationList();
 
             foreach (Delegate d in invocationList)
@@ -220,12 +221,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Swallow -- subscriber isolation; don't break fan-out for other listeners
                 }
             }
-            sw.Stop();
+            probe = probe.Stop();
             // Log only if fan-out takes > 1ms to keep the output clean
-            if (sw.Elapsed.TotalMilliseconds > 1.0)
+            long micros = probe.ElapsedMicroseconds;
+            if (micros > 1000)
             {
-                NinjaTrader.Code.Output.Process(string.Format("[LATENCY_FANOUT] {0}: {1:F2}ms across {2} subscribers", 
-                    typeof(T).Name, sw.Elapsed.TotalMilliseconds, invocationList.Length), PrintTo.OutputTab1);
+                NinjaTrader.Code.Output.Process(
+                    string.Format(
+                        "[LATENCY_FANOUT] {0}: {1:F2}ms across {2} subscribers",
+                        typeof(T).Name,
+                        micros / 1000.0,
+                        invocationList.Length
+                    ),
+                    PrintTo.OutputTab1
+                );
             }
         }
 
@@ -272,11 +281,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastFlatten(string reason)
         {
-            var signal = new FlattenSignal
-            {
-                Reason = reason ?? "Manual flatten",
-                Timestamp = DateTime.Now
-            };
+            var signal = new FlattenSignal { Reason = reason ?? "Manual flatten", Timestamp = DateTime.Now };
 
             SafeInvoke(OnFlattenAll, signal);
         }
@@ -286,11 +291,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastBreakeven(string signalId = "")
         {
-            var signal = new BreakevenSignal
-            {
-                SignalId = signalId,
-                Timestamp = DateTime.Now
-            };
+            var signal = new BreakevenSignal { SignalId = signalId, Timestamp = DateTime.Now };
 
             SafeInvoke(OnBreakevenRequest, signal);
         }
@@ -305,7 +306,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TradeId = tradeId,
                 NewStopPrice = newStopPrice,
                 StopLevel = stopLevel,
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
             };
 
             SafeInvoke(OnStopUpdate, signal);
@@ -320,7 +321,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 TradeId = tradeId,
                 NewEntryPrice = newEntryPrice,
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
             };
 
             SafeInvoke(OnEntryUpdate, signal);
@@ -335,7 +336,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 TradeId = tradeId,
                 Reason = reason ?? "Manual cancel",
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
             };
 
             SafeInvoke(OnOrderCancel, signal);
@@ -350,7 +351,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Command = command,
                 TargetSymbol = targetSymbol,
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
             };
 
             SafeInvoke(OnExternalCommand, signal);

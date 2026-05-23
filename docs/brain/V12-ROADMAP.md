@@ -6,21 +6,18 @@
 |------|--------|-----|----------|---------|-----|
 | 1: SIMA Fleet Dispatch | ✅ COMPLETE | - | - | - | - |
 | 2: Core State FSM | ✅ COMPLETE | - | - | - | - |
-| 3: REAPER Expansion | 🔄 ACTIVE | 95.65% | 5/5 | 7 | #1 |
-| 4: Sticky State & IPC | ⏳ PENDING | - | - | - | - |
-| 5: V12 Global Adjudication | ⏳ PENDING | - | - | - | - |
+| 3: REAPER Expansion | ✅ COMPLETE | 100% | 5/5 | 7 | #1 |
+| 4: Sticky State & IPC | ✅ COMPLETE | 100% | 5/5 | 3 | #2 |
+| 5: Performance Optimization | 🔄 ACTIVE | - | - | - | - |
 
 ## Cross-Epic Technical Debt Register
-
-### Deferred to Epic 4
-- [ ] IPC queue monitoring (_photonDispatchRing.Count observability)
-- [ ] Entries quantity validation (secondary dispatch methods)
 
 ### Deferred to Epic 5
 - [ ] Qlty code quality hardening (306 code smells)
 - [ ] Method complexity reduction (UpdateComplianceDisplay: 25→15)
 - [ ] Parameter object refactoring (ExecuteOrderSync: 7 params)
 - [ ] Python script linting cleanup
+- [ ] Resolve 100 Codacy violations from Epic 4 (EPIC-QUALITY-DEBT-EPIC4.md)
 
 ## Jane Street Compliance Checklist
 

@@ -168,7 +168,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int filled = GetTargetFilledQuantity(masterPos, targetNum);
                 target.Price = price;
                 target.RemainingContracts = Math.Max(0, contracts - filled);
-                target.IsWorking = targetOrder != null
+                target.IsWorking =
+                    targetOrder != null
                     && (targetOrder.OrderState == OrderState.Working || targetOrder.OrderState == OrderState.Accepted);
             }
         }
@@ -203,50 +204,62 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return string.Format("LIVE {0} {1}", snapshot.LivePosition.Direction, entryName);
             }
 
-            string mode = snapshot != null && !string.IsNullOrEmpty(snapshot.Mode)
-                ? snapshot.Mode
-                : "ORB";
+            string mode = snapshot != null && !string.IsNullOrEmpty(snapshot.Mode) ? snapshot.Mode : "ORB";
             return "MODE " + mode;
         }
 
         private void PublishUiSnapshot()
         {
-            string mode = GetCurrentPanelMode();
-            double ema9Value = SafeEmaValue(ema9);
+            // [EPIC-5-PERF] Latency instrumentation
+            var probe = LatencyProbe.Start();
 
-            UIStateSnapshot snapshot = new UIStateSnapshot
+            try
             {
-                EmaValue = ema9Value,
-                AtrValue = currentATR > 0 ? currentATR : 0,
-                LastUpdateTicks = DateTime.UtcNow.Ticks,
-                LastPrice = lastKnownPrice,
-                Mode = mode,
-                TargetCount = Math.Max(1, Math.Min(5, activeTargetCount)),
-                IsRmaModeActive = isRMAModeActive,
-                IsTrendRmaMode = isTrendRmaMode,
-                IsRetestRmaMode = isRetestRmaMode,
-                ConfigRevision = Volatile.Read(ref _uiConfigRevision),
-                OrHigh = sessionHigh != double.MinValue ? sessionHigh : 0,
-                OrLow = sessionLow != double.MaxValue ? sessionLow : 0,
-                OrRange = (sessionHigh != double.MinValue && sessionLow != double.MaxValue)
-                    ? (sessionHigh - sessionLow)
-                    : 0,
-                Ema9Value = ema9Value,
-                Ema15Value = SafeEmaValue(ema15),
-                Ema30Value = SafeEmaValue(ema30),
-                Ema65Value = SafeEmaValue(ema65),
-                Ema200Value = SafeEmaValue(ema200),
-                Config = BuildUiConfigSnapshot(mode),
-                Compliance = BuildUiComplianceSnapshot(),
-                LivePosition = BuildUiLivePositionSnapshot(),
-            };
+                string mode = GetCurrentPanelMode();
+                double ema9Value = SafeEmaValue(ema9);
 
-            snapshot.MasterMarketPosition = snapshot.LivePosition != null && snapshot.LivePosition.HasLivePosition
-                ? snapshot.LivePosition.Direction
-                : (Position != null ? Position.MarketPosition : MarketPosition.Flat);
-            snapshot.StatusMessage = BuildUiStatusMessage(snapshot);
+                UIStateSnapshot snapshot = new UIStateSnapshot
+                {
+                    EmaValue = ema9Value,
+                    AtrValue = currentATR > 0 ? currentATR : 0,
+                    LastUpdateTicks = DateTime.UtcNow.Ticks,
+                    LastPrice = lastKnownPrice,
+                    Mode = mode,
+                    TargetCount = Math.Max(1, Math.Min(5, activeTargetCount)),
+                    IsRmaModeActive = isRMAModeActive,
+                    IsTrendRmaMode = isTrendRmaMode,
+                    IsRetestRmaMode = isRetestRmaMode,
+                    ConfigRevision = Volatile.Read(ref _uiConfigRevision),
+                    OrHigh = sessionHigh != double.MinValue ? sessionHigh : 0,
+                    OrLow = sessionLow != double.MaxValue ? sessionLow : 0,
+                    OrRange =
+                        (sessionHigh != double.MinValue && sessionLow != double.MaxValue)
+                            ? (sessionHigh - sessionLow)
+                            : 0,
+                    Ema9Value = ema9Value,
+                    Ema15Value = SafeEmaValue(ema15),
+                    Ema30Value = SafeEmaValue(ema30),
+                    Ema65Value = SafeEmaValue(ema65),
+                    Ema200Value = SafeEmaValue(ema200),
+                    Config = BuildUiConfigSnapshot(mode),
+                    Compliance = BuildUiComplianceSnapshot(),
+                    LivePosition = BuildUiLivePositionSnapshot(),
+                };
 
-            _uiSnapshot = snapshot;
+                snapshot.MasterMarketPosition =
+                    snapshot.LivePosition != null && snapshot.LivePosition.HasLivePosition
+                        ? snapshot.LivePosition.Direction
+                        : (Position != null ? Position.MarketPosition : MarketPosition.Flat);
+                snapshot.StatusMessage = BuildUiStatusMessage(snapshot);
+
+                _uiSnapshot = snapshot;
+            }
+            finally
+            {
+                // [EPIC-5-PERF] Record latency
+                probe = probe.Stop();
+                _histPublishUiSnapshot.Record(probe);
+            }
         }
     }
 }

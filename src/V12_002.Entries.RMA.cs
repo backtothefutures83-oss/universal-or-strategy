@@ -1,13 +1,15 @@
 // V12.Phase7 MODULAR: RMA Entry Node (Split from Entries.cs -- Phase 7 Partition)
 // Contains: ExecuteTrendSplitEntry, DeactivateRMAMode
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,16 +19,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -42,7 +42,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ExecuteTrendSplitEntry(int contracts)
         {
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
-            if (isFlattenRunning) return;
+            if (isFlattenRunning)
+                return;
 
             if (currentATR <= 0)
             {
@@ -61,7 +62,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // M1-B: Orchestrator pattern - delegates to focused helpers (CYC 31 -> <=5)
                 var levels = CalculateTrendSplitLevels(contracts);
                 var brackets = SubmitTrendSplitBrackets(levels);
-                if (brackets == null) return; // Null-abort from bracket submission
+                if (brackets == null)
+                    return; // Null-abort from bracket submission
                 FinalizeTrendSplitEntry(levels, brackets);
             }
             catch (Exception ex)
@@ -86,16 +88,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             // When isTrendRmaMode is ON, both legs fall back to RMAStopATRMultiplier (same as standard TREND).
             double e1Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry1ATRMultiplier;
             double e2Mult = isTrendRmaMode ? RMAStopATRMultiplier : TRENDEntry2ATRMultiplier;
-            double stop9Dist  = CalculateATRStopDistance(e1Mult);  // EMA9 leg stop distance
-            double stop15Dist = CalculateATRStopDistance(e2Mult);  // EMA15 leg stop distance
+            double stop9Dist = CalculateATRStopDistance(e1Mult); // EMA9 leg stop distance
+            double stop15Dist = CalculateATRStopDistance(e2Mult); // EMA15 leg stop distance
 
             // totalQty extracted directly from passed in parameter (contracts) rather than dynamic calculation
             int totalQty = contracts;
             // TREND-SPLIT-FIX: Strict floor -- EMA9 gets ?Total/3?, EMA15 gets remainder.
             // Matches the (1/3, 2/3) weights in weightedStopDist; prevents risk budget overrun.
-            int qty9  = Math.Max(1, totalQty / 3);
+            int qty9 = Math.Max(1, totalQty / 3);
             int qty15 = Math.Max(0, totalQty - qty9);
-            if (totalQty >= 2 && qty15 < 1) { qty15 = 1; qty9 = Math.Max(1, totalQty - qty15); }
+            if (totalQty >= 2 && qty15 < 1)
+            {
+                qty15 = 1;
+                qty9 = Math.Max(1, totalQty - qty15);
+            }
 
             int finalTotalQty = qty9 + qty15;
             string timestamp = DateTime.Now.ToString("HHmmssffff");
@@ -114,7 +120,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FinalTotalQty = finalTotalQty,
                 TrendGroupId = trendGroupId,
                 Entry1Name = trendGroupId + "_E1",
-                Entry2Name = trendGroupId + "_E2"
+                Entry2Name = trendGroupId + "_E2",
             };
         }
 
@@ -122,58 +128,159 @@ namespace NinjaTrader.NinjaScript.Strategies
         private TrendSplitBrackets SubmitTrendSplitBrackets(TrendSplitLevels levels)
         {
             double stop1Price = Instrument.MasterInstrument.RoundToTickSize(
-                levels.Direction == MarketPosition.Long ? levels.E9 - levels.Stop9Dist : levels.E9 + levels.Stop9Dist);
-            PositionInfo pos1 = CreateTRENDPosition(levels.Entry1Name, levels.Direction, levels.E9, stop1Price, levels.Qty9, true, levels.TrendGroupId, true);
+                levels.Direction == MarketPosition.Long ? levels.E9 - levels.Stop9Dist : levels.E9 + levels.Stop9Dist
+            );
+            PositionInfo pos1 = CreateTRENDPosition(
+                levels.Entry1Name,
+                levels.Direction,
+                levels.E9,
+                stop1Price,
+                levels.Qty9,
+                true,
+                levels.TrendGroupId,
+                true
+            );
 
             List<string> masterEntryNames = new List<string> { levels.Entry1Name };
 
             int masterDeltaE1 = (levels.Direction == MarketPosition.Long) ? levels.Qty9 : -levels.Qty9;
-            { var _aek966 = ExpKey(Account.Name); var _aed966 = (masterDeltaE1); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+            {
+                var _aek966 = ExpKey(Account.Name);
+                var _aed966 = (masterDeltaE1);
+                Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966));
+            }
 
-            Order entryOrder1 = levels.Direction == MarketPosition.Long
-                ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, levels.Qty9, levels.E9, 0, "", levels.Entry1Name)
-                : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, levels.Qty9, levels.E9, 0, "", levels.Entry1Name);
+            Order entryOrder1 =
+                levels.Direction == MarketPosition.Long
+                    ? SubmitOrderUnmanaged(
+                        0,
+                        OrderAction.Buy,
+                        OrderType.Limit,
+                        levels.Qty9,
+                        levels.E9,
+                        0,
+                        "",
+                        levels.Entry1Name
+                    )
+                    : SubmitOrderUnmanaged(
+                        0,
+                        OrderAction.SellShort,
+                        OrderType.Limit,
+                        levels.Qty9,
+                        levels.E9,
+                        0,
+                        "",
+                        levels.Entry1Name
+                    );
 
             // A1-1/A2-1: Null-abort + stateLock wrap for E1 (Build 960 audit fix)
             if (entryOrder1 == null)
             {
-                { var _aek966 = ExpKey(Account.Name); var _aed966 = (-masterDeltaE1); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
-                Print("[ENTRY_ABORT] TrendSplit E1 SubmitOrderUnmanaged returned null for " + levels.Entry1Name + ". Rolling back.");
+                {
+                    var _aek966 = ExpKey(Account.Name);
+                    var _aed966 = (-masterDeltaE1);
+                    Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966));
+                }
+                Print(
+                    "[ENTRY_ABORT] TrendSplit E1 SubmitOrderUnmanaged returned null for "
+                        + levels.Entry1Name
+                        + ". Rolling back."
+                );
                 return null;
             }
-            { var _en966 = levels.Entry1Name; var _p966 = pos1; var _eo966 = entryOrder1;
-            Enqueue(ctx => { ctx.activePositions[_en966] = _p966; ctx.entryOrders[_en966] = _eo966; }); }
+            {
+                var _en966 = levels.Entry1Name;
+                var _p966 = pos1;
+                var _eo966 = entryOrder1;
+                Enqueue(ctx =>
+                {
+                    ctx.activePositions[_en966] = _p966;
+                    ctx.entryOrders[_en966] = _eo966;
+                });
+            }
 
             if (levels.Qty15 > 0)
             {
                 double stop2Price = Instrument.MasterInstrument.RoundToTickSize(
-                    levels.Direction == MarketPosition.Long ? levels.E15 - levels.Stop15Dist : levels.E15 + levels.Stop15Dist);
-                PositionInfo pos2 = CreateTRENDPosition(levels.Entry2Name, levels.Direction, levels.E15, stop2Price, levels.Qty15, false, levels.TrendGroupId, true);
+                    levels.Direction == MarketPosition.Long
+                        ? levels.E15 - levels.Stop15Dist
+                        : levels.E15 + levels.Stop15Dist
+                );
+                PositionInfo pos2 = CreateTRENDPosition(
+                    levels.Entry2Name,
+                    levels.Direction,
+                    levels.E15,
+                    stop2Price,
+                    levels.Qty15,
+                    false,
+                    levels.TrendGroupId,
+                    true
+                );
 
                 linkedTRENDEntries[levels.Entry1Name] = levels.Entry2Name;
                 linkedTRENDEntries[levels.Entry2Name] = levels.Entry1Name;
 
                 int masterDeltaE2 = (levels.Direction == MarketPosition.Long) ? levels.Qty15 : -levels.Qty15;
-                { var _aek966 = ExpKey(Account.Name); var _aed966 = (masterDeltaE2); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+                {
+                    var _aek966 = ExpKey(Account.Name);
+                    var _aed966 = (masterDeltaE2);
+                    Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966));
+                }
 
-                Order entryOrder2 = levels.Direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, levels.Qty15, levels.E15, 0, "", levels.Entry2Name)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, levels.Qty15, levels.E15, 0, "", levels.Entry2Name);
+                Order entryOrder2 =
+                    levels.Direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.Buy,
+                            OrderType.Limit,
+                            levels.Qty15,
+                            levels.E15,
+                            0,
+                            "",
+                            levels.Entry2Name
+                        )
+                        : SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.SellShort,
+                            OrderType.Limit,
+                            levels.Qty15,
+                            levels.E15,
+                            0,
+                            "",
+                            levels.Entry2Name
+                        );
 
                 // A1-1/A2-1: Null-abort + stateLock wrap for E2 (Build 960 audit fix)
                 if (entryOrder2 == null)
                 {
-                    { var _aek966 = ExpKey(Account.Name); var _aed966 = (-masterDeltaE2); Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966)); }
+                    {
+                        var _aek966 = ExpKey(Account.Name);
+                        var _aed966 = (-masterDeltaE2);
+                        Enqueue(ctx => ctx.AddExpectedPositionDeltaLocked(_aek966, _aed966));
+                    }
                     // Remove partnership references; HandleOrderCancelled will teardown E1 state naturally.
                     string removedPartner;
                     linkedTRENDEntries.TryRemove(levels.Entry1Name, out removedPartner);
                     linkedTRENDEntries.TryRemove(levels.Entry2Name, out removedPartner);
-                    if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState)) CancelOrderSafe(entryOrder1, null);
-                    Print("[ENTRY_ABORT] TrendSplit E2 NULL -- E1 cancel issued for " + levels.Entry1Name + "; teardown deferred to cancel callback.");
+                    if (entryOrder1 != null && !IsOrderTerminal(entryOrder1.OrderState))
+                        CancelOrderSafe(entryOrder1, null);
+                    Print(
+                        "[ENTRY_ABORT] TrendSplit E2 NULL -- E1 cancel issued for "
+                            + levels.Entry1Name
+                            + "; teardown deferred to cancel callback."
+                    );
                     return null;
                 }
-                { var _en966 = levels.Entry2Name; var _p966 = pos2; var _eo966 = entryOrder2;
-                Enqueue(ctx => { ctx.activePositions[_en966] = _p966; ctx.entryOrders[_en966] = _eo966; }); }
+                {
+                    var _en966 = levels.Entry2Name;
+                    var _p966 = pos2;
+                    var _eo966 = entryOrder2;
+                    Enqueue(ctx =>
+                    {
+                        ctx.activePositions[_en966] = _p966;
+                        ctx.entryOrders[_en966] = _eo966;
+                    });
+                }
                 masterEntryNames.Add(levels.Entry2Name);
             }
 
@@ -183,17 +290,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         // M1-B Helper: Finalize entry with weighted calculation, logging, SIMA dispatch, and mode deactivation
         private void FinalizeTrendSplitEntry(TrendSplitLevels levels, TrendSplitBrackets brackets)
         {
-            double weightedEntryPrice = ((levels.E9 * levels.Qty9) + (levels.E15 * levels.Qty15)) / Math.Max(1, levels.FinalTotalQty);
+            double weightedEntryPrice =
+                ((levels.E9 * levels.Qty9) + (levels.E15 * levels.Qty15)) / Math.Max(1, levels.FinalTotalQty);
             weightedEntryPrice = Instrument.MasterInstrument.RoundToTickSize(weightedEntryPrice);
 
-            Print(string.Format("TREND RMA SPLIT: {0} | Qty={1} (EMA9={2}, EMA15={3}) | EMA9={4:F2} EMA15={5:F2} | Anchor={6:F2}",
-                levels.Direction == MarketPosition.Long ? "LONG" : "SHORT",
-                levels.FinalTotalQty,
-                levels.Qty9,
-                levels.Qty15,
-                levels.E9,
-                levels.E15,
-                weightedEntryPrice));
+            Print(
+                string.Format(
+                    "TREND RMA SPLIT: {0} | Qty={1} (EMA9={2}, EMA15={3}) | EMA9={4:F2} EMA15={5:F2} | Anchor={6:F2}",
+                    levels.Direction == MarketPosition.Long ? "LONG" : "SHORT",
+                    levels.FinalTotalQty,
+                    levels.Qty9,
+                    levels.Qty15,
+                    levels.E9,
+                    levels.E15,
+                    weightedEntryPrice
+                )
+            );
 
             if (EnableSIMA)
             {
@@ -203,7 +315,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     levels.FinalTotalQty,
                     weightedEntryPrice,
                     OrderType.Limit,
-                    brackets.MasterEntryNames.ToArray());
+                    brackets.MasterEntryNames.ToArray()
+                );
             }
 
             DeactivateTRENDMode();
@@ -245,12 +358,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             string deactivateConfig = string.Format(
                 "CONFIG|OR|COUNT:{0};T1:{1};T1TYPE:{2};T2:{3};T2TYPE:{4};T3:{5};T3TYPE:{6};T4:{7};T4TYPE:{8};T5:{9};T5TYPE:{10};STR:{11};MAX:{12};",
                 minContracts,
-                Target1Value, ToIpcTargetMode(T1Type),
-                Target2Value, ToIpcTargetMode(T2Type),
-                Target3Value, ToIpcTargetMode(T3Type),
-                Target4Value, ToIpcTargetMode(T4Type),
-                Target5Value, ToIpcTargetMode(T5Type),
-                StopMultiplier, MaxRiskAmount);
+                Target1Value,
+                ToIpcTargetMode(T1Type),
+                Target2Value,
+                ToIpcTargetMode(T2Type),
+                Target3Value,
+                ToIpcTargetMode(T3Type),
+                Target4Value,
+                ToIpcTargetMode(T4Type),
+                Target5Value,
+                ToIpcTargetMode(T5Type),
+                StopMultiplier,
+                MaxRiskAmount
+            );
             SendResponseToRemote(deactivateConfig);
             Print("V12.14: DeactivateRMAMode - CONFIG broadcast sent");
         }
@@ -261,75 +381,108 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void MonitorRmaProximity()
         {
-            if (!RmaIntelligenceEnabled) return;
+            // [EPIC-5-PERF] Latency instrumentation
+            var probe = LatencyProbe.Start();
 
-            foreach (var kvp in entryOrders)
+            try
             {
-                Order order = kvp.Value;
-                if (order == null || order.OrderState != OrderState.Working) continue;
+                if (!RmaIntelligenceEnabled)
+                    return;
 
-                PositionInfo pos;
-                if (!activePositions.TryGetValue(kvp.Key, out pos) || !pos.IsRMATrade) continue;
-
-                double currentPrice = Close[0];
-                double level = pos.EntryPrice;
-                double distTicks = Math.Abs(currentPrice - level) / tickSize;
-
-                // Phase 9.2: Initialize ClosestApproachTicks on first observation.
-                if (pos.ClosestApproachTicks <= 0)
-                    pos.ClosestApproachTicks = double.MaxValue;
-
-                // Phase 9.2: Track closest approach as a monotonic minimum.
-                if (distTicks < pos.ClosestApproachTicks)
-                    pos.ClosestApproachTicks = distTicks;
-
-                if (distTicks <= RmaProximityTicks)
+                foreach (var kvp in entryOrders)
                 {
-                    if (!pos.WasInProximity)
+                    Order order = kvp.Value;
+                    if (order == null || order.OrderState != OrderState.Working)
+                        continue;
+
+                    PositionInfo pos;
+                    if (!activePositions.TryGetValue(kvp.Key, out pos) || !pos.IsRMATrade)
+                        continue;
+
+                    double currentPrice = Close[0];
+                    double level = pos.EntryPrice;
+                    double distTicks = Math.Abs(currentPrice - level) / tickSize;
+
+                    // Phase 9.2: Initialize ClosestApproachTicks on first observation.
+                    if (pos.ClosestApproachTicks <= 0)
+                        pos.ClosestApproachTicks = double.MaxValue;
+
+                    // Phase 9.2: Track closest approach as a monotonic minimum.
+                    if (distTicks < pos.ClosestApproachTicks)
+                        pos.ClosestApproachTicks = distTicks;
+
+                    if (distTicks <= RmaProximityTicks)
                     {
-                        pos.WasInProximity = true;
-                        pos.ProximityProbeCount++;
-                        Print(string.Format("[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
-                            pos.ProximityProbeCount, kvp.Key, distTicks, level));
+                        if (!pos.WasInProximity)
+                        {
+                            pos.WasInProximity = true;
+                            pos.ProximityProbeCount++;
+                            Print(
+                                string.Format(
+                                    "[SENTINEL] Probe #{0} for {1} at {2:F1} ticks from {3:F2}",
+                                    pos.ProximityProbeCount,
+                                    kvp.Key,
+                                    distTicks,
+                                    level
+                                )
+                            );
+                        }
+
+                        // Visual feedback only. Draw state is not logic state.
+                        Draw.Dot(this, "Prox_" + kvp.Key, false, 0, level, Brushes.Cyan);
                     }
-
-                    // Visual feedback only. Draw state is not logic state.
-                    Draw.Dot(this, "Prox_" + kvp.Key, false, 0, level, Brushes.Cyan);
-                }
-                else if (distTicks < RmaCancellationTicks)
-                {
-                    // Dead zone hysteresis. No state transition.
-                }
-                else
-                {
-                    if (pos.WasInProximity)
+                    else if (distTicks < RmaCancellationTicks)
                     {
-                        pos.WasInProximity = false;
-
-                        if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
-                        {
-                            Print(string.Format(
-                                "[SENTINEL] EXHAUSTION: {0} probed {1}x (max={2}), closest={3:F1}t. Cancelling.",
-                                kvp.Key, pos.ProximityProbeCount, RmaMaxProbeCount, pos.ClosestApproachTicks));
-                            CancelOrderSafe(order, pos);
-                            RemoveDrawObject("Prox_" + kvp.Key);
-                            SendResponseToRemote("SOUND|SENTINEL_EXHAUSTION_CANCEL");
-                        }
-                        else
-                        {
-                            Print(string.Format(
-                                "[SENTINEL] Retreat for {0} (probe #{1}, closest={2:F1}t). Monitoring.",
-                                kvp.Key, pos.ProximityProbeCount, pos.ClosestApproachTicks));
-                            RemoveDrawObject("Prox_" + kvp.Key);
-                            SendResponseToRemote("SOUND|SENTINEL_PROXIMITY_RETREAT");
-                        }
+                        // Dead zone hysteresis. No state transition.
                     }
                     else
                     {
-                        if (GetDrawObject("Prox_" + kvp.Key) != null)
-                            RemoveDrawObject("Prox_" + kvp.Key);
+                        if (pos.WasInProximity)
+                        {
+                            pos.WasInProximity = false;
+
+                            if (RmaExhaustionEnabled && pos.ProximityProbeCount >= RmaMaxProbeCount)
+                            {
+                                Print(
+                                    string.Format(
+                                        "[SENTINEL] EXHAUSTION: {0} probed {1}x (max={2}), closest={3:F1}t. Cancelling.",
+                                        kvp.Key,
+                                        pos.ProximityProbeCount,
+                                        RmaMaxProbeCount,
+                                        pos.ClosestApproachTicks
+                                    )
+                                );
+                                CancelOrderSafe(order, pos);
+                                RemoveDrawObject("Prox_" + kvp.Key);
+                                SendResponseToRemote("SOUND|SENTINEL_EXHAUSTION_CANCEL");
+                            }
+                            else
+                            {
+                                Print(
+                                    string.Format(
+                                        "[SENTINEL] Retreat for {0} (probe #{1}, closest={2:F1}t). Monitoring.",
+                                        kvp.Key,
+                                        pos.ProximityProbeCount,
+                                        pos.ClosestApproachTicks
+                                    )
+                                );
+                                RemoveDrawObject("Prox_" + kvp.Key);
+                                SendResponseToRemote("SOUND|SENTINEL_PROXIMITY_RETREAT");
+                            }
+                        }
+                        else
+                        {
+                            if (GetDrawObject("Prox_" + kvp.Key) != null)
+                                RemoveDrawObject("Prox_" + kvp.Key);
+                        }
                     }
                 }
+            }
+            finally
+            {
+                // [EPIC-5-PERF] Record latency
+                probe = probe.Stop();
+                _histMonitorRmaProximity.Record(probe);
             }
         }
 

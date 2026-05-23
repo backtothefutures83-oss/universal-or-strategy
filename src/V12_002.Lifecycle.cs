@@ -902,26 +902,38 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnMarketData(MarketDataEventArgs marketDataUpdate)
         {
-            RefreshActorOwnerThread();
+            // [EPIC-5-PERF] Latency instrumentation
+            var probe = LatencyProbe.Start();
 
-            // Only process on primary instrument
-            if (marketDataUpdate.MarketDataType == MarketDataType.Last)
+            try
             {
-                if (!EnsureStartupReady(nameof(OnMarketData)))
-                    return;
-                TouchStrategyHeartbeat();
+                RefreshActorOwnerThread();
 
-                // Update last known price for real-time tracking
-                lastKnownPrice = marketDataUpdate.Price;
+                // Only process on primary instrument
+                if (marketDataUpdate.MarketDataType == MarketDataType.Last)
+                {
+                    if (!EnsureStartupReady(nameof(OnMarketData)))
+                        return;
+                    TouchStrategyHeartbeat();
 
-                // B984-F12: Rate-gate UI snapshot -- publish only every 5 ticks to reduce dispatcher pressure.
-                _uiSnapshotTickCounter = (_uiSnapshotTickCounter + 1) % 5;
-                if (_uiSnapshotTickCounter == 0)
-                    PublishUiSnapshot();
+                    // Update last known price for real-time tracking
+                    lastKnownPrice = marketDataUpdate.Price;
 
-                // Process IPC commands immediately on every tick
-                // This ensures Remote App buttons work even outside session time
-                ProcessIpcCommands();
+                    // B984-F12: Rate-gate UI snapshot -- publish only every 5 ticks to reduce dispatcher pressure.
+                    _uiSnapshotTickCounter = (_uiSnapshotTickCounter + 1) % 5;
+                    if (_uiSnapshotTickCounter == 0)
+                        PublishUiSnapshot();
+
+                    // Process IPC commands immediately on every tick
+                    // This ensures Remote App buttons work even outside session time
+                    ProcessIpcCommands();
+                }
+            }
+            finally
+            {
+                // [EPIC-5-PERF] Record latency
+                probe = probe.Stop();
+                _histOnMarketData.Record(probe);
             }
         }
 

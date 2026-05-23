@@ -803,6 +803,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Prevents re-nudging on subsequent bars after the first limit move.
         private readonly ConcurrentDictionary<string, bool> _citNudgedKeys = new ConcurrentDictionary<string, bool>();
 
+        // [EPIC-5-PERF] Latency histograms for hot path instrumentation
+        private readonly LatencyHistogram _histOnBarUpdate = new LatencyHistogram("OnBarUpdate");
+        private readonly LatencyHistogram _histOnMarketData = new LatencyHistogram("OnMarketData");
+        private readonly LatencyHistogram _histProcessOnOrderUpdate = new LatencyHistogram("ProcessOnOrderUpdate");
+        private readonly LatencyHistogram _histHandleEntryOrderFilled = new LatencyHistogram("HandleEntryOrderFilled");
+        private readonly LatencyHistogram _histMonitorRmaProximity = new LatencyHistogram("MonitorRmaProximity");
+        private readonly LatencyHistogram _histPublishUiSnapshot = new LatencyHistogram("PublishUiSnapshot");
+
         // Build 950: Target snapshot for OCO cascade detection during stop replacement.
         private class TargetSnapshot
         {

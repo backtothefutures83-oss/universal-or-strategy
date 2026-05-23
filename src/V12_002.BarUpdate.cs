@@ -1,12 +1,14 @@
 // Build 971: V12_002 BarUpdate -- OnBarUpdate
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -16,16 +18,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -43,8 +43,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (currentRmaAnchor == RmaAnchorType.Manual && cachedMnlPrice > 0)
             {
                 NinjaTrader.NinjaScript.DrawingTools.Draw.HorizontalLine(
-                    this, "MNL_Line", cachedMnlPrice, Brushes.Magenta, 
-                    DashStyleHelper.Dash, 2);
+                    this,
+                    "MNL_Line",
+                    cachedMnlPrice,
+                    Brushes.Magenta,
+                    DashStyleHelper.Dash,
+                    2
+                );
             }
             else
             {
@@ -61,7 +66,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             TimeSpan currentTime,
             TimeSpan sessionStartTime,
             TimeSpan sessionEndTime,
-            bool sessionCrossesMidnight)
+            bool sessionCrossesMidnight
+        )
         {
             // V12.12: Daily summary roll-over (throttled)
             if (EnableComplianceHub)
@@ -81,8 +87,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (sessionCrossesMidnight)
             {
                 // For overnight sessions: only reset at session start
-                if (currentTime >= sessionStartTime && 
-                    currentTime < sessionStartTime.Add(TimeSpan.FromMinutes(10)))
+                if (currentTime >= sessionStartTime && currentTime < sessionStartTime.Add(TimeSpan.FromMinutes(10)))
                 {
                     if (barTimeInZone.Date != lastResetDate)
                     {
@@ -103,8 +108,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 ResetOR();
                 lastResetDate = barTimeInZone.Date;
-                Print(string.Format("Session Reset: {0} at {1} {2}",
-                    barTimeInZone.Date.ToShortDateString(), currentTime, SelectedTimeZone));
+                Print(
+                    string.Format(
+                        "Session Reset: {0} at {1} {2}",
+                        barTimeInZone.Date.ToShortDateString(),
+                        currentTime,
+                        SelectedTimeZone
+                    )
+                );
             }
         }
 
@@ -116,15 +127,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             DateTime barTimeInZone,
             TimeSpan currentTime,
             TimeSpan sessionStartTime,
-            TimeSpan orEndTime)
+            TimeSpan orEndTime
+        )
         {
             // Build OR during window
             if (currentTime > sessionStartTime && currentTime <= orEndTime)
             {
                 if (!isInORWindow)
                 {
-                    Print(string.Format("OR WINDOW START: {0} (Bar time in {1})",
-                        barTimeInZone.ToString("MM/dd/yyyy HH:mm:ss"), SelectedTimeZone));
+                    Print(
+                        string.Format(
+                            "OR WINDOW START: {0} (Bar time in {1})",
+                            barTimeInZone.ToString("MM/dd/yyyy HH:mm:ss"),
+                            SelectedTimeZone
+                        )
+                    );
                 }
 
                 isInORWindow = true;
@@ -147,10 +164,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Processes OR completion marking when the opening range window closes.
         /// Draws initial OR box and logs completion metrics.
         /// </summary>
-        private void ProcessORCompletion(
-            DateTime barTimeInZone,
-            TimeSpan currentTime,
-            TimeSpan orEndTime)
+        private void ProcessORCompletion(DateTime barTimeInZone, TimeSpan currentTime, TimeSpan orEndTime)
         {
             // Mark OR complete when the last bar of the window closes
             if (currentTime >= orEndTime && !orComplete && orStartBarIndex > 0)
@@ -160,10 +174,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 orEndDateTime = Time[0];
                 orEndBarIndex = CurrentBar;
 
-                Print(string.Format("OR COMPLETE at {0}: H={1:F2} L={2:F2} M={3:F2} R={4:F2}",
-                    barTimeInZone.ToString("HH:mm:ss"), sessionHigh, sessionLow, sessionMid, sessionRange));
-                Print(string.Format("OR Targets: T1={0}({1}) T2={2}({3}) Stop=-{4:F2}",
-                    Target1Value, T1Type, Target2Value, T2Type, CalculateORStopDistance()));
+                Print(
+                    string.Format(
+                        "OR COMPLETE at {0}: H={1:F2} L={2:F2} M={3:F2} R={4:F2}",
+                        barTimeInZone.ToString("HH:mm:ss"),
+                        sessionHigh,
+                        sessionLow,
+                        sessionMid,
+                        sessionRange
+                    )
+                );
+                Print(
+                    string.Format(
+                        "OR Targets: T1={0}({1}) T2={2}({3}) Stop=-{4:F2}",
+                        Target1Value,
+                        T1Type,
+                        Target2Value,
+                        T2Type,
+                        CalculateORStopDistance()
+                    )
+                );
 
                 // V8.30: Always draw immediately when OR completes (important event)
                 DrawORBox();
@@ -179,7 +209,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             TimeSpan currentTime,
             TimeSpan sessionStartTime,
             TimeSpan sessionEndTime,
-            bool sessionCrossesMidnight)
+            bool sessionCrossesMidnight
+        )
         {
             // Update box if OR complete
             bool inActiveSession = false;
@@ -205,9 +236,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
+            // [EPIC-5-PERF] Latency instrumentation
+            var probe = LatencyProbe.Start();
+
             // Only process primary series
-            if (BarsInProgress != 0) return;
-            if (CurrentBar < 5) return;
+            if (BarsInProgress != 0)
+                return;
+            if (CurrentBar < 5)
+                return;
 
             try
             {
@@ -233,7 +269,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // V8.2 FIX: Process pending TREND entry (deferred from button click)
                 if (pendingTRENDEntry)
                 {
-                    double trendDist   = CalculateTRENDStopDistance();
+                    double trendDist = CalculateTRENDStopDistance();
                     int trendContracts = CalculatePositionSize(trendDist);
                     ExecuteTRENDEntry(trendContracts);
                 }
@@ -263,8 +299,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DrawMNLAnchorIfActive();
 
                 // Process session reset with compliance
-                ProcessSessionReset(barTimeInZone, currentTime, sessionStartTime,
-                    sessionEndTime, sessionCrossesMidnight);
+                ProcessSessionReset(
+                    barTimeInZone,
+                    currentTime,
+                    sessionStartTime,
+                    sessionEndTime,
+                    sessionCrossesMidnight
+                );
 
                 // Build OR during window
                 ProcessORWindowBuilding(barTimeInZone, currentTime, sessionStartTime, orEndTime);
@@ -273,8 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ProcessORCompletion(barTimeInZone, currentTime, orEndTime);
 
                 // Update OR box display
-                UpdateORBoxDisplay(currentTime, sessionStartTime, sessionEndTime,
-                    sessionCrossesMidnight);
+                UpdateORBoxDisplay(currentTime, sessionStartTime, sessionEndTime, sessionCrossesMidnight);
 
                 // Position sync check
                 SyncPositionState();
@@ -293,12 +333,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CheckFFMAConditions();
                 }
 
-                SyncPendingOrders();  // V12.30: Real-time sizing synchronization
+                SyncPendingOrders(); // V12.30: Real-time sizing synchronization
                 PublishUiSnapshot();
             }
             catch (Exception ex)
             {
                 Print("ERROR OnBarUpdate: " + ex.Message);
+            }
+            finally
+            {
+                // [EPIC-5-PERF] Record latency
+                probe = probe.Stop();
+                _histOnBarUpdate.Record(probe);
             }
         }
 
