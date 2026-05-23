@@ -476,7 +476,42 @@ Rules:
 - **Gitleaks**: Secret detection
 - **SonarCloud**: Code quality platform
 
-## 19. Universal Agent Protocol
+## 19. Tool Discovery Protocol (MANDATORY)
+
+**CRITICAL:** ALL agents MUST discover and verify tools at session start.
+
+### Session Initialization
+
+```powershell
+# Step 1: Discover all installed tools
+powershell -File .\scripts\discover_tools.ps1
+
+# Step 2: Load tool manifest
+$tools = Get-Content "docs/brain/session_tools.json" | ConvertFrom-Json
+
+# Step 3: Verify critical tools
+# - jcodemunch-mcp, graphify, query_kb.py, Routa CLI, deploy-sync.ps1
+```
+
+### Tool Categories
+
+- **MCP Servers:** jcodemunch, lsp-mcp, greptile (via Quarkus bridge), sequential-thinking
+- **Knowledge:** graphify, query_kb.py, Routa CLI
+- **Build:** dotnet, MSBuild, deploy-sync.ps1
+- **Testing:** xUnit, BenchmarkDotNet, AMAL Harness
+- **Quality:** Semgrep, CodeRabbit CLI, Codacy
+- **Git:** gh, git, PR scripts
+- **Specialized:** Routa, complexity_audit.py, dead_code_scan.py
+
+**See:** [Tool Discovery Protocol](docs/protocol/TOOL_DISCOVERY_PROTOCOL.md)
+
+### Greptile HTTP Bridge
+
+Greptile API uses HTTP/REST, but Bob CLI requires SSE (Server-Sent Events) for MCP. Use the Quarkus MCP Server HTTP bridge to convert Greptile HTTP → Bob SSE.
+
+**See:** [Greptile HTTP Bridge Setup](docs/setup/GREPTILE_HTTP_BRIDGE.md)
+
+## 20. Universal Agent Protocol
 
 **For complete tool integration, workflow protocols, and enforcement rules, see:**
 
