@@ -104,7 +104,41 @@ powershell -File .\scripts\extract_pr_forensics.ps1 -PrNumber <PR_NUMBER>
 **Semgrep Integration (Future):**
 When Semgrep GitHub App is installed, findings will appear in PR comments and be extracted by this script. Until then, Semgrep runs locally in Step 0 (pre-push).
 
-**Gate:** Review forensics report. If P0 issues exist, they MUST be fixed before proceeding.
+**Gate:** Review forensics report. If P0 issues exist, they MUST be fixed before proceeding to Step 2.5.
+
+---
+
+### Step 2.5: CI Log Extraction (NEW - PHASE 2)
+**Mode:** Advanced
+**Action:** Extract actual CI failure logs (ground truth) before analyzing bot comments
+
+```powershell
+powershell -File .\scripts\extract_ci_logs.ps1 -PrNumber <PR_NUMBER>
+```
+
+**Purpose:**
+CI logs show the **ground truth** of what actually failed. Bot comments are interpretations that may miss context or hallucinate. Always read CI logs BEFORE trusting bot analysis.
+
+**Outputs:**
+- `docs/brain/pr_<N>_ci_logs.md` - Raw CI failure logs with categorization
+
+**Categorization:**
+- **WORKFLOW_SYNTAX**: YAML errors in `.github/workflows/`
+- **POWERSHELL_ERROR**: Command failures in scripts
+- **BUILD_FAILURE**: Compilation errors (MSBuild, dotnet build)
+- **TIMEOUT**: Job time limits exceeded
+- **MISSING_DEPENDENCY**: Package/tool not found
+
+**Cross-Reference Protocol:**
+1. Read CI logs first (ground truth)
+2. Compare with bot forensics from Step 2
+3. Identify **bot hallucinations**: Bot flagged issue not in CI logs
+4. Identify **bot misses**: CI error not flagged by bots
+5. Update fix queue with CI-verified issues only
+
+**Critical Rule:** If CI logs contradict bot comments, **CI logs win**. Bots interpret; logs show truth.
+
+**Gate:** If CI logs show failures not in bot forensics, update fix queue before Step 3.
 
 ---
 
@@ -189,13 +223,14 @@ When you see the BUILD_TAG banner, type: F5 done [BUILD_TAG]
 | Aspect | V1 (Old) | V2 (New) |
 |--------|----------|----------|
 | Bot Comment Reading | ❌ Never read | ✅ Mandatory extraction |
+| CI Log Extraction | ❌ Never read | ✅ Ground truth verification (Phase 2) |
 | CodeRabbit Integration | ❌ None | ✅ Automated V12 DNA checks |
 | Semgrep Integration | ❌ None | ✅ Pre-push + PR comments (future) |
 | Issue Categorization | ❌ None | ✅ VALID/HALLUCINATION/INFRA-NOISE |
 | Hallucination Tracking | ❌ None | ✅ Persistent log |
 | Fix Priority | ❌ Undefined | ✅ P0 → P1 → P2 |
 | Manual Override | ❌ None | ✅ Director gate at <100 |
-| Loop Efficiency | ❌ Blind retries | ✅ Forensics-guided |
+| Loop Efficiency | ❌ Blind retries | ✅ Forensics + CI logs guided |
 | V12 DNA Enforcement | ❌ Manual | ✅ Automated (CodeRabbit + Semgrep) |
 
 ## Example Session

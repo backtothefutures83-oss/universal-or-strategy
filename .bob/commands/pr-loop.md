@@ -61,7 +61,7 @@ PROTOCOL:
      - Total VALID issues (P0/P1/P2 breakdown)
      - Hallucinations detected
      - INFRA-NOISE filtered
-  4. If P0 issues exist: Flag as CRITICAL and proceed to Step 2.
+  4. If P0 issues exist: Flag as CRITICAL and proceed to Step 1.5.
   5. If no VALID issues: Skip to Step 3 (verification only).
   6. Emit: [FORENSICS-READY] X VALID issues, Y hallucinations
 ```
@@ -72,6 +72,40 @@ PROTOCOL:
 - `docs/brain/bot_hallucinations.md` - Updated hallucination log
 
 **Gate:** Review forensics report. If P0 issues exist, they MUST be fixed before proceeding.
+
+---
+
+### Step 1.5: CI Log Extraction (NEW - PHASE 2)
+
+**Switch to: Advanced mode**
+
+**Purpose:** Extract actual CI failure logs (ground truth) before analyzing bot comments.
+
+Hand off:
+```
+TASK: Extract CI Failure Logs
+PR: $1
+PROTOCOL:
+  1. Run: powershell -File .\scripts\extract_ci_logs.ps1 -PrNumber $1
+  2. Read the generated CI log report: docs/brain/pr_$1_ci_logs.md
+  3. Categorize findings:
+     - WORKFLOW_SYNTAX: YAML errors
+     - POWERSHELL_ERROR: Command failures
+     - BUILD_FAILURE: Compilation errors
+     - TIMEOUT: Job time limits
+     - MISSING_DEPENDENCY: Package issues
+  4. Cross-reference CI logs with bot forensics (Step 1):
+     - Identify bot hallucinations (bot flagged issue not in CI logs)
+     - Identify bot misses (CI error not flagged by bots)
+  5. Emit: [CI-LOGS-ANALYZED] X real failures, Y bot mismatches
+```
+
+**Outputs:**
+- `docs/brain/pr_$1_ci_logs.md` - Raw CI failure logs
+
+**Critical Rule:** Read CI logs BEFORE bot comments. Bots interpret; logs show truth.
+
+**Gate:** If CI logs show failures not in bot forensics, update fix queue before Step 2.
 
 ---
 
