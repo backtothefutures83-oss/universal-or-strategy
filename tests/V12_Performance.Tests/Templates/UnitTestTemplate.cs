@@ -1,3 +1,4 @@
+using System;
 using Xunit;
 
 namespace NinjaTrader.Custom.AddOns.V12_Performance.Tests.Templates
