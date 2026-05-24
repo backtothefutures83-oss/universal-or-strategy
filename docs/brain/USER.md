@@ -2,7 +2,7 @@
 
 **Purpose:** Persistent user preferences, coding style, and past decisions that agents remember across sessions.
 
-**Last Updated:** 2026-05-24T01:30:00Z
+**Last Updated:** 2026-05-24T01:45:26Z
 
 ---
 
@@ -175,6 +175,11 @@
 ---
 
 ## Project Context
+
+
+### PENDING TUTORIAL: User requested a quick tutorial on the new Hermes Persistent Memory architecture. Schedule for next downtime period. Topics: MEMORY.md/USER.md usage, update_memory.py tool, session start hook, cross-session learning benefits, maintenance (quarterly pruning). Reference: docs/protocol/PERSISTENT_MEMORY.md
+- **Added:** 2026-05-24T01:45:26Z
+- **Source:** Agent memory update
 
 ### Current Focus (2026-Q2)
 - **Epic 6:** Performance lock-in (automated testing)
