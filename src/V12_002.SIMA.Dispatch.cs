@@ -1104,23 +1104,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             ref bool registeredForCleanup
         )
         {
-            if (syncPending)
+            // P1-A: ALWAYS reset all 4 state variables unconditionally at the start
+            // This prevents double-cleanup in exception handlers regardless of fleetEntryName
+            // Capture values before resetting for cleanup operations
+            bool wasSyncPending = syncPending;
+            int capturedReservedDelta = reservedDelta;
+            int capturedPoolSlotIndex = poolSlotIndex;
+
+            // Reset all flags immediately to prevent double-cleanup
+            registeredForCleanup = false;
+            syncPending = false;
+            reservedDelta = 0;
+            poolSlotIndex = -1;
+
+            // Perform actual cleanup operations using captured values
+            if (wasSyncPending)
             {
                 ClearDispatchSyncPending(expectedKey);
-                syncPending = false;
             }
-            if (reservedDelta != 0)
+            if (capturedReservedDelta != 0)
             {
-                AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-                reservedDelta = 0;
+                AddExpectedPositionDeltaLocked(expectedKey, -capturedReservedDelta);
             }
-            if (poolSlotIndex >= 0)
+            if (capturedPoolSlotIndex >= 0)
             {
-                _photonPool.ReleaseByIndex(poolSlotIndex);
-                _photonSideband[poolSlotIndex] = default(FleetDispatchSideband);
-                poolSlotIndex = -1;
+                _photonPool.ReleaseByIndex(capturedPoolSlotIndex);
+                _photonSideband[capturedPoolSlotIndex] = default(FleetDispatchSideband);
             }
-            // P2-4 Fix: Complete state rollback
+
+            // Dictionary cleanup only when fleetEntryName exists
             if (fleetEntryName != null)
             {
                 activePositions.TryRemove(fleetEntryName, out _);
@@ -1134,8 +1146,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 _followerBrackets.TryRemove(fleetEntryName, out _);
             }
-            // EPIC-7-QUALITY-002: Reset flag unconditionally to prevent double-cleanup in exception handler
-            registeredForCleanup = false;
         }
 
         #endregion
