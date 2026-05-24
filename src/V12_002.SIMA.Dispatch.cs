@@ -801,6 +801,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     reservedDelta,
                     _poolSlotIndex,
                     fleetEntryName,
+                    ref registeredForCleanup,
                     out bool circuitBreakerTripped
                 )
             )
@@ -970,6 +971,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     reservedDelta,
                     _poolSlotIndexLmt,
                     fleetEntryName,
+                    ref registeredForCleanup,
                     out bool circuitBreakerTrippedLmt
                 )
             )
@@ -1031,6 +1033,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int reservedDelta,
             int poolSlotIndex,
             string fleetEntryName,
+            ref bool registeredForCleanup,
             out bool circuitBreakerTripped
         )
         {
@@ -1054,14 +1057,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                         );
                     }
                     // Rollback state
-                    RollbackCircuitBreakerState(syncPending, expectedKey, reservedDelta, poolSlotIndex, fleetEntryName);
+                    RollbackCircuitBreakerState(
+                        syncPending,
+                        expectedKey,
+                        reservedDelta,
+                        poolSlotIndex,
+                        fleetEntryName,
+                        ref registeredForCleanup
+                    );
                     circuitBreakerTripped = true;
                     return false;
                 }
                 // Circuit breaker already tripped - reject silently
                 if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
                 {
-                    RollbackCircuitBreakerState(syncPending, expectedKey, reservedDelta, poolSlotIndex, fleetEntryName);
+                    RollbackCircuitBreakerState(
+                        syncPending,
+                        expectedKey,
+                        reservedDelta,
+                        poolSlotIndex,
+                        fleetEntryName,
+                        ref registeredForCleanup
+                    );
                     circuitBreakerTripped = true;
                     return false;
                 }
@@ -1075,13 +1092,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// P2-3: Rollback helper for circuit breaker state cleanup.
+        /// EPIC-7-QUALITY-002: Reset registeredForCleanup to prevent double-cleanup in exception handler.
         /// </summary>
         private void RollbackCircuitBreakerState(
             bool syncPending,
             string expectedKey,
             int reservedDelta,
             int poolSlotIndex,
-            string fleetEntryName
+            string fleetEntryName,
+            ref bool registeredForCleanup
         )
         {
             if (syncPending)
@@ -1106,6 +1125,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         targetDict.TryRemove(fleetEntryName, out _);
                 }
                 _followerBrackets.TryRemove(fleetEntryName, out _);
+                // EPIC-7-QUALITY-002: Reset flag to prevent double-cleanup in exception handler
+                registeredForCleanup = false;
             }
         }
 
