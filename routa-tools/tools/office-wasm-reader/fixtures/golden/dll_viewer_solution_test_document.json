@@ -1,0 +1,311 @@
+{
+  "elementCount": 34,
+  "elementTypes": {
+    "1": 26,
+    "7": 1,
+    "9": 7
+  },
+  "heightEmu": 15840,
+  "imageCount": 1,
+  "images": [
+    {
+      "byteLength": 123599,
+      "contentType": "image/png",
+      "id": "image-2b1dc6ab2052a59f",
+      "sha256": "2b1dc6ab2052a59f4b56caeb2eba3a30a5f6c1cf767b1accf447402438b89df6"
+    }
+  ],
+  "numberingDefinitionCount": 9,
+  "protocol": "oaiproto.coworker.docx.Document",
+  "sectionCount": 1,
+  "tableCount": 7,
+  "tableShapes": [
+    {
+      "rowCount": 1,
+      "cellCounts": [
+        1
+      ],
+      "preview": [
+        [
+          "文档目标\n这份文档不是完整产品规格，而是一个可渲染、可验收的 Word 测试样例。它包含 DLL Viewer 的最小方案、架构图片、数据表格、伪代码与 UI "
+        ]
+      ]
+    },
+    {
+      "rowCount": 8,
+      "cellCounts": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "preview": [
+        [
+          "模块 | 模块 | FFFFFF | 003D4F",
+          "MVP 是否包含 | MVP 是否包含 | FFFFFF | 003D4F",
+          "展示方式 | 展示方式 | FFFFFF | 003D4F",
+          "备注 | 备注 | FFFFFF | 003D4F"
+        ],
+        [
+          "Summary | Summary",
+          "是 | 是",
+          "卡片 | 卡片",
+          "展示架构、入口点、ImageBase、Section 数量 | 展示架构、入口点、ImageBase、Section 数量"
+        ],
+        [
+          "Sections | Sections",
+          "是 | 是",
+          "表格 | 表格",
+          "展示 .text、.rdata、.data、.rsrc 等 | 展示 .text、.rdata、.data、.rsrc 等"
+        ]
+      ]
+    },
+    {
+      "rowCount": 1,
+      "cellCounts": [
+        1
+      ],
+      "preview": [
+        [
+          "function rvaToOffset(rva, sections) {\n  for (const s of sections) {\n    const st"
+        ]
+      ]
+    },
+    {
+      "rowCount": 1,
+      "cellCounts": [
+        1
+      ],
+      "preview": [
+        [
+          "{\n  \"summary\": {\n    \"name\": \"tiny.dll\",\n    \"type\": \"PE32+ DLL\",\n    \"arch\": \"x"
+        ]
+      ]
+    },
+    {
+      "rowCount": 7,
+      "cellCounts": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "preview": [
+        [
+          "页面 | 页面 | FFFFFF | 3F6D7B",
+          "核心内容 | 核心内容 | FFFFFF | 3F6D7B",
+          "测试重点 | 测试重点 | FFFFFF | 3F6D7B"
+        ],
+        [
+          "Overview | Overview",
+          "Summary Card、Warnings、基础元信息 | Summary Card、Warnings、基础元信息",
+          "卡片布局、中文换行、状态标签 | 卡片布局、中文换行、状态标签"
+        ],
+        [
+          "Sections | Sections",
+          "Section 表格、Entropy、权限标记 | Section 表格、Entropy、权限标记",
+          "宽表格、数字对齐、排序 | 宽表格、数字对齐、排序"
+        ]
+      ]
+    },
+    {
+      "rowCount": 1,
+      "cellCounts": [
+        1
+      ],
+      "preview": [
+        [
+          "#include <windows.h>\n\n__declspec(dllexport)\nint add(int a, int b) {\n    return a"
+        ]
+      ]
+    },
+    {
+      "rowCount": 1,
+      "cellCounts": [
+        1
+      ],
+      "preview": [
+        [
+          "安全边界\n测试 Viewer 时应坚持静态解析：不要对未知 DLL 调用 LoadLibrary，不要执行导出函数，也不要在主进程里加载不可信二进制。Viewe"
+        ]
+      ]
+    }
+  ],
+  "textStyleCount": 36,
+  "textStyleIds": [
+    "Normal",
+    "Header",
+    "Footer",
+    "Heading1",
+    "Heading2",
+    "Heading3",
+    "Heading4",
+    "Heading5",
+    "Heading6",
+    "Heading7",
+    "Heading8",
+    "Heading9",
+    "NoSpacing",
+    "Title",
+    "Subtitle",
+    "ListParagraph",
+    "BodyText",
+    "BodyText2",
+    "BodyText3",
+    "List",
+    "List2",
+    "List3",
+    "ListBullet",
+    "ListBullet2",
+    "ListBullet3",
+    "ListNumber",
+    "ListNumber2",
+    "ListNumber3",
+    "ListContinue",
+    "ListContinue2",
+    "ListContinue3",
+    "MacroText",
+    "Quote",
+    "Caption",
+    "IntenseQuote",
+    "TOCHeading"
+  ],
+  "previewElements": [
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "DLL Viewer 最小实现方案",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "用于测试 Word Viewer 的方案文档：标题、表格、图片、代码块、清单与结构化内容",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "版本：v0.1  |  场景：本地 DLL Viewer / Binary Evidence Viewer / Agentic UI 组件测试",
+      "type": 1
+    },
+    {
+      "bbox": {
+        "xEmu": 640080,
+        "widthEmu": 6492240
+      },
+      "hasImageReference": false,
+      "hasTable": true,
+      "paragraphCount": 1,
+      "textPreview": "文档目标\n这份文档不是完整产品规格，而是一个可渲染、可验收的 Word 测试样例。它包含 DLL Viewer 的最小方案、架构图片、数据表格、伪代码与 UI 数据模型，适合测试 Word Viewer 对中文、表格、图片、代码块和多级标题的支持。",
+      "type": 9
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "",
+      "type": 1
+    },
+    {
+      "bbox": {
+        "xEmu": 777240,
+        "yEmu": 0,
+        "widthEmu": 6217920,
+        "heightEmu": 3730752
+      },
+      "hasImageReference": true,
+      "hasTable": false,
+      "paragraphCount": 0,
+      "textPreview": "",
+      "type": 7
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "图 1：DLL Viewer 的最小解析管线与前端 ViewModel 映射",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "1. 背景与目标",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "DLL Viewer 的目标是静态读取 Windows DLL 文件，把二进制格式中的 PE Header、Section、Import、Export、Resource 等信息转成可浏览的结构化视图。最小实现阶段不要执行 DLL，也不要尝试反编译，只做只读解析与证据展示。",
+      "type": 1
+    },
+    {
+      "bbox": {
+        "xEmu": 640080,
+        "widthEmu": 6492240
+      },
+      "hasImageReference": false,
+      "hasTable": true,
+      "paragraphCount": 32,
+      "textPreview": "模块 MVP 是否包含 展示方式 备注 Summary 是 卡片 展示架构、入口点、ImageBase、Section 数量 Sections 是 表格 展示 .text、.rdata、.data、.rsrc 等 Imports 是 树结构 按 DLL 分组展示导入函数 Exports 是 表格 展示导出函数名、Ord",
+      "type": 9
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "2. 最小解析流程",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "• 读取文件字节，并校验 DOS Header 的 MZ 魔数。",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "• 根据 e_lfanew 跳转到 NT Header，并校验 PE 签名。",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "• 读取 File Header 与 Optional Header，识别 x86 / x64、ImageBase、EntryPoint 等基础信息。",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "• 读取 Section Table，建立 RVA 到文件偏移的映射。",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "• 解析 Data Directory 中的 Import Table、Export Table 和 Resource Table。",
+      "type": 1
+    }
+  ],
+  "wasmProtoByteLength": 167075,
+  "wasmProtoSha256": "205635f4cf24669aba1ce156f3cefad0bdf2add5e5cee8cba4c83899f2a12d35",
+  "widthEmu": 12240
+}

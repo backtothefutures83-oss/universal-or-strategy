@@ -1,0 +1,630 @@
+{
+  "chartCount": 3,
+  "imageCount": 0,
+  "protocol": "oaiproto.coworker.spreadsheet.Workbook",
+  "sheetCount": 9,
+  "sheets": [
+    {
+      "cellCount": 2080,
+      "columnCount": 9,
+      "conditionalFormatCount": 0,
+      "dataValidationCount": 0,
+      "drawingCount": 2,
+      "formulaCellCount": 2,
+      "mergedRangeCount": 5,
+      "name": "00_README",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Complex Excel Renderer Test Workbook"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "用于测试本地 Excel renderer 对布局、公式、图表、条件格式、数据验证、合并单元格和跨表引用的支持情况。"
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "Renderer coverage checklist"
+        },
+        {
+          "address": "A6",
+          "formula": "",
+          "value": "Feature"
+        },
+        {
+          "address": "B6",
+          "formula": "",
+          "value": "Where to inspect"
+        },
+        {
+          "address": "C6",
+          "formula": "",
+          "value": "Why it matters"
+        },
+        {
+          "address": "D6",
+          "formula": "",
+          "value": "Expected render behavior"
+        },
+        {
+          "address": "F6",
+          "formula": "",
+          "value": "Useful links"
+        },
+        {
+          "address": "A7",
+          "formula": "",
+          "value": "Merged title bands"
+        },
+        {
+          "address": "B7",
+          "formula": "",
+          "value": "00_README / 01_Dashboard / 07_Layout_Stress"
+        },
+        {
+          "address": "C7",
+          "formula": "",
+          "value": "很多报表会使用合并标题区"
+        },
+        {
+          "address": "D7",
+          "formula": "",
+          "value": "标题不重叠、不截断"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 0,
+      "tables": []
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 14,
+      "conditionalFormatCount": 1,
+      "dataValidationCount": 0,
+      "drawingCount": 3,
+      "formulaCellCount": 24,
+      "mergedRangeCount": 10,
+      "name": "01_Dashboard",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "AI Coding Delivery Dashboard"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "KPI cards, formulas, chart objects and status summary for renderer smoke testing."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "KPI Summary"
+        },
+        {
+          "address": "A6",
+          "formula": "",
+          "value": "Total Tasks"
+        },
+        {
+          "address": "D6",
+          "formula": "",
+          "value": "Done"
+        },
+        {
+          "address": "G6",
+          "formula": "",
+          "value": "Blocked"
+        },
+        {
+          "address": "J6",
+          "formula": "",
+          "value": "Overdue Open"
+        },
+        {
+          "address": "A7",
+          "formula": "COUNTA('02_Tasks_Table'!A5:A44)",
+          "value": "40"
+        },
+        {
+          "address": "D7",
+          "formula": "COUNTIF('02_Tasks_Table'!E5:E44,\"Done\")",
+          "value": "7"
+        },
+        {
+          "address": "G7",
+          "formula": "COUNTIF('02_Tasks_Table'!E5:E44,\"Blocked\")",
+          "value": "6"
+        },
+        {
+          "address": "J7",
+          "formula": "COUNTIFS('02_Tasks_Table'!H5:H44,\"<\"&TODAY(),'02_Tasks_Table'!E5:E44,\"<>Done\")",
+          "value": "17"
+        },
+        {
+          "address": "A11",
+          "formula": "",
+          "value": "Avg Progress"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 0,
+      "tables": []
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 17,
+      "conditionalFormatCount": 4,
+      "dataValidationCount": 0,
+      "drawingCount": 0,
+      "formulaCellCount": 160,
+      "mergedRangeCount": 2,
+      "name": "02_Tasks_Table",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Task Table with Formulas, Validation and Conditional Formatting"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "A realistic project table designed to stress row height, formulas, dropdown validation, conditional formatting and table..."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "ID"
+        },
+        {
+          "address": "B4",
+          "formula": "",
+          "value": "Feature"
+        },
+        {
+          "address": "C4",
+          "formula": "",
+          "value": "Area"
+        },
+        {
+          "address": "D4",
+          "formula": "",
+          "value": "Owner"
+        },
+        {
+          "address": "E4",
+          "formula": "",
+          "value": "Status"
+        },
+        {
+          "address": "F4",
+          "formula": "",
+          "value": "Priority"
+        },
+        {
+          "address": "G4",
+          "formula": "",
+          "value": "Start Date"
+        },
+        {
+          "address": "H4",
+          "formula": "",
+          "value": "Due Date"
+        },
+        {
+          "address": "I4",
+          "formula": "",
+          "value": "Days Left"
+        },
+        {
+          "address": "J4",
+          "formula": "",
+          "value": "Progress"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 1,
+      "tables": [
+        {
+          "displayName": "TasksTable",
+          "name": "TasksTable",
+          "ref": "A4:Q44"
+        }
+      ]
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 12,
+      "conditionalFormatCount": 3,
+      "dataValidationCount": 0,
+      "drawingCount": 1,
+      "formulaCellCount": 18,
+      "mergedRangeCount": 2,
+      "name": "03_TimeSeries",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Monthly Delivery Signals"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "Time series with formulas, chart, data bars and sparklines."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "Month"
+        },
+        {
+          "address": "B4",
+          "formula": "",
+          "value": "Completed"
+        },
+        {
+          "address": "C4",
+          "formula": "",
+          "value": "Escaped Defects"
+        },
+        {
+          "address": "D4",
+          "formula": "",
+          "value": "Coverage"
+        },
+        {
+          "address": "E4",
+          "formula": "",
+          "value": "Lead Time"
+        },
+        {
+          "address": "F4",
+          "formula": "",
+          "value": "Fitness Score"
+        },
+        {
+          "address": "G4",
+          "formula": "",
+          "value": "Sparkline"
+        },
+        {
+          "address": "H4",
+          "formula": "",
+          "value": "Revenue"
+        },
+        {
+          "address": "I4",
+          "formula": "",
+          "value": "Cost"
+        },
+        {
+          "address": "J4",
+          "formula": "",
+          "value": "Margin"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 1,
+      "tables": [
+        {
+          "displayName": "MonthlySignalsTable",
+          "name": "MonthlySignalsTable",
+          "ref": "A4:L22"
+        }
+      ]
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 14,
+      "conditionalFormatCount": 2,
+      "dataValidationCount": 0,
+      "drawingCount": 0,
+      "formulaCellCount": 30,
+      "mergedRangeCount": 5,
+      "name": "04_Heatmap",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Risk × Capability Heatmap"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "Merged labels and color scales test matrix rendering."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "Risk Area"
+        },
+        {
+          "address": "B4",
+          "formula": "",
+          "value": "Capability Coverage Score"
+        },
+        {
+          "address": "J4",
+          "formula": "",
+          "value": "Summary Signals"
+        },
+        {
+          "address": "B5",
+          "formula": "",
+          "value": "Spec"
+        },
+        {
+          "address": "C5",
+          "formula": "",
+          "value": "Context"
+        },
+        {
+          "address": "D5",
+          "formula": "",
+          "value": "Coding"
+        },
+        {
+          "address": "E5",
+          "formula": "",
+          "value": "Review"
+        },
+        {
+          "address": "F5",
+          "formula": "",
+          "value": "Fitness"
+        },
+        {
+          "address": "G5",
+          "formula": "",
+          "value": "Release"
+        },
+        {
+          "address": "H5",
+          "formula": "",
+          "value": "Observe"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 0,
+      "tables": []
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 4,
+      "conditionalFormatCount": 1,
+      "dataValidationCount": 0,
+      "drawingCount": 0,
+      "formulaCellCount": 9,
+      "mergedRangeCount": 2,
+      "name": "05_Formula_Lab",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Formula Lab"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "Cross-sheet formulas, lookup formulas, IF/COUNTIFS/SUMIFS, dynamic-looking formulas and formula text."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "Metric"
+        },
+        {
+          "address": "B4",
+          "formula": "",
+          "value": "Result"
+        },
+        {
+          "address": "C4",
+          "formula": "",
+          "value": "Expected meaning"
+        },
+        {
+          "address": "D4",
+          "formula": "",
+          "value": "Renderer note"
+        },
+        {
+          "address": "A5",
+          "formula": "",
+          "value": "Total tasks"
+        },
+        {
+          "address": "B5",
+          "formula": "COUNTA('02_Tasks_Table'!A5:A44)",
+          "value": "40"
+        },
+        {
+          "address": "C5",
+          "formula": "",
+          "value": "Count task IDs"
+        },
+        {
+          "address": "D5",
+          "formula": "",
+          "value": "Cross-sheet count"
+        },
+        {
+          "address": "A6",
+          "formula": "",
+          "value": "Done tasks"
+        },
+        {
+          "address": "B6",
+          "formula": "COUNTIF('02_Tasks_Table'!E5:E44,\"Done\")",
+          "value": "7"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 0,
+      "tables": []
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 10,
+      "conditionalFormatCount": 2,
+      "dataValidationCount": 0,
+      "drawingCount": 0,
+      "formulaCellCount": 3,
+      "mergedRangeCount": 4,
+      "name": "06_Validation_Form",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Validation Form"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "Editable-looking form with dropdown, date and number validation plus calculated quote."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "Scenario Input Form"
+        },
+        {
+          "address": "A6",
+          "formula": "",
+          "value": "Field"
+        },
+        {
+          "address": "B6",
+          "formula": "",
+          "value": "Value"
+        },
+        {
+          "address": "C6",
+          "formula": "",
+          "value": "Validation"
+        },
+        {
+          "address": "D6",
+          "formula": "",
+          "value": "Computed / helper"
+        },
+        {
+          "address": "A7",
+          "formula": "",
+          "value": "Requester"
+        },
+        {
+          "address": "B7",
+          "formula": "",
+          "value": "Phodal"
+        },
+        {
+          "address": "C7",
+          "formula": "",
+          "value": "Text"
+        },
+        {
+          "address": "A8",
+          "formula": "",
+          "value": "Workstream"
+        },
+        {
+          "address": "B8",
+          "formula": "",
+          "value": "Task-Adaptive Harness"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 0,
+      "tables": []
+    },
+    {
+      "cellCount": 2080,
+      "columnCount": 14,
+      "conditionalFormatCount": 0,
+      "dataValidationCount": 0,
+      "drawingCount": 2,
+      "formulaCellCount": 0,
+      "mergedRangeCount": 6,
+      "name": "07_Layout_Stress",
+      "previewCells": [
+        {
+          "address": "A1",
+          "formula": "",
+          "value": "Layout Stress Sheet"
+        },
+        {
+          "address": "A2",
+          "formula": "",
+          "value": "Designed to exercise merged regions, text wrapping, Unicode, row heights, shape anchors and formula-looking text."
+        },
+        {
+          "address": "A4",
+          "formula": "",
+          "value": "Wide merged banner: Agentic UI / Excel renderer / 中文长标题 / emoji ✅ / right-to-left sample: مرحبا"
+        },
+        {
+          "address": "A6",
+          "formula": "",
+          "value": "Case"
+        },
+        {
+          "address": "B6",
+          "formula": "",
+          "value": "Short"
+        },
+        {
+          "address": "C6",
+          "formula": "",
+          "value": "Wrapped text"
+        },
+        {
+          "address": "D6",
+          "formula": "",
+          "value": "Number"
+        },
+        {
+          "address": "E6",
+          "formula": "",
+          "value": "Date"
+        },
+        {
+          "address": "F6",
+          "formula": "",
+          "value": "Percent"
+        },
+        {
+          "address": "G6",
+          "formula": "",
+          "value": "Formula-ish"
+        },
+        {
+          "address": "H6",
+          "formula": "",
+          "value": "Merged notes"
+        },
+        {
+          "address": "I6",
+          "formula": "",
+          "value": "CJK"
+        }
+      ],
+      "rowCount": 80,
+      "tableCount": 0,
+      "tables": []
+    }
+  ],
+  "styleCounts": {
+    "borderCount": 50,
+    "cellFormatCount": 414,
+    "fillCount": 19,
+    "fontCount": 24,
+    "numberFormatCount": 7
+  },
+  "tableCount": 3,
+  "wasmProtoByteLength": 234138,
+  "wasmProtoSha256": "1b1060592f9f47e19c4d2e6a9cd40e0923cc3906e3145f7ec906012e5a2b7a5a"
+}

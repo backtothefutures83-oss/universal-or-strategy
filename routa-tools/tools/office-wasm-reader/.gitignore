@@ -1,0 +1,6 @@
+artifacts/
+.dotnet-home/
+.dotnet-sdk/
+.nuget/
+**/bin/
+**/obj/

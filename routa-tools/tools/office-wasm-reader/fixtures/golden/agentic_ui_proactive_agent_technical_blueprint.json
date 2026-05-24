@@ -1,0 +1,1969 @@
+{
+  "chartCount": 0,
+  "imageCount": 0,
+  "layoutCount": 2,
+  "protocol": "oaiproto.coworker.presentation.Presentation",
+  "slideCount": 20,
+  "slides": [
+    {
+      "elementCount": 23,
+      "elementTypes": {
+        "1": 11,
+        "5": 12
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide1.xml",
+      "index": 1,
+      "textElementCount": 11,
+      "shapeElementCount": 12,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 6858000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "3",
+          "name": "Shape 1",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 9189720,
+            "yEmu": 594360,
+            "widthEmu": 2331720,
+            "heightEmu": 2331720,
+            "rotation": 1200000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "4",
+          "name": "Shape 2",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 713232,
+            "yEmu": 713232,
+            "widthEmu": 1965960,
+            "heightEmu": 292608
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 786384,
+            "yEmu": 781812,
+            "widthEmu": 1819656,
+            "heightEmu": 146304
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "6",
+          "name": "Text 4",
+          "paragraphCount": 1,
+          "textPreview": "TECHNICAL BLUEPRINT",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 713232,
+            "yEmu": 1481328,
+            "widthEmu": 6766560,
+            "heightEmu": 1280160
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 2,
+          "textPreview": "主动式 Agentic UI 技术方案总览",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 731520,
+            "yEmu": 2971800,
+            "widthEmu": 7406640,
+            "heightEmu": 301752
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 1,
+          "textPreview": "Agent Runtime × Context Engineering × Permission Governance × UI Orchestration",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 749808,
+            "yEmu": 4005072,
+            "widthEmu": 2395728,
+            "heightEmu": 1051560
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 749808,
+            "yEmu": 4005072,
+            "widthEmu": 50292,
+            "heightEmu": 1051560
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 914400,
+            "yEmu": 4114800,
+            "widthEmu": 2103120,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "设计时",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 28,
+      "elementTypes": {
+        "1": 17,
+        "5": 11
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide2.xml",
+      "index": 2,
+      "textElementCount": 17,
+      "shapeElementCount": 11,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "总体判断：技术方案应围绕“有边界的主动性”设计",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "将主动式 Agent 的行为拆成可感知、可解释、可授权、可追踪、可恢复的五层能力。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 749808,
+            "yEmu": 1389888,
+            "widthEmu": 438912,
+            "heightEmu": 438912
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 786384,
+            "yEmu": 1508760,
+            "widthEmu": 365760,
+            "heightEmu": 201168
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "6",
+          "name": "Text 4",
+          "paragraphCount": 1,
+          "textPreview": "01",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 1353312,
+            "yEmu": 1408176,
+            "widthEmu": 2880360,
+            "heightEmu": 256032
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "主动性不是通知更多",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 4343400,
+            "yEmu": 1399032,
+            "widthEmu": 6601968,
+            "heightEmu": 393192
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 1,
+          "textPreview": "Opportunity Detector 先过滤信号，再通过 Relevance / Interruption Policy 决定是否打扰用户。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 1353312,
+            "yEmu": 1975104,
+            "widthEmu": 9966960
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 749808,
+            "yEmu": 2514600,
+            "widthEmu": 438912,
+            "heightEmu": 438912
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 786384,
+            "yEmu": 2633472,
+            "widthEmu": 365760,
+            "heightEmu": 201168
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "02",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 40,
+      "elementTypes": {
+        "1": 27,
+        "5": 13
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide3.xml",
+      "index": 3,
+      "textElementCount": 27,
+      "shapeElementCount": 13,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "设计目标与成功标准",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "主动式 Agent 技术方案既要解决任务效率，也要解决信任、风险和可运营性。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 731520,
+            "yEmu": 1417320,
+            "widthEmu": 2971800,
+            "heightEmu": 1783080
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 731520,
+            "yEmu": 1417320,
+            "widthEmu": 50292,
+            "heightEmu": 1783080
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 896112,
+            "yEmu": 1527048,
+            "widthEmu": 2679192,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "产品目标",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 896112,
+            "yEmu": 1847088,
+            "widthEmu": 2660904,
+            "heightEmu": 1280160
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 3,
+          "textPreview": "• 在用户未明确发问时识别机会 • 将建议沉淀为可执行计划 • 通过 UI 让用户快速理解与授权",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 3977640,
+            "yEmu": 1417320,
+            "widthEmu": 2971800,
+            "heightEmu": 1783080
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 3977640,
+            "yEmu": 1417320,
+            "widthEmu": 50292,
+            "heightEmu": 1783080
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 4142232,
+            "yEmu": 1527048,
+            "widthEmu": 2679192,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "技术目标",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 49,
+      "elementTypes": {
+        "1": 23,
+        "5": 26
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide4.xml",
+      "index": 4,
+      "textElementCount": 23,
+      "shapeElementCount": 26,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "端到端系统架构",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "从信号感知到主动建议、授权执行、审计学习的闭环。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 502920,
+            "yEmu": 1417320,
+            "widthEmu": 1691640,
+            "heightEmu": 2286000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 502920,
+            "yEmu": 1417320,
+            "widthEmu": 50292,
+            "heightEmu": 2286000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 667512,
+            "yEmu": 1527048,
+            "widthEmu": 1399032,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "Signals / Context",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 667512,
+            "yEmu": 1847088,
+            "widthEmu": 1380744,
+            "heightEmu": 1783080
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 2,
+          "textPreview": "日历 · 邮件 · CRM · 产品事件 网页 · 文件 · 代码 · 用户偏好",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 2212848,
+            "yEmu": 2560320,
+            "widthEmu": 109728
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 2359152,
+            "yEmu": 1417320,
+            "widthEmu": 1691640,
+            "heightEmu": 2286000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 2359152,
+            "yEmu": 1417320,
+            "widthEmu": 50292,
+            "heightEmu": 2286000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "11",
+          "name": "Shape 9",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 18,
+      "elementTypes": {
+        "1": 11,
+        "5": 7
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide5.xml",
+      "index": 5,
+      "textElementCount": 11,
+      "shapeElementCount": 7,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "两套系统：设计时工作台 vs 运行时 Agentic UI",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "Claude Design 不直接替代产品运行时，而是作为模式库和原型生成器嵌入研发流程。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 731520,
+            "yEmu": 1417320,
+            "widthEmu": 4937760,
+            "heightEmu": 3886200
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 6492240,
+            "yEmu": 1417320,
+            "widthEmu": 4937760,
+            "heightEmu": 3886200
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 960120,
+            "yEmu": 1664208,
+            "widthEmu": 1417320,
+            "heightEmu": 292608
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "7",
+          "name": "Shape 5",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 1033272,
+            "yEmu": 1732788,
+            "widthEmu": 1271016,
+            "heightEmu": 146304
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 1,
+          "textPreview": "DESIGN-TIME",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 6720840,
+            "yEmu": 1664208,
+            "widthEmu": 1097280,
+            "heightEmu": 292608
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 6793992,
+            "yEmu": 1732788,
+            "widthEmu": 950976,
+            "heightEmu": 146304
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "10",
+          "name": "Text 8",
+          "paragraphCount": 1,
+          "textPreview": "RUNTIME",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 960120,
+            "yEmu": 2212848,
+            "widthEmu": 3108960,
+            "heightEmu": 310896
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "Claude Design / Pattern Lab",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 51,
+      "elementTypes": {
+        "1": 23,
+        "5": 28
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide6.xml",
+      "index": 6,
+      "textElementCount": 23,
+      "shapeElementCount": 28,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "主动式 Agent 的核心循环",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "把“主动”拆成 6 个可工程化的阶段，而不是直接让 Agent 自动行动。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 685800,
+            "yEmu": 1828800,
+            "widthEmu": 1572768,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 685800,
+            "yEmu": 1828800,
+            "widthEmu": 50292,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 850392,
+            "yEmu": 1938528,
+            "widthEmu": 1280160,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "Sense",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 850392,
+            "yEmu": 2258568,
+            "widthEmu": 1261872,
+            "heightEmu": 640080
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 2,
+          "textPreview": "收集信号 事件流 / 连接器 / 用户状态",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 2276856,
+            "yEmu": 2395728,
+            "widthEmu": 256032
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 2560320,
+            "yEmu": 1828800,
+            "widthEmu": 1572768,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 2560320,
+            "yEmu": 1828800,
+            "widthEmu": 50292,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "11",
+          "name": "Shape 9",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 59,
+      "elementTypes": {
+        "1": 30,
+        "5": 29
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide7.xml",
+      "index": 7,
+      "textElementCount": 30,
+      "shapeElementCount": 29,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "Opportunity Engine：主动介入的技术判定",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "核心不是“能发现什么”，而是“什么值得现在告诉用户”。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 822960,
+            "yEmu": 1353312,
+            "widthEmu": 2743200,
+            "heightEmu": 310896
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "5",
+          "name": "Text 3",
+          "paragraphCount": 1,
+          "textPreview": "Opportunity Score",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 822960,
+            "yEmu": 1810512,
+            "widthEmu": 4572000,
+            "heightEmu": 914400
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 1005840,
+            "yEmu": 2148840,
+            "widthEmu": 4206240,
+            "heightEmu": 201168
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "S = Impact × Confidence × Urgency × UserFit − Risk − InterruptionCost",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 5989320,
+            "yEmu": 1417320,
+            "widthEmu": 1508760,
+            "heightEmu": 1097280
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "8",
+          "name": "Shape 6",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 5989320,
+            "yEmu": 1417320,
+            "widthEmu": 50292,
+            "heightEmu": 1097280
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 6153912,
+            "yEmu": 1527048,
+            "widthEmu": 1216152,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "10",
+          "name": "Text 8",
+          "paragraphCount": 1,
+          "textPreview": "Impact",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 6153912,
+            "yEmu": 1847088,
+            "widthEmu": 1197864,
+            "heightEmu": 594360
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 2,
+          "textPreview": "潜在收益或损失 客户流失、收入、项目延期",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 41,
+      "elementTypes": {
+        "1": 19,
+        "5": 22
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide8.xml",
+      "index": 8,
+      "textElementCount": 19,
+      "shapeElementCount": 22,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "Context & Memory：让 Agent 主动但不越界",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "上下文工程决定 Agent 看见什么；记忆治理决定 Agent 可以长期记住什么。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 1417320,
+            "widthEmu": 2331720,
+            "heightEmu": 1005840
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 1417320,
+            "widthEmu": 50292,
+            "heightEmu": 1005840
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 1527048,
+            "widthEmu": 2039112,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "Event Context",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 1847088,
+            "widthEmu": 2020824,
+            "heightEmu": 502920
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 1,
+          "textPreview": "实时信号：邮件、会议、CRM、产品事件、浏览器状态",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 2743200,
+            "widthEmu": 2331720,
+            "heightEmu": 1005840
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 2743200,
+            "widthEmu": 50292,
+            "heightEmu": 1005840
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 2852928,
+            "widthEmu": 2039112,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "Task Context",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 42,
+      "elementTypes": {
+        "1": 20,
+        "5": 22
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide9.xml",
+      "index": 9,
+      "textElementCount": 20,
+      "shapeElementCount": 22,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "Agent Runtime：可替换的编排内核",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "把大模型调用包在可测试、可治理、可追踪的运行时中。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 2011680,
+            "yEmu": 1920240,
+            "widthEmu": 1920240
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 5715000,
+            "yEmu": 1920240,
+            "widthEmu": 1920240
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 5715000,
+            "yEmu": 3291840,
+            "widthEmu": 1920240
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "7",
+          "name": "Shape 5",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 3977640,
+            "yEmu": 2240280,
+            "heightEmu": 731520
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "8",
+          "name": "Shape 6",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 3977640,
+            "yEmu": 3291840,
+            "heightEmu": 749808
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 5715000,
+            "yEmu": 4041648,
+            "widthEmu": 1920240
+          },
+          "hasFill": false,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 731520,
+            "yEmu": 1463040,
+            "widthEmu": 1828800,
+            "heightEmu": 914400
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "11",
+          "name": "Shape 9",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 44,
+      "elementTypes": {
+        "1": 20,
+        "5": 24
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide10.xml",
+      "index": 10,
+      "textElementCount": 20,
+      "shapeElementCount": 24,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "Tool Runtime：MCP / API / Browser 的统一工具网关",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "工具调用是主动式 Agent 最大的价值来源，也是最大的风险来源。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 1325880,
+            "widthEmu": 2331720,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 1325880,
+            "widthEmu": 50292,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 1435608,
+            "widthEmu": 2039112,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "MCP Servers",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 1755648,
+            "widthEmu": 2020824,
+            "heightEmu": 640080
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 1,
+          "textPreview": "第三方/内部工具、数据库、项目管理、监控、CRM",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 3566160,
+            "yEmu": 1325880,
+            "widthEmu": 2331720,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 3566160,
+            "yEmu": 1325880,
+            "widthEmu": 50292,
+            "heightEmu": 1143000
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 3730752,
+            "yEmu": 1435608,
+            "widthEmu": 2039112,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "API Gateway",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 49,
+      "elementTypes": {
+        "1": 31,
+        "5": 18
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide11.xml",
+      "index": 11,
+      "textElementCount": 31,
+      "shapeElementCount": 18,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "Autonomy & Permission Ladder：逐级开放主动性",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "从观察、建议、起草到审批执行和条件自动执行，每一层都有明确 UI 与技术边界。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 822960,
+            "yEmu": 1261872,
+            "widthEmu": 10424160,
+            "heightEmu": 256032
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "5",
+          "name": "Text 3",
+          "paragraphCount": 1,
+          "textPreview": "默认策略：MVP 只开放 L0–L3；L4 仅限低风险、可回滚、用户显式配置的重复流程。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 822960,
+            "yEmu": 1892808,
+            "widthEmu": 384048,
+            "heightEmu": 384048
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 859536,
+            "yEmu": 1984248,
+            "widthEmu": 310896,
+            "heightEmu": 201168
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "0",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 1325880,
+            "yEmu": 1783080,
+            "widthEmu": 10012680,
+            "heightEmu": 658368
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "8",
+          "name": "Shape 6",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 1325880,
+            "yEmu": 1783080,
+            "widthEmu": 54864,
+            "heightEmu": 658368
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 1481328,
+            "yEmu": 1901952,
+            "widthEmu": 1280160,
+            "heightEmu": 164592
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "10",
+          "name": "Text 8",
+          "paragraphCount": 1,
+          "textPreview": "L0 观察",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 2834640,
+            "yEmu": 1901952,
+            "widthEmu": 2788920,
+            "heightEmu": 164592
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "只读取允许上下文，不主动提示",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    },
+    {
+      "elementCount": 27,
+      "elementTypes": {
+        "1": 15,
+        "5": 12
+      },
+      "hasBackground": true,
+      "heightEmu": 6858000,
+      "id": "/ppt/slides/slide12.xml",
+      "index": 12,
+      "textElementCount": 15,
+      "shapeElementCount": 12,
+      "previewElements": [
+        {
+          "bbox": {
+            "widthEmu": 12191695,
+            "heightEmu": 82296
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "2",
+          "name": "Shape 0",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 566928,
+            "yEmu": 329184,
+            "widthEmu": 8046720,
+            "heightEmu": 411480
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "3",
+          "name": "Text 1",
+          "paragraphCount": 1,
+          "textPreview": "Agentic UI Protocol：后端意图到前端组件的桥",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 585216,
+            "yEmu": 795528,
+            "widthEmu": 7863840,
+            "heightEmu": 237744
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "4",
+          "name": "Text 2",
+          "paragraphCount": 1,
+          "textPreview": "不要让前端解析自然语言；让 Agent Runtime 输出结构化 UI 事件。",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 1325880,
+            "widthEmu": 2331720,
+            "heightEmu": 868680
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "5",
+          "name": "Shape 3",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 777240,
+            "yEmu": 1325880,
+            "widthEmu": 50292,
+            "heightEmu": 868680
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "6",
+          "name": "Shape 4",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 1435608,
+            "widthEmu": 2039112,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "7",
+          "name": "Text 5",
+          "paragraphCount": 1,
+          "textPreview": "Agent Runtime",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 941832,
+            "yEmu": 1755648,
+            "widthEmu": 2020824,
+            "heightEmu": 365760
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "8",
+          "name": "Text 6",
+          "paragraphCount": 1,
+          "textPreview": "规划、工具调用、结果、异常",
+          "type": 1
+        },
+        {
+          "bbox": {
+            "xEmu": 4389120,
+            "yEmu": 1325880,
+            "widthEmu": 2606040,
+            "heightEmu": 868680
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "9",
+          "name": "Shape 7",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 4389120,
+            "yEmu": 1325880,
+            "widthEmu": 50292,
+            "heightEmu": 868680
+          },
+          "hasFill": true,
+          "hasLine": true,
+          "id": "10",
+          "name": "Shape 8",
+          "paragraphCount": 0,
+          "textPreview": "",
+          "type": 5
+        },
+        {
+          "bbox": {
+            "xEmu": 4553712,
+            "yEmu": 1435608,
+            "widthEmu": 2313432,
+            "heightEmu": 219456
+          },
+          "hasFill": false,
+          "hasLine": false,
+          "id": "11",
+          "name": "Text 9",
+          "paragraphCount": 1,
+          "textPreview": "UI Protocol Stream",
+          "type": 1
+        }
+      ],
+      "widthEmu": 12191695
+    }
+  ],
+  "wasmProtoByteLength": 106712,
+  "wasmProtoSha256": "a912131ccb617a1d535708c615190978fcc64f43a6fb335797d14362ed7a2cd0"
+}

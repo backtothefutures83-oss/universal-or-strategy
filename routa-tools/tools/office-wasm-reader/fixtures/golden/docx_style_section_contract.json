@@ -1,0 +1,58 @@
+{
+  "elementCount": 5,
+  "elementTypes": {
+    "1": 5
+  },
+  "heightEmu": 15840,
+  "imageCount": 0,
+  "images": [],
+  "numberingDefinitionCount": 0,
+  "protocol": "oaiproto.coworker.docx.Document",
+  "sectionCount": 2,
+  "tableCount": 0,
+  "tableShapes": [],
+  "textStyleCount": 1,
+  "textStyleIds": [
+    "Normal"
+  ],
+  "previewElements": [
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "Normal run before style.",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "Derived character style text plus plain tail",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "Direct override text",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "Section one ending.",
+      "type": 1
+    },
+    {
+      "hasImageReference": false,
+      "hasTable": false,
+      "paragraphCount": 1,
+      "textPreview": "Section two content.",
+      "type": 1
+    }
+  ],
+  "wasmProtoByteLength": 870,
+  "wasmProtoSha256": "d4401313f2cc97a96d5df5bc2c00b32a863904351d0e8848edfeff1174c1a99c",
+  "widthEmu": 12240
+}

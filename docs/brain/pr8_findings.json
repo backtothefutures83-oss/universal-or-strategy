@@ -1,0 +1,82 @@
+﻿{
+    "title":  "[PROTOCOL] TDD Hardening - Phases 1-4 Complete",
+    "pr_number":  8,
+    "bot_findings":  {
+                         "CodeRabbit":  [
+
+                                        ],
+                         "cubic":  [
+
+                                   ],
+                         "Greptile":  [
+                                          {
+                                              "submittedAt":  "2026-05-23T19:14:01Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-23T19:41:02Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-23T20:55:30Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-23T21:15:42Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-23T21:33:58Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-23T22:09:47Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-24T01:12:15Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          },
+                                          {
+                                              "submittedAt":  "2026-05-24T01:33:01Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          }
+                                      ],
+                         "AmazonQ":  [
+
+                                     ],
+                         "Semgrep":  [
+
+                                     ],
+                         "Codacy":  [
+                                        {
+                                            "submittedAt":  "2026-05-23T19:11:38Z",
+                                            "body":  "### Pull Request Overview\n\nThis PR presents a significant misalignment between its stated intent and the actual changes provided. Although the title and description claim a \u0027documentation-only\u0027 update for EPIC-6 testing, the diff introduces new production state fields in the core strategy logic (src/V12_002.cs) without implementing the corresponding behavior or ensuring thread safety. \n\nFurthermore, the automated quality gates in the GitHub Actions workflow are currently ineffective due to regex implementation errors and non-recursive file discovery. These issues, combined with the absence of the 80 tests mentioned in the PR documentation, constitute a failure to meet the phase 1 acceptance criteria.\n\n#### About this PR\n- Missing Test Implementation: While the \u0027Completion Reports\u0027 suggest 80 tests were written, no actual test code (.cs files) is present in the current diff.\n- Scope Misalignment: The PR diff includes changes to production source code and CI workflows, which directly contradicts the \u0027Documentation-only changes\u0027 claim in the PR description.\n- The fields `_proxTagCache` and `PROX_TAG_CACHE_LIMIT` were added to the production code but are never utilized or populated in the provided logic.\n\n\u003cdetails\u003e\n\u003csummary\u003e\u003cb\u003e\u003ccode\u003e2\u003c/code\u003e comments outside of the diff\u003c/b\u003e\u003c/summary\u003e\n\n\u003cdetails\u003e\n\u003csummary\u003e\u003ccode\u003e[REDACTED:HIGH_ENTROPY]\u003c/code\u003e\u003c/summary\u003e\n\n\u003e \u003csub\u003e`line 105` :red_circle: HIGH RISK\u003c/sub\u003e\n\u003e The lock audit is ineffective because `-SimpleMatch` prevents the regex from being interpreted, and the file globbing is non-recursive. Update the audit to use regex matching and recursive file discovery: `Select-String -Path src/**/*.cs -Pattern \u0027lock\\\\s*\\\\(\u0027`.\n\n\u003e \u003csub\u003e`line 118` :yellow_circle: MEDIUM RISK\u003c/sub\u003e\n\u003e Suggestion: The compliance gate silently skips the complexity audit if the script is missing. This should be a hard failure to ensure the CYC Ôëñ 15 rule is consistently enforced.\n\n\u003c/details\u003e\n\n\u003c/details\u003e\n\n#### Test suggestions\n- [x] Verify GitHub Actions workflow (EPIC-6 Testing) triggers correctly on PR/Push for main branch\n- [ ] Verify the proximity tag cache (_proxTagCache) correctly enforces the limit of 1000 items\n- [ ] Verify that the \u0027/nexus:sync\u0027 command correctly loads the V12 Photon Kernel DNA protocol across all supported CLI agents (.bob, .codex, .cursor, .traycer)\n- [ ] Verify LatencyProbe unit tests pass (as planned in the design documents)\n\n\u003cdetails\u003e\n\u003csummary\u003ePrompt proposal for missing tests\u003c/summary\u003e\n\n```\nConsider implementing these tests if applicable:\n1. Verify the proximity tag cache (_proxTagCache) correctly enforces the limit of 1000 items\n2. Verify that the \u0027/nexus:sync\u0027 command correctly loads the V12 Photon Kernel DNA protocol across all supported CLI agents (.bob, .codex, .cursor, .traycer)\n3. Verify LatencyProbe unit tests pass (as planned in the design documents)\n```\n\n\u003c/details\u003e\n\n\n\n##\n\n\u003csub\u003e`TIP` Improve review quality by [adding custom instructions](https://docs.codacy.com/codacy-ai/codacy-ai/#custom-instructions)\u003c/sub\u003e\n\u003csub\u003e`TIP` How was this review? [Give us feedback](https://tally.so/r/jaBlA1?org=mdasdispatch-hash\u0026repo=universal-or-strategy\u0026pr=8)\u003c/sub\u003e\n\u003c!-- e34d5167-b092-49eb-b8c8-33859ab00079 --\u003e",
+                                            "author":  "codacy-production"
+                                        }
+                                    ],
+                         "CodeFactor":  [
+                                            {
+                                                "submittedAt":  "2026-05-23T19:10:31Z",
+                                                "body":  "",
+                                                "author":  "codefactor-io"
+                                            },
+                                            {
+                                                "submittedAt":  "2026-05-23T21:11:10Z",
+                                                "body":  "",
+                                                "author":  "codefactor-io"
+                                            }
+                                        ],
+                         "Sourcery":  [
+
+                                      ]
+                     }
+}

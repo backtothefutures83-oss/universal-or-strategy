@@ -796,10 +796,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // REAPER-EXPANSION Ticket 2: Circuit breaker check with atomic CAS loop
             if (
                 !TryIncrementDispatchCountWithCircuitBreaker(
-                    syncPending,
+                    ref syncPending,
                     expectedKey,
-                    reservedDelta,
-                    _poolSlotIndex,
+                    ref reservedDelta,
+                    ref _poolSlotIndex,
                     fleetEntryName,
                     ref registeredForCleanup,
                     out bool circuitBreakerTripped
@@ -966,10 +966,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             // REAPER-EXPANSION Ticket 2: Circuit breaker check with atomic CAS loop
             if (
                 !TryIncrementDispatchCountWithCircuitBreaker(
-                    syncPending,
+                    ref syncPending,
                     expectedKey,
-                    reservedDelta,
-                    _poolSlotIndexLmt,
+                    ref reservedDelta,
+                    ref _poolSlotIndexLmt,
                     fleetEntryName,
                     ref registeredForCleanup,
                     out bool circuitBreakerTrippedLmt
@@ -1026,12 +1026,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// P2-3: Circuit breaker helper to reduce cyclomatic complexity.
         /// Attempts to increment pending dispatch count with CAS loop.
         /// Returns true if enqueued successfully, false if circuit breaker tripped.
+        /// EPIC-7-QUALITY-002: All state variables passed by ref for complete rollback.
         /// </summary>
         private bool TryIncrementDispatchCountWithCircuitBreaker(
-            bool syncPending,
+            ref bool syncPending,
             string expectedKey,
-            int reservedDelta,
-            int poolSlotIndex,
+            ref int reservedDelta,
+            ref int poolSlotIndex,
             string fleetEntryName,
             ref bool registeredForCleanup,
             out bool circuitBreakerTripped
@@ -1058,10 +1059,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     // Rollback state
                     RollbackCircuitBreakerState(
-                        syncPending,
+                        ref syncPending,
                         expectedKey,
-                        reservedDelta,
-                        poolSlotIndex,
+                        ref reservedDelta,
+                        ref poolSlotIndex,
                         fleetEntryName,
                         ref registeredForCleanup
                     );
@@ -1072,10 +1073,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
                 {
                     RollbackCircuitBreakerState(
-                        syncPending,
+                        ref syncPending,
                         expectedKey,
-                        reservedDelta,
-                        poolSlotIndex,
+                        ref reservedDelta,
+                        ref poolSlotIndex,
                         fleetEntryName,
                         ref registeredForCleanup
                     );
@@ -1092,25 +1093,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// P2-3: Rollback helper for circuit breaker state cleanup.
-        /// EPIC-7-QUALITY-002: Reset registeredForCleanup to prevent double-cleanup in exception handler.
+        /// EPIC-7-QUALITY-002: All state variables passed by ref and reset to prevent double-cleanup.
         /// </summary>
         private void RollbackCircuitBreakerState(
-            bool syncPending,
+            ref bool syncPending,
             string expectedKey,
-            int reservedDelta,
-            int poolSlotIndex,
+            ref int reservedDelta,
+            ref int poolSlotIndex,
             string fleetEntryName,
             ref bool registeredForCleanup
         )
         {
             if (syncPending)
+            {
                 ClearDispatchSyncPending(expectedKey);
+                syncPending = false;
+            }
             if (reservedDelta != 0)
+            {
                 AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                reservedDelta = 0;
+            }
             if (poolSlotIndex >= 0)
             {
                 _photonPool.ReleaseByIndex(poolSlotIndex);
                 _photonSideband[poolSlotIndex] = default(FleetDispatchSideband);
+                poolSlotIndex = -1;
             }
             // P2-4 Fix: Complete state rollback
             if (fleetEntryName != null)
@@ -1125,9 +1133,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         targetDict.TryRemove(fleetEntryName, out _);
                 }
                 _followerBrackets.TryRemove(fleetEntryName, out _);
-                // EPIC-7-QUALITY-002: Reset flag to prevent double-cleanup in exception handler
-                registeredForCleanup = false;
             }
+            // EPIC-7-QUALITY-002: Reset flag unconditionally to prevent double-cleanup in exception handler
+            registeredForCleanup = false;
         }
 
         #endregion

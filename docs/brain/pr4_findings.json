@@ -1,0 +1,38 @@
+﻿{
+    "title":  "[EPIC-5] Performance Optimization - 43M+ Allocations Eliminated",
+    "pr_number":  4,
+    "bot_findings":  {
+                         "CodeRabbit":  [
+
+                                        ],
+                         "cubic":  [
+
+                                   ],
+                         "Greptile":  [
+                                          {
+                                              "submittedAt":  "2026-05-23T06:46:59Z",
+                                              "body":  "",
+                                              "author":  "greptile-apps"
+                                          }
+                                      ],
+                         "AmazonQ":  [
+
+                                     ],
+                         "Semgrep":  [
+
+                                     ],
+                         "Codacy":  [
+
+                                    ],
+                         "CodeFactor":  [
+                                            {
+                                                "submittedAt":  "2026-05-23T06:34:21Z",
+                                                "body":  "",
+                                                "author":  "codefactor-io"
+                                            }
+                                        ],
+                         "Sourcery":  [
+
+                                      ]
+                     }
+}
