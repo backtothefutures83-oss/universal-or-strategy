@@ -528,4 +528,116 @@ This comprehensive document covers:
 - Workflow integration (pre-push checklist, PR loop, epic run)
 - Tool access matrix by agent and task type
 - Enforcement & verification procedures
+- **Self-Improving Architecture** (Hermes integration - persistent memory, progressive disclosure, plugins)
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
+## 21. Self-Improving Architecture (Hermes Integration)
+
+**Status:** APPROVED - Phased implementation starting next sprint
+
+V12 is adopting Hermes Agent's self-improving architecture to enable cross-session learning and autonomous skill evolution. This addresses critical gaps in V12's current implementation.
+
+### 21.1 Persistent Memory System (Phase 1 - CRITICAL)
+
+**Timeline:** Next Sprint (2-3 weeks)
+
+**Components:**
+- **MEMORY.md** - Agent's learned facts (V12 DNA, project structure, environment)
+- **USER.md** - User profile (preferences, coding style, past decisions)
+- **update_memory tool** - Structured memory updates
+- **Session start hook** - Auto-load memory into system prompt
+
+**Benefits:**
+- Agent remembers V12 DNA across sessions (no relearning)
+- Agent remembers user preferences (no re-asking)
+- Agent remembers past mistakes (no repetition)
+- Reduces system prompt size (facts in memory, not rules)
+
+**Example MEMORY.md:**
+```markdown
+# V12 Agent Memory
+
+## V12 DNA Constraints (Never Forget)
+- Lock-free: STRICTLY BANNED - Use FSM/Actor Enqueue model
+- ASCII-only: No Unicode, emoji, or curly quotes in C# strings
+- Complexity: CYC ≤15 for all methods
+- Performance: 0 B allocation, < 300μs latency
+
+## Project Structure
+- Repository: universal-or-strategy
+- Build: MSBuild + dotnet
+- Testing: xUnit + BenchmarkDotNet + AMAL Harness
+- Deployment: deploy-sync.ps1 (MANDATORY after src/ edits)
+
+## User Preferences
+- Prefers PowerShell over Bash
+- Uses Bob CLI (v12-engineer) for src/ work
+- Requires F5 verification in NinjaTrader after every ticket
+```
+
+### 21.2 Progressive Disclosure Skills (Phase 2 - HIGH)
+
+**Timeline:** Next Month (1-2 weeks)
+
+**Components:**
+- **skill_loader tool** - On-demand skill loading
+- **auto_load flag** - Per-skill configuration in SKILL.md
+- **Trigger detection** - Agent detects when skill is needed
+- **/skills command** - Interactive skill management
+
+**Benefits:**
+- 80%+ token savings for sessions using <5 skills
+- Faster session start (less prompt assembly)
+- Scales to 50+ skills without token explosion
+
+**Example Skill Configuration:**
+```yaml
+# .bob/skills/tdd-red/SKILL.md
+---
+name: tdd-red
+description: Write failing test BEFORE implementation (TDD RED phase)
+triggers:
+  - "implement feature"
+  - "add functionality"
+  - "create new code"
+auto_load: false  # Don't load upfront
+priority: high
+---
+```
+
+### 21.3 Plugin System (Phase 3 - MEDIUM)
+
+**Timeline:** Next Quarter (3-4 weeks)
+
+**Components:**
+- **.bob/plugins/** - Plugin directory structure
+- **Plugin API** - Register tools, hooks, commands
+- **Plugin discovery** - Auto-scan at session start
+- **Plugin management** - Interactive UI
+
+**Benefits:**
+- Users can extend V12 without forking
+- Community can contribute plugins
+- Easier to experiment with new features
+
+### 21.4 Complete Documentation
+
+**Primary Reference:** `docs/brain/HERMES_ARCHITECTURE_ANALYSIS.md`
+
+This 543-line analysis document provides:
+- Executive summary with priority gaps
+- Detailed comparison (Skills, Memory, Self-Improvement)
+- Gap analysis tables with priority ratings
+- 4-phase implementation roadmap with effort estimates
+- Risk analysis with mitigations
+- Success criteria for each phase
+
+**Additional References:**
+- **TDD Integration:** `docs/protocol/TDD_INTEGRATION_MATRIX.md`
+- **Testing Pyramid:** `docs/protocol/TESTING_PYRAMID.md`
+- **Universal Protocol:** `docs/protocol/UNIVERSAL_AGENT_PROTOCOL.md`
+
+---
+
+**Last Updated:** 2026-05-24T01:26:00Z
+**Next Review:** After Hermes integration Phase 1 completion

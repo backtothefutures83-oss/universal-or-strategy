@@ -490,17 +490,100 @@ python scripts/amal_harness_v26.py
 
 ---
 
-## 12. References
+## 12. Self-Improving Architecture (Hermes Integration)
+
+### 12.1 Persistent Memory System
+
+**Status:** APPROVED - Implementation Phase 1 (Next Sprint)
+
+**Overview:**
+V12 will adopt Hermes' persistent memory architecture to enable cross-session learning without manual context injection.
+
+**Components:**
+- **MEMORY.md** - Agent's learned facts (V12 DNA, project structure, environment)
+- **USER.md** - User profile (preferences, coding style, past decisions)
+- **update_memory tool** - Structured memory updates
+- **Session start hook** - Auto-load memory into system prompt
+
+**Benefits:**
+- Agent remembers V12 DNA across sessions (no relearning)
+- Agent remembers user preferences (no re-asking)
+- Agent remembers past mistakes (no repetition)
+- Reduces system prompt size (facts in memory, not rules)
+
+**Documentation:** `docs/brain/HERMES_ARCHITECTURE_ANALYSIS.md`
+
+### 12.2 Progressive Disclosure Skills
+
+**Status:** APPROVED - Implementation Phase 2 (Next Month)
+
+**Overview:**
+Skills loaded on-demand instead of upfront, saving 80%+ tokens for sessions that don't need all skills.
+
+**Components:**
+- **skill_loader tool** - On-demand skill loading
+- **auto_load flag** - Per-skill configuration
+- **Trigger detection** - Agent detects when skill is needed
+- **/skills command** - Interactive skill management
+
+**Benefits:**
+- 80%+ token savings for sessions using <5 skills
+- Faster session start (less prompt assembly)
+- Scales to 50+ skills without token explosion
+
+**Documentation:** `docs/brain/HERMES_ARCHITECTURE_ANALYSIS.md`
+
+### 12.3 Plugin System
+
+**Status:** APPROVED - Implementation Phase 3 (Next Quarter)
+
+**Overview:**
+Enable extensions without modifying core code via pluggable architecture.
+
+**Components:**
+- **.bob/plugins/** - Plugin directory structure
+- **Plugin API** - Register tools, hooks, commands
+- **Plugin discovery** - Auto-scan at session start
+- **Plugin management** - Interactive UI
+
+**Benefits:**
+- Users can extend V12 without forking
+- Community can contribute plugins
+- Easier to experiment with new features
+
+**Documentation:** `docs/brain/HERMES_ARCHITECTURE_ANALYSIS.md`
+
+### 12.4 Implementation Roadmap
+
+| Phase | Feature | Timeline | Effort | Priority |
+|-------|---------|----------|--------|----------|
+| 1 | Persistent Memory | Next Sprint | 2-3 weeks | CRITICAL |
+| 2 | Progressive Disclosure | Next Month | 1-2 weeks | HIGH |
+| 3 | Plugin System | Next Quarter | 3-4 weeks | MEDIUM |
+| 4 | agentskills.io Standard | Future | 1-2 months | LOW |
+
+**Detailed Analysis:** See `docs/brain/HERMES_ARCHITECTURE_ANALYSIS.md` for:
+- Gap analysis (Skills, Memory, Self-Improvement)
+- V12 vs Hermes comparison tables
+- Risk analysis with mitigations
+- Success criteria per phase
+
+---
+
+## 13. References
 
 - **Main Protocol:** `AGENTS.md`
 - **Tools Inventory:** `docs/brain/TOOLS_INVENTORY_2026-05-23.md`
 - **Testing Guide:** `docs/TESTING_AND_TOOLS.md`
+- **TDD Integration:** `docs/protocol/TDD_INTEGRATION_MATRIX.md`
+- **Testing Pyramid:** `docs/protocol/TESTING_PYRAMID.md`
+- **Hermes Analysis:** `docs/brain/HERMES_ARCHITECTURE_ANALYSIS.md`
 - **Routa Documentation:** `routa-tools/README.md`
 - **LangSmith Setup:** `scripts/langsmith_bridge.py`
 - **MCP Configuration:** `.mcp/config.json`
 
 ---
 
-**Last Updated:** 2026-05-23T22:41:00Z  
-**Auditor:** Advanced Mode (Claude Sonnet 4.6)  
-**Next Review:** After major tool updates or protocol changes
+**Last Updated:** 2026-05-24T01:25:00Z
+**Auditor:** Advanced Mode (Claude Sonnet 4.6)
+**Next Review:** After Hermes integration Phase 1 completion
