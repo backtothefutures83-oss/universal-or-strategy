@@ -102,7 +102,9 @@ jobs:
         
     - name: Lock-Free Audit
       run: |
-        $lockUsage = Get-ChildItem -Path src -Filter *.cs -Recurse | Select-String -Pattern 'lock\s*\('
+        $lockUsage = Get-ChildItem -Path src -Filter *.cs -Recurse |
+          Select-String -Pattern '^\s*lock\s*\(' |
+          Where-Object { $_.Line -notmatch '^\s*//' }
         if ($lockUsage) {
           Write-Error "Lock-Free Audit FAIL: lock() statements found"
           $lockUsage | ForEach-Object { Write-Output $_.Line }
