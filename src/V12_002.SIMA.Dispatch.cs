@@ -234,6 +234,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int reservedDelta = 0;
                 bool registeredForCleanup = false;
                 bool syncPending = false;
+                int poolSlotIndex = -1;
                 string fleetEntryName = null;
                 string expectedKey = null;
                 try
@@ -289,6 +290,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             dispatchLog,
                             ref syncPending,
                             ref reservedDelta,
+                            ref poolSlotIndex,
                             ref registeredForCleanup
                         );
                     }
@@ -305,6 +307,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             dispatchLog,
                             ref syncPending,
                             ref reservedDelta,
+                            ref poolSlotIndex,
                             ref registeredForCleanup
                         );
                     }
@@ -313,31 +316,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception ex)
                 {
-                    if (syncPending)
-                    {
-                        ClearDispatchSyncPending(expectedKey);
-                        syncPending = false;
-                    }
-
-                    if (reservedDelta != 0)
-                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
-
-                    if (registeredForCleanup)
-                    {
-                        // V12.Phase8 [F-01]: Full tracking-dict cleanup on Submit failure.
-                        activePositions.TryRemove(fleetEntryName, out _);
-                        entryOrders.TryRemove(fleetEntryName, out _);
-                        stopOrders.TryRemove(fleetEntryName, out _);
-                        for (int tNum = 1; tNum <= 5; tNum++)
-                        {
-                            var targetDict = GetTargetOrdersDictionary(tNum);
-                            if (targetDict != null)
-                                targetDict.TryRemove(fleetEntryName, out _);
-                        }
-                    }
-                    // Phase 6: Clean up proactive FSM on dispatch failure (no-op if not yet created)
-                    if (!string.IsNullOrEmpty(fleetEntryName))
-                        _followerBrackets.TryRemove(fleetEntryName, out _);
+                    // EPIC-7-QUALITY-002: Use centralized rollback to ensure all 4 state variables are synchronized
+                    RollbackCircuitBreakerState(
+                        ref syncPending,
+                        expectedKey,
+                        ref reservedDelta,
+                        ref poolSlotIndex,
+                        fleetEntryName,
+                        ref registeredForCleanup
+                    );
 
                     dispatchLog.AppendLine($"[DISPATCH] [X] FAILED on {acct.Name}: {ex.Message}");
                 }
@@ -618,6 +605,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             StringBuilder dispatchLog,
             ref bool syncPending,
             ref int reservedDelta,
+            ref int poolSlotIndex,
             ref bool registeredForCleanup
         )
         {
@@ -889,6 +877,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             StringBuilder dispatchLog,
             ref bool syncPending,
             ref int reservedDelta,
+            ref int poolSlotIndex,
             ref bool registeredForCleanup
         )
         {
