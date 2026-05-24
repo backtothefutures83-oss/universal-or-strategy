@@ -318,12 +318,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     // EPIC-7-QUALITY-002: Use centralized rollback to ensure all 4 state variables are synchronized
                     RollbackCircuitBreakerState(
+                        ref registeredForCleanup,
                         ref syncPending,
-                        expectedKey,
                         ref reservedDelta,
                         ref poolSlotIndex,
                         fleetEntryName,
-                        ref registeredForCleanup
+                        expectedKey
                     );
 
                     dispatchLog.AppendLine($"[DISPATCH] [X] FAILED on {acct.Name}: {ex.Message}");
@@ -1048,12 +1048,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     // Rollback state
                     RollbackCircuitBreakerState(
+                        ref registeredForCleanup,
                         ref syncPending,
-                        expectedKey,
                         ref reservedDelta,
                         ref poolSlotIndex,
                         fleetEntryName,
-                        ref registeredForCleanup
+                        expectedKey
                     );
                     circuitBreakerTripped = true;
                     return false;
@@ -1062,12 +1062,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Volatile.Read(ref _reaperCircuitBreakerTripped) == 1)
                 {
                     RollbackCircuitBreakerState(
+                        ref registeredForCleanup,
                         ref syncPending,
-                        expectedKey,
                         ref reservedDelta,
                         ref poolSlotIndex,
                         fleetEntryName,
-                        ref registeredForCleanup
+                        expectedKey
                     );
                     circuitBreakerTripped = true;
                     return false;
@@ -1085,12 +1085,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// EPIC-7-QUALITY-002: All state variables passed by ref and reset to prevent double-cleanup.
         /// </summary>
         private void RollbackCircuitBreakerState(
+            ref bool registeredForCleanup,
             ref bool syncPending,
-            string expectedKey,
             ref int reservedDelta,
             ref int poolSlotIndex,
             string fleetEntryName,
-            ref bool registeredForCleanup
+            string expectedKey
         )
         {
             // P1-A: ALWAYS reset all 4 state variables unconditionally at the start
