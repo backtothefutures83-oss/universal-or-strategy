@@ -194,32 +194,63 @@ When v12-engineer outputs [TICKET-GATE] (the written plan), present the plan sum
 - APPROVED: switch back to v12-engineer and instruct it to execute the plan
 - FLAG: relay adjustment, switch to v12-engineer to re-plan
 
-**Step C -- Switch to: Advanced mode (verification)**
+**Step C -- Switch to: Advanced mode (milestone validation)**
 
 After v12-engineer confirms execution complete, switch to Advanced mode and hand off:
 ```
-VERIFICATION TASK for epic $1, ticket-XX
-Run the following commands in sequence and report each result:
+MILESTONE VALIDATION TASK for epic $1, ticket-XX
+Run comprehensive validation (Droid Missions pattern):
 
-1. powershell -File .\deploy-sync.ps1
-   PASS = exits 0 and ASCII gate shows PASS
-   FAIL = halt, report error to orchestrator
+1. Full Test Suite
+   dotnet test
+   PASS = all tests pass
+   FAIL = halt, report failures
 
-2. python scripts/complexity_audit.py
-   PASS = target method CYC now < 20
-   FAIL = halt, report before/after CYC
+2. Benchmarks
+   dotnet run --project benchmarks --configuration Release
+   PASS = no performance regressions
+   FAIL = halt, report regressions
 
-3. grep -r "lock(" src/
-   PASS = 0 matches
-   FAIL = halt, report file and line
+3. DNA Audits
+   powershell -File .\deploy-sync.ps1
+   grep -r "lock(" src/
+   grep -Prn "[^\x00-\x7F]" src/
+   python scripts/complexity_audit.py
+   PASS = all clean
+   FAIL = halt, report violations
+
+4. Semgrep (V12 DNA Patterns)
+   powershell -File .\scripts\run_semgrep.ps1
+   PASS = 0 violations
+   FAIL = halt, report violations
+
+5. Dead Code Scan
+   python scripts/dead_code_scan.py
+   PASS = no new dead code
+   FAIL = halt, report dead code
+
+6. Graphify Update
+   graphify update . --silent
+   PASS = graph updated
+   FAIL = non-blocking warning
 
 Report results as:
-  deploy-sync : PASS / FAIL
-  CYC         : [before] -> [after]
-  lock() audit: CLEAN / FAIL [details]
+[MILESTONE-VALIDATION] Ticket XX
+========================================
+Test Suite      : PASS / FAIL
+Benchmarks      : PASS / FAIL
+Deploy-Sync     : PASS / FAIL
+Lock() Audit    : CLEAN / FAIL
+Unicode Audit   : CLEAN / FAIL
+Complexity      : PASS / FAIL
+Semgrep         : PASS / FAIL
+Dead Code       : PASS / FAIL
+Graphify        : UPDATED / WARN
+========================================
+Verdict: PASS / FAIL
 ```
 
-If Advanced mode reports any FAIL: HALT. Report to Director. Do not continue.
+If Advanced mode reports Verdict: FAIL: HALT. Report to Director. Do not continue.
 
 **Step D -- F5 Gate (Director's only manual action):**
 Output:

@@ -1,15 +1,62 @@
 ---
-description: Execute a single V12 refactoring ticket in a new isolated Bob session.
+description: Execute a single V12 refactoring ticket with TDD enforcement and milestone validation.
 argument-hint: <path-to-ticket-file>
 ---
-# TICKET EXECUTION
+# TICKET EXECUTION (TDD-Hardened)
 **Ticket File:** $1
-**Mode:** v12-engineer (Plan-Then-Execute Protocol)
-**Protocol:** V12 Photon Kernel DNA -- Zero Logic Drift
+**Mode:** v12-engineer (TDD Red-Green-Refactor Protocol)
+**Protocol:** V12 Photon Kernel DNA + Droid Missions Validation
 
-> This command is designed to run in a NEW Bob session for each ticket.
+> This command enforces TDD Red-Green-Refactor cycle with milestone validation.
 > Read the ticket file completely before writing a single line of code.
-> STOP after the plan for Director approval. Do not execute autonomously.
+> STOP after each phase for Director approval.
+
+---
+
+## PHASE 0 -- TDD RED (Write Failing Test First)
+
+**Skill:** `tdd-red`
+
+Before ANY src/ modification, write a failing test:
+
+### 0a. Create Test File
+```powershell
+# Location: tests/V12_Performance.Tests/
+# Naming: <Feature>Tests.cs
+```
+
+### 0b. Write Test Method
+```csharp
+[Fact]
+public void <Feature>_<Scenario>_<ExpectedResult>()
+{
+    // Arrange
+    var sut = new SystemUnderTest();
+    
+    // Act
+    var result = sut.MethodToTest();
+    
+    // Assert
+    Assert.Equal(expected, result);
+}
+```
+
+### 0c. Verify Test FAILS
+```powershell
+dotnet test --filter <TestName>
+# Expected: EXIT 1 (FAIL)
+```
+
+**CRITICAL:** If test PASSES before implementation, it's not validating the feature. Fix the test.
+
+### 0d. Commit Test Only
+```powershell
+git add tests/
+git commit -m "[TDD-RED] $1: Add failing test"
+```
+
+**GATE 0:**
+> "[TDD-RED-COMPLETE] Test fails as expected. Type PROCEED to continue to implementation."
 
 ---
 
@@ -82,7 +129,17 @@ If the Director has not typed APPROVED, output:
 
 ---
 
-## STEP 4 -- SURGICAL EXECUTION (only after APPROVED)
+## STEP 4 -- TDD GREEN (Implement to Pass Test)
+
+**Skill:** `tdd-green`
+
+### 4a. Verify Test is Failing
+```powershell
+dotnet test --filter <TestName>
+# Must show: EXIT 1 (FAIL)
+```
+
+### 4b. SURGICAL EXECUTION (only after APPROVED)
 
 ### Split Size Decision
 - If total extracted LOC <= 50 lines: use replace_file_content directly in the target file
@@ -141,9 +198,140 @@ Unicode audit: CLEAN / [N matches]
 
 **If ANY audit fails: HALT. Report failure. Do NOT report completion.**
 
+### 5e. Verify Test Now PASSES
+```powershell
+dotnet test --filter <TestName>
+# Expected: EXIT 0 (PASS)
+```
+
 ---
 
-## STEP 6 -- HANDOFF TO DIRECTOR
+## STEP 6 -- TDD REFACTOR (Clean Up Code)
+
+**Skill:** `tdd-refactor`
+
+### 6a. Run Complexity Audit
+```powershell
+python scripts/complexity_audit.py
+# Target: All methods CYC < 20
+```
+
+### 6b. Refactor Code (if needed)
+Focus areas:
+- Extract methods if CYC > 15
+- Improve naming (PascalCase, descriptive)
+- Remove duplication
+- Simplify logic
+
+### 6c. Run Formatters
+```powershell
+powershell -File .\scripts\format_all_csharp.ps1
+```
+
+### 6d. Verify Tests Still Pass
+```powershell
+dotnet test
+# Expected: All tests PASS (no regressions)
+```
+
+### 6e. Run Full DNA Audit
+```powershell
+# Semgrep (V12 DNA patterns)
+powershell -File .\scripts\run_semgrep.ps1
+
+# Deploy-sync
+powershell -File .\deploy-sync.ps1
+```
+
+### 6f. Commit Refactoring (if changes made)
+```powershell
+git add src/
+git commit -m "[TDD-REFACTOR] $1: Clean up implementation"
+```
+
+---
+
+## STEP 7 -- MILESTONE VALIDATION (Droid Missions Pattern)
+
+**Skill:** `milestone-validation`
+
+Run comprehensive validation after EVERY ticket:
+
+### 7a. Full Test Suite
+```powershell
+dotnet test
+# Expected: All tests PASS
+```
+
+### 7b. Benchmarks
+```powershell
+dotnet run --project benchmarks --configuration Release
+# Expected: No performance regressions
+```
+
+### 7c. DNA Audits
+```powershell
+# Deploy-sync (hard links + ASCII)
+powershell -File .\deploy-sync.ps1
+# Expected: ASCII gate PASS
+
+# Lock-free compliance
+grep -r "lock(" src/
+# Expected: 0 matches
+
+# Unicode compliance
+grep -Prn "[^\x00-\x7F]" src/
+# Expected: 0 matches
+
+# Complexity compliance
+python scripts/complexity_audit.py
+# Expected: All methods CYC < 20
+```
+
+### 7d. Semgrep (V12 DNA Patterns)
+```powershell
+powershell -File .\scripts\run_semgrep.ps1
+# Expected: 0 V12 DNA violations
+```
+
+### 7e. Dead Code Scan
+```powershell
+python scripts/dead_code_scan.py
+# Expected: No new dead code
+```
+
+### 7f. Graphify Update
+```powershell
+graphify update . --silent
+# Expected: Knowledge graph updated
+```
+
+### Validation Report
+```
+[MILESTONE-VALIDATION] $1
+========================================
+Test Suite      : PASS (X tests)
+Benchmarks      : PASS (no regressions)
+Deploy-Sync     : PASS
+Lock() Audit    : CLEAN (0 matches)
+Unicode Audit   : CLEAN (0 matches)
+Complexity      : PASS (all < 20)
+Semgrep         : PASS (0 violations)
+Dead Code       : PASS (no new dead code)
+Graphify        : UPDATED
+========================================
+Verdict: PASS / FAIL
+```
+
+**If ANY validation fails:**
+1. HALT immediately
+2. Report failure to Director
+3. DO NOT advance to next ticket
+4. Fix issue before continuing
+
+---
+
+## STEP 8 -- HANDOFF TO DIRECTOR
 
 Only after ALL Step 5 audits PASS, output:
 

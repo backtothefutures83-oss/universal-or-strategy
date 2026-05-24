@@ -21,5 +21,48 @@
     "graphify": "graphify",
     "deploy_sync": "powershell -File .\\deploy-sync.ps1",
     "nexus_bridge": "python scripts/nexus_relay.py"
+  },
+  "models": {
+    "mixedModels": {
+      "enabled": true,
+      "strategy": "task-based"
+    },
+    "droids": {
+      "v12-engineer": {
+        "model": "claude-sonnet-4-6-20250929",
+        "reasoningEffort": "medium",
+        "useCases": ["tdd-implementation", "refactoring", "src-edits"]
+      },
+      "v12-planner": {
+        "model": "claude-opus-4-7-20251101",
+        "reasoningEffort": "high",
+        "useCases": ["epic-planning", "architectural-analysis", "design-decisions"]
+      },
+      "v12-validator": {
+        "model": "claude-sonnet-4-6-20250929",
+        "reasoningEffort": "medium",
+        "useCases": ["validation", "dna-audits", "milestone-checks"]
+      }
+    },
+    "promptCaching": {
+      "enabled": true,
+      "beta": "prompt-caching-2024-07-31"
+    }
+  },
+  "tdd": {
+    "enforcement": {
+      "enabled": true,
+      "blockSrcEditsWithoutTests": true
+    },
+    "milestoneValidation": {
+      "enabled": true,
+      "runAfterEveryTicket": true,
+      "blockProgressionOnFailure": true
+    }
+  },
+  "droidMissions": {
+    "collaborativePlanning": true,
+    "validationFrequency": "per-ticket",
+    "iterativeRefinement": true
   }
 }
