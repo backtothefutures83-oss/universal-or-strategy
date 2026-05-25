@@ -10,14 +10,37 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 ## 1. Agent Hierarchy (The Director's Gate)
 
 - **ORCHESTRATOR (P1)**: Central Switchboard (Antigravity / Gemini CLI). Controls context and cross-agent routing.
+
+## ⚠️ CRITICAL: Code Mode Deprecation (V12.18)
+
+**EFFECTIVE IMMEDIATELY**: Code mode is **BANNED** for all code modification tasks.
+
+**Enforcement**:
+- ❌ **Code mode** (`code`): DEPRECATED - Do not use for any task
+- ✅ **Advanced mode** (`advanced`): PRIMARY for all code changes
+- ✅ **Bob CLI** (`v12-engineer`): PRIMARY for src/ architectural work
+
+**Rationale**: Advanced mode provides:
+- MCP tool access (jcodemunch, graphify)
+- Browser tools for research
+- Superior context management
+- Full feature parity with code mode
+
+**Violation Protocol**: Any agent attempting to use code mode must:
+1. Immediately switch to advanced mode
+2. Document the attempted violation
+3. Report to Director for protocol review
+
 - **ARCHITECT + ENGINEER (P3/P4/P5)   src/ tasks**: **Bob CLI** (`v12-engineer`) is the unified Architect-Engineer for all `src/` work. Bob handles design (planning), extraction, refactoring, and surgical implementation in a single Orchestrator session. No separate P3 handoff to Claude is required for `src/` tickets.
   - **Bob CLI** (`v12-engineer`): Primary. Handles design-only gates, God-function splitting, and full implementation.
   - **Codex CLI** (`codex-rescue`): Secondary. Specialist for surgical logic hardening and lock-free kernel updates when Bob delegates.
 - **ARCHITECT (P3)   escalation only**: **Claude Opus 4.7** is reserved for (a) non-src architectural review, (b) $battlezip compound intelligence sessions, and (c) cross-subgraph design decisions that span >3 files outside Bob's current context. Claude remains PLAN-ONLY when invoked.
 - **ADJUDICATOR (Arena AI)**: **P4 Vetting Gate**. Adversarial consensus and **PR Audit** required BEFORE surgery.
 - **ENGINEER (P4/P5)   non-src tasks**: Target selection follows strict routing logic:
-    - **Jules AI**: Primary non-src engineer for GitHub-based workflows.
-    - **Gemini CLI** (`yolo`): Secondary non-src local engineer for tasks requiring local file access or visual context.
+    - **Advanced Mode** (`advanced`): Primary non-src engineer for all code modification tasks
+    - **Jules AI**: GitHub-based workflows only
+    - **Gemini CLI** (`yolo`): Secondary for tasks requiring local file access or visual context
+    - ~~**Code Mode** (`code`): DEPRECATED - DO NOT USE~~
 - **FORENSICS (P2/P6)**: Diagnosis (P2) and Adversarial Audit (P6).
 
 ## 2. Architectural Mandates (THE PLATINUM STANDARD)
@@ -303,3 +326,21 @@ Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
+## Mode Selection Rules (V12.18)
+
+When delegating code modification tasks:
+- ✅ ALWAYS use `advanced` mode for non-src code work
+- ✅ ALWAYS use `v12-engineer` (Bob CLI) for src/ work
+- ❌ NEVER use `code` mode (deprecated V12.18)
+
+**Routing Decision Tree**:
+```
+Is task modifying code?
+├─ YES → Is task in src/?
+│  ├─ YES → Use Bob CLI (`v12-engineer`)
+│  └─ NO → Use Advanced mode (`advanced`)
+└─ NO → Use Ask mode (`ask`) or Plan mode (`plan`)
+```
+
+**Code Mode**: BANNED - Any delegation to code mode is a protocol violation.
