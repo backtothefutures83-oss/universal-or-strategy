@@ -478,29 +478,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
                 // T-W1-Perf: for-loop replaces FirstOrDefault lambda -- eliminates delegate allocation.
-                Position[] _posSnapshot = acct.Positions.ToArray();
+                Position[] posSnapshot = acct.Positions.ToArray();
                 Position brokerPos = null;
-                for (int _pi = 0; _pi < _posSnapshot.Length; _pi++)
+                for (int pi = 0; pi < posSnapshot.Length; pi++)
                 {
                     if (
-                        _posSnapshot[_pi] != null
-                        && _posSnapshot[_pi].Instrument != null
-                        && _posSnapshot[_pi].Instrument.FullName == Instrument.FullName
+                        posSnapshot[pi] != null
+                        && posSnapshot[pi].Instrument != null
+                        && posSnapshot[pi].Instrument.FullName == Instrument.FullName
                     )
                     {
-                        brokerPos = _posSnapshot[_pi];
+                        brokerPos = posSnapshot[pi];
                         break;
                     }
                 }
                 bool brokerFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
 
                 // H-13: Check for active FSM entries for this account
-                // T-W1-Perf: Snapshot + for-loop eliminates 2 enumerator allocations
+                // ConcurrentDictionary is thread-safe for enumeration - no snapshot needed
                 bool hasActiveFsmForAcct = false;
-                var _fsmSnapshot = _followerBrackets.ToArray();
-                for (int _fi = 0; _fi < _fsmSnapshot.Length; _fi++)
+                foreach (var fkvp in _followerBrackets)
                 {
-                    var f = _fsmSnapshot[_fi].Value;
+                    var f = fkvp.Value;
                     if (
                         f != null
                         && f.AccountName == acct.Name
@@ -517,10 +516,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
                 bool hasActivePositionForAcct = false;
-                var _positionsSnapshot = activePositions.ToArray();
-                for (int _posi = 0; _posi < _positionsSnapshot.Length; _posi++)
+                foreach (var pkvp in activePositions)
                 {
-                    var p = _positionsSnapshot[_posi].Value;
+                    var p = pkvp.Value;
                     if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name)
                     {
                         hasActivePositionForAcct = true;
