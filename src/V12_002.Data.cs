@@ -17,6 +17,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private long _stateCorruptionDetected = 0;
         private long _stateTempCleanupFailures = 0;
 
+        // V12.EPIC-7-QUALITY-008: UI Callbacks Error Handling Diagnostic Counter
+        private long _uiCallbackFailures = 0;
+
         // Placeholder for missing Data logic.
         public static class Data
         {

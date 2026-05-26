@@ -657,7 +657,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (found != null && found.Visibility == Visibility.Visible)
                     return found;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // V12.EPIC-7-QUALITY-008: Log UI element traversal errors
+                Interlocked.Increment(ref _uiCallbackFailures);
+                Print($"[UI_CALLBACK] ChartTrader type search failed: {ex.Message}");
+                // Return null - non-fatal UI navigation failure
+            }
             return null;
         }
 

@@ -328,7 +328,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                             NinjaTrader.Cbi.Currency.UsDollar
                         );
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // V12.EPIC-7-QUALITY-008: Log account balance retrieval errors
+                        Interlocked.Increment(ref _uiCallbackFailures);
+                        Print($"[UI_CALLBACK] Account balance retrieval failed: {ex.Message}");
+                        // Continue with balance=0 - compliance check will use cached value
+                    }
                 }
                 double buffer = balance - (peak - TrailingDrawdownLimit);
                 if (buffer <= 0)
@@ -737,7 +743,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // V12.EPIC-7-QUALITY-008: Log flat position sync errors
+                Interlocked.Increment(ref _uiCallbackFailures);
+                Print($"[UI_CALLBACK] Flat position sync failed: {ex.Message}");
+                // Continue - position sync is best-effort
+            }
         }
 
         /// <summary>
