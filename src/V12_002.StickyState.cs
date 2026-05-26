@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -143,12 +144,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("[STICKY] Integrity check failed -- attempting rollback");
                     if (RollbackToLastGoodState())
                     {
-                        // Path already validated above
-                        string validStatePath = PathValidation.ValidateAndCanonicalize(
+                        // Re-validate path after rollback (use different variable name)
+                        string validStatePathAfterRollback = PathValidation.ValidateAndCanonicalize(
                             _stickyStatePath,
                             "ReadStateAfterRollback"
                         );
-                        string backupJson = File.ReadAllText(validStatePath, Encoding.UTF8);
+                        string backupJson = File.ReadAllText(validStatePathAfterRollback, Encoding.UTF8);
                         snapshot = DeserializeSnapshot(backupJson);
                         return snapshot;
                     }
