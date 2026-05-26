@@ -140,14 +140,21 @@ Hand off:
 TASK: Global Audit & Monitor
 PR: $1
 PROTOCOL:
-  1. powershell -File .\deploy-sync.ps1 (MANDATORY before push - syncs NT8 hard links)
+  0. DELETE old forensics files (prevent stale reads):
+     Remove-Item docs/brain/pr_$1_forensics.md -ErrorAction SilentlyContinue
+     Remove-Item docs/brain/pr_$1_fix_queue.md -ErrorAction SilentlyContinue
+  1. powershell -File .\deploy-sync.ps1 (MANDATORY - syncs NT8 hard links)
   2. git add . && git commit -m "fix: PHS Perfection Loop - PR #$1" && git push
-  3. monitor_pr_checks $1 (Wait for all bots).
-     - **MANDATORY SLEEP**: Start-Sleep -Seconds 300 (5 min) for the first check.
-     - **SUBSEQUENT SLEEP**: Start-Sleep -Seconds 180 (3 min) if checks are still pending.
-  4. Run: powershell -File .\scripts\calculate_fleet_score.ps1 -PrNumber $1
-  5. If Score < 100: emit [PHS-RETRY] Current: X/100.
-  6. If Score = 100: emit [PHS-PERFECT] 100/100.
+  3. monitor_pr_checks $1 (Wait for all bots)
+     - **MANDATORY SLEEP**: Start-Sleep -Seconds 300 (5 min) for first check
+     - **SUBSEQUENT SLEEP**: Start-Sleep -Seconds 180 (3 min) if checks pending
+  4. Run: powershell -File .\scripts\extract_pr_forensics.ps1 -PrNumber $1
+  5. VERIFY extraction:
+     - Test-Path docs/brain/pr_$1_forensics.md (must exist)
+     - File age < 2 minutes (must be fresh)
+  6. Run: powershell -File .\scripts\calculate_fleet_score.ps1 -PrNumber $1
+  7. If Score < 100: emit [PHS-RETRY] Current: X/100
+  8. If Score = 100: emit [PHS-PERFECT] 100/100
 ```
 
 **Gate:**

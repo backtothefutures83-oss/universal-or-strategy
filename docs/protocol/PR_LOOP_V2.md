@@ -163,13 +163,47 @@ When Semgrep GitHub App is installed, findings will appear in PR comments and be
 ### Step 4: Global Push & Monitor
 **Mode:** Advanced
 
+**CRITICAL**: Always delete old forensics before extraction to prevent stale reads.
+
 **Protocol:**
-1. `powershell -File .\deploy-sync.ps1` (MANDATORY - syncs NT8 hard links)
-2. `git add . && git commit -m "fix: PHS Perfection Loop - PR #<N>" && git push`
-3. **MANDATORY SLEEP**: `Start-Sleep -Seconds 300` (5 min for first check)
-4. Monitor: `gh pr checks <PR_NUMBER>`
-5. **SUBSEQUENT SLEEP**: `Start-Sleep -Seconds 180` (3 min if checks still pending)
-6. Calculate PHS: `powershell -File .\scripts\calculate_fleet_score.ps1 -PrNumber <N>`
+```powershell
+# 0. DELETE old forensics files (prevent stale reads)
+Remove-Item "docs/brain/pr_<N>_forensics.md" -ErrorAction SilentlyContinue
+Remove-Item "docs/brain/pr_<N>_fix_queue.md" -ErrorAction SilentlyContinue
+Remove-Item "docs/brain/bot_hallucinations.md" -ErrorAction SilentlyContinue
+
+# 1. Sync hard links
+powershell -File .\deploy-sync.ps1
+
+# 2. Push changes
+git add . && git commit -m "fix: PHS Perfection Loop - PR #<N>" && git push
+
+# 3. Wait for bots (MANDATORY)
+Start-Sleep -Seconds 300  # 5 minutes
+
+# 4. Extract FRESH forensics
+powershell -File .\scripts\extract_pr_forensics.ps1 -PrNumber <N>
+
+# 5. VERIFY extraction succeeded
+if (-not (Test-Path "docs/brain/pr_<N>_forensics.md")) {
+    Write-Error "Forensics extraction failed! File not created."
+    exit 1
+}
+
+# 6. VERIFY file is fresh (< 2 minutes old)
+$forensicsFile = Get-Item "docs/brain/pr_<N>_forensics.md"
+$fileAge = (Get-Date) - $forensicsFile.LastWriteTime
+if ($fileAge.TotalMinutes -gt 2) {
+    Write-Error "Forensics file is stale! Age: $($fileAge.TotalMinutes) minutes"
+    exit 1
+}
+
+# 7. Monitor checks (if still pending)
+Start-Sleep -Seconds 180  # 3 minutes for subsequent checks
+
+# 8. Calculate PHS
+powershell -File .\scripts\calculate_fleet_score.ps1 -PrNumber <N>
+```
 
 **Outputs:**
 - PHS Score (0-100)

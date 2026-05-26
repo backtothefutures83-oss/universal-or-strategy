@@ -9,6 +9,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Timestamp for freshness verification
+$extractionTimestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+$extractionCommit = git rev-parse HEAD
+
 # Extract repository URL dynamically from git remote
 $GitRemote = git remote get-url origin
 $RepoUrl = $GitRemote -replace '\.git$', '' -replace 'git@github\.com:', 'https://github.com/'
@@ -130,8 +134,15 @@ Write-Host "[3/5] Generating forensics report..." -ForegroundColor Green
 
 $reportPath = "docs/brain/pr_${PrNumber}_forensics.md"
 $reportContent = @"
-# PR #$PrNumber Forensics Report
-Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+# PR #$PrNumber Bot Forensics Report
+
+**Extraction Metadata**:
+- **Timestamp**: $extractionTimestamp
+- **Commit**: $extractionCommit
+- **Branch**: $(git branch --show-current)
+- **Extractor**: extract_pr_forensics.ps1 v2.0
+
+---
 
 ## Summary
 
@@ -267,6 +278,33 @@ Write-Host "  P1 (High): $(($validFindings | Where-Object Priority -eq 'P1').Cou
 Write-Host "  P2 (Medium): $(($validFindings | Where-Object Priority -eq 'P2').Count)" -ForegroundColor Cyan
 Write-Host "`nHallucinations: $($hallucinations.Count)" -ForegroundColor Magenta
 Write-Host "INFRA-NOISE: $(($infraNoise).Count)" -ForegroundColor DarkGray
+
+# Freshness helper function
+function Test-ForensicsFreshness {
+    param(
+        [string]$FilePath,
+        [int]$MaxAgeMinutes = 5
+    )
+    
+    if (-not (Test-Path $FilePath)) {
+        Write-Error "Forensics file not found: $FilePath"
+        return $false
+    }
+    
+    $file = Get-Item $FilePath
+    $age = (Get-Date) - $file.LastWriteTime
+    
+    if ($age.TotalMinutes -gt $MaxAgeMinutes) {
+        Write-Warning "Forensics file is stale! Age: $($age.TotalMinutes) minutes"
+        return $false
+    }
+    
+    Write-Host "✅ Forensics file is fresh (age: $($age.TotalSeconds) seconds)"
+    return $true
+}
+
+# Export function for use in other scripts
+Export-ModuleMember -Function Test-ForensicsFreshness
 
 exit 0
 
