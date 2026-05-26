@@ -459,8 +459,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 "NinjaTrader 8",
                 "SIMA_Logs"
             );
-            if (!System.IO.Directory.Exists(logsDirInit))
-                System.IO.Directory.CreateDirectory(logsDirInit);
+
+            try
+            {
+                // EPIC-7-QUALITY-010: Validate directory path before creation
+                string validLogDir = PathValidation.ValidateDirectoryPath(logsDirInit, "CreateLogDirectory");
+
+                if (!System.IO.Directory.Exists(validLogDir))
+                    System.IO.Directory.CreateDirectory(validLogDir);
+            }
+            catch (SecurityException ex)
+            {
+                Print(string.Format("[IO_SECURITY] {0}", ex.Message));
+                // Continue execution - log directory creation is not critical for strategy operation
+            }
 
             _configureComplete = true;
         }

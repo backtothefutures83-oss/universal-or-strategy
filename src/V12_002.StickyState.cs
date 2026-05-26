@@ -65,32 +65,44 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             try
             {
+                // EPIC-7-QUALITY-010: Validate paths before file operations
+                string validStatePath = PathValidation.ValidateAndCanonicalize(_stickyStatePath, "WriteState");
+                string validTempPath = PathValidation.ValidateAndCanonicalize(tempPath, "WriteTempState");
+                string validBackupPath = PathValidation.ValidateAndCanonicalize(backupPath, "WriteBackupState");
+
                 // EPIC-4 P0 Fix #2: Compute checksum over canonical payload (checksum field empty)
                 snapshot.ChecksumSHA256 = string.Empty;
                 string json = SerializeSnapshot(snapshot);
                 snapshot.ChecksumSHA256 = ComputeSHA256(json);
                 string jsonWithChecksum = SerializeSnapshot(snapshot);
-                File.WriteAllText(tempPath, jsonWithChecksum, Encoding.UTF8);
+                File.WriteAllText(validTempPath, jsonWithChecksum, Encoding.UTF8);
 
-                if (File.Exists(_stickyStatePath))
+                if (File.Exists(validStatePath))
                 {
-                    File.Copy(_stickyStatePath, backupPath, overwrite: true);
+                    File.Copy(validStatePath, validBackupPath, overwrite: true);
                 }
 
                 // .NET Framework 4.5 doesn't support overwrite parameter
-                if (File.Exists(_stickyStatePath))
+                if (File.Exists(validStatePath))
                 {
-                    File.Delete(_stickyStatePath);
+                    File.Delete(validStatePath);
                 }
-                File.Move(tempPath, _stickyStatePath);
+                File.Move(validTempPath, validStatePath);
 
                 Interlocked.Exchange(ref _lastSnapshotTicks, DateTime.UtcNow.Ticks);
                 return true;
+            }
+            catch (SecurityException ex)
+            {
+                // EPIC-7-QUALITY-010: Log security violations
+                Print(string.Format("[IO_SECURITY] {0}", ex.Message));
+                throw; // Re-throw to fail-fast
             }
             catch (Exception ex)
             {
                 Print(string.Format("[STICKY] Snapshot write failed: {0}", ex.Message));
 
+                // Cleanup temp file (use original path since validation may have failed)
                 if (File.Exists(tempPath))
                 {
                     try
@@ -106,15 +118,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private StateSnapshot LoadStateSnapshot()
         {
-            if (!File.Exists(_stickyStatePath))
-            {
-                Print("[STICKY] No persisted state found");
-                return null;
-            }
-
             try
             {
-                string json = File.ReadAllText(_stickyStatePath, Encoding.UTF8);
+                // EPIC-7-QUALITY-010: Validate path before checking existence
+                string validStatePath = PathValidation.ValidateAndCanonicalize(_stickyStatePath, "ReadState");
+
+                if (!File.Exists(validStatePath))
+                {
+                    Print("[STICKY] No persisted state found");
+                    return null;
+                }
+
+                string json = File.ReadAllText(validStatePath, Encoding.UTF8);
                 StateSnapshot snapshot = DeserializeSnapshot(json);
 
                 if (snapshot == null)
@@ -128,7 +143,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("[STICKY] Integrity check failed -- attempting rollback");
                     if (RollbackToLastGoodState())
                     {
-                        string backupJson = File.ReadAllText(_stickyStatePath, Encoding.UTF8);
+                        // Path already validated above
+                        string validStatePath = PathValidation.ValidateAndCanonicalize(
+                            _stickyStatePath,
+                            "ReadStateAfterRollback"
+                        );
+                        string backupJson = File.ReadAllText(validStatePath, Encoding.UTF8);
                         snapshot = DeserializeSnapshot(backupJson);
                         return snapshot;
                     }
@@ -137,6 +157,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 return snapshot;
+            }
+            catch (SecurityException ex)
+            {
+                // EPIC-7-QUALITY-010: Log security violations
+                Print(string.Format("[IO_SECURITY] {0}", ex.Message));
+                throw; // Re-throw to fail-fast
             }
             catch (Exception ex)
             {
@@ -187,15 +213,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             string backupPath = _stickyStatePath + ".bak";
 
-            if (!File.Exists(backupPath))
-            {
-                Print("[STICKY] No backup available for rollback");
-                return false;
-            }
-
             try
             {
-                string json = File.ReadAllText(backupPath, Encoding.UTF8);
+                // EPIC-7-QUALITY-010: Validate backup path
+                string validBackupPath = PathValidation.ValidateAndCanonicalize(backupPath, "ReadBackup");
+
+                if (!File.Exists(validBackupPath))
+                {
+                    Print("[STICKY] No backup available for rollback");
+                    return false;
+                }
+
+                string json = File.ReadAllText(validBackupPath, Encoding.UTF8);
                 StateSnapshot backup = DeserializeSnapshot(json);
 
                 if (backup == null)

@@ -135,11 +135,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             if (Volatile.Read(ref _csvHeaderCreated) != 0)
                 return;
-            if (System.IO.File.Exists(dailySummaryCsvPath))
+
+            try
             {
-                Interlocked.Exchange(ref _csvHeaderCreated, 1);
+                // EPIC-7-QUALITY-010: Validate CSV path before checking existence
+                string validCsvPath = PathValidation.ValidateAndCanonicalize(dailySummaryCsvPath, "CheckCSV");
+
+                if (System.IO.File.Exists(validCsvPath))
+                {
+                    Interlocked.Exchange(ref _csvHeaderCreated, 1);
+                    return;
+                }
+            }
+            catch (SecurityException ex)
+            {
+                Print(string.Format("[IO_SECURITY] CSV path validation failed: {0}", ex.Message));
                 return;
             }
+
             if (Interlocked.CompareExchange(ref _csvHeaderCreated, 1, 0) != 0)
                 return;
 
@@ -149,7 +162,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 try
                 {
-                    System.IO.File.WriteAllText(_csvPath, _csvHeader + Environment.NewLine);
+                    // EPIC-7-QUALITY-010: Validate path before write
+                    string validPath = PathValidation.ValidateAndCanonicalize(_csvPath, "WriteCSV");
+                    System.IO.File.WriteAllText(validPath, _csvHeader + Environment.NewLine);
+                }
+                catch (SecurityException ex)
+                {
+                    Print(string.Format("[IO_SECURITY] {0}", ex.Message));
+                    Interlocked.Exchange(ref _csvHeaderCreated, 0);
                 }
                 catch
                 {
@@ -831,7 +851,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     try
                     {
                         if (path != null)
-                            System.IO.File.WriteAllText(path, jsonPayload);
+                        {
+                            // EPIC-7-QUALITY-010: Validate compliance log path
+                            string validPath = PathValidation.ValidateAndCanonicalize(path, "WriteComplianceLog");
+                            System.IO.File.WriteAllText(validPath, jsonPayload);
+                        }
+                    }
+                    catch (SecurityException ex)
+                    {
+                        Print(string.Format("[IO_SECURITY] {0}", ex.Message));
                     }
                     catch
                     { /* swallow -- compliance log is best-effort */
