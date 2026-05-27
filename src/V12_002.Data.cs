@@ -50,6 +50,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        // V12.EPIC-7-QUALITY-007: Helper methods for state persistence telemetry
+        /// <summary>
+        /// Tracks a state persistence failure (write/read/rollback failure).
+        /// </summary>
+        private void TrackStatePersistenceFailure()
+        {
+            Interlocked.Increment(ref _statePersistenceFailures);
+        }
+
+        /// <summary>
+        /// Tracks a state security violation (path traversal, unauthorized access).
+        /// </summary>
+        private void TrackStateSecurityViolation()
+        {
+            Interlocked.Increment(ref _stateSecurityViolations);
+        }
+
+        /// <summary>
+        /// Tracks a state rollback event (corruption detected, backup restored).
+        /// Rollback events are counted as persistence failures.
+        /// </summary>
+        private void TrackStateRollback()
+        {
+            Interlocked.Increment(ref _statePersistenceFailures);
+        }
+
         // Placeholder for missing Data logic.
         public static class Data
         {

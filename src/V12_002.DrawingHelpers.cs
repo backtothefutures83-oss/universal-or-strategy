@@ -1,12 +1,14 @@
 // Build 971: V12_002 DrawingHelpers -- Drawing, Helpers regions
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -16,16 +18,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -35,8 +35,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void DrawORBox()
         {
-            if (sessionHigh == double.MinValue || sessionLow == double.MaxValue) return;
-            if (orStartDateTime == DateTime.MinValue || orEndDateTime == DateTime.MinValue) return;
+            if (sessionHigh == double.MinValue || sessionLow == double.MaxValue)
+                return;
+            if (orStartDateTime == DateTime.MinValue || orEndDateTime == DateTime.MinValue)
+                return;
 
             try
             {
@@ -61,7 +63,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         sessionEndTime.Hours,
                         sessionEndTime.Minutes,
                         sessionEndTime.Seconds
-                    ).AddDays(1);  // ADD ONE DAY for overnight sessions!
+                    ).AddDays(1); // ADD ONE DAY for overnight sessions!
                 }
                 else
                 {
@@ -98,17 +100,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 DateTime boxEndTime = TimeZoneInfo.ConvertTime(sessionEndInZone, targetZone, TimeZoneInfo.Local);
 
-                    Draw.Rectangle(this, "ORBox", false,
-                    orStartDateTime, sessionHigh,
-                    boxEndTime, sessionLow,
-                    Brushes.DodgerBlue, Brushes.DodgerBlue, areaOpacity);
+                Draw.Rectangle(
+                    this,
+                    "ORBox",
+                    false,
+                    orStartDateTime,
+                    sessionHigh,
+                    boxEndTime,
+                    sessionLow,
+                    Brushes.DodgerBlue,
+                    Brushes.DodgerBlue,
+                    areaOpacity
+                );
 
                 if (ShowMidLine)
                 {
-                    Draw.Line(this, "ORMid", false,
-                        orStartDateTime, sessionMid,
-                        boxEndTime, sessionMid,
-                        Brushes.Yellow, DashStyleHelper.Dash, 1);
+                    Draw.Line(
+                        this,
+                        "ORMid",
+                        false,
+                        orStartDateTime,
+                        sessionMid,
+                        boxEndTime,
+                        sessionMid,
+                        Brushes.Yellow,
+                        DashStyleHelper.Dash,
+                        1
+                    );
                 }
             }
             catch (Exception ex)
@@ -125,7 +143,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             sessionRange = 0;
             isInORWindow = false;
             orComplete = false;
-            retestFiredThisSession = false;  // V12.1101E [B-2]: Reset RETEST latch at session start
+            retestFiredThisSession = false; // V12.1101E [B-2]: Reset RETEST latch at session start
             orStartDateTime = DateTime.MinValue;
             orEndDateTime = DateTime.MinValue;
             sessionStartDateTime = DateTime.MinValue;
@@ -174,7 +192,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-
         private void RemoveDrawObjects()
         {
             RemoveDrawObject("ORBox");
@@ -184,10 +201,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V12.1101Q [FIX-DRAW]: Ultimate fallback helper using 'object' to bypass namespace issues.
         private object GetDrawObject(string tag)
         {
-            if (DrawObjects == null) return null;
+            if (DrawObjects == null)
+                return null;
             foreach (var o in DrawObjects)
             {
-                if (o.Tag == tag) return o;
+                if (o.Tag == tag)
+                    return o;
             }
             return null;
         }
@@ -196,7 +215,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Used for OCO Group IDs to satisfy SonarCloud security hotspots while maintaining stability.
         private string GetStableHash(string input)
         {
-            if (string.IsNullOrEmpty(input)) return "00000000";
+            if (string.IsNullOrEmpty(input))
+                return "00000000";
             uint hash = 2166136261;
             foreach (char c in input)
             {

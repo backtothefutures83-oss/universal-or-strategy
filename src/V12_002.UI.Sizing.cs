@@ -1,13 +1,15 @@
 // V12.44 MODULAR: ATR Auto-Sizing Engine Module (Split from UI.cs)
 // Contains: Position sizing, ATR stop calculations, target distribution, pending order sync
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,16 +19,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -43,16 +43,28 @@ namespace NinjaTrader.NinjaScript.Strategies
         // it is used instead of the live activeTargetCount global read. This prevents the
         // IPC SET_TARGET_COUNT command from changing the distribution mid-dispatch.
         // All existing call sites omit the parameter and continue using the live global (no breaking change).
-        private void GetTargetDistribution(int contracts, out int t1, out int t2, out int t3, out int t4, out int t5,
-            int targetCountOverride = -1)
+        private void GetTargetDistribution(
+            int contracts,
+            out int t1,
+            out int t2,
+            out int t3,
+            out int t4,
+            out int t5,
+            int targetCountOverride = -1
+        )
         {
-            int count = (targetCountOverride >= 1 && targetCountOverride <= 5)
-                ? targetCountOverride
-                : Math.Max(1, Math.Min(5, activeTargetCount));
+            int count =
+                (targetCountOverride >= 1 && targetCountOverride <= 5)
+                    ? targetCountOverride
+                    : Math.Max(1, Math.Min(5, activeTargetCount));
 
             int[] buckets = V12_PureLogic.GetTargetDistribution(contracts, count);
 
-            t1 = buckets[0]; t2 = buckets[1]; t3 = buckets[2]; t4 = buckets[3]; t5 = buckets[4];
+            t1 = buckets[0];
+            t2 = buckets[1];
+            t3 = buckets[2];
+            t4 = buckets[3];
+            t5 = buckets[4];
         }
 
         /// <summary>
@@ -72,13 +84,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SlippageCushionPoints,
                 pointValue,
                 minContracts,
-                maxContracts);
+                maxContracts
+            );
 
             // V12.Phase8.3: Diagnostic warning when ATR/Risk math produces 0
             if (contracts == 0)
-                Print($"[SIZING] Risk/Stop math resulted in 0 -- falling back to minContracts floor ({minContracts}). Risk=${MaxRiskAmount:F0}, StopPoints={stopPoints:F1}");
+                Print(
+                    $"[SIZING] Risk/Stop math resulted in 0 -- falling back to minContracts floor ({minContracts}). Risk=${MaxRiskAmount:F0}, StopPoints={stopPoints:F1}"
+                );
 
-            Print($"[V12.30 SIZING] RawStop={stopDistanceRaw:F2} -> Ceiling={stopPoints:F0}pt | Risk=${MaxRiskAmount:F0} | Qty={contracts} | Clamp=[{minContracts},{maxContracts}]");
+            Print(
+                $"[V12.30 SIZING] RawStop={stopDistanceRaw:F2} -> Ceiling={stopPoints:F0}pt | Risk=${MaxRiskAmount:F0} | Qty={contracts} | Clamp=[{minContracts},{maxContracts}]"
+            );
             return contracts;
         }
 
@@ -100,7 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// 2. Tick-Aware Threshold: Uses tickSize instead of hardcoded 0.01
         /// 3. Retry Cooldown: 500ms pause after ChangeOrder failure to prevent broker hammering
         /// </summary>
-        private DateTime _lastSyncFailureTime = DateTime.MinValue;  // V12.45: Retry cooldown tracker
+        private DateTime _lastSyncFailureTime = DateTime.MinValue; // V12.45: Retry cooldown tracker
 
         private void SyncPendingOrders()
         {
@@ -131,16 +148,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                if (!CalculateSyncParameters(
-                    pos,
-                    entryOrder,
-                    entryName,
-                    out int newQty,
-                    out double newStopDist,
-                    out bool needsQtyChange,
-                    out int expectedDelta,
-                    out string acctName,
-                    out string syncLog))
+                if (
+                    !CalculateSyncParameters(
+                        pos,
+                        entryOrder,
+                        entryName,
+                        out int newQty,
+                        out double newStopDist,
+                        out bool needsQtyChange,
+                        out int expectedDelta,
+                        out string acctName,
+                        out string syncLog
+                    )
+                )
                 {
                     continue;
                 }
@@ -207,7 +227,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             out bool needsQtyChange,
             out int expectedDelta,
             out string acctName,
-            out string syncLog)
+            out string syncLog
+        )
         {
             // [RACE-05]: Compute sizing math + flicker check + stop-price update atomically.
             // Prevents volatility drift where currentATR changes between math and state mutation.
@@ -228,9 +249,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return false;
             }
 
-            double newStopPrice = pos.Direction == MarketPosition.Long
-                ? pos.EntryPrice - newStopDist
-                : pos.EntryPrice + newStopDist;
+            double newStopPrice =
+                pos.Direction == MarketPosition.Long ? pos.EntryPrice - newStopDist : pos.EntryPrice + newStopDist;
 
             // Stop prices update immediately -- they reflect intent and are safe before broker confirmation.
             pos.CurrentStopPrice = newStopPrice;
@@ -248,11 +268,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // sees the updated target size before the fill arrives.
                 int qtyDelta = newQty - entryOrder.Quantity;
                 expectedDelta = pos.Direction == MarketPosition.Long ? qtyDelta : -qtyDelta;
-                acctName = (pos.IsFollower && pos.ExecutingAccount != null)
-                    ? pos.ExecutingAccount.Name : Account.Name;
+                acctName = (pos.IsFollower && pos.ExecutingAccount != null) ? pos.ExecutingAccount.Name : Account.Name;
             }
 
-            syncLog = $"[V12.45 SYNC] {entryName}: Stop {oldCeilingStop:F0}->{newStopDist:F0}pt | Qty {entryOrder.Quantity}->{newQty} | ATR={currentATR:F2}";
+            syncLog =
+                $"[V12.45 SYNC] {entryName}: Stop {oldCeilingStop:F0}->{newStopDist:F0}pt | Qty {entryOrder.Quantity}->{newQty} | ATR={currentATR:F2}";
             return true;
         }
 
@@ -266,7 +286,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             int expectedDelta,
             string acctName,
             string syncLog,
-            string entryName)
+            string entryName
+        )
         {
             // ChangeOrder must be called outside stateLock -- broker API call.
             try

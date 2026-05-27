@@ -16,8 +16,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ShadowEngineCheck()
         {
-            if (!EnableSIMA || !ShadowModeEnabled) return;
-            if (_isTerminating || isFlattenRunning) return;
+            if (!EnableSIMA || !ShadowModeEnabled)
+                return;
+            if (_isTerminating || isFlattenRunning)
+                return;
 
             ShadowPropagateStopMoves();
             ShadowPropagateLeaderFlatten();
@@ -33,18 +35,23 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in activePositions.ToArray())
             {
                 PositionInfo pos = kvp.Value;
-                if (pos == null || pos.IsFollower) continue;
-                if (!pos.EntryFilled || pos.RemainingContracts <= 0) continue;
+                if (pos == null || pos.IsFollower)
+                    continue;
+                if (!pos.EntryFilled || pos.RemainingContracts <= 0)
+                    continue;
 
                 Order leaderStop;
-                if (!stopOrders.TryGetValue(kvp.Key, out leaderStop)) continue;
-                if (leaderStop == null || leaderStop.StopPrice <= 0) continue;
+                if (!stopOrders.TryGetValue(kvp.Key, out leaderStop))
+                    continue;
+                if (leaderStop == null || leaderStop.StopPrice <= 0)
+                    continue;
 
                 double lastKnown;
                 _leaderLastStopPrice.TryGetValue(kvp.Key, out lastKnown);
 
                 // Only propagate if price actually changed (beyond half-tick noise)
-                if (Math.Abs(leaderStop.StopPrice - lastKnown) < tickSize * 0.5) continue;
+                if (Math.Abs(leaderStop.StopPrice - lastKnown) < tickSize * 0.5)
+                    continue;
 
                 // Find and update all follower positions linked to this leader entry
                 if (ShadowMoveFollowerStops(kvp.Key, leaderStop.StopPrice))
@@ -55,14 +62,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 PositionInfo livePos;
                 Order liveStop;
-                if (!activePositions.TryGetValue(cacheKvp.Key, out livePos)
+                if (
+                    !activePositions.TryGetValue(cacheKvp.Key, out livePos)
                     || livePos == null
                     || livePos.IsFollower
                     || !livePos.EntryFilled
                     || livePos.RemainingContracts <= 0
                     || !stopOrders.TryGetValue(cacheKvp.Key, out liveStop)
                     || liveStop == null
-                    || liveStop.StopPrice <= 0)
+                    || liveStop.StopPrice <= 0
+                )
                 {
                     _leaderLastStopPrice.TryRemove(cacheKvp.Key, out _);
                 }
@@ -76,10 +85,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             ctx = null;
             string dispatchId;
-            if (string.IsNullOrEmpty(leaderEntryKey)
+            if (
+                string.IsNullOrEmpty(leaderEntryKey)
                 || !symmetryMasterEntryToDispatch.TryGetValue(leaderEntryKey, out dispatchId)
                 || !symmetryDispatchById.TryGetValue(dispatchId, out ctx)
-                || ctx == null)
+                || ctx == null
+            )
             {
                 return false;
             }
@@ -91,12 +102,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// ADR-019: Uses Volatile.Read snapshot for lock-free access.
         /// </summary>
         private System.Collections.Generic.List<string> ShadowBuildFollowerEntryList(
-            SymmetryDispatchContext ctx, string dispatchId)
+            SymmetryDispatchContext ctx,
+            string dispatchId
+        )
         {
             // ADR-019: snapshot via Volatile.Read on immutable string[] -- zero-alloc, lock-free.
             string[] followerSnapshot = ctx.Followers;
             var followerEntryNames = new System.Collections.Generic.List<string>(followerSnapshot.Length);
-            
+
             foreach (string followerEntryName in followerSnapshot)
             {
                 if (string.IsNullOrEmpty(followerEntryName))
@@ -118,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 followerEntryNames.Add(kvp.Key);
             }
-            
+
             return followerEntryNames;
         }
 
@@ -127,14 +140,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Returns true if follower found, sets waitingOnFollower if not ready.
         /// </summary>
         private bool ShadowProcessFollowerStopUpdate(
-            string followerEntryName, double newStopPrice, out bool waitingOnFollower)
+            string followerEntryName,
+            double newStopPrice,
+            out bool waitingOnFollower
+        )
         {
             waitingOnFollower = false;
-            
+
             FollowerBracketFSM fsm;
             bool hasFsm = _followerBrackets.TryGetValue(followerEntryName, out fsm) && fsm != null;
             PositionInfo followerPos;
-            bool hasFollowerPos = activePositions.TryGetValue(followerEntryName, out followerPos) && followerPos != null;
+            bool hasFollowerPos =
+                activePositions.TryGetValue(followerEntryName, out followerPos) && followerPos != null;
 
             if (!hasFsm && !hasFollowerPos)
                 return false;
@@ -156,10 +173,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
 
             // Use existing stop update infrastructure (two-phase Replace FSM)
-            Print(string.Format("[SHADOW] Propagating stop {0:F2} -> {1} on {2}",
-                newStopPrice, followerEntryName, fsm.AccountName));
+            Print(
+                string.Format(
+                    "[SHADOW] Propagating stop {0:F2} -> {1} on {2}",
+                    newStopPrice,
+                    followerEntryName,
+                    fsm.AccountName
+                )
+            );
             UpdateStopOrder(followerEntryName, followerPos, newStopPrice, followerPos.CurrentTrailLevel);
-            
+
             return true;
         }
 
@@ -175,7 +198,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             string dispatchId;
             symmetryMasterEntryToDispatch.TryGetValue(leaderEntryKey, out dispatchId);
-            
+
             var followerEntryNames = ShadowBuildFollowerEntryList(ctx, dispatchId);
 
             bool foundAnyFollower = false;

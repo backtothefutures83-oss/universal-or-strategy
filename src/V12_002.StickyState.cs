@@ -115,11 +115,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (SecurityException ex)
             {
                 // EPIC-7-QUALITY-010: Log security violations
+                TrackStateSecurityViolation();
                 Print(string.Format("[IO_SECURITY] {0}", ex.Message));
                 throw; // Re-throw to fail-fast
             }
             catch (Exception ex)
             {
+                TrackStatePersistenceFailure();
                 Print(string.Format("[STICKY] Snapshot write failed: {0}", ex.Message));
 
                 // Cleanup temp file (use original path since validation may have failed)
@@ -203,11 +205,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (SecurityException ex)
             {
                 // EPIC-7-QUALITY-010: Log security violations
+                TrackStateSecurityViolation();
                 Print(string.Format("[IO_SECURITY] {0}", ex.Message));
                 throw; // Re-throw to fail-fast
             }
             catch (Exception ex)
             {
+                TrackStatePersistenceFailure();
                 Print(string.Format("[STICKY] Load failed: {0}", ex.Message));
                 return null;
             }
@@ -286,7 +290,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return false;
                 }
 
-                File.Copy(backupPath, _stickyStatePath, overwrite: true);
+                // EPIC-7-QUALITY-010: Use validated paths for File.Copy
+                string validStickyPath = PathValidation.ValidateAndCanonicalize(_stickyStatePath, "RollbackWrite");
+                File.Copy(validBackupPath, validStickyPath, overwrite: true);
+
+                TrackStateRollback();
 
                 Print(
                     string.Format(
@@ -300,8 +308,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 return true;
             }
+            catch (SecurityException ex)
+            {
+                TrackStateSecurityViolation();
+                Print(string.Format("[STICKY] Rollback security violation: {0}", ex.Message));
+                return false;
+            }
             catch (Exception ex)
             {
+                TrackStatePersistenceFailure();
                 Print(string.Format("[STICKY] Rollback failed: {0}", ex.Message));
                 return false;
             }

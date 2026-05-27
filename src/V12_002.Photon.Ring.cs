@@ -14,7 +14,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class V12_002 : Strategy
     {
-        private sealed class SPSCRing<T> where T : struct
+        private sealed class SPSCRing<T>
+            where T : struct
         {
             private readonly T[] _buffer;
             private readonly int _mask;
@@ -23,11 +24,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             // only throughput, not correctness. Both cursors are Volatile-fenced.
             private long _producerCursor;
 #pragma warning disable 0169
-            private long _pad1, _pad2, _pad3, _pad4, _pad5, _pad6, _pad7;
+            private long _pad1,
+                _pad2,
+                _pad3,
+                _pad4,
+                _pad5,
+                _pad6,
+                _pad7;
 #pragma warning restore 0169
             private long _consumerCursor;
 
-            public int Capacity { get { return _buffer.Length; } }
+            public int Capacity
+            {
+                get { return _buffer.Length; }
+            }
 
             public int Count
             {

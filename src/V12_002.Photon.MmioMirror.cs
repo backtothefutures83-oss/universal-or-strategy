@@ -35,18 +35,18 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         private sealed class MmioDispatchMirror : IDisposable
         {
-            private const int HeaderBytes           = 128;
+            private const int HeaderBytes = 128;
             private const long ProducerCursorOffset = 0;
-            private const long ShadowSaltOffset     = 64;
-            private const long SlotsBaseOffset      = 128;
+            private const long ShadowSaltOffset = 64;
+            private const long SlotsBaseOffset = 128;
 
-            private readonly MemoryMappedFile         _mmf;
+            private readonly MemoryMappedFile _mmf;
             private readonly MemoryMappedViewAccessor _accessor;
-            private readonly int                      _capacity;
-            private readonly int                      _mask;
-            private readonly int                      _slotSize;
-            private long                              _producerCursor;
-            private int                               _disposed;
+            private readonly int _capacity;
+            private readonly int _mask;
+            private readonly int _slotSize;
+            private long _producerCursor;
+            private int _disposed;
 
             public string Name { get; private set; }
 
@@ -58,20 +58,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     throw new ArgumentException("Slot size must be a positive multiple of 8", "slotSize");
 
                 _capacity = capacity;
-                _mask     = capacity - 1;
+                _mask = capacity - 1;
                 _slotSize = slotSize;
-                Name      = name;
+                Name = name;
 
                 long totalBytes = HeaderBytes + (long)slotSize * (long)capacity;
 
-                _mmf      = MemoryMappedFile.CreateOrOpen(name, totalBytes, MemoryMappedFileAccess.ReadWrite);
+                _mmf = MemoryMappedFile.CreateOrOpen(name, totalBytes, MemoryMappedFileAccess.ReadWrite);
                 _accessor = _mmf.CreateViewAccessor(0, totalBytes, MemoryMappedFileAccess.ReadWrite);
 
                 // Zero header and publish salt
                 for (long i = 0; i < HeaderBytes; i++)
                     _accessor.Write(i, (byte)0);
-
-                unchecked { _accessor.Write(ShadowSaltOffset, (long)salt); }
+                unchecked
+                {
+                    _accessor.Write(ShadowSaltOffset, (long)salt);
+                }
 
                 _producerCursor = 0L;
                 _accessor.Write(ProducerCursorOffset, _producerCursor);
@@ -82,7 +84,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             // the mirror but still succeeds on the primary heap ring.
             public bool TryPublish(ref FleetDispatchSlot slot)
             {
-                if (Volatile.Read(ref _disposed) != 0) return false;
+                if (Volatile.Read(ref _disposed) != 0)
+                    return false;
 
                 long prod = _producerCursor;
                 // Sidecar cursor is not read back in single-writer/observer mode; wrap
@@ -108,9 +111,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public void Dispose()
             {
-                if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-                try { _accessor.Dispose(); } catch { }
-                try { _mmf.Dispose();      } catch { }
+                if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                    return;
+                try
+                {
+                    _accessor.Dispose();
+                }
+                catch { }
+                try
+                {
+                    _mmf.Dispose();
+                }
+                catch { }
             }
 
             // Diagnostic helper; not on the hot path.
@@ -118,7 +130,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 return string.Format(
                     "MmioDispatchMirror: name={0} capacity={1} slotSize={2} prod={3}",
-                    Name, _capacity, _slotSize, Volatile.Read(ref _producerCursor));
+                    Name,
+                    _capacity,
+                    _slotSize,
+                    Volatile.Read(ref _producerCursor)
+                );
             }
         }
     }

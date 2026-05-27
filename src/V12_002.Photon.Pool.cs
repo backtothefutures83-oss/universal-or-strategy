@@ -11,7 +11,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     public partial class V12_002 : Strategy
     {
         private const int PhotonPoolCapacity = 64; // 5 signals x 12 accounts = 60 < 64
-        private const int MaxOrdersPerSlot   = 7;  // 1 entry + 1 stop + 5 targets
+        private const int MaxOrdersPerSlot = 7; // 1 entry + 1 stop + 5 targets
 
         // FleetDispatchSlot (v28.0, blittable, 64 bytes, cache-line sized)
         //
@@ -28,17 +28,36 @@ namespace NinjaTrader.NinjaScript.Strategies
         [StructLayout(LayoutKind.Explicit, Size = 64)]
         private struct FleetDispatchSlot
         {
-            [FieldOffset(0)]  public double EntryPrice;
-            [FieldOffset(8)]  public double StopPrice;
-            [FieldOffset(16)] public long   SignalTicks;
-            [FieldOffset(24)] public int    PoolSlotIndex;   // also the SidebandIndex (same index)
-            [FieldOffset(28)] public int    OrderCount;
-            [FieldOffset(32)] public int    Quantity;
-            [FieldOffset(36)] public int    TargetCount;
-            [FieldOffset(40)] public int    Action;          // (int)OrderAction, cast at boundary
-            [FieldOffset(44)] public int    ReservedDelta;
+            [FieldOffset(0)]
+            public double EntryPrice;
+
+            [FieldOffset(8)]
+            public double StopPrice;
+
+            [FieldOffset(16)]
+            public long SignalTicks;
+
+            [FieldOffset(24)]
+            public int PoolSlotIndex; // also the SidebandIndex (same index)
+
+            [FieldOffset(28)]
+            public int OrderCount;
+
+            [FieldOffset(32)]
+            public int Quantity;
+
+            [FieldOffset(36)]
+            public int TargetCount;
+
+            [FieldOffset(40)]
+            public int Action; // (int)OrderAction, cast at boundary
+
+            [FieldOffset(44)]
+            public int ReservedDelta;
+
             // bytes 48..56 reserved padding (Size=64 auto-zeros)
-            [FieldOffset(56)] public ulong  Shadow;          // XorShadow integrity (last 8 bytes)
+            [FieldOffset(56)]
+            public ulong Shadow; // XorShadow integrity (last 8 bytes)
         }
 
         // Parallel sideband: managed refs indexed by PoolSlotIndex.
@@ -49,12 +68,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private struct FleetDispatchSideband
         {
             public Account Account;
-            public string  FleetEntryName;
-            public string  ExpectedKey;
+            public string FleetEntryName;
+            public string ExpectedKey;
         }
 
         private FleetDispatchSideband[] _photonSideband;
-        private ulong                   _photonShadowSalt;
+        private ulong _photonShadowSalt;
 
         // === Pool Claim Result ===
         // V14.2 FIX-D1: Returns both the Order[] and its SlotIndex so the producer
@@ -62,8 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private struct PoolClaimResult
         {
-            public Order[] Orders;    // null if pool exhausted
-            public int SlotIndex;     // -1 if pool exhausted
+            public Order[] Orders; // null if pool exhausted
+            public int SlotIndex; // -1 if pool exhausted
         }
 
         // === PhotonOrderPool ===
@@ -120,7 +139,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             /// </summary>
             public Order[] GetByIndex(int slotIndex)
             {
-                if (slotIndex < 0 || slotIndex >= _capacity) return null;
+                if (slotIndex < 0 || slotIndex >= _capacity)
+                    return null;
                 return _orderArrays[slotIndex];
             }
 
@@ -129,7 +149,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             /// </summary>
             public void ReleaseByIndex(int slotIndex)
             {
-                if (slotIndex < 0 || slotIndex >= _capacity) return;
+                if (slotIndex < 0 || slotIndex >= _capacity)
+                    return;
                 Order[] arr = _orderArrays[slotIndex];
                 for (int i = 0; i < MaxOrdersPerSlot; i++)
                     arr[i] = null;
@@ -145,10 +166,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 return string.Format(
                     "PhotonPool: free={0}/{1} claims={2} releases={3} exhausted={4}",
-                    Volatile.Read(ref _freeTop), _capacity,
+                    Volatile.Read(ref _freeTop),
+                    _capacity,
                     Interlocked.Read(ref _claimCount),
                     Interlocked.Read(ref _releaseCount),
-                    Interlocked.Read(ref _exhaustedCount));
+                    Interlocked.Read(ref _exhaustedCount)
+                );
             }
         }
 
@@ -156,7 +179,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private static long FnvHash64(string s)
         {
-            if (string.IsNullOrEmpty(s)) return 0;
+            if (string.IsNullOrEmpty(s))
+                return 0;
             long hash = unchecked((long)0xcbf29ce484222325L);
             long prime = unchecked((long)0x100000001b3L);
             for (int i = 0; i < s.Length; i++)
@@ -215,20 +239,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public bool ContainsOrAdd(long hash)
             {
-                if (hash == EMPTY_KEY) hash = 1L;
+                if (hash == EMPTY_KEY)
+                    hash = 1L;
 
                 int bucket = (int)(hash & _tableMask);
                 int probes = 0;
                 while (probes < _tableKeys.Length)
                 {
                     long key = _tableKeys[bucket];
-                    if (key == EMPTY_KEY) break;
+                    if (key == EMPTY_KEY)
+                        break;
                     if (key == hash)
                     {
                         HitCount++;
                         return true;
                     }
-                    if (probes > 0) CollisionCount++;
+                    if (probes > 0)
+                        CollisionCount++;
                     bucket = (bucket + 1) & _tableMask;
                     probes++;
                 }
@@ -269,7 +296,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 int bucket = (int)(hash & _tableMask);
                 while (true)
                 {
-                    if (_tableKeys[bucket] == EMPTY_KEY) return;
+                    if (_tableKeys[bucket] == EMPTY_KEY)
+                        return;
                     if (_tableKeys[bucket] == hash)
                     {
                         _tableKeys[bucket] = EMPTY_KEY;
@@ -297,7 +325,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 return string.Format(
                     "ExecIdRing: count={0}/{1} hits={2} misses={3} evicts={4} probeCollisions={5}",
-                    _ringCount, _ringCapacity, HitCount, MissCount, EvictCount, CollisionCount);
+                    _ringCount,
+                    _ringCapacity,
+                    HitCount,
+                    MissCount,
+                    EvictCount,
+                    CollisionCount
+                );
             }
         }
 
@@ -321,17 +355,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             acc ^= unchecked((ulong)BitConverter.DoubleToInt64Bits(slot.EntryPrice));
             acc = (acc << 13) | (acc >> 51); // rotate-left 13 to diffuse field positions
             acc ^= unchecked((ulong)BitConverter.DoubleToInt64Bits(slot.StopPrice));
-            acc = (acc << 7)  | (acc >> 57);
+            acc = (acc << 7) | (acc >> 57);
             acc ^= unchecked((ulong)slot.SignalTicks);
             acc = (acc << 11) | (acc >> 53);
-            acc ^= ((ulong)(uint)slot.PoolSlotIndex)
-                 | (((ulong)(uint)slot.OrderCount) << 32);
+            acc ^= ((ulong)(uint)slot.PoolSlotIndex) | (((ulong)(uint)slot.OrderCount) << 32);
             acc = (acc << 17) | (acc >> 47);
-            acc ^= ((ulong)(uint)slot.Quantity)
-                 | (((ulong)(uint)slot.TargetCount) << 32);
+            acc ^= ((ulong)(uint)slot.Quantity) | (((ulong)(uint)slot.TargetCount) << 32);
             acc = (acc << 19) | (acc >> 45);
-            acc ^= ((ulong)(uint)slot.Action)
-                 | (((ulong)(uint)slot.ReservedDelta) << 32);
+            acc ^= ((ulong)(uint)slot.Action) | (((ulong)(uint)slot.ReservedDelta) << 32);
             return acc;
         }
     }

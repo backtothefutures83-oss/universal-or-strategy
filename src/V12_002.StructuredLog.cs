@@ -18,9 +18,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private enum V12LogLevel
         {
             DEBUG, // Low-noise diagnostics -- only visible when needed
-            INFO,  // Standard operational events
-            WARN,  // Unexpected but recoverable conditions
-            ERROR  // Logic invariant violations or exception paths
+            INFO, // Standard operational events
+            WARN, // Unexpected but recoverable conditions
+            ERROR, // Logic invariant violations or exception paths
         }
 
         #endregion
@@ -35,12 +35,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void StructuredPrint(string traceId, string module, V12LogLevel level, string message)
         {
             // Defensive null guards -- format must never throw in a trading strategy.
-            string safeId      = traceId ?? "?????";
-            string safeModule  = module  ?? "UNKNOWN";
+            string safeId = traceId ?? "?????";
+            string safeModule = module ?? "UNKNOWN";
             string safeMessage = message ?? "(null)";
 
-            Print(string.Format("[TRACE:{0}][{1}][{2}] {3}",
-                safeId, safeModule, level, safeMessage));
+            Print(string.Format("[TRACE:{0}][{1}][{2}] {3}", safeId, safeModule, level, safeMessage));
         }
 
         #endregion
@@ -107,7 +106,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _currentTraceId,
                 module,
                 V12LogLevel.ERROR,
-                string.Format("{0}: [{1}] {2}", context, ex.GetType().Name, ex.Message));
+                string.Format("{0}: [{1}] {2}", context, ex.GetType().Name, ex.Message)
+            );
         }
 
         #endregion

@@ -4,13 +4,15 @@
 // Build 971: Orders.Management.Flatten -- SyncPositionState, ManageCIT, FlattenAll, FlattenPositionByName, IsOrderTerminal, HasActiveOrPendingOrderForEntry
 // V12 Orders.Management Module (Extracted)
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -20,16 +22,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -67,8 +67,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ManageCIT()
         {
-            if (activePositions.Count == 0 && entryOrders.Count == 0) return;
-            if (string.IsNullOrEmpty(ChaseIfTouchPoints) || ChaseIfTouchPoints == "0") return;
+            if (activePositions.Count == 0 && entryOrders.Count == 0)
+                return;
+            if (string.IsNullOrEmpty(ChaseIfTouchPoints) || ChaseIfTouchPoints == "0")
+                return;
 
             // [BUILD 924 -- Fix C] Suppress CIT during price-move propagation to prevent
             // race-fire on freshly resubmitted follower limit orders before sync cycle completes.
@@ -79,7 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             double citOffset = 0;
-            if (!double.TryParse(ChaseIfTouchPoints, out citOffset)) return;
+            if (!double.TryParse(ChaseIfTouchPoints, out citOffset))
+                return;
 
             int _citBrokerBudget = MaxBrokerCallsPerCycle; // 5 calls max per cycle (constant at V12_002.cs:303)
             // Iterate ALL entry orders in the unified dictionary (local + every fleet account)
@@ -87,9 +90,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 string key = kvp.Key;
                 Order order = kvp.Value;
-                if (order == null || order.OrderState != OrderState.Working) continue;
-                if (order.OrderType != OrderType.Limit) continue; // only chase limit entries
-                if (_citNudgedKeys.ContainsKey(key)) continue;    // [BUILD 949] one-shot: already nudged
+                if (order == null || order.OrderState != OrderState.Working)
+                    continue;
+                if (order.OrderType != OrderType.Limit)
+                    continue; // only chase limit entries
+                if (_citNudgedKeys.ContainsKey(key))
+                    continue; // [BUILD 949] one-shot: already nudged
 
                 // [BUILD 984 CIT FIX] Correct directional bar-price logic:
                 // - LONG entry (Buy): price must DROP DOWN to the limit -> compare Low[0] <= limitPrice
@@ -99,12 +105,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double currentPrice = (order.OrderAction == OrderAction.Buy) ? Low[0] : High[0];
                 double limitPrice = order.LimitPrice;
 
-                bool triggerChase = (order.OrderAction == OrderAction.Buy)
-                    ? (currentPrice <= limitPrice)   // Long: bar low touched or pierced the limit
-                    : (currentPrice >= limitPrice);  // Short: bar high touched or pierced the limit
+                bool triggerChase =
+                    (order.OrderAction == OrderAction.Buy)
+                        ? (currentPrice <= limitPrice) // Long: bar low touched or pierced the limit
+                        : (currentPrice >= limitPrice); // Short: bar high touched or pierced the limit
 
-
-                if (!triggerChase) continue;
+                if (!triggerChase)
+                    continue;
 
                 // Determine local vs follower
                 PositionInfo pos = null;
@@ -113,17 +120,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 try
                 {
-                    double tickSize      = Instrument.MasterInstrument.TickSize;
+                    double tickSize = Instrument.MasterInstrument.TickSize;
                     double nudgeDistance = citOffset * tickSize;
-                    double newLimitPrice = (order.OrderAction == OrderAction.Buy)
-                        ? Instrument.MasterInstrument.RoundToTickSize(limitPrice + nudgeDistance)
-                        : Instrument.MasterInstrument.RoundToTickSize(limitPrice - nudgeDistance);
+                    double newLimitPrice =
+                        (order.OrderAction == OrderAction.Buy)
+                            ? Instrument.MasterInstrument.RoundToTickSize(limitPrice + nudgeDistance)
+                            : Instrument.MasterInstrument.RoundToTickSize(limitPrice - nudgeDistance);
 
                     if (isFollower)
                     {
                         // Fleet follower: cancel limit, resubmit as nudged limit via account API
                         Account followerAcct = pos.ExecutingAccount;
-                        Print($"[CIT] FLEET nudge: {key} on {followerAcct.Name} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)");
+                        Print(
+                            $"[CIT] FLEET nudge: {key} on {followerAcct.Name} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
+                        );
 
                         // Build 1109 [FREEZE-PROOF]: Budget broker calls to prevent strategy thread stall
                         if (_citBrokerBudget <= 0)
@@ -136,11 +146,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                         followerAcct.Cancel(new[] { order });
 
-                        Order nudgedOrder = followerAcct.CreateOrder(Instrument, order.OrderAction, OrderType.Limit,
-                            TimeInForce.Gtc, order.Quantity, newLimitPrice, 0, "", "CIT_" + key, null);
+                        Order nudgedOrder = followerAcct.CreateOrder(
+                            Instrument,
+                            order.OrderAction,
+                            OrderType.Limit,
+                            TimeInForce.Gtc,
+                            order.Quantity,
+                            newLimitPrice,
+                            0,
+                            "",
+                            "CIT_" + key,
+                            null
+                        );
                         if (nudgedOrder == null)
                         {
-                            Print($"[CIT] ERROR: CreateOrder returned null for {key} on {followerAcct.Name} -- nudge aborted");
+                            Print(
+                                $"[CIT] ERROR: CreateOrder returned null for {key} on {followerAcct.Name} -- nudge aborted"
+                            );
                             continue;
                         }
                         followerAcct.Submit(new[] { nudgedOrder });
@@ -152,7 +174,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                     {
                         // Local account: ChangeOrder moves limit N ticks toward market
-                        Print($"[CIT] LOCAL nudge: {key} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)");
+                        Print(
+                            $"[CIT] LOCAL nudge: {key} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
+                        );
                         ChangeOrder(order, order.Quantity, newLimitPrice, 0);
                     }
                     _citNudgedKeys.TryAdd(key, true); // [BUILD 949] one-shot: mark as nudged
@@ -171,17 +195,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 HandleGhostPositionCleanup();
-                
+
                 if (activePositions.Count == 0 && Position.MarketPosition == MarketPosition.Flat)
                 {
                     Print("FLATTEN: No active positions to close");
-                    if (EnableSIMA) DispatchFleetFlatten();
+                    if (EnableSIMA)
+                        DispatchFleetFlatten();
                     return;
                 }
 
                 Print("FLATTEN: Closing all positions...");
                 CancelMasterEntryOrders();
-                if (EnableSIMA) DispatchFleetFlatten();
+                if (EnableSIMA)
+                    DispatchFleetFlatten();
                 ResetSyncStateAndPurgeFollowers();
                 FlattenFilledMasterPositions();
                 CancelUnfilledMasterEntries();
@@ -214,7 +240,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (liveDir == MarketPosition.Long)
                     SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, liveQty, 0, 0, "", "Flatten_Ghost");
                 else
-                    SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, liveQty, 0, 0, "", "Flatten_Ghost");
+                    SubmitOrderUnmanaged(
+                        0,
+                        OrderAction.BuyToCover,
+                        OrderType.Market,
+                        liveQty,
+                        0,
+                        0,
+                        "",
+                        "Flatten_Ghost"
+                    );
             }
         }
 
@@ -226,9 +261,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Clear all tracked pending entry orders using account-aware routing
             foreach (var entryOrder in entryOrders.Values)
             {
-                if (entryOrder != null
+                if (
+                    entryOrder != null
                     && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted)
-                    && (entryOrder.Account == null || entryOrder.Account == Account))
+                    && (entryOrder.Account == null || entryOrder.Account == Account)
+                )
                     CancelOrderOnAccount(entryOrder, entryOrder.Account);
             }
         }
@@ -265,11 +302,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V8.30: Thread-safe snapshot iteration (Master/Main entries)
             foreach (var kvp in activePositions.ToArray())
             {
-                if (!activePositions.ContainsKey(kvp.Key)) continue;
+                if (!activePositions.ContainsKey(kvp.Key))
+                    continue;
                 PositionInfo pos = kvp.Value;
                 string entryName = kvp.Key;
 
-                if (!pos.EntryFilled) continue;
+                if (!pos.EntryFilled)
+                    continue;
 
                 FlattenSinglePosition(entryName, pos);
             }
@@ -277,8 +316,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void FlattenSinglePosition(string entryName, PositionInfo pos)
         {
-            Print(string.Format("FLATTEN: Closing filled {0} position",
-                pos.Direction == MarketPosition.Long ? "LONG" : "SHORT"));
+            Print(
+                string.Format(
+                    "FLATTEN: Closing filled {0} position",
+                    pos.Direction == MarketPosition.Long ? "LONG" : "SHORT"
+                )
+            );
 
             // V12.1101E [PH5-COLLIDE-01]: Lifecycle-safe stop cancellation.
             // Keep stop dictionary refs until broker-confirmed terminal state.
@@ -298,7 +341,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 var tDict = GetTargetOrdersDictionary(tNum);
                 if (tDict != null && tDict.TryGetValue(entryName, out var tOrder))
                 {
-                    if (tOrder != null && (tOrder.OrderState == OrderState.Working || tOrder.OrderState == OrderState.Accepted || tOrder.OrderState == OrderState.Submitted))
+                    if (
+                        tOrder != null
+                        && (
+                            tOrder.OrderState == OrderState.Working
+                            || tOrder.OrderState == OrderState.Accepted
+                            || tOrder.OrderState == OrderState.Submitted
+                        )
+                    )
                         CancelOrderSafe(tOrder, pos);
                 }
             }
@@ -310,11 +360,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Position != null && Position.MarketPosition != MarketPosition.Flat)
                     livePositionQty = Position.Quantity;
             }
-            catch (Exception pEx) { Print("Flatten Error reading Position: " + pEx.Message); }
+            catch (Exception pEx)
+            {
+                Print("Flatten Error reading Position: " + pEx.Message);
+            }
 
             // Use the smaller of cached and live to avoid overselling
             // V10 DIAGNOSTIC: Print values
-            Print(string.Format("FLATTEN DIAGNOSTIC: Entry={0} Cached={1} Live={2}", entryName, pos.RemainingContracts, livePositionQty));
+            Print(
+                string.Format(
+                    "FLATTEN DIAGNOSTIC: Entry={0} Cached={1} Live={2}",
+                    entryName,
+                    pos.RemainingContracts,
+                    livePositionQty
+                )
+            );
 
             // V10 FLATTEN FIX: Trust cached contracts if live is 0 (latency protection)
             // If cached says we have contracts, we close them.
@@ -332,12 +392,39 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Submit market order to close position
             if (flattenQty > 0)
             {
-                Order flattenOrder = pos.Direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, flattenQty, 0, 0, "", "Flatten_" + entryName);
+                Order flattenOrder =
+                    pos.Direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.Sell,
+                            OrderType.Market,
+                            flattenQty,
+                            0,
+                            0,
+                            "",
+                            "Flatten_" + entryName
+                        )
+                        : SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.BuyToCover,
+                            OrderType.Market,
+                            flattenQty,
+                            0,
+                            0,
+                            "",
+                            "Flatten_" + entryName
+                        );
 
-                if (flattenOrder == null) Print("FLATTEN ERROR: SubmitOrderUnmanaged returned NULL");
-                else Print(string.Format("FLATTEN SENT: {0} {1} contracts", pos.Direction == MarketPosition.Long ? "SELL" : "BUY", flattenQty));
+                if (flattenOrder == null)
+                    Print("FLATTEN ERROR: SubmitOrderUnmanaged returned NULL");
+                else
+                    Print(
+                        string.Format(
+                            "FLATTEN SENT: {0} {1} contracts",
+                            pos.Direction == MarketPosition.Long ? "SELL" : "BUY",
+                            flattenQty
+                        )
+                    );
             }
             else
             {
@@ -350,21 +437,31 @@ namespace NinjaTrader.NinjaScript.Strategies
             // V8.30: Thread-safe snapshot iteration (Master/Main entries)
             foreach (var kvp in activePositions.ToArray())
             {
-                if (!activePositions.ContainsKey(kvp.Key)) continue;
+                if (!activePositions.ContainsKey(kvp.Key))
+                    continue;
                 PositionInfo pos = kvp.Value;
                 string entryName = kvp.Key;
 
-                if (pos.EntryFilled) continue;
+                if (pos.EntryFilled)
+                    continue;
 
                 // Cancel pending entry order
                 if (entryOrders.ContainsKey(entryName))
                 {
                     Order entryOrder = entryOrders[entryName];
-                    if (entryOrder != null && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted))
+                    if (
+                        entryOrder != null
+                        && (entryOrder.OrderState == OrderState.Working || entryOrder.OrderState == OrderState.Accepted)
+                    )
                     {
                         CancelOrderSafe(entryOrder, pos);
-                        Print(string.Format("FLATTEN: Cancelled pending {0} entry order @ {1:F2}",
-                            pos.Direction == MarketPosition.Long ? "LONG" : "SHORT", pos.EntryPrice));
+                        Print(
+                            string.Format(
+                                "FLATTEN: Cancelled pending {0} entry order @ {1:F2}",
+                                pos.Direction == MarketPosition.Long ? "LONG" : "SHORT",
+                                pos.EntryPrice
+                            )
+                        );
                     }
                 }
             }
@@ -372,8 +469,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void FlattenPositionByName(string entryName)
         {
-            if (!activePositions.TryGetValue(entryName, out var pos)) return;
-            if (!pos.EntryFilled || pos.RemainingContracts <= 0) return;
+            if (!activePositions.TryGetValue(entryName, out var pos))
+                return;
+            if (!pos.EntryFilled || pos.RemainingContracts <= 0)
+                return;
 
             Print(string.Format("(!) EMERGENCY FLATTEN: Closing {0} position due to stop order failure", entryName));
 
@@ -412,15 +511,27 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             bool isFleetFollower = pos.IsFollower && pos.ExecutingAccount != null;
             int flattenQty = pos.RemainingContracts;
-            OrderAction flattenAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+            OrderAction flattenAction =
+                pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
 
             Order flattenOrder = null;
             if (isFleetFollower)
             {
                 string sigName = "EF_" + entryName;
-                if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
-                flattenOrder = pos.ExecutingAccount.CreateOrder(Instrument, flattenAction,
-                    OrderType.Market, TimeInForce.Gtc, flattenQty, 0, 0, "", sigName, null);
+                if (sigName.Length > 50)
+                    sigName = sigName.Substring(0, 50);
+                flattenOrder = pos.ExecutingAccount.CreateOrder(
+                    Instrument,
+                    flattenAction,
+                    OrderType.Market,
+                    TimeInForce.Gtc,
+                    flattenQty,
+                    0,
+                    0,
+                    "",
+                    sigName,
+                    null
+                );
                 pos.ExecutingAccount.Submit(new[] { flattenOrder });
             }
             else
@@ -433,16 +544,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                 catch { }
 
                 string sigName = "EF_" + entryName;
-                if (sigName.Length > 50) sigName = sigName.Substring(0, 50);
+                if (sigName.Length > 50)
+                    sigName = sigName.Substring(0, 50);
                 flattenOrder = SubmitOrderUnmanaged(0, flattenAction, OrderType.Market, flattenQty, 0, 0, "", sigName);
             }
 
             if (flattenOrder != null)
             {
-                Print(string.Format("Emergency flatten order submitted on {0}: {1} {2} contracts at MARKET",
-                    isFleetFollower ? pos.ExecutingAccount.Name : "LOCAL",
-                    pos.Direction == MarketPosition.Long ? "SELL" : "BUY",
-                    flattenQty));
+                Print(
+                    string.Format(
+                        "Emergency flatten order submitted on {0}: {1} {2} contracts at MARKET",
+                        isFleetFollower ? pos.ExecutingAccount.Name : "LOCAL",
+                        pos.Direction == MarketPosition.Long ? "SELL" : "BUY",
+                        flattenQty
+                    )
+                );
             }
             else
             {
@@ -451,12 +567,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-
         // V12.1101E [DESYNC-01]: Terminal-only removal. Returns true if order is Filled, Cancelled, Rejected, or Unknown.
         private static bool IsOrderTerminal(OrderState state)
         {
-            return state == OrderState.Filled || state == OrderState.Cancelled
-                || state == OrderState.Rejected || state == OrderState.Unknown;
+            return state == OrderState.Filled
+                || state == OrderState.Cancelled
+                || state == OrderState.Rejected
+                || state == OrderState.Unknown;
         }
 
         // V12.1101E [DESYNC-01]: True if any stop/target/entry dict still holds a non-terminal order for this entry.
@@ -468,11 +585,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             for (int tNum = 1; tNum <= 5; tNum++)
             {
                 var tDict = GetTargetOrdersDictionary(tNum);
-                if (tDict != null && tDict.TryGetValue(entryName, out var tOrder) && tOrder != null && !IsOrderTerminal(tOrder.OrderState))
+                if (
+                    tDict != null
+                    && tDict.TryGetValue(entryName, out var tOrder)
+                    && tOrder != null
+                    && !IsOrderTerminal(tOrder.OrderState)
+                )
                     return true;
             }
 
-            if (entryOrders.TryGetValue(entryName, out var e) && e != null && !IsOrderTerminal(e.OrderState)) return true;
+            if (entryOrders.TryGetValue(entryName, out var e) && e != null && !IsOrderTerminal(e.OrderState))
+                return true;
             return false;
         }
 
@@ -481,7 +604,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// if Working/Accepted/Pending, call CancelOrder but do NOT remove -- OnOrderUpdate will remove on terminal state.
         /// activePositions is removed only at the end and only when no dict still holds an active/pending order.
         /// </summary>
-
         #endregion
     }
 }

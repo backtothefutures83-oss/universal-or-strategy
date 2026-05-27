@@ -18,17 +18,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             try
             {
-                if (eventTicks <= 0) return true;
+                if (eventTicks <= 0)
+                    return true;
 
                 long ageTicks = DateTime.UtcNow.Ticks - eventTicks;
-                if (ageTicks <= 0) return true;
+                if (ageTicks <= 0)
+                    return true;
 
                 long maxAgeTicks = MetadataMaxCommandAgeMs * TimeSpan.TicksPerMillisecond;
                 if (ageTicks > maxAgeTicks)
                 {
-                    double ageMs = ageTicks / (double) TimeSpan.TicksPerMillisecond;
-                    Print(string.Format("[METADATA-G1] STALE {0}: age={1:F0}ms > max={2}ms -- rejected",
-                        context, ageMs, MetadataMaxCommandAgeMs));
+                    double ageMs = ageTicks / (double)TimeSpan.TicksPerMillisecond;
+                    Print(
+                        string.Format(
+                            "[METADATA-G1] STALE {0}: age={1:F0}ms > max={2}ms -- rejected",
+                            context,
+                            ageMs,
+                            MetadataMaxCommandAgeMs
+                        )
+                    );
                     return false;
                 }
 
@@ -62,17 +70,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             try
             {
-                if (eventTicks <= 0) return true;
+                if (eventTicks <= 0)
+                    return true;
 
                 long ageTicks = DateTime.UtcNow.Ticks - eventTicks;
-                if (ageTicks <= 0) return true;
+                if (ageTicks <= 0)
+                    return true;
 
                 long maxAgeTicks = MetadataMaxEventAgeMs * TimeSpan.TicksPerMillisecond;
                 if (ageTicks > maxAgeTicks)
                 {
-                    double ageMs = ageTicks / (double) TimeSpan.TicksPerMillisecond;
-                    Print(string.Format("[METADATA-G1b] STALE {0}: age={1:F0}ms > max={2}ms -- rejected",
-                        context, ageMs, MetadataMaxEventAgeMs));
+                    double ageMs = ageTicks / (double)TimeSpan.TicksPerMillisecond;
+                    Print(
+                        string.Format(
+                            "[METADATA-G1b] STALE {0}: age={1:F0}ms > max={2}ms -- rejected",
+                            context,
+                            ageMs,
+                            MetadataMaxEventAgeMs
+                        )
+                    );
                     return false;
                 }
 
@@ -84,16 +100,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool MetadataGuardStateCompatibility(FollowerBracketState currentState, OrderState incomingEvent, string context)
+        private bool MetadataGuardStateCompatibility(
+            FollowerBracketState currentState,
+            OrderState incomingEvent,
+            string context
+        )
         {
             try
             {
-                if (currentState == FollowerBracketState.Filled
+                if (
+                    currentState == FollowerBracketState.Filled
                     || currentState == FollowerBracketState.Cancelled
-                    || currentState == FollowerBracketState.Rejected)
+                    || currentState == FollowerBracketState.Rejected
+                )
                 {
-                    Print(string.Format("[METADATA-G2] Terminal FSM {0} received {1} -- rejected",
-                        currentState, incomingEvent));
+                    Print(
+                        string.Format(
+                            "[METADATA-G2] Terminal FSM {0} received {1} -- rejected",
+                            currentState,
+                            incomingEvent
+                        )
+                    );
                     return false;
                 }
 
@@ -109,7 +136,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             try
             {
-                if (string.IsNullOrEmpty(commandId)) return true;
+                if (string.IsNullOrEmpty(commandId))
+                    return true;
 
                 DateTime nowUtc = DateTime.UtcNow;
                 DateTime pruneBefore = nowUtc.AddMilliseconds(-MetadataMaxCommandAgeMs * 2);
@@ -138,13 +166,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 bool hasActiveFsm = _followerBrackets.Values.Any(f =>
-                    f != null
-                    && f.AccountName == accountName
-                    && f.State == FollowerBracketState.Active);
+                    f != null && f.AccountName == accountName && f.State == FollowerBracketState.Active
+                );
 
                 if (hasActiveFsm)
                 {
-                    Print(string.Format("[METADATA-G4] Repair suppressed for {0}: FSM Active (self-healed)", accountName));
+                    Print(
+                        string.Format("[METADATA-G4] Repair suppressed for {0}: FSM Active (self-healed)", accountName)
+                    );
                     return false;
                 }
 
@@ -158,9 +187,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool MetadataGuardFsmEvent(AccountEvent evt, FollowerBracketFSM fsm)
         {
-            string context = fsm != null && !string.IsNullOrEmpty(fsm.EntryName)
-                ? fsm.EntryName
-                : (!string.IsNullOrEmpty(evt.SignalName) ? evt.SignalName : "FSM");
+            string context =
+                fsm != null && !string.IsNullOrEmpty(fsm.EntryName)
+                    ? fsm.EntryName
+                    : (!string.IsNullOrEmpty(evt.SignalName) ? evt.SignalName : "FSM");
 
             if (evt.TimestampTicks > 0 && !MetadataGuardEventAge(evt.TimestampTicks, context))
                 return false;

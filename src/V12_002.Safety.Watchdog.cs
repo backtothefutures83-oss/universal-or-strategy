@@ -145,11 +145,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 if (order.Instrument.FullName != instrumentName)
                     continue;
-                if (order.OrderState == OrderState.Working
+                if (
+                    order.OrderState == OrderState.Working
                     || order.OrderState == OrderState.Submitted
                     || order.OrderState == OrderState.Accepted
                     || order.OrderState == OrderState.ChangePending
-                    || order.OrderState == OrderState.ChangeSubmitted)
+                    || order.OrderState == OrderState.ChangeSubmitted
+                )
                 {
                     ordersToCancel.Add(order);
                 }
@@ -174,14 +176,35 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
 
                 int quantity = position.Quantity;
-                Order flattenOrder = position.MarketPosition == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, quantity, 0, 0, "", "Watchdog_MasterLong")
-                    : SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, quantity, 0, 0, "", "Watchdog_MasterShort");
+                Order flattenOrder =
+                    position.MarketPosition == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.Sell,
+                            OrderType.Market,
+                            quantity,
+                            0,
+                            0,
+                            "",
+                            "Watchdog_MasterLong"
+                        )
+                        : SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.BuyToCover,
+                            OrderType.Market,
+                            quantity,
+                            0,
+                            0,
+                            "",
+                            "Watchdog_MasterShort"
+                        );
 
                 if (flattenOrder == null)
                     Print("[WATCHDOG] Strategy-thread master close returned null.");
                 else
-                    Print("[WATCHDOG] Strategy-thread master close submitted: " + quantity + " on " + masterAccount.Name);
+                    Print(
+                        "[WATCHDOG] Strategy-thread master close submitted: " + quantity + " on " + masterAccount.Name
+                    );
             }
         }
 
@@ -252,11 +275,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 if (order.Instrument.FullName != instrumentName)
                     continue;
-                if (order.OrderState == OrderState.Working
+                if (
+                    order.OrderState == OrderState.Working
                     || order.OrderState == OrderState.Submitted
                     || order.OrderState == OrderState.Accepted
                     || order.OrderState == OrderState.ChangePending
-                    || order.OrderState == OrderState.ChangeSubmitted)
+                    || order.OrderState == OrderState.ChangeSubmitted
+                )
                 {
                     ordersToCancel.Add(order);
                 }
@@ -280,9 +305,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (position.MarketPosition == MarketPosition.Flat)
                     continue;
 
-                OrderAction closeAction = position.MarketPosition == MarketPosition.Long
-                    ? OrderAction.Sell
-                    : OrderAction.BuyToCover;
+                OrderAction closeAction =
+                    position.MarketPosition == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
                 Order closeOrder = masterAccount.CreateOrder(
                     Instrument,
                     closeAction,
@@ -293,7 +317,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     0,
                     string.Empty,
                     "Watchdog_Direct_" + position.MarketPosition,
-                    null);
+                    null
+                );
 
                 if (closeOrder == null)
                 {

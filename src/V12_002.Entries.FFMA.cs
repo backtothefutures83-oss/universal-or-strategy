@@ -2,13 +2,15 @@
 // Contains: CheckFFMAConditions, ExecuteFFMAEntry, DeactivateFFMAMode,
 //           ExecuteFFMALimitEntry, ExecuteFFMAManualMarketEntry
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -18,16 +20,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -42,9 +42,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void CheckFFMAConditions()
         {
-            if (!isFFMAModeArmed || !FFMAEnabled) return;
-            if (ema9 == null || rsiIndicator == null || currentATR <= 0) return;
-            if (CurrentBar < 20) return;
+            if (!isFFMAModeArmed || !FFMAEnabled)
+                return;
+            if (ema9 == null || rsiIndicator == null || currentATR <= 0)
+                return;
+            if (CurrentBar < 20)
+                return;
 
             try
             {
@@ -59,11 +62,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // SHORT SETUP: RSI > 80 + Price far ABOVE EMA + RED reversal candle
                 if (rsiValue > FFMARSIOverbought && distanceFromEMA >= FFMAEMADistance && isRedCandle)
                 {
-                    Print(string.Format("FFMA SHORT TRIGGERED: RSI={0:F1} > {1} | Distance={2:F2}pts > {3}pts | RED candle",
-                        rsiValue, FFMARSIOverbought, distanceFromEMA, FFMAEMADistance));
+                    Print(
+                        string.Format(
+                            "FFMA SHORT TRIGGERED: RSI={0:F1} > {1} | Distance={2:F2}pts > {3}pts | RED candle",
+                            rsiValue,
+                            FFMARSIOverbought,
+                            distanceFromEMA,
+                            FFMAEMADistance
+                        )
+                    );
                     double stopPrice = High[0];
                     double stopDistance = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
-                    if (stopDistance < tickSize * 2) stopDistance = tickSize * 2;
+                    if (stopDistance < tickSize * 2)
+                        stopDistance = tickSize * 2;
                     int contracts = CalculatePositionSize(stopDistance);
                     ExecuteFFMAEntry(MarketPosition.Short, contracts);
                     return;
@@ -72,11 +83,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // LONG SETUP: RSI < 20 + Price far BELOW EMA + GREEN reversal candle
                 if (rsiValue < FFMARSIOversold && distanceFromEMA <= -FFMAEMADistance && isGreenCandle)
                 {
-                    Print(string.Format("FFMA LONG TRIGGERED: RSI={0:F1} < {1} | Distance={2:F2}pts (below by {3}pts) | GREEN candle",
-                        rsiValue, FFMARSIOversold, distanceFromEMA, FFMAEMADistance));
+                    Print(
+                        string.Format(
+                            "FFMA LONG TRIGGERED: RSI={0:F1} < {1} | Distance={2:F2}pts (below by {3}pts) | GREEN candle",
+                            rsiValue,
+                            FFMARSIOversold,
+                            distanceFromEMA,
+                            FFMAEMADistance
+                        )
+                    );
                     double stopPrice = Low[0];
                     double stopDistance = Math.Min(Math.Abs(currentPrice - stopPrice), MaximumStop);
-                    if (stopDistance < tickSize * 2) stopDistance = tickSize * 2;
+                    if (stopDistance < tickSize * 2)
+                        stopDistance = tickSize * 2;
                     int contracts = CalculatePositionSize(stopDistance);
                     ExecuteFFMAEntry(MarketPosition.Long, contracts);
                     return;
@@ -95,13 +114,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ExecuteFFMAEntry(MarketPosition direction, int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate -- abort if drawdown or daily cap breached.
-            if (!IsOrderAllowed()) return;
+            if (!IsOrderAllowed())
+                return;
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
-            if (isFlattenRunning) return;
+            if (isFlattenRunning)
+                return;
 
             try
             {
-                double entryPrice = Close[0];  // Market order at current price
+                double entryPrice = Close[0]; // Market order at current price
 
                 // Stop at entry candle high (short) or low (long)
                 double stopPrice = direction == MarketPosition.Long ? Low[0] : High[0];
@@ -111,9 +132,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (stopDistance < tickSize * 2)
                 {
                     Print(string.Format("FFMA: Stop too tight ({0:F2}pts) - using 2 tick minimum", stopDistance));
-                    stopPrice = direction == MarketPosition.Long
-                        ? entryPrice - (tickSize * 2)
-                        : entryPrice + (tickSize * 2);
+                    stopPrice =
+                        direction == MarketPosition.Long ? entryPrice - (tickSize * 2) : entryPrice + (tickSize * 2);
                     stopDistance = tickSize * 2;
                 }
 
@@ -135,10 +155,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
                 // Calculate position size based on ATR stop
-                            // contracts input passed directly by UI/IPC (No-Blink compliance)
+                // contracts input passed directly by UI/IPC (No-Blink compliance)
 
                 // 5-target distribution
-                int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+                int t1Qty,
+                    t2Qty,
+                    t3Qty,
+                    t4Qty,
+                    t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
                 string timestamp = DateTime.Now.ToString("HHmmssffff");
@@ -174,12 +198,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Market,
                     IsRMATrade = false,
                     IsFFMATrade = true,
-                    OcoGroupId = "V12_" + GetStableHash(entryName)
+                    OcoGroupId = "V12_" + GetStableHash(entryName),
                 };
                 // Submit MARKET order (immediate execution)
-                Order entryOrder = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Market, contracts, 0, 0, "", entryName);
+                Order entryOrder =
+                    direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
+                        : SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.SellShort,
+                            OrderType.Market,
+                            contracts,
+                            0,
+                            0,
+                            "",
+                            entryName
+                        );
 
                 // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
                 if (entryOrder == null)
@@ -187,21 +221,62 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("[ENTRY_ABORT] FFMA SubmitOrderUnmanaged returned null for " + entryName + ". Rolling back.");
                     return;
                 }
-                { var _en966ap = entryName; var _p966ap = pos; Enqueue(ctx => { ctx.activePositions[_en966ap] = _p966ap; }); }
-                { var _en966 = entryName; var _eo966 = entryOrder; Enqueue(ctx => { ctx.entryOrders[_en966] = _eo966; }); }
+                {
+                    var _en966ap = entryName;
+                    var _p966ap = pos;
+                    Enqueue(ctx =>
+                    {
+                        ctx.activePositions[_en966ap] = _p966ap;
+                    });
+                }
+                {
+                    var _en966 = entryName;
+                    var _eo966 = entryOrder;
+                    Enqueue(ctx =>
+                    {
+                        ctx.entryOrders[_en966] = _eo966;
+                    });
+                }
                 // B957: Notify panel only after confirmed submit (not before). Prevents premature IPC notification.
                 string syncMsg = string.Format("POSITION_ENTERED|FFMA|{0}", contracts);
                 SendResponseToRemote(syncMsg);
 
-                Print(string.Format("FFMA MARKET ORDER: {0} {1}@MARKET | Stop: {2:F2} (candle {3})",
-                    signalName, contracts, stopPrice, direction == MarketPosition.Long ? "low" : "high"));
-                Print(string.Format("FFMA TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2} (Runner targets trail-only)",
-                    t1Qty, target1Price, t2Qty, target2Price, t3Qty, target3Price, t4Qty, target4Price, t5Qty, target5Price));
+                Print(
+                    string.Format(
+                        "FFMA MARKET ORDER: {0} {1}@MARKET | Stop: {2:F2} (candle {3})",
+                        signalName,
+                        contracts,
+                        stopPrice,
+                        direction == MarketPosition.Long ? "low" : "high"
+                    )
+                );
+                Print(
+                    string.Format(
+                        "FFMA TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2} (Runner targets trail-only)",
+                        t1Qty,
+                        target1Price,
+                        t2Qty,
+                        target2Price,
+                        t3Qty,
+                        target3Price,
+                        t4Qty,
+                        target4Price,
+                        t5Qty,
+                        target5Price
+                    )
+                );
 
                 // V12 SIMA: Dispatch to fleet (replaces legacy slave broadcast)
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("FFMA", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Market, entryName);
+                    ExecuteSmartDispatchEntry(
+                        "FFMA",
+                        direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort,
+                        contracts,
+                        entryPrice,
+                        OrderType.Market,
+                        entryName
+                    );
                 }
 
                 // Disarm FFMA after execution (one-shot)
@@ -232,9 +307,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ExecuteFFMALimitEntry(double manualPrice, MarketPosition direction, int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
-            if (!IsOrderAllowed()) return;
+            if (!IsOrderAllowed())
+                return;
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
-            if (isFlattenRunning) return;
+            if (isFlattenRunning)
+                return;
 
             if (currentATR <= 0)
             {
@@ -248,16 +325,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 // V12.27: ATR-based stop (mirrors standard FFMA but won't use candle high/low since manual)
                 double stopDistance = CalculateATRStopDistance(RMAStopATRMultiplier); // V12.30: Ceiling-rounded
-                double stopPrice = Instrument.MasterInstrument.RoundToTickSize(direction == MarketPosition.Long
-                    ? entryPrice - stopDistance
-                    : entryPrice + stopDistance);
+                double stopPrice = Instrument.MasterInstrument.RoundToTickSize(
+                    direction == MarketPosition.Long ? entryPrice - stopDistance : entryPrice + stopDistance
+                );
 
                 if (stopDistance < tickSize * 2)
                 {
-                    Print(string.Format("V12.27 FFMA_LIMIT: Stop too tight ({0:F2}pts) - using 2 tick minimum", stopDistance));
-                    stopPrice = Instrument.MasterInstrument.RoundToTickSize(direction == MarketPosition.Long
-                        ? entryPrice - (tickSize * 2)
-                        : entryPrice + (tickSize * 2));
+                    Print(
+                        string.Format(
+                            "V12.27 FFMA_LIMIT: Stop too tight ({0:F2}pts) - using 2 tick minimum",
+                            stopDistance
+                        )
+                    );
+                    stopPrice = Instrument.MasterInstrument.RoundToTickSize(
+                        direction == MarketPosition.Long ? entryPrice - (tickSize * 2) : entryPrice + (tickSize * 2)
+                    );
                     stopDistance = tickSize * 2;
                 }
 
@@ -275,8 +357,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                            // contracts input passed directly by UI/IPC (No-Blink compliance)
-                int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+                // contracts input passed directly by UI/IPC (No-Blink compliance)
+                int t1Qty,
+                    t2Qty,
+                    t3Qty,
+                    t4Qty,
+                    t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
                 string signalName = direction == MarketPosition.Long ? "FFMAMnlLong" : "FFMAMnlShort";
@@ -311,30 +397,94 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Limit,
                     IsRMATrade = false,
                     IsFFMATrade = true,
-                    OcoGroupId = "V12_" + GetStableHash(entryName)
+                    OcoGroupId = "V12_" + GetStableHash(entryName),
                 };
                 // V12.27: Submit LIMIT order (not Market like standard FFMA)
-                Order entryOrder = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Limit, contracts, entryPrice, 0, "", entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Limit, contracts, entryPrice, 0, "", entryName);
+                Order entryOrder =
+                    direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.Buy,
+                            OrderType.Limit,
+                            contracts,
+                            entryPrice,
+                            0,
+                            "",
+                            entryName
+                        )
+                        : SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.SellShort,
+                            OrderType.Limit,
+                            contracts,
+                            entryPrice,
+                            0,
+                            "",
+                            entryName
+                        );
 
                 // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
                 if (entryOrder == null)
                 {
-                    Print("[ENTRY_ABORT] FFMA_LIMIT SubmitOrderUnmanaged returned null for " + entryName + ". Rolling back.");
+                    Print(
+                        "[ENTRY_ABORT] FFMA_LIMIT SubmitOrderUnmanaged returned null for "
+                            + entryName
+                            + ". Rolling back."
+                    );
                     return;
                 }
-                { var _en966ap = entryName; var _p966ap = pos; Enqueue(ctx => { ctx.activePositions[_en966ap] = _p966ap; }); }
-                { var _en966 = entryName; var _eo966 = entryOrder; Enqueue(ctx => { ctx.entryOrders[_en966] = _eo966; }); }
+                {
+                    var _en966ap = entryName;
+                    var _p966ap = pos;
+                    Enqueue(ctx =>
+                    {
+                        ctx.activePositions[_en966ap] = _p966ap;
+                    });
+                }
+                {
+                    var _en966 = entryName;
+                    var _eo966 = entryOrder;
+                    Enqueue(ctx =>
+                    {
+                        ctx.entryOrders[_en966] = _eo966;
+                    });
+                }
 
-                Print(string.Format("V12.27 FFMA_LIMIT: {0} {1}@{2:F2} LIMIT | Stop: {3:F2} | ATR-based",
-                    direction, contracts, entryPrice, stopPrice));
-                Print(string.Format("V12.27 FFMA_LIMIT TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2}",
-                    t1Qty, target1Price, t2Qty, target2Price, t3Qty, target3Price, t4Qty, target4Price, t5Qty, target5Price));
+                Print(
+                    string.Format(
+                        "V12.27 FFMA_LIMIT: {0} {1}@{2:F2} LIMIT | Stop: {3:F2} | ATR-based",
+                        direction,
+                        contracts,
+                        entryPrice,
+                        stopPrice
+                    )
+                );
+                Print(
+                    string.Format(
+                        "V12.27 FFMA_LIMIT TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2}",
+                        t1Qty,
+                        target1Price,
+                        t2Qty,
+                        target2Price,
+                        t3Qty,
+                        target3Price,
+                        t4Qty,
+                        target4Price,
+                        t5Qty,
+                        target5Price
+                    )
+                );
 
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("FFMA_MNL", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Limit, entryName);
+                    ExecuteSmartDispatchEntry(
+                        "FFMA_MNL",
+                        direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort,
+                        contracts,
+                        entryPrice,
+                        OrderType.Limit,
+                        entryName
+                    );
                 }
 
                 DeactivateFFMAMode();
@@ -352,9 +502,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ExecuteFFMAManualMarketEntry(int contracts)
         {
             // V12.Phase7 [C-09]: Compliance enforcement gate.
-            if (!IsOrderAllowed()) return;
+            if (!IsOrderAllowed())
+                return;
             // V12.Phase6 [FLATTEN-GUARD]: Prevent order submission during active flatten
-            if (isFlattenRunning) return;
+            if (isFlattenRunning)
+                return;
 
             if (currentATR <= 0)
             {
@@ -380,28 +532,45 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (currentPrice < ema9Value)
                 {
                     direction = MarketPosition.Long;
-                    Print(string.Format("V12.27 FFMA_MANUAL_MARKET: Price below EMA9 ({0:F2} < {1:F2}) = LONG toward EMA",
-                        currentPrice, ema9Value));
+                    Print(
+                        string.Format(
+                            "V12.27 FFMA_MANUAL_MARKET: Price below EMA9 ({0:F2} < {1:F2}) = LONG toward EMA",
+                            currentPrice,
+                            ema9Value
+                        )
+                    );
                 }
                 else
                 {
                     direction = MarketPosition.Short;
-                    Print(string.Format("V12.27 FFMA_MANUAL_MARKET: Price above EMA9 ({0:F2} > {1:F2}) = SHORT toward EMA",
-                        currentPrice, ema9Value));
+                    Print(
+                        string.Format(
+                            "V12.27 FFMA_MANUAL_MARKET: Price above EMA9 ({0:F2} > {1:F2}) = SHORT toward EMA",
+                            currentPrice,
+                            ema9Value
+                        )
+                    );
                 }
 
                 double entryPrice = currentPrice; // Market order
 
                 // Stop at entry candle high/low (same as Auto FFMA)
-                double stopPrice = Instrument.MasterInstrument.RoundToTickSize(direction == MarketPosition.Long ? Low[0] : High[0]);
+                double stopPrice = Instrument.MasterInstrument.RoundToTickSize(
+                    direction == MarketPosition.Long ? Low[0] : High[0]
+                );
                 double stopDistance = Math.Min(Math.Abs(entryPrice - stopPrice), MaximumStop);
 
                 if (stopDistance < tickSize * 2)
                 {
-                    Print(string.Format("V12.27 FFMA_MANUAL_MARKET: Stop too tight ({0:F2}pts) - using 2 tick minimum", stopDistance));
-                    stopPrice = Instrument.MasterInstrument.RoundToTickSize(direction == MarketPosition.Long
-                        ? entryPrice - (tickSize * 2)
-                        : entryPrice + (tickSize * 2));
+                    Print(
+                        string.Format(
+                            "V12.27 FFMA_MANUAL_MARKET: Stop too tight ({0:F2}pts) - using 2 tick minimum",
+                            stopDistance
+                        )
+                    );
+                    stopPrice = Instrument.MasterInstrument.RoundToTickSize(
+                        direction == MarketPosition.Long ? entryPrice - (tickSize * 2) : entryPrice + (tickSize * 2)
+                    );
                     stopDistance = tickSize * 2;
                 }
 
@@ -419,8 +588,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double target4Price = CalculateTargetPrice(direction, entryPrice, 4);
                 double target5Price = CalculateTargetPrice(direction, entryPrice, 5);
 
-                            // contracts input passed directly by UI/IPC (No-Blink compliance)
-                int t1Qty, t2Qty, t3Qty, t4Qty, t5Qty;
+                // contracts input passed directly by UI/IPC (No-Blink compliance)
+                int t1Qty,
+                    t2Qty,
+                    t3Qty,
+                    t4Qty,
+                    t5Qty;
                 GetTargetDistribution(contracts, out t1Qty, out t2Qty, out t3Qty, out t4Qty, out t5Qty);
 
                 string signalName = direction == MarketPosition.Long ? "FFMAMnlMktLong" : "FFMAMnlMktShort";
@@ -455,30 +628,86 @@ namespace NinjaTrader.NinjaScript.Strategies
                     EntryOrderType = OrderType.Market,
                     IsRMATrade = false,
                     IsFFMATrade = true,
-                    OcoGroupId = "V12_" + GetStableHash(entryName)
+                    OcoGroupId = "V12_" + GetStableHash(entryName),
                 };
                 // Submit MARKET order (immediate execution)
-                Order entryOrder = direction == MarketPosition.Long
-                    ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
-                    : SubmitOrderUnmanaged(0, OrderAction.SellShort, OrderType.Market, contracts, 0, 0, "", entryName);
+                Order entryOrder =
+                    direction == MarketPosition.Long
+                        ? SubmitOrderUnmanaged(0, OrderAction.Buy, OrderType.Market, contracts, 0, 0, "", entryName)
+                        : SubmitOrderUnmanaged(
+                            0,
+                            OrderAction.SellShort,
+                            OrderType.Market,
+                            contracts,
+                            0,
+                            0,
+                            "",
+                            entryName
+                        );
 
                 // A1-1/A2-1: Null-abort rollback + stateLock wrap (Build 960 audit fix)
                 if (entryOrder == null)
                 {
-                    Print("[ENTRY_ABORT] FFMA_MANUAL_MARKET SubmitOrderUnmanaged returned null for " + entryName + ". Rolling back.");
+                    Print(
+                        "[ENTRY_ABORT] FFMA_MANUAL_MARKET SubmitOrderUnmanaged returned null for "
+                            + entryName
+                            + ". Rolling back."
+                    );
                     return;
                 }
-                { var _en966ap = entryName; var _p966ap = pos; Enqueue(ctx => { ctx.activePositions[_en966ap] = _p966ap; }); }
-                { var _en966 = entryName; var _eo966 = entryOrder; Enqueue(ctx => { ctx.entryOrders[_en966] = _eo966; }); }
+                {
+                    var _en966ap = entryName;
+                    var _p966ap = pos;
+                    Enqueue(ctx =>
+                    {
+                        ctx.activePositions[_en966ap] = _p966ap;
+                    });
+                }
+                {
+                    var _en966 = entryName;
+                    var _eo966 = entryOrder;
+                    Enqueue(ctx =>
+                    {
+                        ctx.entryOrders[_en966] = _eo966;
+                    });
+                }
 
-                Print(string.Format("V12.27 FFMA_MANUAL_MARKET: {0} {1}@MARKET | Stop: {2:F2} (candle {3}) | Toward EMA9={4:F2}",
-                    direction, contracts, stopPrice, direction == MarketPosition.Long ? "low" : "high", ema9Value));
-                Print(string.Format("V12.27 FFMA_MANUAL_MARKET TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2}",
-                    t1Qty, target1Price, t2Qty, target2Price, t3Qty, target3Price, t4Qty, target4Price, t5Qty, target5Price));
+                Print(
+                    string.Format(
+                        "V12.27 FFMA_MANUAL_MARKET: {0} {1}@MARKET | Stop: {2:F2} (candle {3}) | Toward EMA9={4:F2}",
+                        direction,
+                        contracts,
+                        stopPrice,
+                        direction == MarketPosition.Long ? "low" : "high",
+                        ema9Value
+                    )
+                );
+                Print(
+                    string.Format(
+                        "V12.27 FFMA_MANUAL_MARKET TARGETS: T1:{0}@{1:F2} | T2:{2}@{3:F2} | T3:{4}@{5:F2} | T4:{6}@{7:F2} | T5:{8}@{9:F2}",
+                        t1Qty,
+                        target1Price,
+                        t2Qty,
+                        target2Price,
+                        t3Qty,
+                        target3Price,
+                        t4Qty,
+                        target4Price,
+                        t5Qty,
+                        target5Price
+                    )
+                );
 
                 if (EnableSIMA)
                 {
-                    ExecuteSmartDispatchEntry("FFMA_MNL_MKT", direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort, contracts, entryPrice, OrderType.Market, entryName);
+                    ExecuteSmartDispatchEntry(
+                        "FFMA_MNL_MKT",
+                        direction == MarketPosition.Long ? OrderAction.Buy : OrderAction.SellShort,
+                        contracts,
+                        entryPrice,
+                        OrderType.Market,
+                        entryName
+                    );
                 }
 
                 DeactivateFFMAMode();

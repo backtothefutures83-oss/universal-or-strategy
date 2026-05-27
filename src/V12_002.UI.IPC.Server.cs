@@ -470,21 +470,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // V12.EPIC-7-QUALITY-006: Explicit client cleanup with zombie detection
                         try
                         {
-                            if (kvp.Value.Client != null && kvp.Value.Client.Connected)
+                            if (kvp.Value.Client != null)
                             {
-                                try
+                                if (kvp.Value.Client.Connected)
                                 {
-                                    kvp.Value.Client.Client?.Shutdown(SocketShutdown.Both);
+                                    try
+                                    {
+                                        kvp.Value.Client.Client?.Shutdown(SocketShutdown.Both);
+                                    }
+                                    catch (Exception shutdownEx)
+                                    {
+                                        Interlocked.Increment(ref _ipcZombieConnections);
+                                        Print(
+                                            $"[IPC_ZOMBIE] Connection stuck during shutdown [id={kvp.Key}]: {shutdownEx.Message}"
+                                        );
+                                    }
                                 }
-                                catch (Exception shutdownEx)
-                                {
-                                    Interlocked.Increment(ref _ipcZombieConnections);
-                                    Print(
-                                        $"[IPC_ZOMBIE] Connection stuck during shutdown [id={kvp.Key}]: {shutdownEx.Message}"
-                                    );
-                                }
+                                kvp.Value.Client.Close();
                             }
-                            kvp.Value.Client.Close();
                         }
                         catch (Exception ex)
                         {

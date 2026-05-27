@@ -3,8 +3,8 @@
 // </copyright>
 // V12.50 SYMMETRY GUARD - Master-Fill Anchored Fleet Risk Isolation
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using NinjaTrader.Cbi;
@@ -22,16 +22,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             public static readonly AnchorSnapshot Pending = new AnchorSnapshot(false, 0d, 0d, 0);
 
-            public readonly bool   IsResolved;
+            public readonly bool IsResolved;
             public readonly double MasterAnchorPrice;
             public readonly double MasterWeightedFill;
-            public readonly int    MasterFilledQuantity;
+            public readonly int MasterFilledQuantity;
 
             public AnchorSnapshot(bool isResolved, double anchorPrice, double weightedFill, int filledQty)
             {
-                IsResolved           = isResolved;
-                MasterAnchorPrice    = anchorPrice;
-                MasterWeightedFill   = weightedFill;
+                IsResolved = isResolved;
+                MasterAnchorPrice = anchorPrice;
+                MasterWeightedFill = weightedFill;
                 MasterFilledQuantity = filledQty;
             }
         }
@@ -50,7 +50,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             // ADR-019: anchor state replaces { IsResolved, MasterAnchorPrice, MasterWeightedFill, MasterFilledQuantity }
             // and the prior monitor-backed mutation path. Single reference field, swapped via Interlocked.CompareExchange.
             private AnchorSnapshot _anchor = AnchorSnapshot.Pending;
-            public AnchorSnapshot Anchor { get { return Volatile.Read(ref _anchor); } }
+            public AnchorSnapshot Anchor
+            {
+                get { return Volatile.Read(ref _anchor); }
+            }
+
             public bool TryPublishAnchor(AnchorSnapshot expected, AnchorSnapshot updated)
             {
                 return Interlocked.CompareExchange(ref _anchor, updated, expected) == expected;
@@ -60,34 +64,46 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Hot-path readers do a single Volatile.Read; iteration is index-based and zero-alloc.
             // Mutators allocate one fresh array per change (cold path: register/forget per dispatch).
             private string[] _followers = Array.Empty<string>();
-            public string[] Followers { get { return Volatile.Read(ref _followers); } }
+            public string[] Followers
+            {
+                get { return Volatile.Read(ref _followers); }
+            }
 
             public void AddFollower(string name)
             {
-                if (string.IsNullOrEmpty(name)) return;
+                if (string.IsNullOrEmpty(name))
+                    return;
                 while (true)
                 {
                     string[] cur = Volatile.Read(ref _followers);
-                    if (Array.IndexOf(cur, name) >= 0) return;
+                    if (Array.IndexOf(cur, name) >= 0)
+                        return;
                     string[] next = new string[cur.Length + 1];
-                    if (cur.Length > 0) Array.Copy(cur, 0, next, 0, cur.Length);
+                    if (cur.Length > 0)
+                        Array.Copy(cur, 0, next, 0, cur.Length);
                     next[cur.Length] = name;
-                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur) return;
+                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur)
+                        return;
                 }
             }
 
             public void RemoveFollower(string name)
             {
-                if (string.IsNullOrEmpty(name)) return;
+                if (string.IsNullOrEmpty(name))
+                    return;
                 while (true)
                 {
                     string[] cur = Volatile.Read(ref _followers);
                     int idx = Array.IndexOf(cur, name);
-                    if (idx < 0) return;
+                    if (idx < 0)
+                        return;
                     string[] next = new string[cur.Length - 1];
-                    if (idx > 0) Array.Copy(cur, 0, next, 0, idx);
-                    if (idx < cur.Length - 1) Array.Copy(cur, idx + 1, next, idx, cur.Length - idx - 1);
-                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur) return;
+                    if (idx > 0)
+                        Array.Copy(cur, 0, next, 0, idx);
+                    if (idx < cur.Length - 1)
+                        Array.Copy(cur, idx + 1, next, idx, cur.Length - idx - 1);
+                    if (Interlocked.CompareExchange(ref _followers, next, cur) == cur)
+                        return;
                 }
             }
         }
@@ -102,11 +118,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly ConcurrentDictionary<string, SymmetryDispatchContext> symmetryDispatchById =
             new ConcurrentDictionary<string, SymmetryDispatchContext>(StringComparer.Ordinal);
 
-        private readonly ConcurrentDictionary<string, string> symmetryFleetEntryToDispatch =
-            new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, string> symmetryFleetEntryToDispatch = new ConcurrentDictionary<
+            string,
+            string
+        >(StringComparer.Ordinal);
 
-        private readonly ConcurrentDictionary<string, string> symmetryMasterEntryToDispatch =
-            new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<string, string> symmetryMasterEntryToDispatch = new ConcurrentDictionary<
+            string,
+            string
+        >(StringComparer.Ordinal);
 
         private readonly ConcurrentDictionary<string, PendingFollowerFill> symmetryPendingFollowerFills =
             new ConcurrentDictionary<string, PendingFollowerFill>(StringComparer.Ordinal);
@@ -116,11 +136,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private static readonly TimeSpan SymmetryAnchorWait = TimeSpan.FromMilliseconds(2000);
         private static readonly TimeSpan SymmetryDispatchTtl = TimeSpan.FromMinutes(5);
 
-        private string SymmetryGuardBeginDispatch(string tradeType, OrderAction action, int quantity, double requestedEntryPrice)
+        private string SymmetryGuardBeginDispatch(
+            string tradeType,
+            OrderAction action,
+            int quantity,
+            double requestedEntryPrice
+        )
         {
             string normalizedType = SymmetryNormalizeTradeType(tradeType);
-            MarketPosition direction = (action == OrderAction.Buy || action == OrderAction.BuyToCover)
-                ? MarketPosition.Long : MarketPosition.Short;
+            MarketPosition direction =
+                (action == OrderAction.Buy || action == OrderAction.BuyToCover)
+                    ? MarketPosition.Long
+                    : MarketPosition.Short;
 
             // ADR-019: Duplicate dispatch guard is lock-free. Iteration over symmetryDispatchById
             // (ConcurrentDictionary) is snapshot-safe. The CAS-loop publisher in PublishFollowers/
@@ -133,20 +160,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in symmetryDispatchById)
             {
                 var existing = kvp.Value;
-                if (existing.TradeType == normalizedType &&
-                    existing.Direction == direction &&
-                    !existing.Anchor.IsResolved &&
-                    (now - existing.CreatedUtc) < SymmetryDispatchTtl)
+                if (
+                    existing.TradeType == normalizedType
+                    && existing.Direction == direction
+                    && !existing.Anchor.IsResolved
+                    && (now - existing.CreatedUtc) < SymmetryDispatchTtl
+                )
                 {
-                    Print(string.Format("[SYMMETRY] Duplicate dispatch suppressed: {0} {1} -- reusing {2}", normalizedType, direction, existing.DispatchId));
+                    Print(
+                        string.Format(
+                            "[SYMMETRY] Duplicate dispatch suppressed: {0} {1} -- reusing {2}",
+                            normalizedType,
+                            direction,
+                            existing.DispatchId
+                        )
+                    );
                     return existing.DispatchId;
                 }
             }
 
-            string dispatchId = string.Format("SG_{0}_{1}_{2}",
-                now.Ticks,
-                normalizedType,
-                (int)action);
+            string dispatchId = string.Format("SG_{0}_{1}_{2}", now.Ticks, normalizedType, (int)action);
 
             var ctx = new SymmetryDispatchContext
             {
@@ -155,9 +188,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Direction = direction,
                 ExpectedQuantity = Math.Max(1, quantity),
                 CreatedUtc = now,
-                RequestedAnchorPrice = Instrument != null
-                    ? Instrument.MasterInstrument.RoundToTickSize(requestedEntryPrice)
-                    : requestedEntryPrice
+                RequestedAnchorPrice =
+                    Instrument != null
+                        ? Instrument.MasterInstrument.RoundToTickSize(requestedEntryPrice)
+                        : requestedEntryPrice,
             };
 
             symmetryDispatchById[dispatchId] = ctx;
@@ -212,20 +246,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                     symmetryMasterEntryToDispatch.TryRemove(masterKey, out _);
                 }
 
-                Print(string.Format("[SYMMETRY_GUARD] Dispatch {0} rolled back due to order submission failure", dispatchId));
+                Print(
+                    string.Format(
+                        "[SYMMETRY_GUARD] Dispatch {0} rolled back due to order submission failure",
+                        dispatchId
+                    )
+                );
             }
         }
 
-        private void SymmetryGuardOnMasterFill(string entryName, PositionInfo masterPos, double averageFillPrice, int fillQty, DateTime fillTimeUtc)
+        private void SymmetryGuardOnMasterFill(
+            string entryName,
+            PositionInfo masterPos,
+            double averageFillPrice,
+            int fillQty,
+            DateTime fillTimeUtc
+        )
         {
             if (masterPos == null || masterPos.IsFollower || averageFillPrice <= 0 || fillQty <= 0)
                 return;
 
             SymmetryDispatchContext ctx = null;
 
-            if (!string.IsNullOrEmpty(entryName) &&
-                symmetryMasterEntryToDispatch.TryGetValue(entryName, out var mappedDispatch) &&
-                symmetryDispatchById.TryGetValue(mappedDispatch, out var mappedCtx))
+            if (
+                !string.IsNullOrEmpty(entryName)
+                && symmetryMasterEntryToDispatch.TryGetValue(entryName, out var mappedDispatch)
+                && symmetryDispatchById.TryGetValue(mappedDispatch, out var mappedCtx)
+            )
             {
                 ctx = mappedCtx;
             }
@@ -263,14 +310,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (resolvedSnap != null)
             {
-                Print(string.Format("[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
-                    ctx.TradeType, resolvedSnap.MasterAnchorPrice, resolvedSnap.MasterFilledQuantity));
+                Print(
+                    string.Format(
+                        "[SYMMETRY_GUARD] MASTER ANCHOR LOCKED | Trade={0} | Anchor={1:F2} | FillQty={2}",
+                        ctx.TradeType,
+                        resolvedSnap.MasterAnchorPrice,
+                        resolvedSnap.MasterFilledQuantity
+                    )
+                );
 
                 SymmetryGuardTryResolveFollowersForDispatch(ctx.DispatchId, DateTime.UtcNow);
             }
         }
 
-        private SymmetryDispatchContext SymmetryFindDispatchForMasterFill(string tradeType, MarketPosition direction, DateTime fillTimeUtc)
+        private SymmetryDispatchContext SymmetryFindDispatchForMasterFill(
+            string tradeType,
+            MarketPosition direction,
+            DateTime fillTimeUtc
+        )
         {
             string norm = SymmetryNormalizeTradeType(tradeType);
             SymmetryDispatchContext best = null;

@@ -25,13 +25,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // -- Logic Metric Counters (Interlocked -- never lock) ---------------------
         // Each counter tracks a distinct FSM event across the strategy lifetime.
-        private long _metricFsmTransitions   = 0; // Every actor Enqueue() execution
-        private long _metricSimaDispatches   = 0; // Every SIMA fleet broadcast
-        private long _metricReaperAudits     = 0; // Every AuditApexPositions() call
-        private long _metricSymmetryReplace  = 0; // Every follower bracket Replace FSM entry
+        private long _metricFsmTransitions = 0; // Every actor Enqueue() execution
+        private long _metricSimaDispatches = 0; // Every SIMA fleet broadcast
+        private long _metricReaperAudits = 0; // Every AuditApexPositions() call
+        private long _metricSymmetryReplace = 0; // Every follower bracket Replace FSM entry
         private long _metricOrderSubmissions = 0; // Every SubmitOrderUnmanaged call
-        private long _metricIpcCommands      = 0; // Every IPC command processed
+        private long _metricIpcCommands = 0; // Every IPC command processed
 
+        // -- State Persistence Diagnostic Counters (EPIC-7-QUALITY) ----------------
+        private long _statePersistenceFailures = 0; // Failed state write/read operations
+        private long _stateSecurityViolations = 0; // Path validation failures
+        private long _stateRetryAttempts = 0; // File I/O retry attempts
+        private long _stateRollbacksExecuted = 0; // Rollback to backup operations
         #endregion
 
         #region Trace ID Management
@@ -60,6 +65,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             Interlocked.Exchange(ref _metricSymmetryReplace, 0L);
             Interlocked.Exchange(ref _metricOrderSubmissions, 0L);
             Interlocked.Exchange(ref _metricIpcCommands, 0L);
+            Interlocked.Exchange(ref _statePersistenceFailures, 0L);
+            Interlocked.Exchange(ref _stateSecurityViolations, 0L);
+            Interlocked.Exchange(ref _stateRetryAttempts, 0L);
+            Interlocked.Exchange(ref _stateRollbacksExecuted, 0L);
             _currentTraceId = "00000";
         }
 
@@ -71,22 +80,64 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Each maps 1:1 to a distinct FSM event. Call-site adds zero heap allocation.
 
         /// <summary>Increment FSM actor transition counter. Call once per Enqueue execution.</summary>
-        private void TrackFsmTransition()   { Interlocked.Increment(ref _metricFsmTransitions);   }
+        private void TrackFsmTransition()
+        {
+            Interlocked.Increment(ref _metricFsmTransitions);
+        }
 
         /// <summary>Increment SIMA broadcast counter. Call once per fleet dispatch cycle.</summary>
-        private void TrackSimaDispatch()    { Interlocked.Increment(ref _metricSimaDispatches);    }
+        private void TrackSimaDispatch()
+        {
+            Interlocked.Increment(ref _metricSimaDispatches);
+        }
 
         /// <summary>Increment Reaper audit counter. Call once per AuditApexPositions cycle.</summary>
-        private void TrackReaperAudit()     { Interlocked.Increment(ref _metricReaperAudits);      }
+        private void TrackReaperAudit()
+        {
+            Interlocked.Increment(ref _metricReaperAudits);
+        }
 
         /// <summary>Increment Symmetry Replace FSM entry counter.</summary>
-        private void TrackSymmetryReplace() { Interlocked.Increment(ref _metricSymmetryReplace);   }
+        private void TrackSymmetryReplace()
+        {
+            Interlocked.Increment(ref _metricSymmetryReplace);
+        }
 
         /// <summary>Increment order submission counter. Call once per SubmitOrderUnmanaged.</summary>
-        private void TrackOrderSubmission() { Interlocked.Increment(ref _metricOrderSubmissions);  }
+        private void TrackOrderSubmission()
+        {
+            Interlocked.Increment(ref _metricOrderSubmissions);
+        }
 
         /// <summary>Increment IPC command processed counter.</summary>
-        private void TrackIpcCommand()      { Interlocked.Increment(ref _metricIpcCommands);       }
+        private void TrackIpcCommand()
+        {
+            Interlocked.Increment(ref _metricIpcCommands);
+        }
+
+        /// <summary>Increment state persistence failure counter.</summary>
+        private void TrackStatePersistenceFailure()
+        {
+            Interlocked.Increment(ref _statePersistenceFailures);
+        }
+
+        /// <summary>Increment state security violation counter.</summary>
+        private void TrackStateSecurityViolation()
+        {
+            Interlocked.Increment(ref _stateSecurityViolations);
+        }
+
+        /// <summary>Increment state retry attempt counter.</summary>
+        private void TrackStateRetryAttempt()
+        {
+            Interlocked.Increment(ref _stateRetryAttempts);
+        }
+
+        /// <summary>Increment state rollback executed counter.</summary>
+        private void TrackStateRollback()
+        {
+            Interlocked.Increment(ref _stateRollbacksExecuted);
+        }
 
         #endregion
 
@@ -101,12 +152,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             internal readonly string TraceId;
             internal readonly string Module;
-            internal readonly long   StartTicks; // DateTime.UtcNow.Ticks at span entry
+            internal readonly long StartTicks; // DateTime.UtcNow.Ticks at span entry
 
             internal TraceSpan(string traceId, string module)
             {
-                TraceId    = traceId;
-                Module     = module;
+                TraceId = traceId;
+                Module = module;
                 StartTicks = DateTime.UtcNow.Ticks;
             }
 
@@ -116,7 +167,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             /// </summary>
             internal void End(Action<string> print)
             {
-                if (print == null) return;
+                if (print == null)
+                    return;
                 long elapsedMs = (DateTime.UtcNow.Ticks - StartTicks) / TimeSpan.TicksPerMillisecond;
                 print(string.Format("[TRACE:{0}][{1}][SPAN] elapsed={2}ms", TraceId, Module, elapsedMs));
             }
@@ -146,12 +198,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             try
             {
-                long fsm      = Interlocked.Read(ref _metricFsmTransitions);
-                long sima     = Interlocked.Read(ref _metricSimaDispatches);
-                long reaper   = Interlocked.Read(ref _metricReaperAudits);
+                long fsm = Interlocked.Read(ref _metricFsmTransitions);
+                long sima = Interlocked.Read(ref _metricSimaDispatches);
+                long reaper = Interlocked.Read(ref _metricReaperAudits);
                 long symmetry = Interlocked.Read(ref _metricSymmetryReplace);
-                long orders   = Interlocked.Read(ref _metricOrderSubmissions);
-                long ipc      = Interlocked.Read(ref _metricIpcCommands);
+                long orders = Interlocked.Read(ref _metricOrderSubmissions);
+                long ipc = Interlocked.Read(ref _metricIpcCommands);
+                long stateFailures = Interlocked.Read(ref _statePersistenceFailures);
+                long stateViolations = Interlocked.Read(ref _stateSecurityViolations);
+                long stateRetries = Interlocked.Read(ref _stateRetryAttempts);
+                long stateRollbacks = Interlocked.Read(ref _stateRollbacksExecuted);
 
                 Print("------------------------------------------------");
                 Print(string.Format("[{0}] SESSION METRICS REPORT", BUILD_TAG));
@@ -161,6 +217,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("  Symmetry Replaces : {0}", symmetry));
                 Print(string.Format("  Order Submissions : {0}", orders));
                 Print(string.Format("  IPC Commands      : {0}", ipc));
+                Print(string.Format("  State Failures    : {0}", stateFailures));
+                Print(string.Format("  Security Violations: {0}", stateViolations));
+                Print(string.Format("  State Retries     : {0}", stateRetries));
+                Print(string.Format("  State Rollbacks   : {0}", stateRollbacks));
                 Print("------------------------------------------------");
             }
             catch

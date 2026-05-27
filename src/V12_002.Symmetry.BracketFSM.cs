@@ -1,8 +1,8 @@
 // Build 982: BracketFSM (Shadow Mode) - Phase 2 Definitions
 // V12 Symmetry Module - Follower Bracket Finite State Machine
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript;
@@ -20,17 +20,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private enum FollowerBracketState
         {
-            None,            // Initial state
-            PendingSubmit,   // Strategic intent to submit, pre-submission validation/anchoring
-            Submitted,       // acct.Submit() called, awaiting broker ack
-            Accepted,        // Broker acknowledged (OrderState.Accepted/Working)
-            Active,          // Entry filled, protective bracket (Stop + Targets) live
-            Replacing,       // In-flight two-phase cancel+resubmit (MOVE-SYNC FSM active)
-            Modifying,       // Price change (trailing) in flight, awaiting confirm
-            Filled,          // Final: Position closed via Stop or Target fill
-            Cancelled,       // Final: All orders cancelled
-            Rejected,        // Final: Broker rejected (requires audit)
-            Disconnected     // Temporary: Account connection lost, FSM frozen
+            None, // Initial state
+            PendingSubmit, // Strategic intent to submit, pre-submission validation/anchoring
+            Submitted, // acct.Submit() called, awaiting broker ack
+            Accepted, // Broker acknowledged (OrderState.Accepted/Working)
+            Active, // Entry filled, protective bracket (Stop + Targets) live
+            Replacing, // In-flight two-phase cancel+resubmit (MOVE-SYNC FSM active)
+            Modifying, // Price change (trailing) in flight, awaiting confirm
+            Filled, // Final: Position closed via Stop or Target fill
+            Cancelled, // Final: All orders cancelled
+            Rejected, // Final: Broker rejected (requires audit)
+            Disconnected, // Temporary: Account connection lost, FSM frozen
         }
 
         /// <summary>
@@ -40,8 +40,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private class FollowerBracketFSM
         {
             public string AccountName;
-            public string EntryName;         // Links to Master Position key (fleetEntryName)
-            public string OcoGroupId;        // Shared ID for broker OCO
+            public string EntryName; // Links to Master Position key (fleetEntryName)
+            public string OcoGroupId; // Shared ID for broker OCO
             public FollowerBracketState State = FollowerBracketState.None;
             public int RemainingContracts;
             public string ReplacingCancelOrderId;
@@ -54,7 +54,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Shadow Mode Diagnostics
             public bool IsInSync = true;
             public string LastBrokerError;
-            
+
             // Metadata for reconciliation
             public double ExpectedEntryPrice;
             public double ExpectedStopPrice;
@@ -87,7 +87,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void DrainAccountMailbox()
         {
-            if (!EnsureStartupReady("DrainAccountMailbox")) return;
+            if (!EnsureStartupReady("DrainAccountMailbox"))
+                return;
 
             int processed = 0;
             const int MAX_PER_DRAIN = 100;
@@ -101,7 +102,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void RemoveFsmOrderIdMappings(FollowerBracketFSM fsm)
         {
-            if (fsm == null) return;
+            if (fsm == null)
+                return;
 
             if (fsm.EntryOrder != null && !string.IsNullOrEmpty(fsm.EntryOrder.OrderId))
                 _orderIdToFsmKey.TryRemove(fsm.EntryOrder.OrderId, out _);
@@ -112,7 +114,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (fsm.StopOrder != null && !string.IsNullOrEmpty(fsm.StopOrder.OrderId))
                 _orderIdToFsmKey.TryRemove(fsm.StopOrder.OrderId, out _);
 
-            if (fsm.Targets == null) return;
+            if (fsm.Targets == null)
+                return;
 
             foreach (Order target in fsm.Targets)
             {
@@ -124,8 +127,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool TryTerminateFollowerBracket(string entryName, out FollowerBracketFSM removedFsm)
         {
             removedFsm = null;
-            if (string.IsNullOrEmpty(entryName)) return false;
-            if (!_followerBrackets.TryRemove(entryName, out removedFsm)) return false;
+            if (string.IsNullOrEmpty(entryName))
+                return false;
+            if (!_followerBrackets.TryRemove(entryName, out removedFsm))
+                return false;
 
             RemoveFsmOrderIdMappings(removedFsm);
             return true;
@@ -133,10 +138,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void SetFsmReplacing(string fleetEntryName, string cancelOrderId)
         {
-            if (string.IsNullOrEmpty(fleetEntryName) || string.IsNullOrEmpty(cancelOrderId)) return;
+            if (string.IsNullOrEmpty(fleetEntryName) || string.IsNullOrEmpty(cancelOrderId))
+                return;
 
             FollowerBracketFSM fsm;
-            if (!_followerBrackets.TryGetValue(fleetEntryName, out fsm) || fsm == null) return;
+            if (!_followerBrackets.TryGetValue(fleetEntryName, out fsm) || fsm == null)
+                return;
 
             fsm.State = FollowerBracketState.Replacing;
             fsm.ReplacingCancelOrderId = cancelOrderId;
@@ -156,14 +163,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private FollowerBracketFSM ResolveFsm_ByOrderId(string orderId)
         {
-            if (string.IsNullOrEmpty(orderId)) return null;
-            
+            if (string.IsNullOrEmpty(orderId))
+                return null;
+
             if (_orderIdToFsmKey.TryGetValue(orderId, out var entryName))
             {
                 _followerBrackets.TryGetValue(entryName, out var fsm);
                 return fsm;
             }
-            
+
             return null;
         }
 
@@ -174,8 +182,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private FollowerBracketFSM ResolveFsm_BySignalName(string signalName, string orderId)
         {
-            if (string.IsNullOrEmpty(signalName)) return null;
-            
+            if (string.IsNullOrEmpty(signalName))
+                return null;
+
             int firstUnder = signalName.IndexOf('_');
             if (firstUnder >= 0 && firstUnder < signalName.Length - 1)
             {
@@ -185,11 +194,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Back-fill the OrderId map if we found it via signal
                     if (!string.IsNullOrEmpty(orderId))
                         _orderIdToFsmKey[orderId] = fleetEntryName;
-                    
+
                     return fsm;
                 }
             }
-            
+
             return null;
         }
 
@@ -199,18 +208,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private FollowerBracketFSM ResolveFsm_ByScan(string accountAlias, string orderId)
         {
-            if (string.IsNullOrEmpty(orderId)) return null;
-            
+            if (string.IsNullOrEmpty(orderId))
+                return null;
+
             foreach (var f in _followerBrackets.Values)
             {
-                if (f.AccountName != accountAlias) continue;
-                
+                if (f.AccountName != accountAlias)
+                    continue;
+
                 if (f.StopOrder != null && f.StopOrder.OrderId == orderId)
                 {
                     _orderIdToFsmKey[orderId] = f.EntryName;
                     return f;
                 }
-                
+
                 bool foundT = false;
                 for (int i = 0; i < 5; i++)
                 {
@@ -221,15 +232,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         return f;
                     }
                 }
-                if (foundT) break;
-                
+                if (foundT)
+                    break;
+
                 if (f.EntryOrder != null && f.EntryOrder.OrderId == orderId)
                 {
                     _orderIdToFsmKey[orderId] = f.EntryName;
                     return f;
                 }
             }
-            
+
             return null;
         }
 
@@ -240,11 +252,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             // Tier 1: O(1) OrderId lookup (primary)
             FollowerBracketFSM fsm = ResolveFsm_ByOrderId(evt.OrderId);
-            if (fsm != null) return fsm;
+            if (fsm != null)
+                return fsm;
 
             // Tier 2: SignalName parsing (secondary)
             fsm = ResolveFsm_BySignalName(evt.SignalName, evt.OrderId);
-            if (fsm != null) return fsm;
+            if (fsm != null)
+                return fsm;
 
             // Tier 3: O(N) scan (last resort)
             fsm = ResolveFsm_ByScan(evt.AccountAlias, evt.OrderId);
@@ -258,9 +272,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void HandleFsmFilled(AccountEvent evt, FollowerBracketFSM fsm)
         {
             // Phase 2 [D2/D3]: Precise target matching with null guards
-            bool isStop = !string.IsNullOrEmpty(evt.SignalName) && (evt.SignalName.StartsWith("Stop_") || evt.SignalName.StartsWith("S_"));
-            bool isTarget = !string.IsNullOrEmpty(evt.SignalName) && (evt.SignalName.StartsWith("T1_") || evt.SignalName.StartsWith("T2_") ||
-                             evt.SignalName.StartsWith("T3_") || evt.SignalName.StartsWith("T4_") || evt.SignalName.StartsWith("T5_"));
+            bool isStop =
+                !string.IsNullOrEmpty(evt.SignalName)
+                && (evt.SignalName.StartsWith("Stop_") || evt.SignalName.StartsWith("S_"));
+            bool isTarget =
+                !string.IsNullOrEmpty(evt.SignalName)
+                && (
+                    evt.SignalName.StartsWith("T1_")
+                    || evt.SignalName.StartsWith("T2_")
+                    || evt.SignalName.StartsWith("T3_")
+                    || evt.SignalName.StartsWith("T4_")
+                    || evt.SignalName.StartsWith("T5_")
+                );
 
             if (isStop || isTarget)
             {
@@ -281,11 +304,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ProcessBracketEvent(AccountEvent evt)
         {
             FollowerBracketFSM fsm = ResolveFsmFromEvent(evt);
-            if (fsm == null) return;
-            if (!MetadataGuardFsmEvent(evt, fsm)) return;
+            if (fsm == null)
+                return;
+            if (!MetadataGuardFsmEvent(evt, fsm))
+                return;
 
             FollowerBracketState oldState = fsm.State;
-            
+
             switch (evt.NewState)
             {
                 case OrderState.Accepted:
@@ -300,8 +325,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     break;
 
                 case OrderState.Cancelled:
-                    if (fsm.State == FollowerBracketState.Replacing
-                        && string.Equals(fsm.ReplacingCancelOrderId, evt.OrderId, StringComparison.Ordinal))
+                    if (
+                        fsm.State == FollowerBracketState.Replacing
+                        && string.Equals(fsm.ReplacingCancelOrderId, evt.OrderId, StringComparison.Ordinal)
+                    )
                     {
                         Print("[FSM-C2] Replace-cycle cancel absorbed -- FSM stays Replacing");
                     }
@@ -320,8 +347,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (fsm.State != oldState)
             {
                 fsm.LastUpdateUtc = DateTime.UtcNow;
-                Print(string.Format("[FSM-SHADOW] {0} Transition: {1} -> {2} | Event={3} | Order={4}",
-                    fsm.EntryName, oldState, fsm.State, evt.NewState, evt.SignalName));
+                Print(
+                    string.Format(
+                        "[FSM-SHADOW] {0} Transition: {1} -> {2} | Event={3} | Order={4}",
+                        fsm.EntryName,
+                        oldState,
+                        fsm.State,
+                        evt.NewState,
+                        evt.SignalName
+                    )
+                );
             }
         }
 
@@ -337,19 +372,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in _followerBrackets)
             {
                 FollowerBracketFSM f = kvp.Value;
-                if (f == null || f.AccountName != accountName) continue;
+                if (f == null || f.AccountName != accountName)
+                    continue;
 
-                if (f.State == FollowerBracketState.Active
+                if (
+                    f.State == FollowerBracketState.Active
                     || f.State == FollowerBracketState.Accepted
                     || f.State == FollowerBracketState.Submitted
                     || f.State == FollowerBracketState.PendingSubmit
                     || f.State == FollowerBracketState.Replacing
-                    || f.State == FollowerBracketState.Modifying)
+                    || f.State == FollowerBracketState.Modifying
+                )
                 {
                     if (f.EntryOrder != null)
                     {
-                        int entrySign = (f.EntryOrder.OrderAction == OrderAction.Buy
-                            || f.EntryOrder.OrderAction == OrderAction.BuyToCover) ? 1 : -1;
+                        int entrySign =
+                            (
+                                f.EntryOrder.OrderAction == OrderAction.Buy
+                                || f.EntryOrder.OrderAction == OrderAction.BuyToCover
+                            )
+                                ? 1
+                                : -1;
                         sum += f.EntryOrder.Quantity * entrySign;
                     }
                     else if (f.State == FollowerBracketState.Active)

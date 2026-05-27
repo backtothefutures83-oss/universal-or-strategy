@@ -88,26 +88,34 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-                // All retries exhausted - final attempt without catch
-                Interlocked.Increment(ref _ioRetryFailures);
-
+                // All retries exhausted - final attempt with proper failure tracking
                 try
                 {
-                    Print(
-                        string.Format(
-                            "[IO_RETRY] {0} failed after {1} attempts: {2}",
-                            operationName,
-                            maxAttempts,
-                            lastException?.Message ?? "Unknown error"
-                        )
-                    );
+                    return operation();
                 }
-                catch
+                catch (Exception finalEx)
                 {
-                    // Swallow logging errors
-                }
+                    // Only increment failure counter if final attempt also fails
+                    Interlocked.Increment(ref _ioRetryFailures);
 
-                return operation();
+                    try
+                    {
+                        Print(
+                            string.Format(
+                                "[IO_RETRY] {0} failed after {1} attempts: {2}",
+                                operationName,
+                                maxAttempts,
+                                finalEx.Message
+                            )
+                        );
+                    }
+                    catch
+                    {
+                        // Swallow logging errors
+                    }
+
+                    throw; // Re-throw to preserve stack trace
+                }
             }
 
             /// <summary>
@@ -155,9 +163,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                         || hResult == unchecked((int)0x80070050);
                 }
 
-                // UnauthorizedAccessException: Temporary permission issues (e.g., antivirus scan)
-                if (ex is UnauthorizedAccessException)
+                // UnauthorizedAccessException: Only retry if it's likely transient (e.g., antivirus scan)
+                // HEURISTIC TRADE-OFF: We use message inspection to distinguish permanent vs transient.
+                // - Permanent: "read-only", "access is denied" (file attributes, ACL issues)
+                // - Transient: Antivirus scan, file in use by another process
+                // LIMITATION: This is best-effort. Some permanent issues may be retried unnecessarily,
+                // but this is safer than never retrying (which would fail on transient AV scans).
+                if (ex is UnauthorizedAccessException uaEx)
                 {
+                    string msg = uaEx.Message ?? string.Empty;
+                    // Don't retry if it's clearly a permanent permission issue
+                    // Use IndexOf with OrdinalIgnoreCase for locale-independent matching
+                    if (
+                        msg.IndexOf("read-only", StringComparison.OrdinalIgnoreCase) >= 0
+                        || msg.IndexOf("access is denied", StringComparison.OrdinalIgnoreCase) >= 0
+                    )
+                    {
+                        return false;
+                    }
+                    // Otherwise, assume it's transient (e.g., antivirus scan)
                     return true;
                 }
 

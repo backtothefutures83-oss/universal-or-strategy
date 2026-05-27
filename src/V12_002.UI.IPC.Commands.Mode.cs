@@ -1,13 +1,15 @@
 // Build 971: UI.IPC.Commands.Mode -- TryHandleDiagCommand, TryHandleModeCommand, TryHandleRiskCommand
 // V12 UI.IPC Module (Extracted)
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,16 +19,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -36,12 +36,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool TryHandleModeCommand(string action, string[] parts)
         {
-            if (TryHandleMode_SetRmaMode(action, parts)) return true;
-            if (TryHandleMode_SyncMode(action, parts)) return true;
-            if (TryHandleMode_MktSync(action)) return true;
-            if (TryHandleMode_SyncAll(action)) return true;
-            if (TryHandleMode_SetMode(action, parts)) return true;
-            if (TryHandleMode_ToggleOrExecute(action)) return true;
+            if (TryHandleMode_SetRmaMode(action, parts))
+                return true;
+            if (TryHandleMode_SyncMode(action, parts))
+                return true;
+            if (TryHandleMode_MktSync(action))
+                return true;
+            if (TryHandleMode_SyncAll(action))
+                return true;
+            if (TryHandleMode_SetMode(action, parts))
+                return true;
+            if (TryHandleMode_ToggleOrExecute(action))
+                return true;
             return false;
         }
 
@@ -57,7 +63,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 isRMAButtonClicked = enable;
                 if (!enable)
                     ClearClickTraderBorderIfInactive();
-                Print(string.Format("V12.4: SET_RMA_MODE = {0} (Chart-Click RMA {1})", enable, enable ? "ENABLED" : "DISABLED"));
+                Print(
+                    string.Format(
+                        "V12.4: SET_RMA_MODE = {0} (Chart-Click RMA {1})",
+                        enable,
+                        enable ? "ENABLED" : "DISABLED"
+                    )
+                );
                 MarkStickyDirty(); // Build 1103: Persist RMA toggle
                 BumpUiConfigRevision();
                 PublishUiSnapshot();
@@ -127,30 +139,60 @@ namespace NinjaTrader.NinjaScript.Strategies
                 isMOMOModeActive = false;
                 isFFMAModeArmed = false;
 
-                if (newMode == "RMA") { isRMAModeActive = true; isRMAButtonClicked = true; }
-                else if (newMode == "RETEST") isRetestModeActive = true;
-                else if (newMode == "TREND") isTRENDModeActive = true;
-                else if (newMode == "MOMO") { ActivateMOMOMode(); }
-                else if (newMode == "FFMA") isFFMAModeArmed = true;
+                if (newMode == "RMA")
+                {
+                    isRMAModeActive = true;
+                    isRMAButtonClicked = true;
+                }
+                else if (newMode == "RETEST")
+                    isRetestModeActive = true;
+                else if (newMode == "TREND")
+                    isTRENDModeActive = true;
+                else if (newMode == "MOMO")
+                {
+                    ActivateMOMOMode();
+                }
+                else if (newMode == "FFMA")
+                    isFFMAModeArmed = true;
 
                 // Build 1106 Phase 2: Hydrate incoming mode's config (if profile exists)
                 ModeConfigProfile incomingProfile;
                 if (_modeProfiles.TryGetValue(newMode, out incomingProfile))
                 {
                     HydrateFromProfile(incomingProfile, newMode);
-                    Print(string.Format("[STICKY] Mode switch {0} -> {1}: hydrated profile (count={2})",
-                        outgoingMode, newMode, incomingProfile.TargetCount));
+                    Print(
+                        string.Format(
+                            "[STICKY] Mode switch {0} -> {1}: hydrated profile (count={2})",
+                            outgoingMode,
+                            newMode,
+                            incomingProfile.TargetCount
+                        )
+                    );
                 }
                 else
                 {
-                    Print(string.Format("[STICKY] Mode switch {0} -> {1}: no saved profile, using current config",
-                        outgoingMode, newMode));
+                    Print(
+                        string.Format(
+                            "[STICKY] Mode switch {0} -> {1}: no saved profile, using current config",
+                            outgoingMode,
+                            newMode
+                        )
+                    );
                 }
                 BumpUiConfigRevision();
                 ClearClickTraderBorderIfInactive();
 
-                Print(string.Format("V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
-                    newMode, isRMAModeActive, isRetestModeActive, isTRENDModeActive, isMOMOModeActive, isFFMAModeArmed));
+                Print(
+                    string.Format(
+                        "V12.25: SET_MODE = {0} | RMA={1} RETEST={2} TREND={3} MOMO={4} FFMA={5} (no CONFIG echo)",
+                        newMode,
+                        isRMAModeActive,
+                        isRetestModeActive,
+                        isTRENDModeActive,
+                        isMOMOModeActive,
+                        isFFMAModeArmed
+                    )
+                );
                 MarkStickyDirty(); // Build 1103: Persist mode change
                 PublishUiSnapshot();
 
@@ -178,13 +220,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private bool TryHandleRiskCommand(string action, string[] parts)
         {
-            if (TryHandleRisk_SetTrail(action, parts)) return true;
-            if (TryHandleRisk_SetCit(action, parts)) return true;
-            if (TryHandleRisk_Breakeven(action, parts)) return true;
-            if (TryHandleRisk_SetMaxRisk(action, parts)) return true;
-            if (TryHandleRisk_SetAnchor(action, parts)) return true;
-            if (TryHandleRisk_SetTargets(action, parts)) return true;
-            if (TryHandleRisk_SetManualPrice(action, parts)) return true;
+            if (TryHandleRisk_SetTrail(action, parts))
+                return true;
+            if (TryHandleRisk_SetCit(action, parts))
+                return true;
+            if (TryHandleRisk_Breakeven(action, parts))
+                return true;
+            if (TryHandleRisk_SetMaxRisk(action, parts))
+                return true;
+            if (TryHandleRisk_SetAnchor(action, parts))
+                return true;
+            if (TryHandleRisk_SetTargets(action, parts))
+                return true;
+            if (TryHandleRisk_SetManualPrice(action, parts))
+                return true;
             return false;
         }
 
@@ -207,25 +256,41 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     foreach (var kvp in activePositions.ToArray())
                     {
-                        if (!activePositions.ContainsKey(kvp.Key)) continue;
+                        if (!activePositions.ContainsKey(kvp.Key))
+                            continue;
                         PositionInfo pos = kvp.Value;
                         string entryName = kvp.Key;
 
-                        if (!pos.EntryFilled) continue;
+                        if (!pos.EntryFilled)
+                            continue;
 
                         // Calculate new stop: Longs = Price - Distance, Shorts = Price + Distance
-                        double newStopPrice = pos.Direction == MarketPosition.Long
-                            ? currentPrice - trailDistance
-                            : currentPrice + trailDistance;
+                        double newStopPrice =
+                            pos.Direction == MarketPosition.Long
+                                ? currentPrice - trailDistance
+                                : currentPrice + trailDistance;
 
                         newStopPrice = Instrument.MasterInstrument.RoundToTickSize(newStopPrice);
                         UpdateStopOrder(entryName, pos, newStopPrice, pos.CurrentTrailLevel);
                         trailCount++;
-                        Print(string.Format("[V12] SET_TRAIL: {0} -> Stop @ {1:F2} (Price: {2:F2}, Dist: {3})",
-                            entryName, newStopPrice, currentPrice, trailDistance));
+                        Print(
+                            string.Format(
+                                "[V12] SET_TRAIL: {0} -> Stop @ {1:F2} (Price: {2:F2}, Dist: {3})",
+                                entryName,
+                                newStopPrice,
+                                currentPrice,
+                                trailDistance
+                            )
+                        );
                     }
 
-                    Print(string.Format("[V12] SET_TRAIL COMPLETE: Updated {0} position(s) with {1} pt trail", trailCount, trailDistance));
+                    Print(
+                        string.Format(
+                            "[V12] SET_TRAIL COMPLETE: Updated {0} position(s) with {1} pt trail",
+                            trailCount,
+                            trailDistance
+                        )
+                    );
                 }
             }
             else
@@ -322,7 +387,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // FIX-B [Build 1102Z]: Clamp + lock to prevent IPC race with SIMA dispatch loop.
                 int clamped = Math.Max(1, Math.Min(5, targetCount));
                 activeTargetCount = clamped;
-                Print(string.Format("V12.Phase8.3: SET_TARGETS = {0} targets (clamped from {1}; minContracts preserved at {2})", clamped, targetCount, minContracts));
+                Print(
+                    string.Format(
+                        "V12.Phase8.3: SET_TARGETS = {0} targets (clamped from {1}; minContracts preserved at {2})",
+                        clamped,
+                        targetCount,
+                        minContracts
+                    )
+                );
                 // V12.25: CONFIG broadcast REMOVED -- Panel is sole source of truth.
                 // Sending CONFIG back here caused the Ping-Pong overwrite bug.
                 // Build 1102Y [U-02]: Immediately sync panel visibility -- panel needs the count, not a CONFIG echo.
@@ -342,7 +414,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             // Format: SET_MANUAL_PRICE|<symbol>|<price>  (symbol in parts[1] for router, price in parts[2])
             // NOTE: External callers must use the new symbol-first format (updated Build 944).
-            if (parts.Length > 2 && double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double manualPrice))
+            if (
+                parts.Length > 2
+                && double.TryParse(
+                    parts[2],
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double manualPrice
+                )
+            )
             {
                 cachedMnlPrice = manualPrice;
                 currentRmaAnchor = RmaAnchorType.Manual;
@@ -353,7 +433,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                Print(string.Format("IPC SET_MANUAL_PRICE: Invalid price format in command: {0}", string.Join("|", parts)));
+                Print(
+                    string.Format("IPC SET_MANUAL_PRICE: Invalid price format in command: {0}", string.Join("|", parts))
+                );
             }
 
             return true;
@@ -364,7 +446,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// RESET_MEMORY, LONG/SHORT entries, OR entries, manual limit entries, CLOSE_T*, MOVE_TARGET*,
         /// GET_FLEET*, TOGGLE_ACCOUNT, SET_SIMA, SET_LEADER_ACCOUNT, REQUEST_FLEET_STATE.
         /// </summary>
-
         #endregion
     }
 }

@@ -11,7 +11,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public enum AtmStrategyMode
             {
                 Standard,
-                Custom
+                Custom,
             }
         }
     }

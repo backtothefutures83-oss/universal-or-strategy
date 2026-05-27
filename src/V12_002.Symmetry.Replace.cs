@@ -1,8 +1,8 @@
 // Build 971: Symmetry.Replace -- SymmetryGuardRetargetExistingFollowerBracket, ReplaceExistingFollowerTarget, SkipFollower
 // V12 Symmetry Module (Extracted)
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript;
@@ -28,9 +28,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             string fleetEntryName,
             PositionInfo pos,
             int targetNumber,
-            ConcurrentDictionary<string, Order> dict)
+            ConcurrentDictionary<string, Order> dict
+        )
         {
-            if (pos.ExecutingAccount == null) return;
+            if (pos.ExecutingAccount == null)
+                return;
             string targetTag = "T" + targetNumber;
             bool isRunner = IsRunnerTarget(targetNumber);
             bool isFilled = IsTargetFilled(pos, targetNumber);
@@ -40,10 +42,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (dict.TryGetValue(fleetEntryName, out var staleTarget) && staleTarget != null)
                 {
-                    if (staleTarget.OrderState == OrderState.Working ||
-                        staleTarget.OrderState == OrderState.Accepted ||
-                        staleTarget.OrderState == OrderState.Submitted ||
-                        staleTarget.OrderState == OrderState.ChangePending)
+                    if (
+                        staleTarget.OrderState == OrderState.Working
+                        || staleTarget.OrderState == OrderState.Accepted
+                        || staleTarget.OrderState == OrderState.Submitted
+                        || staleTarget.OrderState == OrderState.ChangePending
+                    )
                     {
                         pos.ExecutingAccount.Cancel(new[] { staleTarget });
                     }
@@ -60,26 +64,30 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Phase 1 (here): store spec and cancel only.
             // Phase 2 (automatic): AccountOrders.cs lines 352-382 detects cancel confirm by CancellingOrderId,
             // fires TriggerCustomEvent -> SubmitFollowerTargetReplacement() in Propagation.cs.
-            if (oldTarget.OrderState == OrderState.Working ||
-                oldTarget.OrderState == OrderState.Accepted ||
-                oldTarget.OrderState == OrderState.Submitted ||
-                oldTarget.OrderState == OrderState.ChangePending)
+            if (
+                oldTarget.OrderState == OrderState.Working
+                || oldTarget.OrderState == OrderState.Accepted
+                || oldTarget.OrderState == OrderState.Submitted
+                || oldTarget.OrderState == OrderState.ChangePending
+            )
             {
                 double newPrice = GetTargetPrice(pos, targetNumber);
-                if (newPrice <= 0) return;
+                if (newPrice <= 0)
+                    return;
 
-                OrderAction exitAction = pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
+                OrderAction exitAction =
+                    pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
                 string signalName = SymmetryTrim(targetTag + "_" + fleetEntryName, 40);
 
                 var tSpec = new FollowerTargetReplaceSpec
                 {
-                    EntryName         = fleetEntryName,
-                    TargetNum         = targetNumber,
-                    NewTargetPrice    = Instrument.MasterInstrument.RoundToTickSize(newPrice),
-                    Quantity          = qty,
-                    ExitAction        = exitAction,
-                    TargetAccount     = pos.ExecutingAccount,
-                    CancellingOrderId = oldTarget.OrderId
+                    EntryName = fleetEntryName,
+                    TargetNum = targetNumber,
+                    NewTargetPrice = Instrument.MasterInstrument.RoundToTickSize(newPrice),
+                    Quantity = qty,
+                    ExitAction = exitAction,
+                    TargetAccount = pos.ExecutingAccount,
+                    CancellingOrderId = oldTarget.OrderId,
                 };
                 _followerTargetReplaceSpecs[signalName] = tSpec;
                 // A1-2: Stamp REAPER grace window before cancel to suppress false desync during replace gap.
@@ -94,11 +102,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             double fleetFillPrice,
             double slippageTicks,
             double slippageUsdPerContract,
-            string reason)
+            string reason
+        )
         {
-            Print(string.Format(
-                "[SYMMETRY_GUARD] SKIP | {0} | {1} | FleetFill={2:F2} | Slip={3:F1} ticks (${4:F2}/ct)",
-                fleetEntryName, reason, fleetFillPrice, slippageTicks, slippageUsdPerContract));
+            Print(
+                string.Format(
+                    "[SYMMETRY_GUARD] SKIP | {0} | {1} | FleetFill={2:F2} | Slip={3:F1} ticks (${4:F2}/ct)",
+                    fleetEntryName,
+                    reason,
+                    fleetFillPrice,
+                    slippageTicks,
+                    slippageUsdPerContract
+                )
+            );
 
             // Build 1004 [DNA-FIX]: Replace the old stateLock path with Enqueue actor write (no internal locks).
             // TotalContracts snapshot captured before lambda to prevent closure mutation.
@@ -181,25 +197,44 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void SymmetryGuardCascadeFollowerCleanup(string masterEntryName)
         {
-            if (!symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId)) return;
-            if (!symmetryDispatchById.TryGetValue(dispatchId, out var ctx)) return;
+            if (!symmetryMasterEntryToDispatch.TryGetValue(masterEntryName, out string dispatchId))
+                return;
+            if (!symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+                return;
 
             // ADR-019: ctx.Followers is already an immutable string[] snapshot -- direct read, lock-free.
             string[] followers = ctx.Followers;
 
-            Print(string.Format("[CASCADE] Master {0} cancelled -- terminating {1} linked follower(s).", masterEntryName, followers.Length));
+            Print(
+                string.Format(
+                    "[CASCADE] Master {0} cancelled -- terminating {1} linked follower(s).",
+                    masterEntryName,
+                    followers.Length
+                )
+            );
 
             foreach (string followerName in followers)
             {
-                if (!activePositions.TryGetValue(followerName, out var pos)) continue;
-                if (!entryOrders.TryGetValue(followerName, out var order)) continue;
-                if (order == null) continue;
+                if (!activePositions.TryGetValue(followerName, out var pos))
+                    continue;
+                if (!entryOrders.TryGetValue(followerName, out var order))
+                    continue;
+                if (order == null)
+                    continue;
 
-                if (order.OrderState == OrderState.Working  ||
-                    order.OrderState == OrderState.Submitted ||
-                    order.OrderState == OrderState.Accepted)
+                if (
+                    order.OrderState == OrderState.Working
+                    || order.OrderState == OrderState.Submitted
+                    || order.OrderState == OrderState.Accepted
+                )
                 {
-                    Print(string.Format("[CASCADE] Cancelling follower entry: {0} (Acc: {1})", followerName, pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : "Master"));
+                    Print(
+                        string.Format(
+                            "[CASCADE] Cancelling follower entry: {0} (Acc: {1})",
+                            followerName,
+                            pos.ExecutingAccount != null ? pos.ExecutingAccount.Name : "Master"
+                        )
+                    );
                     CancelOrderSafe(order, pos);
                     // A2-3: DeltaExpectedPositionLocked deferred to OnAccountOrderUpdate confirmed-cancel
                     // to prevent REAPER desync if the follower was microseconds from filling (Build 960 audit fix).
@@ -209,13 +244,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void SymmetryGuardForgetEntry(string entryName)
         {
-            if (string.IsNullOrEmpty(entryName)) return;
+            if (string.IsNullOrEmpty(entryName))
+                return;
 
             symmetryPendingFollowerFills.TryRemove(entryName, out _);
             symmetryMasterEntryToDispatch.TryRemove(entryName, out _);
 
-            if (symmetryFleetEntryToDispatch.TryRemove(entryName, out var dispatchId) &&
-                symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+            if (
+                symmetryFleetEntryToDispatch.TryRemove(entryName, out var dispatchId)
+                && symmetryDispatchById.TryGetValue(dispatchId, out var ctx)
+            )
             {
                 // ADR-019: FollowerEntries.Remove is superseded by the atomic CAS-loop publisher in Symmetry.cs.
                 // Forget-on-remove is a no-op here: the CAS loop publishes a new snapshot that excludes
@@ -231,7 +269,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in symmetryDispatchById.ToArray())
             {
                 SymmetryDispatchContext ctx = kvp.Value;
-                if (ctx == null) continue;
+                if (ctx == null)
+                    continue;
 
                 bool remove = false;
 
@@ -253,7 +292,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             break;
                         }
                     }
-                    if (!hasActiveFollowers) remove = true;
+                    if (!hasActiveFollowers)
+                        remove = true;
                 }
 
                 if (remove)
@@ -265,32 +305,45 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (pos != null)
             {
-                if (pos.IsTRENDTrade) return "TREND";
-                if (pos.IsRetestTrade) return "RETEST";
-                if (pos.IsFFMATrade) return "FFMA";
-                if (pos.IsMOMOTrade) return "MOMO";
-                if (pos.IsRMATrade) return "RMA";
+                if (pos.IsTRENDTrade)
+                    return "TREND";
+                if (pos.IsRetestTrade)
+                    return "RETEST";
+                if (pos.IsFFMATrade)
+                    return "FFMA";
+                if (pos.IsMOMOTrade)
+                    return "MOMO";
+                if (pos.IsRMATrade)
+                    return "RMA";
             }
             return SymmetryNormalizeTradeType(entryName);
         }
 
         private string SymmetryNormalizeTradeType(string raw)
         {
-            if (string.IsNullOrEmpty(raw)) return "GENERIC";
+            if (string.IsNullOrEmpty(raw))
+                return "GENERIC";
 
             string t = raw.ToUpperInvariant();
-            if (t.StartsWith("TREND", StringComparison.Ordinal)) return "TREND";
-            if (t.StartsWith("RETEST", StringComparison.Ordinal)) return "RETEST";
-            if (t.StartsWith("FFMA", StringComparison.Ordinal)) return "FFMA";
-            if (t.StartsWith("MOMO", StringComparison.Ordinal)) return "MOMO";
-            if (t.StartsWith("RMA", StringComparison.Ordinal)) return "RMA";
-            if (t.StartsWith("OR", StringComparison.Ordinal) || t.Contains("ORLONG") || t.Contains("ORSHORT")) return "OR";
+            if (t.StartsWith("TREND", StringComparison.Ordinal))
+                return "TREND";
+            if (t.StartsWith("RETEST", StringComparison.Ordinal))
+                return "RETEST";
+            if (t.StartsWith("FFMA", StringComparison.Ordinal))
+                return "FFMA";
+            if (t.StartsWith("MOMO", StringComparison.Ordinal))
+                return "MOMO";
+            if (t.StartsWith("RMA", StringComparison.Ordinal))
+                return "RMA";
+            if (t.StartsWith("OR", StringComparison.Ordinal) || t.Contains("ORLONG") || t.Contains("ORSHORT"))
+                return "OR";
             return "GENERIC";
         }
 
         private static string SymmetryTrim(string text, int maxLen)
         {
-            if (string.IsNullOrEmpty(text)) return string.Empty;
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
             return text.Length <= maxLen ? text : text.Substring(0, maxLen);
         }
 

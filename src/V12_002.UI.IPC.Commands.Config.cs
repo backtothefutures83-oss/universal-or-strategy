@@ -1,13 +1,15 @@
 // Build 971: UI.IPC.Commands.Config -- HandleTrimCommand, HandleConfigCommand, TryApplyConfig*, HandleToggleAccountCommand
 // V12 UI.IPC Module (Extracted)
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
 using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,16 +19,14 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using NinjaTrader.Cbi;
+using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
-using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
-using System.Net;
-using System.Net.Sockets;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
@@ -53,41 +53,94 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (rawQty >= 1 && (pos.RemainingContracts - rawQty) >= 1)
                     {
-                        OrderAction trimAction = pos.Direction == MarketPosition.Long
-                            ? OrderAction.Sell : OrderAction.BuyToCover;
+                        OrderAction trimAction =
+                            pos.Direction == MarketPosition.Long ? OrderAction.Sell : OrderAction.BuyToCover;
 
                         // [1102Z-F]: Route to fleet follower account when applicable
                         if (EnableSIMA && pos.IsFollower && pos.ExecutingAccount != null)
                         {
                             string trimSig = "Trim_" + pos.SignalName;
-                            if (trimSig.Length > 50) trimSig = trimSig.Substring(0, 50);
+                            if (trimSig.Length > 50)
+                                trimSig = trimSig.Substring(0, 50);
                             Order trimOrder = pos.ExecutingAccount.CreateOrder(
-                                Instrument, trimAction, OrderType.Market, TimeInForce.Gtc,
-                                rawQty, 0, 0, "", trimSig, null);
+                                Instrument,
+                                trimAction,
+                                OrderType.Market,
+                                TimeInForce.Gtc,
+                                rawQty,
+                                0,
+                                0,
+                                "",
+                                trimSig,
+                                null
+                            );
                             pos.ExecutingAccount.Submit(new[] { trimOrder });
-                            Print(string.Format("[SIMA] TRIM {0}%: Follower {1} -> {2} closing {3} contracts",
-                                (int)(percent * 100), pos.SignalName, pos.ExecutingAccount.Name, rawQty));
+                            Print(
+                                string.Format(
+                                    "[SIMA] TRIM {0}%: Follower {1} -> {2} closing {3} contracts",
+                                    (int)(percent * 100),
+                                    pos.SignalName,
+                                    pos.ExecutingAccount.Name,
+                                    rawQty
+                                )
+                            );
                         }
                         else
                         {
-                            Print(string.Format("IPC Trim: Closing {0} of {1} contracts for {2} ({3:P0})",
-                                rawQty, pos.RemainingContracts, pos.SignalName, percent));
+                            Print(
+                                string.Format(
+                                    "IPC Trim: Closing {0} of {1} contracts for {2} ({3:P0})",
+                                    rawQty,
+                                    pos.RemainingContracts,
+                                    pos.SignalName,
+                                    percent
+                                )
+                            );
 
                             if (pos.Direction == MarketPosition.Long)
-                                SubmitOrderUnmanaged(0, OrderAction.Sell, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                                SubmitOrderUnmanaged(
+                                    0,
+                                    OrderAction.Sell,
+                                    OrderType.Market,
+                                    rawQty,
+                                    0,
+                                    0,
+                                    "",
+                                    "Trim_" + pos.SignalName
+                                );
                             else
-                                SubmitOrderUnmanaged(0, OrderAction.BuyToCover, OrderType.Market, rawQty, 0, 0, "", "Trim_" + pos.SignalName);
+                                SubmitOrderUnmanaged(
+                                    0,
+                                    OrderAction.BuyToCover,
+                                    OrderType.Market,
+                                    rawQty,
+                                    0,
+                                    0,
+                                    "",
+                                    "Trim_" + pos.SignalName
+                                );
                         }
                     }
                     else
                     {
-                        Print(string.Format("IPC Trim SKIPPED: {0} contracts for {1} - cannot satisfy {2:P0} trim with 1+ remaining",
-                            pos.RemainingContracts, pos.SignalName, percent));
+                        Print(
+                            string.Format(
+                                "IPC Trim SKIPPED: {0} contracts for {1} - cannot satisfy {2:P0} trim with 1+ remaining",
+                                pos.RemainingContracts,
+                                pos.SignalName,
+                                percent
+                            )
+                        );
                     }
                 }
                 else
                 {
-                    Print(string.Format("IPC Trim SKIPPED: {0} has only 1 contract - use FLATTEN to close", pos.SignalName));
+                    Print(
+                        string.Format(
+                            "IPC Trim SKIPPED: {0} has only 1 contract - use FLATTEN to close",
+                            pos.SignalName
+                        )
+                    );
                 }
             }
         }
@@ -417,7 +470,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Handles mode-switching commands: SET_RMA_MODE, SYNC_MODE, MKT_SYNC,
         /// SYNC_ALL, SET_MODE, MODE_*, EXEC_*, FFMA_DISARM.
         /// </summary>
-
         #endregion
     }
 }
