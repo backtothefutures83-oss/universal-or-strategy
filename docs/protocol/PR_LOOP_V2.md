@@ -13,6 +13,52 @@ The V2 PR Loop adds **mandatory Bot Forensics extraction** before any fix attemp
 5. **Manual Override Gate**: Director can approve <100 PHS when flagged
 
 ## The Improved Cycle
+### Step -2: Pre-Branch Validation (NEW - V12.23)
+**Mode:** Local (PowerShell)
+**Action:** Validate main is clean before creating src-only branches
+
+**Purpose:** Prevents src/non-src contamination at branch creation time (proactive prevention vs reactive detection)
+
+**Usage:**
+```powershell
+# For src-only branches (requires clean main)
+powershell -File .\scripts\create_clean_branch.ps1 -BranchName "feature-branch" -BranchType "src"
+
+# For mixed branches (not recommended)
+powershell -File .\scripts\create_clean_branch.ps1 -BranchName "feature-branch" -BranchType "mixed"
+```
+
+**Validation Checks:**
+1. ✅ Currently on `main` branch
+2. ✅ No uncommitted non-src files in working directory
+3. ✅ Local `main` is synced with `origin/main`
+4. ✅ Branch name doesn't already exist
+
+**Contamination Prevention:**
+- **BLOCKS** src branch creation if non-src files are uncommitted
+- **GUIDES** user to commit non-src files directly to main first
+- **ENFORCES** clean branching discipline
+
+**Non-Src File Protocol (V12.23):**
+```powershell
+# Non-src files go DIRECTLY to main (no PR needed)
+git add scripts/ docs/ .github/ .bob/
+git commit -m "chore: Update tooling"
+git push origin main
+
+# THEN create src branch
+powershell -File .\scripts\create_clean_branch.ps1 -BranchName "feature-branch" -BranchType "src"
+```
+
+**Gate:** PASS/FAIL
+- **PASS**: Main is clean, branch created successfully
+- **FAIL**: Non-src files detected, user must commit to main first
+- **Override**: Use `-Force` flag (not recommended, creates contaminated PRs)
+
+**Rationale:** Git commits are snapshots of entire repo state. Branching from "dirty" main (with uncommitted non-src files) creates contaminated branches where PR diffs show non-src files even though you only changed src/. This step catches contamination at creation time, not after PR submission.
+
+---
+
 
 ### Step -1: PR Existence Check (NEW - MANDATORY)
 **Mode:** Advanced

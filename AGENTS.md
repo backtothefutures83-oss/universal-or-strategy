@@ -51,6 +51,75 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 - **Jane Street Alignment (V12.17)**: ALL agents (Bob, Codex, Qwen, Antigravity, Jules, Rovo Dev, Cursor, etc.) MUST load and apply the ingested Jane Street Intel from `docs/intel/jane-street/` for every architectural decision.
 - **Hard-Link Integrity**: Every `src/` modification MUST be followed by `powershell -File .\deploy-sync.ps1` to re-synchronize NinjaTrader hard links.
 
+## 2.5. Commit Protocol (V12.23 - CONTAMINATION PREVENTION)
+
+### Direct to Main (No PR Required)
+
+**Files that bypass PR process**:
+- Scripts: `scripts/**/*.{ps1,py,sh,bat}`
+- Documentation: `docs/**/*.md`
+- CI/CD: `.github/workflows/**`
+- Tool configs: `.bob/`, `.codacy.yml`, `.semgrep.yml`, `.coderabbit.yaml`, etc.
+- Project configs: `*.json`, `*.yaml`, `*.toml` (root level)
+
+**Workflow**:
+```powershell
+# Make changes to non-src files
+git add scripts/ docs/ .github/ .bob/
+git commit -m "chore: Update tooling/docs"
+git push origin main  # Direct to main, no PR
+```
+
+**Rationale**: Non-src files are low-risk, self-contained, and easy to revert. PR overhead adds no value.
+
+### PR Required (Src Code Only)
+
+**Files that require PR**:
+- Source code: `src/**/*.cs`
+- Test code: `tests/**/*.cs`
+- Benchmarks: `benchmarks/**/*.cs`
+
+**Workflow**:
+```powershell
+# STEP 1: Ensure main is clean (commit any pending non-src files first)
+git status  # Check for uncommitted non-src files
+# If non-src files exist, commit them to main first (see above)
+
+# STEP 2: Create clean branch using validation script
+powershell -File .\scripts\create_clean_branch.ps1 -BranchName "feature-branch" -BranchType "src"
+
+# STEP 3: Make src/ changes
+# ... edit src/ files ...
+
+# STEP 4: Stage ONLY src/ files
+git add src/
+
+# STEP 5: Commit
+git commit -m "feat: Add new entry logic"
+
+# STEP 6: Push
+git push origin feature-branch
+
+# STEP 7: Create PR
+gh pr create --title "feat: ..." --body "..."
+```
+
+**Rationale**: Src code is high-risk, affects production trading, and requires architectural validation.
+
+### Contamination Prevention
+
+**Problem**: Branching from "dirty" main (with uncommitted non-src files) creates contaminated branches where PR diffs show non-src files even though you only changed src/.
+
+**Solution**: Use `create_clean_branch.ps1` which:
+1. ✅ Validates you're on `main` branch
+2. ✅ Detects uncommitted non-src files
+3. ✅ **BLOCKS** branch creation if contamination risk exists
+4. ✅ Guides you to commit non-src files to main first
+5. ✅ Creates clean branch only after validation passes
+
+**Enforcement**: ALL agents MUST use `create_clean_branch.ps1` for src branches. Manual `git checkout -b` is BANNED for src work.
+
+
 
 ## 3. Standard Commands
 
