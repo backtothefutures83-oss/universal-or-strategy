@@ -194,14 +194,23 @@ When v12-engineer outputs [TICKET-GATE] (the written plan), present the plan sum
 - APPROVED: switch back to v12-engineer and instruct it to execute the plan
 - FLAG: relay adjustment, switch to v12-engineer to re-plan
 
-**Step C -- Switch to: Advanced mode (verification)**
+**Step C -- Switch to: Advanced mode (verification + Jane Street audit)**
 
 After v12-engineer confirms execution complete, switch to Advanced mode and hand off:
 ```
 VERIFICATION TASK for epic $1, ticket-XX
-Run the FULL pre-push validation suite:
+Run the FULL pre-push validation suite with Jane Street audit:
 
-powershell -File .\scripts\pre_push_validation.ps1
+1. powershell -File .\scripts\pre_push_validation.ps1
+
+2. JANE STREET AUDIT (MANDATORY):
+   - Read: docs/standards/JANE_STREET_DEVIATIONS.md
+   - Verify no new violations of documented Jane Street principles:
+     * Zero locks (grep -r "lock(" src/)
+     * ASCII-only (already checked in validation)
+     * FSM/Actor pattern (no new stateful classes without Enqueue)
+     * Complexity ≤15 (already checked in validation)
+   - If new Jane Street conflicts detected: HALT and report
 
 Report results as:
   ASCII Gate      : PASS / FAIL
@@ -217,6 +226,7 @@ Report results as:
   Codacy Preview  : PASS / FAIL (warnings OK)
   Semgrep         : PASS / FAIL (warnings OK)
   CodeRabbit AI   : PASS / FAIL (warnings OK)
+  Jane Street DNA : PASS / FAIL
 
 If ANY blocking check fails: HALT and report to orchestrator.
 ```

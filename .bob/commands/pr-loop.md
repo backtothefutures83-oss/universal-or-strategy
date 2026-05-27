@@ -98,53 +98,74 @@ PROTOCOL:
 
 ---
 
-### Step 1: Bot Forensics (MANDATORY - NEW IN V2)
+### Step 1: Bot Forensics + Jane Street Audit (MANDATORY - NEW IN V2)
 
 **Switch to: Advanced mode**
 
 Hand off:
 ```
-TASK: Extract and Categorize Bot Findings
+TASK: Extract and Categorize Bot Findings with Jane Street Alignment Review
 PR: $1
 PROTOCOL:
   1. Run: powershell -File .\scripts\extract_pr_forensics.ps1 -PrNumber $1
   2. Read the generated forensics report: docs/brain/pr_$1_forensics.md
-  3. Present summary to Director:
-     - Total VALID issues (P0/P1/P2 breakdown)
+  3. JANE STREET AUDIT (MANDATORY):
+     - Read: docs/standards/JANE_STREET_DEVIATIONS.md
+     - For each VALID issue, check if it conflicts with documented Jane Street deviations
+     - Categorize as:
+       * [VALID-FIX]: Issue aligns with Jane Street principles - must fix
+       * [VALID-SUPPRESS]: Issue conflicts with Jane Street - suppress via .codacy.yml
+       * [HALLUCINATION]: Bot error - log and ignore
+       * [INFRA-NOISE]: Infrastructure issue - ignore
+  4. Present summary to Director:
+     - Total VALID-FIX issues (P0/P1/P2 breakdown)
+     - Total VALID-SUPPRESS issues (with Jane Street rationale)
      - Hallucinations detected
      - INFRA-NOISE filtered
-  4. If P0 issues exist: Flag as CRITICAL and proceed to Step 2.
-  5. If no VALID issues: Skip to Step 3 (verification only).
-  6. Emit: [FORENSICS-READY] X VALID issues, Y hallucinations
+  5. If P0 VALID-FIX issues exist: Flag as CRITICAL and proceed to Step 2.
+  6. If only VALID-SUPPRESS issues: Update .codacy.yml, document in JANE_STREET_DEVIATIONS.md
+  7. If no VALID issues: Skip to Step 3 (verification only).
+  8. Emit: [FORENSICS-READY] X VALID-FIX, Y VALID-SUPPRESS, Z hallucinations
 ```
 
 **Outputs:**
 - `docs/brain/pr_$1_forensics.md` - Full categorized findings
-- `docs/brain/pr_$1_fix_queue.md` - Priority-ordered fix list
+- `docs/brain/pr_$1_fix_queue.md` - Priority-ordered fix list (VALID-FIX only)
+- `docs/brain/pr_$1_suppress_queue.md` - Suppression list (VALID-SUPPRESS with rationale)
 - `docs/brain/bot_hallucinations.md` - Updated hallucination log
 
-**Gate:** Review forensics report. If P0 issues exist, they MUST be fixed before proceeding.
+**Gate:** Review forensics report. If P0 VALID-FIX issues exist, they MUST be fixed before proceeding. If VALID-SUPPRESS issues exist, they MUST be documented before proceeding.
 
 ---
 
-### Step 2: Local Repair
+### Step 2: Local Repair (VALID-FIX) + Suppression (VALID-SUPPRESS)
 
 **Switch to: v12-engineer mode**
 
 Hand off:
 ```
-TASK: Fix VALID Issues from Forensics Report
-INPUT: @docs/brain/pr_$1_fix_queue.md
+TASK: Fix VALID-FIX Issues and Document VALID-SUPPRESS Issues
+INPUT: @docs/brain/pr_$1_fix_queue.md @docs/brain/pr_$1_suppress_queue.md
 PROTOCOL:
-  1. Read fix queue completely.
-  2. For each VALID issue (P0 first, then P1, then P2):
-     - Apply fix
-     - Verify locally (compile, test)
-     - Mark as [x] FIXED in fix queue
-  3. Run formatters: powershell -File .\scripts\format_all_csharp.ps1
-  4. Run FULL local validation: powershell -File .\scripts\pre_push_validation.ps1
-  5. If ANY blocking check fails: identify issue, repeat Step 2.
-  6. If ALL checks pass (13/13): emit [LOCAL-READY] with fix summary.
+  PART A: Code Fixes (VALID-FIX)
+    1. Read fix queue completely.
+    2. For each VALID-FIX issue (P0 first, then P1, then P2):
+       - Apply fix
+       - Verify locally (compile, test)
+       - Mark as [x] FIXED in fix queue
+  
+  PART B: Jane Street Suppressions (VALID-SUPPRESS)
+    1. Read suppress queue completely.
+    2. For each VALID-SUPPRESS issue:
+       - Add file/pattern to .codacy.yml exclude_paths with Jane Street rationale
+       - Document in docs/standards/JANE_STREET_DEVIATIONS.md as new Decision #N
+       - Mark as [x] SUPPRESSED in suppress queue
+  
+  PART C: Validation
+    3. Run formatters: powershell -File .\scripts\format_all_csharp.ps1
+    4. Run FULL local validation: powershell -File .\scripts\pre_push_validation.ps1
+    5. If ANY blocking check fails: identify issue, repeat Step 2.
+    6. If ALL checks pass (13/13): emit [LOCAL-READY] with fix summary.
 ```
 
 **Gate:** ALL local checks PASS (8 blocking + 5 warnings). If any blocking check fails, repeat Step 2.
