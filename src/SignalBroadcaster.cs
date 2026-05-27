@@ -10,12 +10,12 @@ namespace NinjaTrader.NinjaScript.Strategies
     public static class SignalBroadcaster
     {
         #region Signal Data Classes
-    
-            /// <summary>
-            /// Complete trade signal with all bracket order details
-            /// </summary>
-            public class TradeSignal : EventArgs
-            {
+
+        /// <summary>
+        /// Complete trade signal with all bracket order details
+        /// </summary>
+        public class TradeSignal : EventArgs
+        {
             public string SignalId { get; set; }
             public string Instrument { get; set; } // V7.1: For instrument filtering
             public MarketPosition Direction { get; set; }

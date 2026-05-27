@@ -505,6 +505,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                                     item.EventArgs.Execution != null ? item.EventArgs.Execution.Price : 0;
                                 SymmetryGuardOnFollowerFill(fleetKey, pos, fleetFillPrice);
                             }
+
                             break;
                         }
                     }
@@ -574,6 +575,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     cancelledTargets++;
                 }
             }
+
             return cancelledTargets;
         }
 
