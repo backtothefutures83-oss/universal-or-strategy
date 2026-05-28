@@ -462,6 +462,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case Key.C:
                     ExecuteTargetAction(target, "cancel");
                     break;
+                default:
+                    throw new InvalidOperationException($"Unexpected key for target action: {key}");
             }
         }
 
@@ -1147,6 +1149,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case "disabletrail":
                     ExecuteRunner_DisableTrail(entryName, pos);
                     break;
+
+                default:
+                    throw new InvalidOperationException($"Unexpected runner action: {action}");
             }
         }
 
