@@ -174,9 +174,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     _photonMmioMirror.Dispose();
                 }
+                catch (ObjectDisposedException ex)
+                {
+                    // Known issue - MMIO already disposed
+                    Print("[SHUTDOWN_ERROR] MMIO mirror already disposed: " + ex.Message);
+                }
                 catch (Exception ex)
                 {
-                    Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.ToString());
+                    // Unexpected exception during shutdown - log but continue cleanup
+                    Print("[SHUTDOWN_ERROR] CRITICAL: MMIO mirror dispose failed: " + ex.ToString());
+                    throw;
                 }
                 _photonMmioMirror = null;
             }
