@@ -264,9 +264,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Deactivate MOMO mode after entry (one-shot)
                 DeactivateMOMOMode();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state issue
+                Print("WARNING ExecuteMOMOEntry: NT8 order submission quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteMOMOEntry: " + ex.Message);
+                // Unexpected exception in MOMO entry execution - fail fast
+                Print("CRITICAL ExecuteMOMOEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 

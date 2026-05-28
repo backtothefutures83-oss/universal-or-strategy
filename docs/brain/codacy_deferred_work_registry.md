@@ -216,6 +216,46 @@ All 5 reported issues were verified as non-existent through agent search.
 
 ---
 
+## Category 5: Style Violations (NEW)
+
+### EPIC-STYLE-INLINE-COMMENTS
+
+**Metadata**:
+- **Pattern**: Code + inline comment on same line
+- **Count**: TBD (need scan)
+- **Priority**: P2
+- **Effort**: 2-3 hours
+- **Status**: DEFERRED - Fix after P0 ErrorProne issues complete
+
+**Examples**:
+- `src/V12_002.Entries.Trend.cs:911`: `UpdateATRStopDistance(RMAStopATRMultiplier); // V12.30: Ceiling-rounded`
+- `src/V12_002.REAPER.Audit.cs:65`: `int threshold = 1600; // 80% of 2000 capacity`
+
+**Fix Pattern**:
+```csharp
+// Before
+UpdateATRStopDistance(RMAStopATRMultiplier); // V12.30: Ceiling-rounded
+
+// After
+// V12.30: Ceiling-rounded
+UpdateATRStopDistance(RMAStopATRMultiplier);
+```
+
+**Scan Command**:
+```powershell
+Select-String -Path "src/*.cs" -Pattern ";\s*//" | Measure-Object
+```
+
+**Rationale**:
+- V12 DNA mandates clean separation of code and comments
+- Inline comments reduce readability in dense HFT code
+- CSharpier does not enforce this (style-only rule)
+- Manual fix required across entire codebase
+
+**Documentation**: See `docs/brain/codacy_inline_comment_issue.md`
+
+---
+
 ## Summary Table
 
 | Category | Count | Priority | Effort | Action |
@@ -224,7 +264,8 @@ All 5 reported issues were verified as non-existent through agent search.
 | Threshold Mismatch (PR #8) | 29 | LOW | 0 | Document in `.codacy.yml` |
 | False Positives (PR #8) | 324 | NONE | 0 | No action |
 | Non-Existent (PR #14) | 5 | NONE | 0 | No action |
-| **TOTAL** | **375** | - | **2-3 days** | 1 epic + 1 doc task |
+| Style Violations (NEW) | TBD | P2 | 2-3 hours | EPIC-STYLE-INLINE-COMMENTS |
+| **TOTAL** | **375+** | - | **2-3 days + 2-3 hours** | 2 epics + 1 doc task |
 
 ---
 

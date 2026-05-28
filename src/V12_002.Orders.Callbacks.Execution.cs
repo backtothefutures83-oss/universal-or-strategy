@@ -297,9 +297,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // execution events (stop fill, target fill) where next trailing cycle is too late.
                 ProcessOnExecution_RunShadowCheck();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("ProcessOnExecution_RunShadowCheck"))
+            {
+                Print("WARNING: Known quirk in OnExecutionUpdate shadow check: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("Error OnExecutionUpdate: " + ex.Message);
+                Print("CRITICAL: Unexpected exception in OnExecutionUpdate: " + ex.ToString());
+                throw;
             }
         }
 
