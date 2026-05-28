@@ -1,0 +1,213 @@
+{
+  "// BOB GODMODE: MAXIMUM REAL-TIME CODE QUALITY FEEDBACK": "==============================================",
+  "// Generated": "2026-05-28",
+  "// Purpose": "Deploy all real-time feedback layers for V12 Universal OR Strategy",
+  "// Import via": "Bob Settings → General → Import IDE settings from a JSON file",
+  "// ============================================================================": "",
+
+  "// 1. AUTO-FORMATTING (V12 DNA: Curly Braces Mandate)": "====================================",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "[csharp]": {
+    "editor.defaultFormatter": "csharpier.csharpier-vscode",
+    "editor.formatOnSave": true
+  },
+
+  "// 2. SPELL CHECKING (Catch Typos in Comments)": "====================================",
+  "cSpell.enabled": true,
+  "cSpell.language": "en",
+  "cSpell.diagnosticLevel": "Information",
+  "cSpell.showStatus": true,
+  "cSpell.allowCompoundWords": true,
+  "cSpell.words": [
+    "SIMA",
+    "Antigravity",
+    "NinjaTrader",
+    "Codacy",
+    "CSharpier",
+    "jcodemunch",
+    "graphify",
+    "Orchestrator",
+    "Adjudicator",
+    "Karpathy",
+    "Firestore",
+    "Gemini",
+    "Qwen",
+    "Codex",
+    "Rovo",
+    "Traycerrefactor",
+    "Screenpipe",
+    "Langsmith",
+    "Semgrep",
+    "Gitleaks",
+    "Snyk",
+    "CodeRabbit",
+    "CodeScene",
+    "Roslyn",
+    "dotnet",
+    "powershell",
+    "SPSC",
+    "MPSC",
+    "FSM",
+    "Enqueue",
+    "Dequeue",
+    "ArrayPool",
+    "Interlocked",
+    "Volatile",
+    "SonarLint",
+    "SonarQube"
+  ],
+
+  "// 3. ERROR LENS (Inline Error Messages)": "====================================",
+  "errorLens.enabled": true,
+  "errorLens.enabledDiagnosticLevels": [
+    "error",
+    "warning",
+    "info",
+    "hint"
+  ],
+  "errorLens.followCursor": "allLines",
+  "errorLens.followCursorMore": 5,
+  "errorLens.gutterIconsEnabled": true,
+  "errorLens.messageBackgroundMode": "message",
+  "errorLens.messageEnabled": true,
+  "errorLens.statusBarIconsEnabled": true,
+  "errorLens.statusBarMessageEnabled": true,
+
+  "// 4. C# LANGUAGE SERVER": "====================================",
+  "omnisharp.enableRoslynAnalyzers": true,
+  "omnisharp.enableEditorConfigSupport": true,
+  "omnisharp.enableImportCompletion": true,
+  "omnisharp.organizeImportsOnFormat": true,
+  "omnisharp.useModernNet": true,
+
+  "// 5. SONARLINT (Advanced Code Quality Analysis)": "====================================",
+  "sonarlint.rules": {
+    "csharpsquid:S1067": {
+      "level": "on",
+      "parameters": {
+        "max": "15"
+      }
+    },
+    "csharpsquid:S134": {
+      "level": "on",
+      "parameters": {
+        "max": "4"
+      }
+    },
+    "csharpsquid:S1541": {
+      "level": "on",
+      "parameters": {
+        "threshold": "15"
+      }
+    }
+  },
+  "sonarlint.connectedMode.connections.sonarqube": [],
+  "sonarlint.connectedMode.connections.sonarcloud": [],
+  "sonarlint.output.showAnalyzerLogs": false,
+  "sonarlint.output.showVerboseLogs": false,
+  "sonarlint.disableTelemetry": true,
+  "sonarlint.pathToCompileCommands": "",
+  "sonarlint.ls.javaHome": "",
+
+  "// 6. EDITOR BEHAVIOR": "====================================",
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": false,
+    "strings": false
+  },
+  "editor.parameterHints.enabled": true,
+  "editor.inlineSuggest.enabled": true,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.renderWhitespace": "boundary",
+  "editor.rulers": [120],
+  "editor.wordWrap": "off",
+  "editor.minimap.enabled": true,
+  "editor.minimap.renderCharacters": false,
+  "editor.minimap.showSlider": "always",
+
+  "// 7. FILES & ENCODING (V12 DNA: ASCII-Only)": "====================================",
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+
+  "// 8. PROBLEMS PANEL": "====================================",
+  "problems.showCurrentInStatus": true,
+  "problems.sortOrder": "severity",
+
+  "// 9. TERMINAL": "====================================",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.fontSize": 12,
+
+  "// 10. GIT": "====================================",
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+
+  "// 11. SEARCH": "====================================",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bin": true,
+    "**/obj": true,
+    "**/.git": true,
+    "**/graphify-out": true
+  },
+
+  "// 12. PERFORMANCE": "====================================",
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "**/graphify-out/**": true
+  },
+
+  "// 13. CODESCENE (if extension installed)": "====================================",
+  "codescene.enableCodeHealthMonitor": true,
+  "codescene.codeHealthGateThreshold": 7.0,
+
+  "// 14. TODO TREE (if extension installed)": "====================================",
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "XXX",
+    "BUG",
+    "NOTE"
+  ],
+  "todo-tree.highlights.defaultHighlight": {
+    "icon": "alert",
+    "type": "text",
+    "foreground": "#ffffff",
+    "background": "#ff0000",
+    "opacity": 50
+  },
+
+  "// 15. PRETTIER (for JSON/MD files)": "====================================",
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "on"
+  },
+
+  "// 16. WORKSPACE TRUST": "====================================",
+  "security.workspace.trust.untrustedFiles": "open",
+
+  "// END OF BOB GODMODE SETTINGS": "====================================",
+  "// After import, reload Bob IDE": "Ctrl+Shift+P → Developer: Reload Window"
+}

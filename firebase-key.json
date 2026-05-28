@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "v12-morpheus",
+  "private_key_id": "33796aef27815bcd594bed032581b11235cc7f9d",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDIvFyA0/CVPs1a\n5brdzmoJo4eQGf06C8Kg4hj3pCAandfvg9G8vgOpP8sFOC/ktHHu+qgtdfEt4598\nmuTWYGgFGWGvoyKNpugxKzFbgyTdQjODY5C5m9kbHVpT16ZZmzXv3Wu5Y8C9F29a\nlf3jhplqFZKDqEUBJ04eV22vjRp216Z1xDNJp/N6RGaayFkIzJrYBw6R8GZyuI2y\nUHFikk4mSyxd2lDzf7MbsWQwemIpsvlIIMqY2hiDCT5riIuEp58hSnJ2savrRtL2\nFn9mY5000NXFMwSXMSAcvwDemQ2DB7isvf3i2w3WFwYP8AfO5VX2xmqxs4d1UIV+\nV+PRavWfAgMBAAECggEARPwqxCFSBFBdbXgW1KRb360h6P1tf5XMENMy5mQynkMR\nkyAXo8gfZPpl8IjDONNkdk8RHfJy7KTVyhJHQ39FMD9tSVmEhe7OzBr+bucuc5WN\nM4Gzmn37Siy3vqmVYyUKj8DmBQPJmJJls9lpM9itf34jaHibIk7aM2YzbUnORvmw\nw5tymyc8CgG2fQPFvn5KVlEKUJuPIYgwqQVuX8D+GPMUTtY6ydgrHBuiPPPRC9rq\nimHKCQr429UcGJVyTusAXUibbendkbQArpKpjmFDuDxuqJ5PmbM/F1weBe/SXxP9\nmR3H2RW/vzhOuOS3ow9F03nTkTmovDJej5C217WU0QKBgQDnqr5p54elyxLfCzvF\nnrQcQ2cWQwGi/jOUtqsbNlPBrFdjlV8tD1N7ne7w7P012JCEtJ+YXwdoJRBnroBu\njl4daAehsJRZT5/d9kJuUqW+fBdq6xSEZgajWJkJ+3MLVIitMKt/p8xaLnh7X6fN\nw9vs0JXHuTNVU0nIZSGM6quajwKBgQDd0en3BiO+y2EajG/8gszY5CPXcM/LAdE7\nvEtLCBnEyrs6UUZ9U7qWVz9VsthWYc8+OWwPsOFhklfXENpRr8t5Bm7+jUd1SrYN\njMeC03SONpmR5SOkPZGGuNMyDfY571z0elK8iBHHPsCOb+6P/LGBFA2a1mM5Kihl\nucJ7kIi78QKBgBwGU7KMB6TOxCGnQjvNzwv8O2Q+Btyo06SR1HEeSVOMfaXWVAUn\nbXnuyRDsGlWBNTpYf1X3aPX4RdvFCFRXdJsqEoJE0i1brIM1XyPpa5N3f323omvB\ny9vGw/ypJmmgeEg7MwPmUJo4NOr3z1zc7KXhNb1LciJISQys7zoUyV2RAoGAU1Om\nq0ggJ20pJhr5eob8QsG5ARZ8yIr/OYxrUF1TqMxrduXPMAdDAXT28s+DWzfU7VAO\n2vocQFYEL2NCUAtUyTr0eSVDYblWGFL5I5khoMa7+8VzFSCXyV8m3xfFlk/nwGMv\nL2mCHDHjjd5YZLiNSarpzW+ZyICguk4E0/wgkVECgYBwUJIeb5XP2AhggsgvAEcv\nqlxJbS9FYGzdE796oAgdcSj5E1dlGzUS6b9K1ru6TtiU1F9Co6NXE0chsLn2+4KG\n07MRpXlXy9I9VYBHXcy56P9UHYMa5mrO2NLM4yFBzRQ5ph9//yo20eqpp1oA+OoF\nve7IS9r8ud8qbHl4qXrtuA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@v12-morpheus.iam.gserviceaccount.com",
+  "client_id": "104131180157101898060",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40v12-morpheus.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

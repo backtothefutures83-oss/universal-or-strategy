@@ -1,0 +1,10 @@
+C:\WSGTA\universal-or-strategy\routa-tools\target\release\deps\unicase-d3c4b3bb9f26e212.d: C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\lib.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\ascii.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\mod.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\map.rs
+
+C:\WSGTA\universal-or-strategy\routa-tools\target\release\deps\libunicase-d3c4b3bb9f26e212.rlib: C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\lib.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\ascii.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\mod.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\map.rs
+
+C:\WSGTA\universal-or-strategy\routa-tools\target\release\deps\libunicase-d3c4b3bb9f26e212.rmeta: C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\lib.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\ascii.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\mod.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\map.rs
+
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\lib.rs:
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\ascii.rs:
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\mod.rs:
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\unicase-2.9.0\src\unicode\map.rs:

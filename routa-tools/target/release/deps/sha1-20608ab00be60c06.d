@@ -1,0 +1,10 @@
+C:\WSGTA\universal-or-strategy\routa-tools\target\release\deps\sha1-20608ab00be60c06.d: C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\lib.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\soft.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\x86.rs
+
+C:\WSGTA\universal-or-strategy\routa-tools\target\release\deps\libsha1-20608ab00be60c06.rlib: C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\lib.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\soft.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\x86.rs
+
+C:\WSGTA\universal-or-strategy\routa-tools\target\release\deps\libsha1-20608ab00be60c06.rmeta: C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\lib.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\soft.rs C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\x86.rs
+
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\lib.rs:
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress.rs:
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\soft.rs:
+C:\Users\Mohammed\ Khalid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sha1-0.10.6\src\compress\x86.rs:

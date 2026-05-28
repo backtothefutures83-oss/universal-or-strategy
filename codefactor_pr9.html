@@ -1,0 +1,997 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="h-100">
+<head>
+    <title>fix(quality): PR #1A - Event handlers, empty catch, switch defaults (30 issues) - #9 - universal-or-strategy</title>
+<meta name="fragment" content="!">
+<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Quality software, faster." />
+<link rel="shortcut icon" href="/Content/img/favicon.png?v=3">
+<meta name="google-site-verification" content="vMXF-XmKqv70y5A21UuMyHxhz6G10slU89r0dtCBigE" />
+    
+    <noscript>
+        <iframe src="//www.googletagmanager.com/ns.html?id=GTM-MKX4LC"
+                height="0" width="0" style="display:none;visibility:hidden"></iframe>
+    </noscript>
+    <script>
+            (function (w, d, s, l, i) {
+            w[l] = w[l] || []; w[l].push({
+                'gtm.start':
+                    new Date().getTime(), event: 'gtm.js'
+            }); var f = d.getElementsByTagName(s)[0],
+                j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                    '//www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+            })(window, document, 'script', 'dataLayer', 'GTM-MKX4LC');</script>
+
+    
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-60835575-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-60835575-1');
+    </script>
+
+    <script src="/Scripts/modernizr-custom.min.js?v=SPiYRp1dt6WeDSZOh54ODXMyN5Yqb8fV9gtTDlJvqhY"></script>
+<script>
+    var isBot = /bot|googlebot|crawler|spider|robot|crawling|org_bot/i.test(navigator.userAgent);
+    if (!isBot && (!Modernizr.cookies || !Modernizr.eventlistener || !Modernizr.es5function)) {
+        window.location.href = '/unsupported';
+    }
+</script>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,500,700|Open+Sans:400,600,700" rel="stylesheet">
+    
+    
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" crossorigin="anonymous" />
+<meta name="x-stylesheet-fallback-test" content="" class="sr-only" /><script>!function(a,b,c,d){var e,f=document,g=f.getElementsByTagName("SCRIPT"),h=g[g.length-1].previousElementSibling,i=f.defaultView&&f.defaultView.getComputedStyle?f.defaultView.getComputedStyle(h):h.currentStyle;if(i&&i[a]!==b)for(e=0;e<c.length;e++)f.write('<link href="'+c[e]+'" '+d+"/>")}("position","absolute",["/Bundles/bootstrap.min.css"], "rel=\u0022stylesheet\u0022 crossorigin=\u0022anonymous\u0022 ");</script>
+        <link rel="stylesheet" href="/Bundles/site.min.css?v=aulp5jBbKqAWeQx7E7_gbxo83X6EZ60n08uwHHWcfBc" />
+    
+    
+    
+
+    <link rel="stylesheet" href="/Bundles/RepoPages.min.css?v=AzVH7cKDJijgk3UcoHa3tNqA39hqc55QoZi_h45TvC8" />
+
+    
+
+    <link rel="stylesheet" href="/Bundles/RepoIssues.min.css?v=7y6x_61BQw-kQMeOG64iDIYE95jL9Jj7KrxFDJC1v2k" />
+
+    
+
+    <link rel="stylesheet" href="/Bundles/RepoPulls.min.css?v=xSdfFmBI7wsNnsru5Amn3QWB87NZbRnZbUNZQlPm8yg" />
+
+    
+
+    <link rel="stylesheet" href="/Bundles/highlight.min.css?v=euvYmDIsWxaE55HkDI_Vcp1M1jAFht4QmdbfvWAHFvI" />
+
+
+</head>
+<body ng-app="App" class="d-flex flex-column h-100">
+        <main role="main" class="flex-shrink-0">
+            <div class="container-guest">
+    <div class="container" ng-controller="HeaderCtrl">
+        <nav class="navbar navbar-expand-md navbar-light text-sm navbar-guest" style="z-index: 2">
+            <a class="navbar-brand" href="/" aria-label="Homepage ">
+                <svg xmlns="http://www.w3.org/2000/svg" width="147" height="22" viewBox="0 0 147 22" class="d-inline-block align-top">
+                    <defs>
+                        <linearGradient id="a" x1="-.002%" x2="100.002%" y1="49.998%" y2="49.998%">
+                            <stop offset="0%" stop-color="#0AA1A5" />
+                            <stop offset="100%" stop-color="#50D690" />
+                        </linearGradient>
+                        <linearGradient id="b" x1="-.002%" x2="100.002%" y1="49.998%" y2="49.998%">
+                            <stop offset="0%" stop-color="#0AA1A5" />
+                            <stop offset="100%" stop-color="#50D690" />
+                        </linearGradient>
+                    </defs>
+                    <g fill="none" fill-rule="evenodd">
+                        <path fill="#232344" d="M39.497 9.095c-1.217 0-2.615.59-2.615 5.18s1.398 5.178 2.615 5.178c.757 0 1.767-.227 2.272-1.999.146-.511.64-.84 1.166-.817.77.03 1.29.793 1.071 1.54-.684 2.34-2.169 3.483-4.509 3.483-3.386 0-4.962-2.347-4.962-7.386 0-5.038 1.576-7.385 4.962-7.385 2.34 0 3.825 1.142 4.51 3.482.218.747-.302 1.51-1.072 1.541-.526.021-1.02-.307-1.166-.818-.505-1.771-1.515-1.999-2.272-1.999zm13.54 6.954c0-2.3-.79-3.467-2.35-3.467-1.558 0-2.348 1.167-2.348 3.467 0 2.299.79 3.465 2.349 3.465 1.558 0 2.349-1.166 2.349-3.465zm-2.35-5.612c3.003 0 4.657 1.993 4.657 5.612 0 3.618-1.654 5.61-4.656 5.61-3.003 0-4.656-1.992-4.656-5.61 0-3.62 1.653-5.612 4.656-5.612zm13.54 5.364c0-1.985-.93-3.219-2.43-3.219-1.973 0-2.268 2.171-2.268 3.467 0 1.294.295 3.465 2.268 3.465 1.5 0 2.43-1.233 2.43-3.218V15.8zm0-4.198V7.239c0-.627.503-1.135 1.123-1.135s1.123.508 1.123 1.135v13.13c0 .577-.463 1.044-1.032 1.044-.719-.015-1.038-.393-1.072-1.03-.632.839-1.596 1.277-2.837 1.277-2.699 0-4.31-2.098-4.31-5.611 0-3.462 1.644-5.612 4.29-5.612 1.14 0 2.076.407 2.715 1.166zm7.119 3.166h4.55c-.267-1.47-1.014-2.187-2.275-2.187-1.26 0-2.007.716-2.275 2.187zm6.886.08c.01.075.017.15.023.223.079.922-.627 1.718-1.543 1.718h-5.437c.165 1.857.962 2.725 2.49 2.725.743 0 1.304-.226 1.697-.651.629-.679 1.136-.923 1.806-.605.582.275.763.891.373 1.499-.8 1.245-2.118 1.902-3.897 1.902-3.095 0-4.799-2-4.799-5.632 0-3.606 1.66-5.592 4.676-5.592 2.67 0 4.27 1.556 4.611 4.414zm4.13 6.564c-.587 0-1.062-.48-1.062-1.073V8.208c0-.592.475-1.072 1.061-1.072h6.576c.587 0 1.062.48 1.062 1.072 0 .593-.475 1.073-1.062 1.073h-5.35v3.796h4.125c.586 0 1.061.481 1.061 1.073 0 .593-.475 1.073-1.061 1.073h-4.125v5.117c0 .592-.476 1.073-1.063 1.073h-.163zm15.987-4.374h-2.468c-.867 0-1.9.218-1.9 1.258 0 1.06.986 1.218 1.573 1.218 1.55 0 2.73-1.056 2.795-2.476zm-2.04-6.603c2.806 0 4.289 1.392 4.289 4.023v5.892c0 .587-.471 1.06-1.05 1.058-.801-.016-1.081-.466-1.063-1.162-.763.907-1.91 1.413-3.259 1.413-2.157 0-3.552-1.312-3.552-3.342 0-2.141 1.494-3.321 4.207-3.321h2.47v-.434c0-1.351-.662-1.981-2.083-1.981-.82 0-1.405.196-1.713.636a1.629 1.629 0 0 0-.131.22c-.197.394-.583.65-1.018.65-.808 0-1.38-.841-1.047-1.584a3.01 3.01 0 0 1 .208-.389c.592-.923 1.684-1.679 3.742-1.679zm11.824 9.079c1.12 0 1.698-.763 1.972-1.321.177-.361.55-.577.948-.577h.22c.786 0 1.301.834.956 1.549-.723 1.618-2.143 2.494-4.096 2.494-3.002 0-4.656-1.994-4.656-5.611 0-3.57 1.61-5.558 4.536-5.612 1.683-.03 3.166.902 4.03 2.282l.033.057c.44.74-.112 1.684-.966 1.684-.423 0-.815-.237-.995-.624a2.579 2.579 0 0 0-.196-.349c-.402-.593-.988-.905-1.786-.905-1.558 0-2.348 1.167-2.348 3.467s.79 3.466 2.348 3.466zm13.785-1.837c0-.697.32-1.084 1.056-1.073.635 0 1.15.52 1.15 1.162v.118c0 2.46-1.443 3.846-3.946 3.773-1.988-.059-3.55-1.764-3.55-3.773v-5.118h-1.52c-.57 0-1.032-.466-1.032-1.041 0-.576.462-1.042 1.031-1.042h1.626l.028-2.519c.007-.57.466-1.029 1.031-1.029h.052c.569 0 1.03.467 1.03 1.042v2.506h3.483c.57 0 1.03.466 1.03 1.042 0 .575-.46 1.041-1.03 1.041h-3.482v4.91c0 1.63.808 1.838 1.511 1.838 1.06 0 1.532-.566 1.532-1.837zm11.17-1.63c0-2.3-.79-3.466-2.349-3.466-1.559 0-2.349 1.167-2.349 3.467 0 2.299.79 3.465 2.35 3.465 1.557 0 2.347-1.166 2.347-3.465zm-2.349-5.611c3.003 0 4.656 1.993 4.656 5.612 0 3.618-1.653 5.61-4.656 5.61-3.003 0-4.656-1.992-4.656-5.61 0-3.62 1.653-5.612 4.656-5.612zm12.641 0c2.265 0 3.513 1.48 3.513 4.167v.536c0 .627-.503 1.135-1.123 1.135s-1.123-.508-1.123-1.135v-.33c0-1.478-.57-2.228-1.695-2.228-1.395 0-2.37 1.103-2.37 2.683v5.014c0 .626-.502 1.134-1.122 1.134-.62 0-1.123-.508-1.123-1.134v-8.524c0-.567.44-1.063 1-1.07.85-.013 1.097.45 1.108 1.096.684-.873 1.699-1.345 2.935-1.345z" />
+                        <path fill="#F44A6A" d="M4.753 2.4c0 1.326-1.064 2.4-2.376 2.4C1.064 4.8 0 3.726 0 2.4 0 1.074 1.064 0 2.377 0c1.312 0 2.376 1.074 2.376 2.4zm0 8.462c0 1.325-1.064 2.4-2.376 2.4-1.313 0-2.377-1.075-2.377-2.4 0-1.326 1.064-2.4 2.377-2.4 1.312 0 2.376 1.074 2.376 2.4zm0 8.461c0 1.326-1.064 2.4-2.376 2.4-1.313 0-2.377-1.074-2.377-2.4 0-1.326 1.064-2.4 2.377-2.4 1.312 0 2.376 1.074 2.376 2.4z" />
+                        <path fill="url(#a)" d="M10.128 0C8.816 0 7.752 1.074 7.752 2.4c0 1.326 1.064 2.4 2.376 2.4h9c1.312 0 2.375-1.074 2.375-2.4 0-1.326-1.063-2.4-2.376-2.4h-9z" />
+                        <path fill="url(#b)" d="M10.128 8.461c-1.312 0-2.376 1.075-2.376 2.4 0 1.326 1.064 2.401 2.376 2.401h5.138c1.312 0 2.376-1.075 2.376-2.4 0-1.326-1.064-2.4-2.376-2.4h-5.138z" />
+                    </g>
+                </svg>
+            </a>
+            <button class="navbar-toggler" type="button" data-toggle="modal" data-target="#loginModal" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon "></span>
+            </button>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav mx-auto text-uppercase">
+                        <li class="nav-item">
+                            <a class="nav-link " href="/features">Features</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link " href="/pricing">Pricing</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link " href="/contact">Contact</a>
+                        </li>
+                </ul>
+                <ul class="nav login float-right ">
+                        <span>Login with:</span>
+<form action="/account/externallogin" method="post">                                <button type="submit" name="provider" value="GitHub" class="btn btn-light rounded-circle" analytics-on analytics-category="Login with"><img src="/Content/img/logo-github.svg" alt="GitHub" /></button>
+                                <button type="submit" name="provider" value="Bitbucket" class="btn btn-light rounded-circle" analytics-on analytics-category="Login with"><img src="/Content/img/logo-bitbucket.svg" alt="Bitbucket" /></button>
+<input name="__RequestVerificationToken" type="hidden" value="CfDJ8LfkDTMLebJEh6QF38-iDYQ-2UUcWXdUU1oY0atYnKpzBoRxtQFp0HTvQYRkvQXvNssT7pff0_PGp-nXb8XGnnQhIQODJ8T-jBxA9cyPWmsebaOwX2pxt0oqNDIWH67zDCbGkLls4fdrvxpx7oKENY4" /></form>                </ul>
+
+            </div>
+        </nav>
+        <!-- Modal -->
+        <div class="modal" id="loginModal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="margin-right: -10px;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding-top: 22.5%;">
+                        <ul class="text-center text-uppercase">
+                                <li><a href="/features">Features</a></li>
+                                <li><a href="/pricing">Pricing</a></li>
+                                <li><a href="/contact">Contact</a></li>
+                        </ul>
+                            <div class="text-center" style="padding-top: 78px;">
+                                <div class="text-center" style="margin-bottom: 1rem">Login with:</div>
+<form action="/account/externallogin" method="post">                                        <div class="row justify-content-center">
+                                            <div class="col-9 modal-col">
+                                                <button type="submit" name="provider" value="GitHub" class="btn btn-light btn-block border modal-button" analytics-on analytics-category="Login with (modal)"><img class="float-left" alt="GitHub (modal)" style="padding-left: 4px; padding-top: 1px;" src="/Content/img/logo-github.svg" /> <span style="margin-left: -18px;">GitHub</span></button>
+                                            </div>
+                                        </div>
+                                        <div class="row justify-content-center">
+                                            <div class="col-9 modal-col">
+                                                <button type="submit" name="provider" value="Bitbucket" class="btn btn-light btn-block border modal-button" analytics-on analytics-category="Login with (modal)"><img class="float-left" alt="Bitbucket (modal)" style="padding-left: 4px; padding-top: 1px;" src="/Content/img/logo-bitbucket.svg" /> <span style="margin-left: -18px;">Bitbucket</span></button>
+                                            </div>
+                                        </div>
+<input name="__RequestVerificationToken" type="hidden" value="CfDJ8LfkDTMLebJEh6QF38-iDYQ-2UUcWXdUU1oY0atYnKpzBoRxtQFp0HTvQYRkvQXvNssT7pff0_PGp-nXb8XGnnQhIQODJ8T-jBxA9cyPWmsebaOwX2pxt0oqNDIWH67zDCbGkLls4fdrvxpx7oKENY4" /></form>                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div ng-cloak>
+    <div ng-show="message.show" ng-controller="StatusMessageCtrl" class="alert alert-{{message.type}} alert-dismissible show" role="alert">
+        <svg ng-show="message.type!='danger'" width="36" height="36" viewBox="0 0 36 36">
+            <g fill="none" fill-rule="evenodd">
+                <g transform="translate(6 6)">
+                    <mask id="c-info" fill="#fff">
+                        <circle cx="12" cy="12" r="12" />
+                    </mask>
+                    <g fill="#fff" mask="url(#c-info)">
+                        <path d="M-6-6h36v36H-6z" />
+                    </g>
+                </g>
+                <g transform="translate(15 11)">
+                    <mask id="p-info" fill="#fff">
+                        <path d="M4 10.5h1a1 1 0 0 1 0 2H1a1 1 0 0 1 0-2h1V6H1a1 1 0 1 1 0-2h3v6.5zM2.5 3a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
+                    </mask>
+                    <g fill="#7e7eb9" mask="url(#p-info)">
+                        <path d="M-15-11h36v36h-36z" />
+                    </g>
+                </g>
+            </g>
+        </svg>
+        <svg ng-show="message.type=='danger'" width="36" height="36" viewBox="0 0 36 36">
+            <g fill="none" fill-rule="evenodd">
+                <g transform="translate(6 5)">
+                    <mask id="p-warn-1" fill="#fff">
+                        <path id="a" d="M14.12 2.48l8.394 15.06a3 3 0 0 1-2.62 4.46H3.106a3 3 0 0 1-2.62-4.46L8.88 2.48a3 3 0 0 1 5.24 0z" />
+                    </mask>
+                    <g fill="#fff" mask="url(#p-warn-1)">
+                        <path d="M-6-5h36v36H-6z" />
+                    </g>
+                </g>
+                <g transform="translate(16 12)">
+                    <mask id="p-warn-2" fill="#fff">
+                        <path id="c" d="M1.5 0A1.5 1.5 0 0 1 3 1.5v4a1.5 1.5 0 0 1-3 0v-4A1.5 1.5 0 0 1 1.5 0zm0 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
+                    </mask>
+                    <g fill="#fa7b7b" mask="url(#p-warn-2)">
+                        <path d="M-16-12h36v36h-36z" />
+                    </g>
+                </g>
+            </g>
+        </svg>
+        <span ng-bind-html="message.text"></span>
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close" ng-click="message.show = false">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+</div>
+
+<div id="repo-stats">
+    <div class="container container-sm">
+        <div class="row no-gutters">
+            <div class="col-md-6 order-1 order-md-0 my-auto">
+                <div class="d-inline-block" style="border-radius: 32.5px; background-color: #efeffc; width: 26px; height: 26px; position: relative; line-height: 26px">
+                        <img src="/Content/img/repo-public.svg" style="position: relative; margin-left: 2px; margin-bottom: 3px;" alt=""/>
+                </div>
+                <div aria-label="Default branch main" class="d-inline-block" style="border-radius: 24.5px; background-color: #efeffc; height: 26px; width: fit-content; padding-right: 15px; padding-left: 8px; position: relative">
+                    <img src="/Content/img/repo-branch.svg" alt=""/>
+                    <span id="branch-name" class="text-uppercase">main</span>
+                </div>
+                <div class="d-inline-block">
+                    <a id="repo-name" href="/repository/github/malhitticrypto-debug/universal-or-strategy">universal-or-strategy</a>
+                </div>
+            </div>
+            <div class="col-md-6 justify-content-end d-flex order-0 order-md-1">
+                <div  class="d-inline-block badge-wrapper">
+                    <img id="repo-badge" src="/Content/badges/F.svg" alt="Repository badge with F rating" data-toggle="modal" data-target="#badgeTexts" analytics-on="click" analytics-category="Repo Header" analytics-event="Badge"/>
+                </div>
+                <a class="repo-header-circle d-inline-block tooltip-default" title="View on GitHub" href="https://github.com/malhitticrypto-debug/universal-or-strategy" target="_blank" rel="noopener noreferrer" analytics-on analytics-category="Repo Header" analytics-event="View on GitHub">
+                    <img src="/Content/img/repo-provider-link-github.svg" alt="View on GitHub"/>
+                </a>
+            </div>
+        </div>
+        <hr style="color: #fafafc; margin-top: 27px; margin-bottom: 15px;"/>
+        <ul class="list-inline owl-carousel">
+            <li class="list-inline-item">
+                <a class="repo-header-item main-link " href="/repository/github/malhitticrypto-debug/universal-or-strategy/issues" analytics-on analytics-category="Repo Stats Header" analytics-event="Issues">
+                    <span class="number">5,568</span>
+                    <span class="text">issues</span>
+                </a>
+            </li>
+                <li class="list-inline-item">
+                    <a class="repo-header-item main-link selected" href="/repository/github/malhitticrypto-debug/universal-or-strategy/pulls" analytics-on analytics-category="Repo Stats Header" analytics-event="Pulls">
+                        <span class="number">2</span>
+                        <span class="text">pull requests</span>
+                    </a>
+                </li>
+            <li class="list-inline-item">
+                <a class="repo-header-item main-link " href="/repository/github/malhitticrypto-debug/universal-or-strategy/files" analytics-on analytics-category="Repo Stats Header" analytics-event="Files">
+                    <span class="number">207</span>
+                    <span class="text">files</span>
+                </a>
+            </li>
+            <li class="list-inline-item">
+                <a class="repo-header-item main-link " href="/repository/github/malhitticrypto-debug/universal-or-strategy/branches" analytics-on analytics-category="Repo Stats Header" analytics-event="Branches">
+                    <span class="number">1</span>
+                    <span class="text">active branch</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+<!-- Modal -->
+<div class="modal" id="badgeTexts" ng-controller="BadgeCtrl" ng-init="init([{&quot;Name&quot;:&quot;Markdown&quot;,&quot;Text&quot;:&quot;[![CodeFactor](https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy/badge)](https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy)&quot;},{&quot;Name&quot;:&quot;HTML&quot;,&quot;Text&quot;:&quot;&lt;a href=\&quot;https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy\&quot;&gt;&lt;img src=\&quot;https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy/badge\&quot; alt=\&quot;CodeFactor\&quot; /&gt;&lt;/a&gt;&quot;},{&quot;Name&quot;:&quot;Textile&quot;,&quot;Text&quot;:&quot;!https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy/badge!:https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy&quot;},{&quot;Name&quot;:&quot;RDoc&quot;,&quot;Text&quot;:&quot;{&lt;img src=\&quot;https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy/badge\&quot; alt=\&quot;CodeFactor\&quot; /&gt;}[https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy]&quot;},{&quot;Name&quot;:&quot;reST&quot;,&quot;Text&quot;:&quot;.. image:: https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy/badge\n   :target: https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy\n   :alt: CodeFactor&quot;},{&quot;Name&quot;:&quot;Image URL&quot;,&quot;Text&quot;:&quot;https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy/badge&quot;}])" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-body">
+                <button type="button" class="close" data-dismiss="modal" analytics-on analytics-category="Repo Badge" analytics-event="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h1>CodeFactor Rating F</h1>
+                <ul class="list-inline">
+                    <li class="list-inline-item" ng-repeat="format in formats">
+                        <a ng-click="setFormat(format)" class="format" ng-class="{'selected-link': activeFormat.Name == format.Name}" analytics-on analytics-category="Repo Badge">{{format.Name}}</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <textarea class="form-control" rows="3" ng-model="activeFormat.Text" readonly="" select-on-click></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="container container-sm" style="margin-top: 30px">
+    <div class="row">
+        <div class="col-12 my-auto text-break">
+            <span class="badge badge-Open">
+                <img src="/Content/img/pull-request-white.svg" alt="" style="margin-right: 3px" />
+                Open
+            </span>
+            <h2 class="page-title d-inline-block">
+                fix(quality): PR #1A - Event handlers, empty catch, switch defaults (30 issues)
+                <a class="page-title-link" href="https://github.com/malhitticrypto-debug/universal-or-strategy/pull/9" target="_blank" rel="noopener noreferrer" analytics-on analytics-category="Pull" analytics-event="View on GitHub">
+                    #9
+                </a>
+            </h2>
+        </div>
+    </div>
+    <div class="card-info">
+        <span class="author">
+                <img class="rounded-circle" style="margin-right: 13px;" src="https://avatars.githubusercontent.com/u/283004077?v=4" alt="Author avatar" height="26" width="26">
+            malhitticrypto-debug
+        </span>
+        <span class="text"> wants to merge changes into </span><span class="badge badge-neutral badge-branch"><img src="/Content/img/branch.svg" alt="" />main</span><span class="text"> from </span><span class="badge badge-neutral badge-branch"><img src="/Content/img/branch.svg" alt="" />epic-quality-critical</span>
+            <a href="/repository/github/malhitticrypto-debug/universal-or-strategy/pull/fixed/9" class="badge badge-fixed float-md-right" analytics-on analytics-category="Pull"><span class="badge-count">8</span> fixed issues</a>
+            <a href="/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9" class="badge badge-new float-md-right" analytics-on analytics-category="Pull"><span class="badge-count">35</span> new issues</a>
+    </div>
+        <div ng-controller="CodeFileCtrl">
+            <nav ng-cloak class="navbar navbar-issues d-none d-sm-flex" ng-if="model.Filter.TotalCount > 0 || model.Filter.SwitchView.Name == 'Active'">
+    <ul class="nav" style="padding-right: 0">
+        <li ng-cloak class="nav-item" ng-if="model.Filter.SwitchView.Name == 'Active'">
+            <a href="{{model.Filter.SwitchView.Url}}" class="link-leading" style="line-height: 33px; margin-right: 22px;" rel="nofollow" analytics-on analytics-category="Issues Filter" analytics-event="{{model.Filter.SwitchView.Name}}">
+                <img src="/Content/img/arrow-left.svg" alt=""/><span style="margin-left: 10px; margin-right: 5px;">Active issues</span>
+            </a>
+        </li>
+        <li ng-cloak class="nav-item" ng-if="model.NewIssuesUrl != null">
+            <a href="{{model.NewIssuesUrl}}" class="link-leading" style="line-height: 33px; margin-right: 22px;" rel="nofollow" analytics-on analytics-category="Issues Filter" analytics-event="New issues">
+                <img src="/Content/img/arrow-left.svg" alt=""/><span style="margin-left: 10px; margin-right: 5px;">New issues</span>
+            </a>
+        </li>
+        <li ng-cloak ng-if="model.Filter.Langs.length > 0 && (model.Filter.Langs.length > 1 || categoriesWithCounts.length > 1)" class="dropdown nav-item">
+            <a class="nav-link dropdown-toggle" ng-class="{'active': areLangsActive()}" style="padding-right: 44px; padding-left: 18px;" aria-expanded="false" data-toggle="dropdown" rel="nofollow" analytics-on analytics-category="Issues Filter" analytics-event="All">All Languages</a>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" ng-click="setLangFilter()" rel="nofollow">All</a></li>
+                <li ng-repeat="langItem in model.Filter.Langs">
+                    <a class="dropdown-item variable-text" ng-class="{'active': isLangActive(langItem)}" href="#" ng-click="setLangFilter(langItem)">
+                        <span ng-bind-html="langItem.Name"></span>
+                        <strong class="count">{{langItem.Count}}</strong>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        <li ng-cloak class="dropdown nav-item" ng-repeat="filterItem in categoriesWithCounts">
+            <a class="nav-link dropdown-toggle" ng-class="{'active': isCategoryActive(filterItem), 'fixable': model.Filter.FixableCountVisible && filterItem.Fixable}" aria-expanded="false" data-toggle="dropdown" rel="nofollow" analytics-on analytics-category="Issues Filter" analytics-event="{{filterItem.Name}}">
+                <img ng-src="{{getAutofixImageUrl(filterItem)}}" alt="" ng-if="model.Filter.FixableCountVisible && filterItem.Fixable" width="21" style="margin-bottom: 3px; margin-right: 7px;" title="Autofix available"/>&nbsp;{{filterItem.Name}} <span class="total">{{filterItem.Count}}</span>
+            </a>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" ng-style="{'padding-left': model.Filter.FixableCountVisible && filterItem.Fixable ? '38px' : '10px'}" ng-click="setCategoryFilter(filterItem, filterItem.Name)" rel="nofollow">All</a></li>
+                <li ng-repeat="patternItem in filterItem.Items">
+                    <a class="dropdown-item variable-text" ng-class="{'active': isGroupActive(patternItem)}" href="#" ng-click="setCategoryFilter(patternItem, filterItem.Name, patternItem.Id)" 
+                       ng-style="{'padding-right': '{{::getPaddingByIssueCount(patternItem.Count)}}px', 'padding-left': model.Filter.FixableCountVisible && filterItem.Fixable ? '38px' : '10px'}">
+                        <img src="/Content/img/issues-autofix.svg" alt="" ng-if="model.Filter.FixableCountVisible && patternItem.Fixable && patternItem.SupportsGroupAutofix" width="21" style="margin-left: -28px; margin-right: 4px;" title="Autofix available"/>
+                        <img src="/Content/img/issues-autofix-muted.svg" alt="" ng-show="model.Filter.FixableCountVisible && patternItem.Fixable && !patternItem.SupportsGroupAutofix" width="21" style="margin-left: -28px; margin-right: 4px;" title="Autofix available (limited)"/>
+                        <span ng-bind-html="patternItem.Description"></span>
+                        <strong class="count">{{patternItem.Count}}</strong>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        <li ng-cloak class="nav-item clear-filters" ng-show="model.Filter.Url != model.Filter.AppliedUrl">
+            <a href="{{model.Filter.Url}}">Clear all filters</a>
+        </li>
+    </ul>
+</nav>
+<div ng-cloak class="row no-gutters" style="margin-top: 35px; margin-bottom: 16px;">
+    <div class="col-6 col-sm-12 col-md-5">
+        <div class="d-inline-block issues-text">
+            <h1 class="d-inline" style="vertical-align: middle; font-size: 17px" ng-bind-html="getSearchHeaderText(filteredIssues.length)"></h1>
+        </div>
+    </div>
+    <div class="col-6 col-sm-12 col-md-7 text-right">
+        <div ng-show="filteredIssues.length > 0" class="d-inline-block d-sm-none">
+            <img src="/Content/img/issues-filter.svg" alt="" class="" style="margin-top: 7px;" data-toggle="modal" data-target="#filterIssues" analytics-on="click" analytics-category="Issue Header" analytics-event="Filter" />
+            <span ng-show="getIssueFilterCount() > 0" class="badge badge-filter-count" data-toggle="modal" data-target="#filterIssues">{{getIssueFilterCount()}}</span>
+        </div>
+        <button ng-if="!matchedAutofixFilter.CreatedPullUrl && !matchedAutofixFilter.LastWarning" type="button"
+                ng-show="model.Filter.FixableCountVisible && model.AddManualAutofixLink.IsVisible && model.Filter.FixableCount > 0 && !isAutofixInProcess()"
+                class="link-cta d-none d-sm-inline tooltip-default" title="{{getAutofixLimitedText()}}" style="padding-right: 20px;" ng-click="addManualAutofix()" ng-class="{'disabled': !canApplyFixForCurrentFilter() || model.AutofixFilter.scheduling}">
+            <img ng-if="!model.AutofixFilter.scheduling" alt="" src="/Content/img/issues-autofix.svg" width="21" style="margin-right: 7px;" title="Autofix available" />
+            <img ng-if="model.AutofixFilter.scheduling" alt="" src="/Content/img/loading-arrow.svg" width="14" class="fa-spin" style="margin-right: 7px;" />
+            <span ng-if="model.PullRequestExternalId == null">Create Fix PR</span>
+            <span ng-if="model.PullRequestExternalId != null">Create Fix Commit</span>
+        </button>
+        <span ng-show="isAutofixInProcess()" class="d-none d-sm-inline" style="font-size: 13px; color: #2a0f4d; vertical-align: middle; padding: 8.5px 15px;">
+            <img src="/Content/img/issues-autofix-muted.svg" alt="" width="21" style="margin-bottom: 2px;" />
+            <span style="margin-left: 7px; margin-right: 3px;">Autofix is being processed.</span>
+            <img src="/Content/img/repo-settings-check.svg" alt="" style="margin-bottom: 2px;"/>
+        </span>
+        <div ng-if="matchedAutofixFilter.CreatedPullUrl || matchedAutofixFilter.LastWarning"
+             ng-show="model.Filter.FixableCountVisible && model.AddManualAutofixLink.IsVisible && model.Filter.FixableCount > 0 && !isAutofixInProcess()"
+             class="btn-group d-none d-sm-inline-flex">
+            <button class="btn btn-fix disabled" ng-if="matchedAutofixFilter.LastWarning">
+                <span class="label label-danger">
+                    <img src="/Content/img/issues-autofix-muted.svg" alt="" width="21" style="margin-bottom: 2px;" />
+                    <span>{{matchedAutofixFilter.LastWarning}}</span>
+                    <img src="/Content/img/repo-settings-warn.svg" alt="" width="21" height="21" style="margin-bottom: 1px;" />
+                </span>
+            </button>
+            <a ng-if="matchedAutofixFilter.CreatedPullUrl && !matchedAutofixFilter.LastWarning" href="{{matchedAutofixFilter.CreatedPullUrl}}" target="_blank"
+               rel="nofollow noopener noreferrer" class="btn btn-fix" style="padding-left: 10px; padding-right: 16px; padding-top: 6px; padding-bottom: 4px;">
+                <img src="/Content/img/pull-request.svg" alt="" width="21" style="margin-right: 9px; vertical-align: bottom; line-height: 13px;" />
+                <span>View latest PR</span>
+            </a>
+            <a href="#" class="btn btn-fix dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span class="sr-only">Toggle Dropdown</span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right dropdown-menu-fix">
+                <a ng-if="matchedAutofixFilter.CreatedPullUrl && matchedAutofixFilter.LastWarning" class="dropdown-item" href="{{matchedAutofixFilter.CreatedPullUrl}}" target="_blank" rel="nofollow noopener noreferrer">
+                    <img src="/Content/img/pull-request.svg" alt="" width="21" style="margin-right: 9px; vertical-align: bottom; line-height: 13px;" />
+                    <span>View latest PR</span>
+                </a>
+                <a ng-show="model.Filter.FixableCountVisible && model.AddManualAutofixLink.IsVisible && model.Filter.FixableCount > 0" class="dropdown-item" href="#" ng-click="addManualAutofix()">
+                    <img src="/Content/img/issues-autofix.svg" alt="" width="21" style="margin-right: 9px;" title="Autofix available" />
+                    <span ng-if="model.PullRequestExternalId == null">Create Fix PR</span><span ng-if="model.PullRequestExternalId != null">Create Fix Commit</span>
+                </a>
+            </div>
+        </div>
+        <div class="d-inline" ng-if="(model.AllowSort && filteredIssues.length > 1) || (model.Filter.PageCount <= 1 && (hasAvailableProviderIssues() || hasAvailableIssuesForComments())) || model.Filter.SwitchView.Count > 0 || model.FileExternalUrl != null || model.FileSourceViewUrl != null || model.NewIssuesUrl != null || model.FixedIssuesUrl != null">
+            <img src="/Content/img/menu-dots.svg" alt="" class="d-sm-none issues-menu" data-toggle="modal" data-target="#issuesActionsModal" analytics-on="click" analytics-category="Issue Header" analytics-event="Issues Actions" />
+            <button class="link-cta dropdown-toggle d-none d-sm-inline-block" href="#" role="button" id="issueActions" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Actions</button>
+            <div class="dropdown-menu dropdown-menu-right dropdown-menu-actions" aria-labelledby="issueActions">
+                <a href="#" ng-show="model.AllowSort && filteredIssues.length > 1" class="dropdown-item" ng-click="setSortBy('Weight')">
+                    <img class="sort-icon" src="/Content/img/issue-sort-weight.svg" alt="" />Sort issues by weight<img ng-show="model.Filter.IssueSort == 'Weight'" class="float-right" src="/Content/img/issue-sort-check.svg" alt="Checked" />
+                </a>
+                <a href="#" ng-show="model.AllowSort && filteredIssues.length > 1" class="dropdown-item" ng-click="setSortBy('MostRecent')">
+                    <img class="sort-icon" src="/Content/img/issue-sort-recent.svg" alt="" />See most recent first<img ng-show="model.Filter.IssueSort == 'MostRecent'" class="float-right" src="/Content/img/issue-sort-check.svg" alt="Checked" />
+                </a>
+                <div ng-if="model.AllowSort && filteredIssues.length > 1 && model.Filter.PageCount <= 1 && (hasAvailableProviderIssues() || hasAvailableIssuesForComments())" class="dropdown-divider"></div>
+                <a href="#" ng-if="model.Filter.PageCount <= 1 && hasAvailableProviderIssues()" class="dropdown-item"
+                   ng-click="setProviderIssuePreview(filteredIssues)" data-toggle="modal" data-target="#createIssue" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Group Issue">
+                    <img class="sort-icon" src="/Content/img/issue-new-issue.svg" alt="" />
+                    Create group issue on {{Issues[0].ProviderName}}
+                </a>
+                <a href="#" ng-if="model.Filter.PageCount <= 1 && hasAvailableIssuesForComments()" class="dropdown-item"
+                   ng-click="setProviderCommentPreview(filteredIssues)" data-toggle="modal" data-target="#createComment" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Group Comment">
+                    <img class="sort-icon" src="/Content/img/issue-new-comment.svg" alt="" />
+                    Create group comment on {{Issues[0].ProviderName}}
+                </a>
+                <div ng-show="model.AllowSort && filteredIssues.length > 1" ng-if="model.Filter.SwitchView.Count > 0 || model.FileSourceViewUrl != null || model.NewIssuesUrl != null || model.FixedIssuesUrl != null || model.FileExternalUrl != null" class="dropdown-divider"></div>
+                <a ng-if="model.Filter.SwitchView.Count > 0" href="{{model.Filter.SwitchView.Url}}" class="dropdown-item" ng-click="setProviderCommentPreview(filteredIssues)" analytics-category="Issue Header" analytics-event="Go to {{model.Filter.SwitchView.Name}} issues">
+                    <img class="sort-icon" ng-src="/Content/img/issue-{{model.Filter.SwitchView.Name}}.svg" alt="" />
+                    Go to {{model.Filter.SwitchView.Name}} issues
+                </a>
+                <a ng-if="model.FileSourceViewUrl != null" href="{{model.FileSourceViewUrl}}" class="dropdown-item">
+                    <img class="sort-icon" ng-src="/Content/img/source-code.svg" alt="" />
+                    Go to source view
+                </a>
+                <a ng-if="model.NewIssuesUrl != null" href="{{model.NewIssuesUrl}}" class="dropdown-item">
+                    <img class="sort-icon" ng-src="/Content/img/issue-new-issue.svg" alt="" />
+                    Go to new issues
+                </a>
+                <a ng-if="model.FixedIssuesUrl != null" href="{{model.FixedIssuesUrl}}" class="dropdown-item">
+                    <img class="sort-icon" ng-src="/Content/img/issue-new-issue.svg" alt="" />
+                    Go to fixed issues
+                </a>
+                <a ng-if="model.FileExternalUrl != null" href="{{model.FileExternalUrl}}" class="dropdown-item" target="_blank" rel="nofollow noopener noreferrer" analytics-on analytics-category="Code File Header" analytics-event="View file on {{model.ProviderName}}">
+                    <img class="sort-icon" ng-src="/Content/img/repo-provider-link-{{model.ProviderName}}.svg" style="width: 22px; height: 22px" alt=""/>
+                    View file on {{model.ProviderName}}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<div ng-cloak style="margin-top: 20px;">
+    <div class="card" ng-class="{'muted': issue.Actionable && !issue.Active }" ng-repeat="issue in (filteredIssues = (Issues | orderBy:issueOrderBy:1 | filter:{LangId: langId, Category:categoryFilter, GroupId:groupFilter, Hidden: false}:true)) track by issue.Key">
+        <div class="card-header" issue-header="issue"></div>
+        <div readup="issue"></div>
+        <div class="card-body" ng-class="{'readup-expanded': issue.showReadup}">
+            <div ng-if="model.ShowFoundIn && !issue.StartLine" style="margin-bottom: 12px; margin-top: 12px;">
+                <span class="text-muted">Found in</span>
+                <div class="d-inline"><a href="{{::getFileUrl(issue)}}" rel="nofollow">{{::issue.Locations[0].Path}}</a></div>
+            </div>
+            <div ng-if="issue.StartLine" style="margin-bottom: 12px; margin-top: 12px;">
+                <span class="text-muted">Found in </span>
+                <div ng-repeat="location in ::issue.Locations" class="d-inline">
+                    <a href="{{::getLocationUrl(issue, location)}}" rel="nofollow" analytics-on analytics-category="Issue Line">
+                        {{::location.Path}}:{{::location.StartLine}}<span ng-if="location.StartLine != location.EndLine">-{{::location.EndLine}}</span>
+                    </a>
+                    <span ng-show="!$last">, </span>
+                </div>
+            </div>
+            <div ng-if="::issue.StartLine" style="margin-bottom: 19px;">
+                <div class="line-numbers float-left">
+                    <a ng-repeat="lineNumber in range(issue.StartLine, issue.PreviewEndLine) track by lineNumber" href="{{::getLineUrl(issue, lineNumber)}}" rel="nofollow" analytics-on analytics-category="Issue Line" class="d-block">{{::lineNumber}}</a>
+                </div>
+                <pre class="code" ng-bind-html="getPreviewCode(issue)"></pre>
+                <div ng-if="!issue.loadedMore && model.ViewMoreLink.IsVisible && issue.EndLine - issue.StartLine >= model.PreviewLineCount" class="view-more">
+                    <button ng-if="!model.IsArchived" class="btn btn-default btn-block" btn-disabler ng-model="issue.loadingMore" ng-click="viewMore(issue)" analytics-on analytics-category="Issue" rel="nofollow">
+                        View more <img src="/Content/img/chevron-down-sm.svg?v=1" alt="" style="margin-left: 5px;" />
+                    </button>
+                    <button ng-if="model.IsArchived" class="btn btn-default btn-block disabled" uib-tooltip="Sorry, this repository was archived due to inactivity." analytics-on analytics-category="Issue (Archived)" rel="nofollow">View more</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div ng-cloak ng-if="model.Filter.PageCount > 1">
+    <ul class="pager list-unstyled list-inline">
+        <li ng-hide="model.Filter.CurrentPage == 1" class="list-inline-item previous float-left">
+            <a href="{{getPagerUrl(model.Filter.CurrentPage - 1)}}" analytics-on analytics-category="Issues">
+                <img src="/Content/img/chevron-left.svg?v=1" alt="" style="width: 14px; height: 14px; margin-right: 11px;" />
+                <span class="hidden-xs">Previous Page</span>
+            </a>
+        </li>
+        <li ng-hide="model.Filter.CurrentPage >= model.Filter.PageCount" class="list-inline-item next float-right">
+            <a href="{{getPagerUrl(model.Filter.CurrentPage + 1)}}" analytics-on analytics-category="Issues">
+                <span class="hidden-xs">Next Page</span>
+                <img src="/Content/img/chevron-right.svg" alt="" style="width: 14px; height: 14px; margin-left: 11px;" />
+            </a>
+        </li>
+    </ul>
+</div>
+<script type="text/ng-template" id="issueHeader.htm">
+    <div class="issue-header row" ng-click="showReadUp(issue, lineNumber);">
+        <div class="variable-text" ng-class="{'col-12 col-sm-8 col-md-9': model.NewProviderCommentLink.IsVisible, 'col-10 col-sm-11': !model.NewProviderCommentLink.IsVisible}">
+            <img ng-src="/Content/img/issue-severity-{{::issue.Severity}}.svg" alt="" class="img-issue-severity" title="Severity: {{issue.Severity}}" />
+            <img src="/Content/img/issues-autofix.svg" alt="" ng-if="issue.Fixable && issue.Actionable && issue.Active" style="width: 17px; height: 17px; margin-right: 4px; margin-left: -4px;" title="Autofix available" />
+            <span title="{{issue.Name}}" style="vertical-align: middle;" ng-bind-html="issue.Name"></span>
+            <span ng-if="issue.Metric" class="issue-metric"><span class="marked text-nowrap" ng-class="{'tooltip-default': issue.Metric.Description != ''}" data-placement="top" title="{{issue.Metric.Description}}">{{issue.Metric.Name}}</span> = {{issue.Metric.Value}}</span>
+            <img ng-if="issue.Actionable" src="/Content/img/menu-dots.svg" alt="" class="d-sm-none issue-menu" ng-click="showIssueActions([issue]); $event.stopPropagation();" analytics-on="click" analytics-category="Issue Header" analytics-event="Issue Actions" />
+        </div>
+        <div class="actions text-right d-none d-sm-block" ng-class="{'col-sm-4 col-md-3': model.NewProviderCommentLink.IsVisible, 'col-2 col-sm-1': !model.NewProviderCommentLink.IsVisible}">
+            <span class="icon-container">
+                <a ng-click="copyIssueText(issue, $event)" rel="nofollow noopener noreferrer">
+                  <img
+                    src="/Content/img/issue-copy-text.svg"
+                    uib-tooltip="{{ issue.copiedText ? 'Copied!' : 'Copy Issue to clipboard' }}"
+                    tooltip-class="copy-tooltip"
+                    tooltip-append-to-body="true"
+                    tooltip-is-open="issue.tooltipOpen"
+                    tooltip-trigger="'mouseenter'">
+                </a>
+            </span>
+            <span ng-if="issue.Actionable && model.NewProviderCommentLink.IsVisible && issue.Revision != null" class="icon-container">
+                <a ng-if="issue.CommentExternalUrl && !issue.creatingComment" ng-click="openInNewTab(issue.CommentExternalUrl, $event)" rel="nofollow noopener noreferrer" analytics-on analytics-category="Issue Header" analytics-event="View Comment">
+                    <img src="/Content/img/issue-new-comment.svg" class="tooltip-default" data-placement="top" title="View Comment on {{::issue.ProviderName}}" />
+                </a>
+                <img ng-if="!issue.Active" src="/Content/img/issue-new-comment.svg" class="tooltip-default" title="No need to Create Comment on {{::issue.ProviderName}} - this issue is already resolved" />
+                <img ng-if="!issue.CommentExternalUrl && !issue.creatingComment && issue.Active" src="/Content/img/issue-new-comment.svg" class="tooltip-default" ng-click="setProviderCommentPreview([issue], true); $event.stopPropagation();" data-placement="top" title="Create Comment on {{::issue.ProviderName}}" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Comment" />
+                <img ng-if="issue.creatingComment" src="/Content/img/loading-arrow.svg" class="fa-spin tooltip-default" data-placement="top" title="Creating Comment..." />
+            </span>
+            <span ng-if="issue.Actionable && model.NewProviderIssueLink.IsVisible" class="icon-container">
+                <a ng-if="issue.ExternalUrl && !issue.creatingIssue" ng-click="openInNewTab(issue.ExternalUrl, $event)" rel="nofollow noopener noreferrer" analytics-on analytics-category="Issue Header" analytics-event="View Issue"><img src="/Content/img/issue-new-issue.svg" class="tooltip-default" data-placement="top" title="View Issue on {{::issue.ProviderName}}" /></a>
+                <img ng-if="!issue.Active" src="/Content/img/issue-new-issue.svg" class="tooltip-default" title="No need to Create Issue on {{::issue.ProviderName}} - this issue is already resolved" />
+                <img ng-if="!issue.ExternalUrl && !issue.creatingIssue && issue.Active" src="/Content/img/issue-new-issue.svg" class="tooltip-default" ng-click="setProviderIssuePreview([issue], true); $event.stopPropagation();" data-placement="top" title="Create Issue on {{::issue.ProviderName}}" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Issue" />
+                <img ng-if="issue.creatingIssue" src="/Content/img/loading-arrow.svg" class="fa-spin tooltip-default" data-placement="top" title="Creating Issue..." />
+            </span>
+            <span ng-if="issue.Actionable && model.IgnoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Ignored'" class="icon-container">
+                <img ng-if="!issue.Active" src="/Content/img/issue-Ignored.svg" class="tooltip-default" title="No need to Ignore - this issue is already resolved" />
+                <img ng-if="!issue.ignoring && issue.Active" src="/Content/img/issue-Ignored.svg" class="tooltip-default" ng-click="setNewIgnore([issue], $event)"
+                     data-placement="top" title="Ignore" analytics-on="click" analytics-category="Issue Header" analytics-event="Ignore" />
+                <img ng-if="issue.ignoring" src="/Content/img/loading-arrow.svg" class="fa-spin tooltip-default" data-placement="top" title="Ignoring..." />
+                <div ng-if="model.FileListViewUrl == null" class="dropdown-menu dropdown-menu-actions dropdown-menu-right" aria-labelledby="ignoreIssue">
+                    <a class="dropdown-item" ng-click="ignore(model.IgnoreIssueLink.Url, 'single')" rel="nofollow">Ignore Issue</a>
+                    <a class="dropdown-item" ng-click="ignore(model.AddIgnoredIssuePatternLink.Url, 'similar')" rel="nofollow">Ignore Issues like this</a>
+                    <a class="dropdown-item" ng-click="ignore(model.IgnoreFileFromIssueLink.Url, 'file')" rel="nofollow">Ignore File</a>
+                </div>
+            </span>
+            <span ng-if="issue.Actionable && model.UnignoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Active'" class="icon-container">
+                <img ng-if="!issue.unignoring" src="/Content/img/issue-Active.svg" class="tooltip-default" ng-click="setNewIgnore([issue], $event)"
+                     data-placement="top" title="Unignore" analytics-on="click" analytics-category="Issue Header" />
+                <img ng-if="issue.unignoring" src="/Content/img/loading-arrow.svg" class="fa-spin tooltip-default" data-placement="top" title="Unignoring..." />
+                <div class="dropdown-menu dropdown-menu-actions dropdown-menu-right">
+                    <a class="dropdown-item" ng-click="unignore(model.UnignoreIssueLink.Url, 'single')" rel="nofollow">Unignore Issue</a>
+                    <a class="dropdown-item" ng-click="unignore(model.RemoveIgnoredIssuePatternLink.Url, 'similar')" rel="nofollow">Unignore Issues like this</a>
+                </div>
+            </span>
+            <span class="icon-container read-up-icon">
+                <img src="/Content/img/chevron-down.svg?v=1" width="22" ng-click="showReadUp(issue, lineNumber); $event.stopPropagation();" aria-expanded="false" analytics-on="click" analytics-category="Issue Header" analytics-event="Read Up"
+                     class="tooltip-default" data-placement="top" title="Read Up" />
+            </span>
+        </div>
+    </div>
+</script>
+<!-- Read-Up template -->
+<script type="text/ng-template" id="readup.htm">
+    <div ng-if="issue.showReadup" class="card-readup">
+        <div class="card-body">
+            <p class="author" ng-if="::issue.AuthorName">
+                <img ng-src="{{::issue.AuthorAvatarUrl}}" alt="Avatar for {{::issue.AuthorName}}" class="rounded-circle" style="margin-right: 10px;" />
+                <span class="source-text">
+                    <span ng-if="::model.AuthorUrl == null">{{::issue.AuthorName}}</span>
+                    <a ng-if="::model.AuthorUrl != null" href="{{::model.AuthorUrl}}">{{::issue.AuthorName}}</a><span class="text-muted"> {{::issue.AddedAt | timeAgo}}</span>
+                </span>
+            </p>
+            <p class="text" ng-bind-html="::IssueGroups[issue.GroupId].Description"></p>
+            <h2 ng-if="::IssueGroups[issue.GroupId].Links.length > 0" style="padding-left: 20px; margin-top: 25px;">External links</h2>
+            <ul>
+                <li ng-repeat="link in ::IssueGroups[issue.GroupId].Links">
+                    <a class="issue-link non-variable-text" href="{{::link}}" target="_blank" rel="nofollow noopener noreferrer" analytics-on analytics-category="Style - External link">{{::link}}</a>
+                </li>
+            </ul>
+            <blockquote ng-if="::IssueGroups[issue.GroupId].SourceConfigUrl">
+                Have your own <a href="{{::IssueGroups[issue.GroupId].SourceConfigUrl}}" target="_blank" rel="nofollow noopener noreferrer">{{::IssueGroups[issue.GroupId].SourceName}}<img src="/Content/img/icon-external-url.svg" alt="" /></a> rules? No problem, simply add <b>{{::IssueGroups[issue.GroupId].SourceConfigFileName}}</b> file to the root of this branch.
+                <p ng-if="::IssueGroups[issue.GroupId].DisplayCode"><b>issue code:</b> <span class="issue-code" ng-bind-html="::IssueGroups[issue.GroupId].DisplayCode"></span></p>
+            </blockquote>
+        </div>
+    </div> 
+</script>
+<!-- Create Issue Modal -->
+<div class="modal modal-issue" id="createIssue" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Issue</h5>
+                <button type="button" class="close" data-dismiss="modal" analytics-on analytics-category="Settings - Remove Modal" analytics-event="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="createIssueForm" role="form" class="angular">
+                    <div class="form-group" style="margin-bottom: 3px">
+                        <input name="title" type="text" class="form-control" ng-model="NewProviderIssue.Title" required>
+                        <span class="help-block"></span>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 3px">
+                        <textarea name="body" class="form-control" rows="10" ng-model="NewProviderIssue.Body" ng-bind-html="NewProviderIssue.Body" required></textarea>
+                        <span class="help-block"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-regular" data-dismiss="modal" analytics-on analytics-category="Issue Modal">Cancel</button>
+                <button type="button" class="btn btn-primary" ng-click="createIssue()" analytics-on analytics-category="Issue Modal">Create Issue</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Create Comment Modal -->
+<div class="modal modal-issue" id="createComment" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Comment</h5>
+                <button type="button" class="close" data-dismiss="modal" analytics-on analytics-category="Settings - Remove Modal" analytics-event="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="createCommentForm" role="form" class="angular">
+                    <div class="form-group" style="margin-bottom: 3px">
+                        <textarea name="body" class="form-control" rows="10" ng-model="NewProviderComment.Body" ng-bind-html="NewProviderComment.Body" required></textarea>
+                        <span class="help-block"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-regular" data-dismiss="modal" analytics-on analytics-category="Comment Modal">Cancel</button>
+                <button type="button" class="btn btn-primary" ng-click="createComment()" analytics-on analytics-category="Comment Modal">Create Comment</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Filter issues -->
+<div class="modal" id="filterIssues" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div style="padding: 19px; padding-right: 0;">
+                    <h1 class="modal-title">
+                        Filters
+                        <button type="button" class="close" data-dismiss="modal" analytics-on analytics-category="Filter issues" analytics-event="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </h1>
+                    <h2 class="modal-subtitle">Language</h2>
+                    <nav class="navbar navbar-issues-modal">
+                        <ul class="nav owl-carousel" data-margin="10">
+                            <li class="nav-item">
+                                <a class="nav-link" ng-class="{'active': model.Filter.LangId == null}" href="#" rel="nofollow noopener noreferrer" ng-click="filterCategoriesByLang(null)" style="padding: 7.5px 17px">All</a>
+                            </li>
+                            <li class="nav-item" ng-repeat="langItem in model.Filter.Langs">
+                                <a class="nav-link" ng-class="{'active': langItem.Id === model.Filter.LangId}" href="#" rel="nofollow noopener noreferrer" ng-click="filterCategoriesByLang(langItem.Id)">
+                                    <span ng-bind-html="langItem.Name" style="margin-right: 5px;"></span>
+                                    <strong class="total">{{langItem.Count}}</strong>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+                <nav class="navbar navbar-categories">
+                    <div class="navbar-collapse">
+                        <ul class="navbar-nav">
+                            <li class="dropdown nav-item col-12" ng-repeat="filterItem in categoriesWithCounts">
+                                <a class="nav-link dropdown-toggle" ng-class="{'active': isCategoryActive(filterItem), 'fixable': model.Filter.FixableCountVisible && filterItem.Fixable}" aria-expanded="false" data-toggle="dropdown" rel="nofollow" analytics-on analytics-category="Issues Filter" analytics-event="{{filterItem.Name}}">
+                                    <img ng-src="/Content/img/issues-autofix.svg" alt="" ng-if="model.Filter.FixableCountVisible && filterItem.Fixable" width="21" style="margin-bottom: 3px; margin-right: 3px;" title="Autofix available" />
+                                    &nbsp;{{filterItem.Name}}
+                                    <span class="total float-right">{{filterItem.Count}}</span>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" ng-click="setCategoryFilter(filterItem, filterItem.Name, undefined, true)" rel="nofollow">All</a></li>
+                                    <li ng-repeat="patternItem in filterItem.Items">
+                                        <a class="dropdown-item" ng-class="{'active': isGroupActive(patternItem)}" href="#" ng-click="setCategoryFilter(patternItem, filterItem.Name, patternItem.Id, true)">
+                                            <img src="/Content/img/issues-autofix.svg" alt="" ng-if="model.Filter.FixableCountVisible && patternItem.Fixable && patternItem.SupportsGroupAutofix" width="21" style="position: absolute; left: 19px;" title="Autofix available" />
+                                            <img src="/Content/img/issues-autofix-muted.svg" alt="" ng-show="model.Filter.FixableCountVisible && patternItem.Fixable && !patternItem.SupportsGroupAutofix" width="21" style="position: absolute; left: 19px;" title="Autofix available (limited)" />
+                                            <span ng-bind-html="patternItem.Description"></span>
+                                            <span class="count float-right">{{patternItem.Count}}</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            </div>
+            <div class="modal-footer">
+                <div class="row mx-auto">
+                    <div class="col-12">
+                        <button class="btn btn-regular" ng-click="resetModalFilters()">Clear filters</button>
+                        <button class="btn btn-primary btn-sm" ng-click="applyModalFilters()">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Issues actions -->
+<div class="modal issue-actions" id="issuesActionsModal" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body">
+                <h1 class="modal-title">
+                    Actions
+                    <button type="button" class="close" data-dismiss="modal" analytics-on analytics-category="Actions" analytics-event="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </h1>
+                <ul class="list-unstyled">
+                    <li ng-if="matchedAutofixFilter.LastWarning">
+                        <span class="label label-danger">
+                            <img class="left-icon" src="/Content/img/issues-autofix-muted.svg" width="21" alt=""/>
+                            <span>{{matchedAutofixFilter.LastWarning}}</span>
+                            <img src="/Content/img/repo-settings-warn.svg" alt="" width="21" height="21" style="margin-bottom: 1px;" /> 
+                        </span>
+                    </li>
+                    <li ng-if="matchedAutofixFilter.CreatedPullUrl" ng-show="!isAutofixInProcess()">
+                        <a href="{{matchedAutofixFilter.CreatedPullUrl}}" target="_blank" rel="nofollow noopener noreferrer">
+                            <img class="left-icon" ng-if="!model.AutofixFilter.scheduling" src="/Content/img/issues-autofix.svg" alt="" width="21" style="margin-right: 9px; vertical-align: bottom; line-height: 13px;"/>
+                            <img class="left-icon fa-spin" ng-if="model.AutofixFilter.scheduling" src="/Content/img/loading-arrow.svg" alt="" width="14" style="margin-right: 9px;"/>
+                            <span>View latest PR</span>
+                        </a>
+                    </li>
+                    <li ng-show="model.Filter.FixableCountVisible && model.AddManualAutofixLink.IsVisible && model.Filter.FixableCount > 0 && model.Filter.SupportsGroupAutofix && !isAutofixInProcess()">
+                        <a href="#" ng-click="addManualAutofix()">
+                            <img class="left-icon" ng-if="!model.AutofixFilter.scheduling" src="/Content/img/issues-autofix.svg" alt="" width="21" title="Autofix available"/>
+                            <img class="left-icon fa-spin" ng-if="model.AutofixFilter.scheduling" src="/Content/img/loading-arrow.svg" alt="" width="14" style="margin-right: 9px;"/>
+                            <span ng-if="model.PullRequestExternalId == null">Create Fix PR</span>
+                            <span ng-if="model.PullRequestExternalId != null">Create Fix Commit</span>
+                        </a>
+                    </li>
+                    <li ng-show="isAutofixInProcess()">
+                        <img class="left-icon" src="/Content/img/issues-autofix-muted.svg" width="21" alt=""/><span style="margin-right: 3px;">Autofix is being processed.</span><img class="float-right" src="/Content/img/repo-settings-check.svg" alt=""/>
+                    </li>
+                    <li ng-show="matchedAutofixFilter.CreatedPullUrl || (model.Filter.FixableCountVisible && model.AddManualAutofixLink.IsVisible && model.Filter.FixableCount > 0 && model.Filter.SupportsGroupAutofix) || isAutofixInProcess()" class="dropdown-divider"></li>
+                    <li ng-show="model.AllowSort && filteredIssues.length > 1">
+                        <a href="#" ng-click="setSortBy('Weight')" data-dismiss="modal">
+                            <img class="left-icon" src="/Content/img/issue-sort-weight.svg" alt=""/>Sort issues by weight<img ng-show="model.Filter.IssueSort == 'Weight'" class="float-right" src="/Content/img/issue-sort-check.svg" alt="Checked"/>
+                        </a>
+                    </li>
+                    <li ng-show="model.AllowSort && filteredIssues.length > 1">
+                        <a href="#" ng-click="setSortBy('MostRecent')" data-dismiss="modal">
+                            <img class="left-icon" src="/Content/img/issue-sort-recent.svg" alt=""/>See most recent first<img ng-show="model.Filter.IssueSort == 'MostRecent'" class="float-right" src="/Content/img/issue-sort-check.svg" alt="Checked"/>
+                        </a>
+                    </li>
+                    <li ng-if="model.AllowSort && filteredIssues.length > 1 && model.Filter.PageCount <= 1 && (hasAvailableProviderIssues() || hasAvailableIssuesForComments())" class="dropdown-divider"></li>
+                    <li ng-if="model.Filter.PageCount <= 1 && hasAvailableProviderIssues()">
+                        <a href="#" ng-click="setProviderIssuePreview(filteredIssues)" data-toggle="modal" data-target="#createIssue" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Group Issue">
+                            <img class="left-icon" src="/Content/img/issue-new-issue.svg" alt=""/>
+                            Create group issue on {{Issues[0].ProviderName}}
+                        </a>
+                    </li>
+                    <li ng-if="model.Filter.PageCount <= 1 && hasAvailableIssuesForComments()">
+                        <a href="#" ng-click="setProviderCommentPreview(filteredIssues)" data-toggle="modal" data-target="#createComment" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Group Comment">
+                            <img class="left-icon" src="/Content/img/issue-new-comment.svg" alt=""/>
+                            Create group comment on {{Issues[0].ProviderName}}
+                        </a>
+                    </li>
+                    <li ng-show="model.AllowSort && filteredIssues.length > 1 && (model.Filter.SwitchView.Count > 0 || model.FileExternalUrl != null || model.NewIssuesUrl != null || model.FixedIssuesUrl != null || model.FileExternalUrl != null)" class="dropdown-divider"></li>
+                    <li ng-if="model.Filter.SwitchView.Count > 0">
+                        <a href="{{model.Filter.SwitchView.Url}}" ng-click="setProviderCommentPreview(filteredIssues)" analytics-category="Issue Header" analytics-event="Go to {{model.Filter.SwitchView.Name}} issues">
+                            <img class="left-icon" ng-src="/Content/img/issue-{{model.Filter.SwitchView.Name}}.svg" alt=""/>
+                            Go to {{model.Filter.SwitchView.Name}} issues
+                        </a>
+                    </li>
+                    <li ng-if="model.FileSourceViewUrl != null">
+                        <a href="{{model.FileSourceViewUrl}}">
+                            <img class="left-icon" ng-src="/Content/img/source-code.svg" alt=""/>
+                            Go to source view
+                        </a>
+                    </li>
+                    <li ng-if="model.NewIssuesUrl != null">
+                        <a href="{{model.NewIssuesUrl}}">
+                            <img class="left-icon" ng-src="/Content/img/issue-new-issue.svg" alt=""/>
+                            Go to new issues
+                        </a>
+                    </li>
+                    <li ng-if="model.FixedIssuesUrl != null">
+                        <a href="{{model.FixedIssuesUrl}}">
+                            <img class="left-icon" ng-src="/Content/img/issue-new-issue.svg" alt=""/>
+                            Go to fixed issues
+                        </a>
+                    </li>
+                    <li ng-if="model.FileExternalUrl != null">
+                        <a href="{{model.FileExternalUrl}}" target="_blank" rel="nofollow noopener noreferrer" analytics-on analytics-category="Code File Header" analytics-event="View file on {{model.ProviderName}}">
+                            <img class="left-icon" ng-src="/Content/img/repo-provider-link-{{model.ProviderName}}.svg" style="width: 22px; height: 22px" alt="View file on {{model.ProviderName}}"/>
+                            View file on {{model.ProviderName}}
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Issue actions -->
+<div class="modal fade issue-actions" id="issueActionsModal" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body">
+                <h1 class="modal-title">
+                    Actions
+                    <button type="button" class="close" data-dismiss="modal" analytics-on analytics-category="Actions" analytics-event="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </h1>
+                <ul class="list-unstyled">
+                    <li>
+                        <a ng-click="copyIssueText(issue, $event)">
+                            <img src="/Content/img/issue-copy-text.svg" class="left-icon" alt="" />
+                            <span>Copy Issue to clipboard</span>
+                        </a>
+                    </li>
+                    <li ng-if="selected[0].Actionable && model.NewProviderCommentLink.IsVisible && selected[0].Revision != null">
+                        <a ng-if="selected[0].CommentExternalUrl && !selected[0].creatingComment" href="{{::selected[0].CommentExternalUrl}}" target="_blank" rel="nofollow noopener noreferrer" analytics-on analytics-category="Issue Header" analytics-event="View Comment">
+                            <img src="/Content/img/issue-new-comment.svg" class="left-icon" alt=""/>
+                            <span>View Comment on {{::selected[0].ProviderName}}</span>
+                        </a>
+                        <a ng-if="!selected[0].CommentExternalUrl && !selected[0].creatingComment && selected[0].Active" ng-click="setProviderCommentPreview([selected[0]], true); $event.stopPropagation();" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Comment">
+                            <img src="/Content/img/issue-new-comment.svg" class="left-icon" alt=""/>
+                            <span>Create Comment on {{::selected[0].ProviderName}}</span>
+                        </a>
+                        <span ng-if="!selected[0].Active">
+                            <img src="/Content/img/issue-new-comment.svg" class="left-icon" alt=""/>
+                            <span>No need to Create Comment on {{::selected[0].ProviderName}} - this issue is already resolved</span>
+                        </span>
+                        <span ng-if="selected[0].creatingComment">
+                            <img class="fa-spin left-icon" src="/Content/img/loading-arrow.svg" alt="" />
+                            <span>Creating Comment...</span>
+                        </span>
+                    </li>
+                    <li ng-if="selected[0].Actionable && model.NewProviderIssueLink.IsVisible">
+                        <a ng-if="selected[0].ExternalUrl && !selected[0].creatingIssue" href="{{selected[0].ExternalUrl}}" target="_blank" rel="nofollow noopener noreferrer" analytics-on analytics-category="Issue Header" analytics-event="View Issue">
+                            <img src="/Content/img/issue-new-issue.svg" class="left-icon" alt=""/>
+                            View Issue on {{::selected[0].ProviderName}}
+                        </a>
+                        <a ng-if="!selected[0].ExternalUrl && !selected[0].creatingIssue && selected[0].Active" ng-click="setProviderIssuePreview([selected[0]], true)" analytics-on="click" analytics-category="Issue Header" analytics-event="Create Issue">
+                            <img src="/Content/img/issue-new-issue.svg" class="left-icon" alt=""/>
+                            <span>Create Issue on {{::selected[0].ProviderName}}</span>
+                        </a>
+                        <span ng-if="selected[0].creatingIssue">
+                            <img class="fa-spin left-icon" src="/Content/img/loading-arrow.svg" alt="" />
+                            <span>Creating Issue...</span>
+                        </span>
+                        <span ng-if="!selected[0].Active" >
+                            <img class="left-icon" src="/Content/img/issue-new-issue.svg" alt=""/>
+                            No need to Create Issue on {{::selected[0].ProviderName}} - this issue is already resolved
+                        </span>
+                    </li>
+                    <li class="dropdown-divider"></li>
+                    <li ng-if="selected[0].Actionable && model.IgnoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Ignored'">
+                        <a ng-click="ignore(model.IgnoreIssueLink.Url, 'single', $event)" rel="nofollow">
+                            <img src="/Content/img/issue-Ignored.svg" alt=""/>
+                            <span>Ignore Issue</span>
+                        </a>
+                    </li>
+                    <li ng-if="selected[0].Actionable && model.IgnoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Ignored'">
+                        <a ng-click="ignore(model.AddIgnoredIssuePatternLink.Url, 'similar', $event);" rel="nofollow">
+                            <img src="/Content/img/issue-Ignored.svg" alt=""/>
+                            <span>Ignore Issues like this</span>
+                        </a>
+                    </li>
+                    <li ng-if="selected[0].Actionable && model.IgnoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Ignored'">
+                        <a ng-click="ignore(model.IgnoreFileFromIssueLink.Url, 'file', $event)" rel="nofollow">
+                            <img src="/Content/img/issue-Ignored.svg" alt=""/>
+                            <span>Ignore File</span>
+                        </a>
+                    </li>
+                    <li ng-if="selected[0].Actionable && model.UnignoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Active'">
+                        <a ng-click="unignore(model.UnignoreIssueLink.Url, 'single', $event)" rel="nofollow">
+                            <img src="/Content/img/issue-Active.svg" alt=""/>
+                            <span>Unignore Issue</span>
+                        </a>
+                    </li>
+                    <li ng-if="selected[0].Actionable && model.UnignoreIssueLink.IsVisible && model.Filter.SwitchView.Name == 'Active'">
+                        <a ng-click="unignore(model.RemoveIgnoredIssuePatternLink.Url, 'similar', $event)" rel="nofollow">
+                            <img src="/Content/img/issue-Active.svg" alt=""/>
+                            <span>Unignore Issues like this</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+            <div ng-cloak ng-if="filteredIssues.length == 0">
+                
+<div class="jumbotron no-issues">
+    <div class="row no-gutters">
+        <div class="col-12 col-md-7">
+            <h2>No issues found</h2>
+            <div style="position: relative">
+                <div class="quote">“</div>
+                <div class="text">The most amazing achievement of the computer software industry is its continuing cancellation of the steady and staggering gains made by the computer hardware industry.</div>
+            </div>
+            <p class="author">– Henry Petroski</p>
+        </div>
+        <div class="col-12 col-md-5">
+            <div class="d-none d-md-block">
+                <img src="/Content/img/jumbo-success.svg" alt="" style="position: absolute; right: 0; bottom: 0;"/>
+            </div>
+        </div>
+    </div>
+</div>
+            </div>
+        </div>
+</div>
+
+        </main>
+        <footer class="mt-auto ">
+    <div class="container">
+        <div class="row text-md-center no-gutters">
+            <div class="col-12 col-lg-4 text-left">
+                <ul class="list-inline text-uppercase d-inline-block ml-0 ml-xl-3 mb-3 mb-lg-0">
+                    <li class="list-inline-item"><a href="/security">Security</a></li>
+                    <li class="list-inline-item"><a href="/terms">Terms</a></li>
+                    <li class="list-inline-item"><a href="/privacy">Privacy</a></li>
+                    <li class="list-inline-item"><a href="/contact">Contact</a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-lg-3 text-left">
+                <div class="twitter-container d-inline-block">
+                    <a href="https://x.com/codefactor_io" target="_blank" rel="noopener noreferrer" analytics-on analytics-category="Footer" class="btn text-uppercase">
+                        <svg class="twitter" width="12px" height="12px" viewBox="0 0 1200 1227">
+                            <g>
+                                <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z"></path>
+                            </g>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            <div class="col-6 col-lg-5 text-right">
+                <span class="copyright">&copy; 2026 CodeFactor</span>
+            </div>
+        </div>
+    </div>
+</footer>
+    <div id="cookie-consent">
+        <div class="card">
+            <div class="card-body">
+                <p>We use cookies in order to offer you the most relevant information. See our <a href="/privacy">Privacy Policy</a>.</p>
+                <button class="btn btn-regular mb-1" style="padding: 7px 22px;" data-cookie-string=".AspNet.Consent=yes; expires=Thu, 27 May 2027 17:30:05 GMT; path=/; secure; samesite=none">Ok, got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+    var logErrorUrl = '/jserror/log';
+    </script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js" crossorigin="anonymous"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js" crossorigin="anonymous"></script>
+    <script src="//ajax.aspnetcdn.com/ajax/jquery.validate/1.19.0/jquery.validate.min.js" crossorigin="anonymous"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" crossorigin="anonymous"></script>
+    <script src="//stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" crossorigin="anonymous"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.5.8/angular.min.js" crossorigin="anonymous"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.5.8/angular-sanitize.min.js" crossorigin="anonymous"></script>
+    
+
+    <script src="/Bundles/CommonJS.min.js?v=ZQqFWR5Ey-bnsbkWl-ymLIZ3u13lZ7jcFIVeBbs-sS8"></script>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            //cookie consent
+            $("#cookie-consent button[data-cookie-string]").bind("click",
+                function (event) {
+                    document.cookie = $(event.currentTarget).attr("data-cookie-string");
+                    $("#cookie-consent").hide();
+                });
+        });
+    </script>
+
+    
+    <script src="/Scripts/jquery.timeago.min.js?v=0-5OfvOxkLHqpLPPwy9pDjug8N3cwaqcmleaxnR5VS8"></script>
+    
+
+    <script src="/Bundles/RepoIssuesJS.min.js?v=qtus69UQ_F4kDbfQzGe_h4VK5TLEgbRv5ilkRT2TTls"></script>
+
+    
+
+    <script src="/Bundles/RepoPagesJS.min.js?v=PUc4UXjlG1RDv51ZhyyPHJDEk1oenC6NGAOaPle8FY4"></script>
+
+    
+
+    <script src="/Bundles/HighlightJS.min.js?v=JZ5QdAUSWuEtdVR9XXdFiDhoAHedcW0Cy_5Uv9u1cfs"></script>
+
+    <script type="text/javascript">
+        app.value('model', {"Issues":{"List":[{"Key":"6a17282e860703d347093ee1","FilePath":"src/V12_002.UI.Compliance.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/V12_002.UI.Compliance.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Style","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Closing brace should be followed by blank line.","GroupId":7544,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\V12_002.UI.Compliance.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/V12_002.UI.Compliance.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/V12_002.UI.Compliance.cs","StartLine":507,"EndLine":507,"Col":30,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/V12_002.UI.Compliance.cs","PreviewCode":"                            }\n","PreviewCol":null,"StartLine":507,"EndLine":507,"PreviewEndLine":508,"Col":30,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":44511452649687},{"Key":"6a17282e860703d347093ee2","FilePath":"src/V12_002.UI.Compliance.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/V12_002.UI.Compliance.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Style","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Closing brace should be followed by blank line.","GroupId":7544,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\V12_002.UI.Compliance.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/V12_002.UI.Compliance.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/V12_002.UI.Compliance.cs","StartLine":576,"EndLine":576,"Col":14,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/V12_002.UI.Compliance.cs","PreviewCode":"            }\n","PreviewCol":null,"StartLine":576,"EndLine":576,"PreviewEndLine":577,"Col":14,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":44511452649618},{"Key":"6a17282e860703d347093ec1","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":50,"EndLine":50,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class TrailUpdateSignal : EventArgs\n","PreviewCol":null,"StartLine":50,"EndLine":50,"PreviewEndLine":51,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160080},{"Key":"6a17282e860703d347093ec2","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":62,"EndLine":62,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class StopUpdateSignal : EventArgs\n","PreviewCol":null,"StartLine":62,"EndLine":62,"PreviewEndLine":63,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160068},{"Key":"6a17282e860703d347093ec3","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":74,"EndLine":74,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class EntryUpdateSignal : EventArgs\n","PreviewCol":null,"StartLine":74,"EndLine":74,"PreviewEndLine":75,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160056},{"Key":"6a17282e860703d347093ec4","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":85,"EndLine":85,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class OrderCancelSignal : EventArgs\n","PreviewCol":null,"StartLine":85,"EndLine":85,"PreviewEndLine":86,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160045},{"Key":"6a17282e860703d347093ec5","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":95,"EndLine":95,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class TargetActionSignal : EventArgs\n","PreviewCol":null,"StartLine":95,"EndLine":95,"PreviewEndLine":96,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160035},{"Key":"6a17282e860703d347093ec6","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":103,"EndLine":103,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public enum TargetType\n","PreviewCol":null,"StartLine":103,"EndLine":103,"PreviewEndLine":104,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160027},{"Key":"6a17282e860703d347093ec7","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":110,"EndLine":110,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public enum TargetAction\n","PreviewCol":null,"StartLine":110,"EndLine":110,"PreviewEndLine":111,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160020},{"Key":"6a17282e860703d347093ec8","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":121,"EndLine":121,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class FlattenSignal : EventArgs\n","PreviewCol":null,"StartLine":121,"EndLine":121,"PreviewEndLine":122,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160009},{"Key":"6a17282e860703d347093ec9","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":130,"EndLine":130,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class BreakevenSignal : EventArgs\n","PreviewCol":null,"StartLine":130,"EndLine":130,"PreviewEndLine":131,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202160000},{"Key":"6a17282e860703d347093eca","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":140,"EndLine":140,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public class ExternalCommandSignal : EventArgs\n","PreviewCol":null,"StartLine":140,"EndLine":140,"PreviewEndLine":141,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159990},{"Key":"6a17282e860703d347093ecb","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":154,"EndLine":154,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;TradeSignal&gt; OnTradeSignal;\n","PreviewCol":null,"StartLine":154,"EndLine":154,"PreviewEndLine":155,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159976},{"Key":"6a17282e860703d347093ecc","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":159,"EndLine":159,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;TrailUpdateSignal&gt; OnTrailUpdate;\n","PreviewCol":null,"StartLine":159,"EndLine":159,"PreviewEndLine":160,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159971},{"Key":"6a17282e860703d347093ecd","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":164,"EndLine":164,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;TargetActionSignal&gt; OnTargetAction;\n","PreviewCol":null,"StartLine":164,"EndLine":164,"PreviewEndLine":165,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159966},{"Key":"6a17282e860703d347093ece","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":169,"EndLine":169,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;FlattenSignal&gt; OnFlattenAll;\n","PreviewCol":null,"StartLine":169,"EndLine":169,"PreviewEndLine":170,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159961},{"Key":"6a17282e860703d347093ecf","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":174,"EndLine":174,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;BreakevenSignal&gt; OnBreakevenRequest;\n","PreviewCol":null,"StartLine":174,"EndLine":174,"PreviewEndLine":175,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159956},{"Key":"6a17282e860703d347093ed0","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":179,"EndLine":179,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;StopUpdateSignal&gt; OnStopUpdate;\n","PreviewCol":null,"StartLine":179,"EndLine":179,"PreviewEndLine":180,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159951},{"Key":"6a17282e860703d347093ed1","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":184,"EndLine":184,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;EntryUpdateSignal&gt; OnEntryUpdate;\n","PreviewCol":null,"StartLine":184,"EndLine":184,"PreviewEndLine":185,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159946},{"Key":"6a17282e860703d347093ed2","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":189,"EndLine":189,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;OrderCancelSignal&gt; OnOrderCancel;\n","PreviewCol":null,"StartLine":189,"EndLine":189,"PreviewEndLine":190,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159941},{"Key":"6a17282e860703d347093ed3","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":194,"EndLine":194,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static event EventHandler&lt;ExternalCommandSignal&gt; OnExternalCommand;\n","PreviewCol":null,"StartLine":194,"EndLine":194,"PreviewEndLine":195,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159936},{"Key":"6a17282e860703d347093ed4","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":206,"EndLine":206,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        private static void SafeInvoke&lt;T&gt;(EventHandler&lt;T&gt; handler, T args)\n","PreviewCol":null,"StartLine":206,"EndLine":206,"PreviewEndLine":207,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159924},{"Key":"6a17282e860703d347093ed5","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":244,"EndLine":244,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastTradeSignal(TradeSignal signal)\n","PreviewCol":null,"StartLine":244,"EndLine":244,"PreviewEndLine":245,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159886},{"Key":"6a17282e860703d347093ed6","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":258,"EndLine":258,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastTrailUpdate(TrailUpdateSignal update)\n","PreviewCol":null,"StartLine":258,"EndLine":258,"PreviewEndLine":259,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159872},{"Key":"6a17282e860703d347093ed7","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":270,"EndLine":270,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastTargetAction(TargetActionSignal action)\n","PreviewCol":null,"StartLine":270,"EndLine":270,"PreviewEndLine":271,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159860},{"Key":"6a17282e860703d347093ed8","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":282,"EndLine":282,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastFlatten(string reason)\n","PreviewCol":null,"StartLine":282,"EndLine":282,"PreviewEndLine":283,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159848},{"Key":"6a17282e860703d347093ed9","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":292,"EndLine":292,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastBreakeven(string signalId = &quot;&quot;)\n","PreviewCol":null,"StartLine":292,"EndLine":292,"PreviewEndLine":293,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159838},{"Key":"6a17282e860703d347093eda","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":302,"EndLine":302,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastStopUpdate(string tradeId, double newStopPrice, string stopLevel)\n","PreviewCol":null,"StartLine":302,"EndLine":302,"PreviewEndLine":303,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159828},{"Key":"6a17282e860703d347093edb","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":318,"EndLine":318,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastEntryUpdate(string tradeId, double newEntryPrice)\n","PreviewCol":null,"StartLine":318,"EndLine":318,"PreviewEndLine":319,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159812},{"Key":"6a17282e860703d347093edc","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":333,"EndLine":333,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastOrderCancel(string tradeId, string reason)\n","PreviewCol":null,"StartLine":333,"EndLine":333,"PreviewEndLine":334,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159797},{"Key":"6a17282e860703d347093edd","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":348,"EndLine":348,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void BroadcastExternalCommand(string command, string targetSymbol)\n","PreviewCol":null,"StartLine":348,"EndLine":348,"PreviewEndLine":349,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159782},{"Key":"6a17282e860703d347093ede","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":367,"EndLine":367,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static string GetSubscriberCounts()\n","PreviewCol":null,"StartLine":367,"EndLine":367,"PreviewEndLine":368,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159763},{"Key":"6a17282e860703d347093edf","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Maintainability","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Elements should have the same indentation.","GroupId":7587,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":384,"EndLine":384,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"        public static void ClearAllSubscribers()\n","PreviewCol":null,"StartLine":384,"EndLine":384,"PreviewEndLine":385,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17010202159746},{"Key":"6a17282e860703d347093ec0","FilePath":"src/SignalBroadcaster.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Style","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Code should not contain trailing whitespace.","GroupId":7533,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\SignalBroadcaster.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/SignalBroadcaster.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","StartLine":13,"EndLine":13,"Col":1,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/SignalBroadcaster.cs","PreviewCode":"    \n","PreviewCol":null,"StartLine":13,"EndLine":13,"PreviewEndLine":14,"Col":1,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":17008702010117},{"Key":"6a17282e860703d347093ee0","FilePath":"src/V12_002.Photon.MmioMirror.cs","FileUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/V12_002.Photon.MmioMirror.cs","Revision":"a8cfd6c0a23032e76bb9bf35b5362a6d00122a96","Category":"Style","AddedAt":"2026-05-27T17:21:02Z","AddedAtTicks":1779902462,"AuthorName":null,"AuthorAvatarUrl":null,"Name":"Closing brace should be followed by blank line.","GroupId":7544,"ExternalUrl":null,"CommentExternalUrl":null,"ProviderName":"GitHub","Severity":"Minor","Metric":{"Name":"lines of code","Description":"","Value":"1"},"Locations":[{"Path":"src\\V12_002.Photon.MmioMirror.cs","Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/file/main/src/V12_002.Photon.MmioMirror.cs","SourceUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/V12_002.Photon.MmioMirror.cs","StartLine":123,"EndLine":123,"Col":18,"ColSpan":null}],"SourceViewUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/source/main/src/V12_002.Photon.MmioMirror.cs","PreviewCode":"                }\n","PreviewCol":null,"StartLine":123,"EndLine":123,"PreviewEndLine":124,"Col":18,"ColSpan":null,"Hidden":false,"Actionable":false,"Active":true,"Fixable":true,"LangId":6,"Order":9007902340040}],"GroupIdsWithModels":{"7544":{"PatternDetail":"Closing brace should be followed by blank line","Description":"<p>To improve the readability of the code, StyleCop requires blank lines in certain situations, and prohibits blank lines\nin other situations. This results in a consistent visual pattern across the code, which can improve recognition and\nreadability of unfamiliar code.</p>\n<p>A violation of this rule occurs when a closing brace is not followed by a blank line. For example, the following code\nwould generate one instance of this violation, since there is one place where a closing brace is not followed by a blank\nline.</p>\n<div class=\"highlight highlight-source-cs\"><pre><span class=\"pl-k\">if</span> <span class=\"pl-kos\">(</span>condition<span class=\"pl-kos\">)</span>\n<span class=\"pl-kos\">{</span>\n    DoSomething<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n<span class=\"pl-kos\">}</span>\n<span class=\"pl-k\">return</span> <span class=\"pl-s1\">value</span><span class=\"pl-kos\">;</span></pre></div>\n","Links":["https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/SA1513.md"],"SourceName":"StyleCop.Analyzers","SourceConfigFileName":".editorconfig","SourceConfigUrl":"https://learn.microsoft.com/en-us/visualstudio/code-quality/use-roslyn-analyzers","SupportsGroupAutofix":true,"DisplayCode":"SA1513"},"7587":{"PatternDetail":"Elements should have the same indentation","Description":"<p>A violation of this rule occurs when two or more sibling elements each start on their own line but are not indented the\nsame amount.</p>\n<p>For example, the following code would produce a violation of this rule:</p>\n<div class=\"highlight highlight-source-cs\"><pre><span class=\"pl-k\">public</span> <span class=\"pl-smi\">void</span> <span class=\"pl-en\">MethodName</span><span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span>\n<span class=\"pl-kos\">{</span>\n    A<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n   B<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span> <span class=\"pl-c\">// SA1137: Expected the indentation to match the previous line</span>\n<span class=\"pl-kos\">}</span></pre></div>\n<p>The following code would not produce any violations:</p>\n<div class=\"highlight highlight-source-cs\"><pre><span class=\"pl-k\">public</span> <span class=\"pl-smi\">void</span> <span class=\"pl-en\">MethodName</span><span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span>\n<span class=\"pl-kos\">{</span>\n    A<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n    B<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n<span class=\"pl-kos\">}</span></pre></div>\n<p>Note that relative indentation and indentation in independent groups of siblings is not checked by this rule. The\nfollowing code shows a more complex example which would not produce any violations:</p>\n<div class=\"highlight highlight-source-cs\"><pre><span class=\"pl-k\">public</span> <span class=\"pl-smi\">void</span> <span class=\"pl-en\">Method1</span><span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span>\n<span class=\"pl-kos\">{</span>\n    A<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n    B<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n<span class=\"pl-kos\">}</span>\n\n<span class=\"pl-k\">public</span> <span class=\"pl-smi\">void</span> <span class=\"pl-en\">Method2</span><span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span>\n<span class=\"pl-kos\">{</span>\n        A<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n        B<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n<span class=\"pl-kos\">}</span>\n\n<span class=\"pl-k\">public</span> <span class=\"pl-smi\">void</span> <span class=\"pl-en\">Method3</span><span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span>\n<span class=\"pl-kos\">{</span>\nA<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\nB<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n<span class=\"pl-kos\">}</span>\n\n<span class=\"pl-k\">public</span> <span class=\"pl-smi\">void</span> <span class=\"pl-en\">Method4</span><span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span>\n    <span class=\"pl-kos\">{</span>\n    A<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n    B<span class=\"pl-kos\">(</span><span class=\"pl-kos\">)</span><span class=\"pl-kos\">;</span>\n    <span class=\"pl-kos\">}</span></pre></div>\n","Links":["https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/SA1137.md"],"SourceName":"StyleCop.Analyzers","SourceConfigFileName":".editorconfig","SourceConfigUrl":"https://learn.microsoft.com/en-us/visualstudio/code-quality/use-roslyn-analyzers","SupportsGroupAutofix":true,"DisplayCode":"SA1137"},"7533":{"PatternDetail":"Code should not contain trailing whitespace","Description":"<p>A violation of this rule occurs when a line of code ends with any form of whitespace other than the end of line character(s). Extra whitespace can show up in editors with visible whitespace, or cause unnecessary code churn when developers format the document such that trailing whitespace is removed later. Some diff tools even highlight trailing whitespace to encourage developers to trim it.</p>\n","Links":["https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/SA1028.md"],"SourceName":"StyleCop.Analyzers","SourceConfigFileName":".editorconfig","SourceConfigUrl":"https://learn.microsoft.com/en-us/visualstudio/code-quality/use-roslyn-analyzers","SupportsGroupAutofix":true,"DisplayCode":"SA1028"}}},"LineNumbersWithIssues":{},"NewProviderIssueLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/newproviderissue","IsVisible":false},"NewProviderCommentLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/newpullcomment","IsVisible":false},"ViewMoreLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/viewmore?externalId=9","IsVisible":false},"IgnoreIssueLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/ignoreissue","IsVisible":false},"IgnoreFileFromIssueLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/ignorefilefromissues?externalId=9","IsVisible":false},"UnignoreIssueLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/unignoreissue","IsVisible":false},"RemoveIgnoredIssuePatternLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/removeignoredissuepattern?externalId=9","IsVisible":false},"AddIgnoredIssuePatternLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/addignoredissuepattern?externalId=9","IsVisible":false},"AddManualAutofixLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/addmanualautofix?externalId=9","IsVisible":false},"CategoriesByLanguageLink":{"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/categoriesbylanguage?externalId=9","IsVisible":true},"Filter":{"TotalCount":35,"PageCount":1,"CurrentPage":1,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9","AppliedUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9","IsActive":true,"ContainsAll":true,"Items":[{"Name":"Category","Values":[{"Name":"Style","Fixable":true,"Count":4,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9?category=Style","IsActive":false,"Items":[{"Id":7544,"Name":"StyleCop.Analyzers-SA1513","Description":"Closing brace should be followed by blank line","Count":3,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9?category=Style&groupId=7544","IsActive":false,"Fixable":true,"SupportsGroupAutofix":true},{"Id":7533,"Name":"StyleCop.Analyzers-SA1028","Description":"Code should not contain trailing whitespace","Count":1,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9?category=Style&groupId=7533","IsActive":false,"Fixable":true,"SupportsGroupAutofix":true}]},{"Name":"Maintainability","Fixable":true,"Count":31,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9?category=Maintainability","IsActive":false,"Items":[{"Id":7587,"Name":"StyleCop.Analyzers-SA1137","Description":"Elements should have the same indentation","Count":31,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9?category=Maintainability&groupId=7587","IsActive":false,"Fixable":true,"SupportsGroupAutofix":true}]}]}],"Langs":[{"Id":6,"Name":"C#","Description":null,"Count":35,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/9?lang=6","IsActive":false,"Fixable":false,"SupportsGroupAutofix":false}],"SwitchView":{"Name":"Ignored","Count":0,"Url":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/ignored/9"},"FixableCount":35,"FixableCountVisible":true,"SupportsGroupAutofix":true,"IssueSort":"Weight","LangId":null},"LineCount":0,"HomeUrl":"https://www.codefactor.io/","ProjectUrl":"https://www.codefactor.io/repository/github/malhitticrypto-debug/universal-or-strategy","ShowFoundIn":true,"Language":null,"AuthorUrl":null,"PullRequestExternalId":"9","FileUrlTemplate":{"Location":"https://github.com/malhitticrypto-debug/universal-or-strategy/blob/{commit}/{path}{line-range}","StartLine":"#L{start-line}","EndLine":"-L{end-line}"},"PreviewLineCount":5,"IsArchived":false,"AutofixFilters":null,"AutofixFilter":{"ChangeSetKey":null,"Category":null,"GroupId":null,"LangId":null,"FilePath":null,"IgnoredFilter":"ActiveOnly","CreatedPullId":null,"CreatedPullUrl":null,"CreatedPullClosed":false,"LastWarning":null,"Status":"Created","UpdatedAt":"0001-01-01T00:00:00"},"FileListViewUrl":null,"FileSourceViewUrl":null,"FileExternalUrl":null,"FixedIssuesUrl":"/repository/github/malhitticrypto-debug/universal-or-strategy/pull/fixed/9","NewIssuesUrl":null,"ProviderName":null,"AllowSort":false});
+    </script>
+
+    
+    
+        <script src="/Bundles/CommonAppJS.min.js?v=0JpGsZYlvF7gY01k4vx6ujPH8wtUSLTMPmrkxiWD9jo"></script>
+    
+</body>
+</html>
+
