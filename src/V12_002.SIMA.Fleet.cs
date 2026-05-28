@@ -64,14 +64,41 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 SubmitAndRegisterFleetOrders(acct, orders, orderCount, fleetEntryName, expectedKey, ref syncCleared);
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("Submit") || ex.Message.Contains("CreateOrder"))
             {
-                Print(string.Format("[PUMP] Submit FAILED for {0} ({1}): {2}", fleetEntryName, acct.Name, ex.Message));
+                // Known NT8 order submission quirk - rollback and continue
+                Print(
+                    string.Format(
+                        "[PUMP] WARNING: Submit failed for {0} ({1}): {2}",
+                        fleetEntryName,
+                        acct.Name,
+                        ex.Message
+                    )
+                );
                 if (!syncCleared)
                     ClearDispatchSyncPending(expectedKey);
                 if (reservedDelta != 0)
                     AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
                 RollbackFleetDispatchState(fleetEntryName);
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - rollback and fail fast
+                Print(
+                    string.Format(
+                        "[PUMP] CRITICAL: Unexpected error for {0} ({1}): {2}",
+                        fleetEntryName,
+                        acct.Name,
+                        ex.ToString()
+                    )
+                );
+                if (!syncCleared)
+                    ClearDispatchSyncPending(expectedKey);
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                RollbackFleetDispatchState(fleetEntryName);
+                throw;
             }
             finally
             {
@@ -88,10 +115,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         TriggerCustomEvent(o => PumpFleetDispatch(), null);
                     }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
+                    {
+                        // Known NT8 TriggerCustomEvent quirk - log and continue
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] WARNING: ProcessFleetSlot pump prime failed: " + ex.Message);
+                    }
                     catch (Exception ex)
                     {
-                        if (_diagFleet)
-                            Print("[FLEET_CATCH] ProcessFleetSlot pump prime failed: " + ex.Message);
+                        // Unexpected error - log and fail fast
+                        Print("[FLEET_CATCH] CRITICAL: Unexpected error in ProcessFleetSlot pump: " + ex.ToString());
+                        throw;
                     }
             }
         }
@@ -375,10 +409,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         TriggerCustomEvent(o => PumpFleetDispatch(), null);
                     }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
+                    {
+                        // Known NT8 TriggerCustomEvent quirk - log and continue
+                        if (_diagFleet)
+                            Print("[FLEET_CATCH] WARNING: ValidateDispatchTimestamp pump prime failed: " + ex.Message);
+                    }
                     catch (Exception ex)
                     {
-                        if (_diagFleet)
-                            Print("[FLEET_CATCH] ValidateDispatchTimestamp pump prime failed: " + ex.Message);
+                        // Unexpected error - log and fail fast
+                        Print(
+                            "[FLEET_CATCH] CRITICAL: Unexpected error in ValidateDispatchTimestamp pump: "
+                                + ex.ToString()
+                        );
+                        throw;
                     }
                 return false;
             }
@@ -555,10 +599,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     );
                 }
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Collection was modified"))
+            {
+                // Known collection modification during iteration - log and continue
+                if (_diagFleet)
+                    Print("[FLEET_CATCH] WARNING: Account iteration collection modified: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                if (_diagFleet)
-                    Print("[FLEET_CATCH] ProcessFleetSlot account iteration failed: " + ex.Message);
+                // Unexpected error - log and fail fast
+                Print("[FLEET_CATCH] CRITICAL: Unexpected error in account iteration: " + ex.ToString());
+                throw;
             }
         }
 
