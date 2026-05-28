@@ -181,9 +181,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     _citNudgedKeys.TryAdd(key, true); // [BUILD 949] one-shot: mark as nudged
                 }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("ChangeOrder"))
+                {
+                    Print($"[CIT] WARNING chasing {key} (known quirk): {ex.Message}");
+                }
                 catch (Exception ex)
                 {
-                    Print($"[CIT] ERROR chasing {key}: {ex.Message}");
+                    Print($"[CIT] CRITICAL chasing {key}: {ex.ToString()}");
+                    throw;
                 }
             }
         }
@@ -212,9 +217,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 FlattenFilledMasterPositions();
                 CancelUnfilledMasterEntries();
             }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("DispatchFleetFlatten") || ex.Message.Contains("CancelOrder"))
+            {
+                Print("WARNING: Known quirk in FlattenAll: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR FlattenAll: " + ex.Message);
+                Print("CRITICAL: Unexpected exception in FlattenAll: " + ex.ToString());
+                throw;
             }
             finally
             {

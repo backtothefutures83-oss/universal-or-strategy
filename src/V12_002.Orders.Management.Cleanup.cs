@@ -625,9 +625,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (foundOrphans || reverseGhosts > 0)
                     Print("Orphaned order reconciliation complete.");
             }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("CancelOrder") || ex.Message.Contains("RemoveDrawObject"))
+            {
+                Print("WARNING: Known quirk in ReconcileOrphanedOrders: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ReconcileOrphanedOrders: " + ex.Message);
+                Print("CRITICAL: Unexpected exception in ReconcileOrphanedOrders: " + ex.ToString());
+                throw;
             }
         }
 
