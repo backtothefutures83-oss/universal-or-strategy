@@ -801,7 +801,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ProcessQueuedExecution(QueuedAccountExecution item)
         {
             if (EnableComplianceHub)
-                Print(string.Format("[COMPLIANCE] Execution Update received for account."));
+                Print("[COMPLIANCE] Execution Update received for account.");
 
             if (EnableComplianceHub && item.Account != null)
             {

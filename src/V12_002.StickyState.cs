@@ -91,11 +91,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         RetryHelper.IsTransientIOError,
                         "BackupStateFile"
                     );
-                }
-
-                // .NET Framework 4.5 doesn't support overwrite parameter
-                if (File.Exists(validStatePath))
-                {
+                    // .NET Framework 4.5 doesn't support overwrite parameter
                     RetryHelper.ExecuteWithRetry(
                         () => File.Delete(validStatePath),
                         RetryHelper.IsTransientIOError,

@@ -415,9 +415,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Interlocked.Decrement(ref pendingReplacementCount);
                     activePositions.TryRemove(entryName, out _);
                     entryOrders.TryRemove(entryName, out _);
-                }
-                if (remainingAfterStop <= 0)
-                {
                     SymmetryGuardForgetEntry(entryName);
                     Print(string.Format("Position {0} fully closed by stop.", entryName));
                 }
