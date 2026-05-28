@@ -119,28 +119,34 @@ rules:
   # V12 DNA HIGH PRIORITY RULES (P1 - MUST FIX)
   # ==========================================================================
 
-  - id: v12-struct-copy-mutation
-    patterns:
-      - pattern: |
-          var $COPY = $STRUCT;
-          ...
-          $COPY.$FIELD = ...;
-    message: |
-      HIGH: Mutating struct copy instead of original. Use ref parameters.
-      Struct copy semantics can cause state transition bugs.
-      
-      Fix: Pass struct by ref or use class instead of struct.
-    languages: [csharp]
-    severity: WARNING
-    metadata:
-      category: correctness
-      confidence: HIGH
-      v12_dna: correctness-by-construction
-      priority: P1
-      likelihood: MEDIUM
-      impact: HIGH
-      subcategory:
-        - vuln
+  # v12-struct-copy-mutation: DISABLED (2026-05-28)
+  # Reason: Cannot distinguish structs from classes in C# - 100% false positive rate
+  # False Positives: 123/123 findings (PositionInfo is a class, WPF UI objects are classes)
+  # Alternative: Manual code review for struct usage during PR reviews
+  # See: docs/brain/SEMGREP_STRUCT_MUTATION_FALSE_POSITIVES.md
+  #
+  # - id: v12-struct-copy-mutation
+  #   patterns:
+  #     - pattern: |
+  #         var $COPY = $STRUCT;
+  #         ...
+  #         $COPY.$FIELD = ...;
+  #   message: |
+  #     HIGH: Mutating struct copy instead of original. Use ref parameters.
+  #     Struct copy semantics can cause state transition bugs.
+  #
+  #     Fix: Pass struct by ref or use class instead of struct.
+  #   languages: [csharp]
+  #   severity: WARNING
+  #   metadata:
+  #     category: correctness
+  #     confidence: HIGH
+  #     v12_dna: correctness-by-construction
+  #     priority: P1
+  #     likelihood: MEDIUM
+  #     impact: HIGH
+  #     subcategory:
+  #       - vuln
 
   - id: v12-linq-in-hot-path
     patterns:
