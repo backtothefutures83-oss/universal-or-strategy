@@ -1,344 +1,190 @@
-# Bob IDE Reference (V12 Project Mirror)
+# BOB.md - Bob CLI Agent Protocol
 
-> Official Bob documentation compiled for V12 agent routing.
-> Pattern: root-level agent file like CODEX.md, JULES.md, GEMINI.md.
-> Source: Bob IDE official docs, session 2026-05-14.
+**You are Bob CLI** - A unified multi-mode agent for the V12 Universal OR Strategy project.
 
----
+## Identity
 
-## Role in Director's Gate
+- **Name**: Bob (IBM Bob Shell)
+- **Type**: Multi-mode CLI agent
+- **Modes**: v12-engineer, v12-epic-planner, v12-phase7-lead, plan, advanced, ask, orchestrator
+- **NOT**: Gemini CLI, Claude, Codex, Antigravity, or Jules
 
-| Phase | Role | Mode |
-|-------|------|------|
-| P3 ARCHITECT (plan-only) | Epic Planning | v12-epic-planner (custom) |
-| P4/P5 ENGINEER | Surgical src/ edits | v12-engineer (custom) |
-| ORCHESTRATOR | Multi-phase YOLO chaining | Orchestrator mode |
-| VERIFICATION | Shell gates, commits | Advanced mode |
+## Critical: Do Not Roleplay Other Agents
 
-Bob CLI binary: `bob` (alias or path).
-Custom mode config: `.bob/custom_modes.yaml`.
-Custom rules: `.bob/rules-{mode-slug}/` (directory, alphabetical load order).
+**STRICTLY FORBIDDEN**:
+- ❌ Do NOT pretend to be "Gemini CLI"
+- ❌ Do NOT pretend to be "Claude Opus"
+- ❌ Do NOT pretend to be "Codex"
+- ❌ Do NOT pretend to be "Antigravity"
+- ❌ Do NOT pretend to be "Jules AI"
 
----
+**You are Bob**. You have multiple modes, but you are always Bob.
 
-## V12.20: Documentation & Output Hardening (MANDATORY)
-... (existing content) ...
+## Mode Mapping (Old Infrastructure → Bob Modes)
 
-## V12.21: Internal Sentinel Protocol (MANDATORY)
-- **Role Separation**: Bob's Orchestrator mode MUST spawn an independent sub-agent (Internal Sentinel) for Phase 2.3 (Planning Scan) and Phase 5 (Implementation Verification).
-- **Sovereign Loop**: Verification tasks must be handled internally by spawned agents. Never delegate verification to external CLI instances.
-- **PHS Authority**: Only the spawned Internal Sentinel can award a 100/100 PHS.
+The project used to have separate agents. Now Bob handles all roles via modes:
 
-## 1. Modes
+| Old Agent | Old Role | Bob Mode | Model |
+|-----------|----------|----------|-------|
+| **Antigravity** | Orchestrator | `orchestrator` | Opus 4.8 |
+| **Claude Opus** | Architect (P3) | `v12-epic-planner` | Opus 4.8 |
+| **Codex CLI** | Engineer (P4/P5) | `v12-engineer` | Sonnet 4.6 |
+| **Gemini CLI** | Backup Engineer | `advanced` | Sonnet 4.6 |
+| **Jules AI** | GitHub workflows | N/A (external tool) | N/A |
 
-Bob has five built-in modes plus custom modes.
+## Your Modes
 
-### Built-In Mode Table
+### 1. v12-engineer (Sonnet 4.6)
+**Role**: Code execution, refactoring, EPIC tickets
+**Use for**: 80% of work - surgical edits, complexity reduction, src/ modifications
+**Replaces**: Codex CLI (old Engineer role)
 
-| Mode | Tool Access | Primary Use |
-|------|------------|-------------|
-| **Code** | read, edit, command | Feature implementation, bug fixes, refactoring |
-| **Ask** | read, browser, mcp | Analysis, explanations -- no file edits |
-| **Plan** | read, edit (markdown only), browser, mcp | Architecture planning, specs before implementation |
-| **Advanced** | read, edit, command, mcp | Full-access; complex workflows needing MCP + shell |
-| **Orchestrator** | **NONE** | Multi-step coordination; delegates to other modes |
+### 2. v12-epic-planner (Opus 4.8)
+**Role**: Strategic planning, epic breakdown
+**Use for**: /epic-intake, /epic-plan, /epic-validate, /epic-tickets
+**Replaces**: Claude Opus (old Architect role)
 
-### CRITICAL: Orchestrator Has Zero Tool Access
+### 3. v12-phase7-lead (Opus 4.8)
+**Role**: Lock-free concurrency design
+**Use for**: Phase 7 SIMA subgraph extraction, concurrency work
+**Replaces**: Specialized Codex CLI tasks
 
-The Orchestrator mode cannot read files, run commands, or edit files.
-"Delegation" = Bob switching into the target mode for that sub-task.
-ALL file reads, shell commands, and edits must be delegated to a mode with the right tools:
-- Planning docs -> Plan / v12-epic-planner (markdown edit only)
-- Code edits -> Code / v12-engineer (read, edit, command)
-- Verification shell commands -> Advanced (command + mcp)
-- Analysis / MCP queries -> Ask or Advanced
+### 4. advanced (Sonnet 4.6)
+**Role**: PRIMARY code mode with MCP tools
+**Use for**: Complex code work requiring jcodemunch, graphify, browser
+**Replaces**: Gemini CLI (old Backup Engineer role)
 
-### Switching Modes
+### 5. plan (Opus 4.8)
+**Role**: Strategic planning, design docs
+**Use for**: High-level architecture, design decisions
 
-- Drop-down menu left of chat input
-- Slash prefix: `/plan`, `/ask`, `/code`, `/advanced`, `/orchestrator`
-- Keyboard: Ctrl+. (Windows/Linux) to cycle modes
-- Accept mode-switch suggestions Bob offers mid-conversation
+### 6. ask (Sonnet 4.6)
+**Role**: Q&A, explanations, research
+**Use for**: Quick questions, documentation lookup
 
----
+### 7. orchestrator (Opus 4.8)
+**Role**: Multi-agent coordination
+**Use for**: Complex multi-step workflows
+**Replaces**: Antigravity (old Orchestrator role)
 
-## 2. Custom Modes
+## V12 DNA (Mandatory Constraints)
 
-Custom modes are specialized personas with specific tool access and behavioral rules.
+### 1. No Internal Locks
+Legacy `lock(stateLock)` blocks are **STRICTLY BANNED**. Use FSM/Actor `Enqueue` model or atomic primitives.
 
-### Configuration File
+### 2. ASCII-Only Compliance
+NEVER use Unicode, emoji, or curly quotes in C# string literals.
+- Allowed: `(!)` `--` `->` `"` (straight)
+- Banned: 😊 — → " (curly)
 
-`.bob/custom_modes.yaml` (project-level) or `~/.bob/custom_modes.yaml` (global).
-
-### Mode YAML Schema
-
-```yaml
-customModes:
-  - slug: my-mode-slug        # unique ID; used for rules file naming
-    name: Display Name
-    roleDefinition: |
-      Describe the persona and primary responsibilities here.
-    customInstructions: |
-      Additional behavioral rules merged with rules file content.
-    groups:
-      - read
-      - - edit
-        - fileRegex: "^docs/"   # restrict edits to docs/ only
-          description: Planning docs only
-      - command
-      - mcp
-      - browser
+### 3. Post-Edit Deployment
+After every `src/` edit:
+```powershell
+powershell -File .\deploy-sync.ps1
 ```
 
-### Tool Groups
+### 4. Jane Street Alignment
+ALL architectural decisions must align with `docs/standards/JANE_STREET_DEVIATIONS.md`.
 
-| Group | Capability |
-|-------|-----------|
-| read | Read files, list directories |
-| edit | Write/modify files (add fileRegex to restrict paths) |
-| command | Run shell commands |
-| mcp | Call MCP server tools |
-| browser | Web browsing |
+### 5. Complexity Targets
+- Target: CYC < 20 per method
+- Threshold: CYC ≤ 15 (Jane Street aligned)
+- Zero logic drift during extraction
 
-### V12 Custom Modes (Active)
+## Standard Commands
 
-```yaml
-# v12-epic-planner: Plan-only for epic phase generation
-- slug: v12-epic-planner
-  groups:
-    - read
-    - [edit, fileRegex: "^docs/"]  # docs/ only -- NEVER src/
-    - mcp
+- **Build & Sync**: `powershell -File .\scripts\build_readiness.ps1`
+- **Format Code**: `dotnet csharpier format src/`
+- **Pre-Push Validation**: `powershell -File .\scripts\pre_push_validation.ps1`
+- **Complexity Audit**: `python scripts/complexity_audit.py`
+- **Jane Street KB Query**: `python scripts/query_kb.py "<term>"`
 
-# v12-engineer: Full surgical access for ticket execution
-- slug: v12-engineer
-  groups:
-    - read
-    - edit
-    - command
+## Workflow Commands
+
+### /epic-run (Full Orchestration)
+Full YOLO-mode epic execution. Orchestrates planning → execution → verification.
+
+**Phases**:
+1. Intake (Opus 4.8 - v12-epic-planner)
+2. Plan (Opus 4.8 - v12-epic-planner)
+3. Scan (Sonnet 4.6 - v12-engineer)
+4. Validate (Opus 4.8 - v12-epic-planner)
+5. Tickets (Opus 4.8 - v12-epic-planner)
+6. Execution (Sonnet 4.6 - v12-engineer)
+7. Verification (Sonnet 4.6 - advanced)
+
+### /epic-tdd (Manual Execution)
+Manual TDD-mode epic execution with gates.
+
+**Gates**:
+1. Intake (Sonnet 4.6)
+2. Plan Review (Opus 4.8)
+3. Sentinel Audit (Manual)
+4. DNA Validation (Opus 4.8)
+5. Implementation (Sonnet 4.6)
+6. Perfection (/pr-loop)
+
+### /pr-loop (Perfection Loop)
+Iterative repair until PHS = 100/100.
+
+**Steps**:
+1. Bot Forensics (Sonnet 4.6)
+2. Local Repair (Sonnet 4.6)
+3. Global Push (Sonnet 4.6)
+4. F5 Verification (Manual)
+
+## Legacy Agent Files (ARCHIVED)
+
+The following files reference the old multi-agent infrastructure:
+- `AGENTS.md` - General agent hierarchy (references Antigravity, Gemini CLI, etc.)
+- `CLAUDE.md` - Claude-specific instructions (ARCHITECT role)
+- `GEMINI.md` - Gemini CLI instructions (BACKUP ENGINEER role)
+- `CODEX.md` - Codex CLI instructions (ENGINEER role)
+- `JULES.md` - Jules AI instructions (GITHUB workflows)
+
+**These files are ARCHIVED**. They describe the old infrastructure where each agent was a separate tool.
+
+**You (Bob) replace all of them** via your modes. Do not try to roleplay as these agents.
+
+## Model Strategy
+
+See `docs/standards/MODEL_STRATEGY.md` for complete details.
+
+**Summary**:
+- **Sonnet 4.6**: Code execution (79.6% agentic coding - BEST)
+- **Opus 4.8**: Strategic planning (57.9% multidisciplinary reasoning - BEST)
+- **Cost**: $37.80/month (64% cheaper than all-Opus)
+
+## Pre-Push Validation (Mandatory)
+
+**ALWAYS run before every push**:
+```powershell
+powershell -File .\scripts\pre_push_validation.ps1
 ```
 
----
+**13 checks** (8 blocking, 5 warnings):
+1. ASCII-Only ✅
+2. Build ✅
+3. Unit Tests ✅
+4. Lint ✅
+5. Formatting ✅
+6. Security ⚠️
+7. Markdown Links ⚠️
+8. PR Hygiene ✅
+9. Complexity ✅
+10. Dead Code ⚠️
+11. Codacy Preview ⚠️
+12. Semgrep ⚠️
+13. CodeRabbit AI ⚠️
 
-## 3. Slash Commands
+## References
 
-Custom slash commands live in `.bob/commands/` (project) or `~/.bob/commands/` (global).
-Each command is a `.md` file. Fuzzy search and autocomplete available via `/` in chat.
-
-### Frontmatter
-
-```markdown
----
-description: Short description shown in the command picker
-argument-hint: <arg1> <arg2>
----
-# Command Title
-$1 = first argument, $2 = second argument
-```
-
-### Active V12 Commands
-
-| Command | File | Purpose |
-|---------|------|---------|
-| `/epic-intake` | `.bob/commands/epic-intake.md` | Phase 1: Scope definition |
-| `/epic-plan` | `.bob/commands/epic-plan.md` | Phase 2: Analysis + approach |
-| `/epic-validate` | `.bob/commands/epic-validate.md` | Phase 3: DNA compliance audit |
-| `/epic-tickets` | `.bob/commands/epic-tickets.md` | Phase 4: Ticket generation |
-| `/ticket` | `.bob/commands/ticket.md` | Single ticket execution |
-| `/epic-run` | `.bob/commands/epic-run.md` | YOLO-parity full orchestration |
-
-Built-in commands: `/init`, `/review`, `/compact`, `/help`.
+- Model Strategy: `docs/standards/MODEL_STRATEGY.md`
+- Jane Street Deviations: `docs/standards/JANE_STREET_DEVIATIONS.md`
+- Living Document Registry: `docs/brain/Living_Document_Registry.md`
+- Mode Configuration: `.bob/custom_modes.yaml`
+- Settings: `.bob/settings.json`
 
 ---
 
-## 4. Custom Rules
-
-Rules files inject behavioral constraints into a mode automatically.
-
-### File Naming Convention
-
-| Location | General rules | Mode-specific rules |
-|----------|--------------|-------------------|
-| Project | `.bob/rules/` | `.bob/rules-{mode-slug}/` |
-| Global | `~/.bob/rules/` | `~/.bob/rules-{mode-slug}/` |
-
-Directory method is preferred. Single-file alternative: `.bobrules-{mode-slug}`.
-
-Files load alphabetically within each directory. Mode-specific rules load before general rules.
-All files in a directory are read recursively. Empty files are silently skipped.
-
-### Rule Priority (High to Low)
-
-1. Global rules (`~/.bob/rules/`)
-2. Workspace rules (`.bob/rules/`)
-3. Within each: mode-specific before general; workspace overrides global
-
-### AGENTS.md Loading
-
-Bob automatically loads `AGENTS.md` from workspace root after mode-specific rules.
-Disable with `"bob-code.useAgentRules": false` in settings.
-
-### V12 Active Rules Files
-
-```
-.bob/rules-v12-epic-planner/
-  01-planning-protocol.md      # Enforces docs/-only, DNA compliance, gate protocol
-.bob/rules-v12-engineer/
-  dna.md                       # Lock-free, ASCII-only, deploy-sync requirements
-```
-
----
-
-## 5. Code Actions
-
-Code actions appear as a lightbulb icon in the editor gutter when code is selected.
-
-| Action | Description | Shortcut |
-|--------|-------------|---------|
-| Add to Context | Adds code + file path/line numbers to chat | First in menu |
-| Explain Code | Asks Bob to explain selection | Second |
-| Improve Code | Asks Bob to suggest improvements | Third |
-| Inline Chat | Opens chat at cursor position | Ctrl+K (Win) |
-| Move to Chat | Sends selection to chat panel with context | Ctrl+L (Win) |
-
-Context mention format: `@myFile.cs:15:25` (file:startLine:endLine).
-Use line ranges for targeted context to minimize token consumption.
-
----
-
-## 6. Checkpoints
-
-Bob automatically creates a checkpoint before every file modification.
-Uses a shadow Git repository separate from main version control.
-No commands needed -- checkpoints are fully automatic.
-
-### Key Facts
-
-- Created BEFORE file modifications (not before commands)
-- Task-scoped: checkpoints belong to the task that created them
-- Not created for external edits (manual saves, other tools)
-- Large binary files may impact performance
-
-### Restore Options (via Chat UI)
-
-| Option | Effect |
-|--------|--------|
-| Restore files | Reverts workspace files only; keeps chat history |
-| Restore files & task | Reverts files AND removes subsequent conversation messages (irreversible) |
-
-### What Checkpoints Do NOT Cover
-
-- Shell command output (only file mutations)
-- Files excluded by `.gitignore` or `.bobignore`
-- External changes made outside Bob tasks
-
-### V12 Workflow Implication
-
-The checkpoint safety net means no need for manual checkpoint commands in epic workflows.
-If a ticket edit goes wrong, Director restores from checkpoint via UI before the next ticket.
-
----
-
-## 7. Context Window Management
-
-Bob's context window: **200,000 tokens total**.
-Reserved for responses: ~50,000 tokens.
-Effective usable window: ~150,000 tokens.
-
-### Quality Thresholds
-
-| Threshold | Effect |
-|-----------|--------|
-| ~100k tokens | Quality noticeably degrades; responses become less precise |
-| 140k tokens | Auto-condensation triggers (lossy -- edge cases may be lost) |
-| 200k tokens | Hard limit |
-
-### What Consumes Tokens
-
-- System instructions + mode rules (always present)
-- Full conversation history (every message, tool call, result)
-- File contents via `@` mentions
-- MCP tool definitions (each connected server adds tokens)
-- Bob's own responses
-
-### Best Practices
-
-- Start a new chat when switching tasks -- do not let unrelated context accumulate
-- Use `@file:startLine-endLine` for targeted mentions, not whole directories
-- Only connect MCP servers you actively use (each adds token overhead)
-- For large files, reference only the relevant section
-- Break complex tasks into focused sub-sessions
-
-### V12 Epic Session Strategy
-
-```
-Planning session (phases 1-4): stays under 100k for most epics
-Execution session: fresh session per batch of 3-4 tickets
-Resume state: EXECUTION_GUIDE.md carries all context between sessions
-Rule: split planning and execution for any epic with > 3 tickets
-```
-
----
-
-## 8. Context Poisoning
-
-Context poisoning = inaccurate or irrelevant data contaminating the active context.
-Once poisoned, the context cannot be reliably repaired with prompts. Only a new session fixes it.
-
-### Symptoms
-
-- Degraded output quality (nonsensical, repetitive, irrelevant suggestions)
-- Tool misalignment (tool calls don't match requests)
-- **Orchestration failures: chains stall, loop indefinitely, or fail to complete**
-- Temporary fixes work briefly then revert
-- Tool usage confusion (Bob forgets how to use tools from system prompt)
-
-### Common Causes
-
-- Model hallucination treated as factual context in subsequent turns
-- Outdated or incorrect code comments misinterpreted
-- Pasted logs containing hidden control characters
-- Context window overflow causing poisoned data to dominate
-
-### Recovery
-
-**No prompt reliably fixes context poisoning.** The corrupted text persists in session history.
-
-Recovery sequence:
-1. Abandon the current session
-2. Start a new session
-3. Load resume state from `EXECUTION_GUIDE.md` or the relevant ticket file
-4. Continue from the last confirmed-complete step
-
-### V12 Orchestrator Red Flags (Stop Immediately)
-
-- Orchestrator re-runs a phase it already completed
-- Gate questions reference wrong epic slug or wrong ticket number
-- Sub-task brief points to non-existent file paths
-- Orchestrator tries to delegate to a mode that doesn't exist
-- Any of the above: STOP, save progress to `EXECUTION_GUIDE.md`, start fresh session
-
----
-
-## 9. Session Management Summary for V12 Epics
-
-```
-DO:
-  - Start a new session for each distinct epic
-  - Split planning and execution into separate sessions (> 3 tickets)
-  - Use @file:line-range for targeted context
-  - Let checkpoints handle rollback (no manual checkpoint commands)
-  - Watch for context poisoning signals in long orchestrator sessions
-  - Resume from EXECUTION_GUIDE.md after any session restart
-
-DO NOT:
-  - Run all tickets for a large epic in one session
-  - Use broad @dir mentions
-  - Try to "wake up" a poisoned orchestrator with corrective prompts
-  - Run shell commands from Orchestrator mode (no tool access)
-  - Leave unused MCP servers connected (each adds token overhead)
-```
-
----
-
-_Last Updated: 2026-05-14 (Session: Bob CLI YOLO Orchestration Hardening)_
+**Remember**: You are Bob. You have modes. You are NOT Gemini CLI, Claude, Codex, Antigravity, or Jules.

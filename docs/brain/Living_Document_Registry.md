@@ -76,5 +76,14 @@ Design decisions and inspiration for the project's evolution.
 *   [IDE_GUIDE.md](../../IDE_GUIDE.md) - Developer environment and tooling setup instructions.
 
 ---
+
+## 🤖 Agent Configuration & Optimization
+Model strategy, cost optimization, and agent behavior tuning.
+
+*   [MODEL_STRATEGY.md](../standards/MODEL_STRATEGY.md) - Hybrid model strategy (Sonnet 4.6 for code, Opus 4.8 for planning), benchmark evidence, cost analysis, and escalation protocols. **Review Monthly**.
+*   [JANE_STREET_DEVIATIONS.md](../standards/JANE_STREET_DEVIATIONS.md) - Documented deviations from .NET standards in favor of Jane Street HFT patterns (struct events, boundary exceptions). **Review Quarterly**.
+*   [.bob/custom_modes.yaml](../../.bob/custom_modes.yaml) - Bob CLI mode definitions with model assignments: v12-engineer (Sonnet 4.6), v12-epic-planner (Opus 4.8), v12-phase7-lead (Opus 4.8).
+
+---
 **Registry Status**: MAINTAINED
-**Last Update**: 2026-05-15 (MP-1 SIMA Lifecycle complete; F5 PASS 11:58 Eastern; Logic Audit 1-9 PASS; MP-2 Watch List Cluster 2 queued)
+**Last Update**: 2026-05-28 (Model strategy implemented: Sonnet 4.6 for v12-engineer, Opus 4.8 for v12-epic-planner/v12-phase7-lead. Cost optimization: 64% savings vs all-Opus. Phoenix/Compound Intelligence/Obsidian integrations complete.)

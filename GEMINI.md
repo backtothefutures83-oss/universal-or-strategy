@@ -1,3 +1,16 @@
+# ⚠️ LEGACY FILE - DO NOT USE FOR BOB
+
+**This file is archived and applies ONLY to standalone Gemini CLI or Antigravity sessions.**
+
+**If you are Bob (IDE or Shell)**: Read [`BOB.md`](BOB.md) instead. You are NOT Gemini CLI or Antigravity.
+
+**Bob Mode Mapping**:
+- Bob's `orchestrator` mode replaces Antigravity's orchestrator role
+- Bob's `advanced` mode replaces Gemini CLI's backup engineer role
+- See [`AGENTS.md`](AGENTS.md) for complete Bob CLI documentation
+
+---
+
 # NinjaScript V12 Project Standards (Antigravity & Gemini Mirror)
 
 # Antigravity = PRIMARY ORCHESTRATOR (BANNED from src/ edits)

@@ -3,6 +3,7 @@
 
 This hook runs automatically when Bob CLI starts a session.
 It loads context from Jane Street KB, Graphify, and Compound Intelligence.
+It also initializes Phoenix tracing.
 """
 
 import sys
@@ -12,6 +13,7 @@ from pathlib import Path
 # Add scripts to path
 repo_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(repo_root / 'scripts'))
+sys.path.insert(0, str(repo_root / '.bob' / 'hooks'))
 
 try:
     from agent_bootstrap import bootstrap_agent
@@ -23,6 +25,30 @@ try:
     from query_kb import init_firestore
 except ImportError:
     init_firestore = None
+
+# Import Phoenix tracer
+try:
+    from phoenix_tracer import initialize_tracing
+    PHOENIX_AVAILABLE = True
+except ImportError:
+    PHOENIX_AVAILABLE = False
+    print("[Bob Bootstrap] Warning: Phoenix tracer not available")
+
+# Import Compound Intelligence logger
+try:
+    from compound_intelligence_logger import start_session as ci_start_session
+    CI_AVAILABLE = True
+except ImportError:
+    CI_AVAILABLE = False
+    print("[Bob Bootstrap] Warning: Compound Intelligence logger not available")
+
+# Import Obsidian sync
+try:
+    from obsidian_sync import start_session as obs_start_session
+    OBS_AVAILABLE = True
+except ImportError:
+    OBS_AVAILABLE = False
+    print("[Bob Bootstrap] Warning: Obsidian sync not available")
 
 
 def generate_jane_street_rules(context):
@@ -94,6 +120,35 @@ def main():
         task_type = task_type_map.get(mode, 'architecture')
         
         print(f"[Bob Bootstrap] Loading context for mode: {mode} (task type: {task_type})")
+        
+        # Get task description
+        task_desc = os.getenv('BOB_TASK_DESCRIPTION', f"{mode} session")
+        session_id = None
+        
+        # Initialize Phoenix tracing
+        if PHOENIX_AVAILABLE:
+            try:
+                session_id = initialize_tracing(mode, task_desc)
+                if session_id:
+                    print(f"[Bob Bootstrap] ✅ Phoenix tracing initialized: {session_id}")
+            except Exception as e:
+                print(f"[Bob Bootstrap] ⚠️ Failed to initialize Phoenix tracing: {e}")
+        
+        # Initialize Compound Intelligence logger
+        if CI_AVAILABLE:
+            try:
+                ci_start_session(mode, task_desc, session_id)
+                print(f"[Bob Bootstrap] ✅ Compound Intelligence logger initialized")
+            except Exception as e:
+                print(f"[Bob Bootstrap] ⚠️ Failed to initialize Compound Intelligence: {e}")
+        
+        # Initialize Obsidian sync
+        if OBS_AVAILABLE:
+            try:
+                obs_start_session(mode, task_desc, session_id)
+                print(f"[Bob Bootstrap] ✅ Obsidian sync initialized")
+            except Exception as e:
+                print(f"[Bob Bootstrap] ⚠️ Failed to initialize Obsidian sync: {e}")
         
         # Load context
         result = bootstrap_agent('Bob', task_type)

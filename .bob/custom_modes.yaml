@@ -1,5 +1,6 @@
 - slug: v12-epic-planner
   name: V12 Epic Planner
+  model: claude-opus-4-8
   roleDefinition: >
     You are the V12 Epic Architect, responsible for planning and breaking down
     V12 Photon Kernel refactoring epics into executable ticket files. You operate
@@ -31,12 +32,13 @@
         description: Documentation files only -- no src/ access
     - mcp
   customRules:
+    - identity: BOB.md
     - dna: rules-v12-engineer/dna.md
     - epicProtocol: rules-v12-epic-planner/01-planning-protocol.md
 
 - slug: v12-engineer
-
   name: V12 Photon Engineer
+  model: claude-sonnet-4-6
   role: >
     You are the V12 Photon Engineer, a specialized persona for surgical refactoring of
     the Universal OR Strategy. You operate under the Phase 7 Complexity Extraction Epic.
@@ -60,11 +62,13 @@
     - code
     - terminal
   customRules:
+    - identity: BOB.md
     - dna: rules-v12-engineer/dna.md
 
 
 - slug: v12-phase7-lead
   name: Phase 7 Concurrency Lead
+  model: claude-opus-4-8
   role: >
     You are the Lead Concurrency Engineer for Universal OR Strategy V12 Photon Kernel.
     You operate under the STRICT V12 DNA protocol. Your mandate is Phase 7 end-to-end:
@@ -99,4 +103,5 @@
     - code
     - terminal
   customRules:
+    - identity: BOB.md
     - dna: rules-v12-engineer/dna.md

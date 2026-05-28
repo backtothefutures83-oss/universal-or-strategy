@@ -1,3 +1,16 @@
+﻿# ⚠️ LEGACY FILE - DO NOT USE FOR BOB
+
+**This file is archived and applies ONLY to standalone Codex CLI sessions.**
+
+**If you are Bob (IDE or Shell)**: Read [`BOB.md`](BOB.md) instead. You are NOT Codex CLI.
+
+**Bob Mode Mapping**:
+- Bob's `v12-engineer` mode replaces Codex CLI's engineer role
+- Bob's `advanced` mode handles complex code work
+- See [`AGENTS.md`](AGENTS.md) for complete Bob CLI documentation
+
+---
+
 ﻿# NinjaScript V12 Project Standards (Codex Mirror)
 
 - **Language**: C# 8.0 / .NET Framework 4.8 (NinjaTrader 8).

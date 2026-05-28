@@ -1,3 +1,11 @@
+# Devbox
+.devbox/
+devbox.lock
+
+# Python virtual environment
+.venv/
+venv/
+
 # MS Build / NinjaTrader defaults
 bin/
 obj/

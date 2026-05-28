@@ -1,0 +1,266 @@
+﻿[
+    {
+        "issueId":  "8f01e1e5b739ee1c8f497cb5d28690a8",
+        "resultDataId":  131495994873,
+        "filePath":  "sandbox/R28_MmioSpscRing/XorShadow.cs",
+        "fileId":  208901233213,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  8,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "    internal static unsafe class XorShadow",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "11d27a00465fb89d25bba01d11b59907",
+        "resultDataId":  131495994721,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  15,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "        public static unsafe void AllocAligned(int capacity, out CoreLane* ptr, out IntPtr handle) {",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "d6b607651010c9fd154ea9886a2c85e6",
+        "resultDataId":  131495993508,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2486",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  157,
+        "message":  "Handle the exception or explain in a comment why it can be ignored.",
+        "language":  "CSharp",
+        "lineText":  "            try { _accessor.Dispose(); } catch { }",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "315af19e11118cd6612c9dbceef1ce9d",
+        "resultDataId":  131495993945,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  9,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "    public unsafe struct CoreLane {",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "9c280713753497966373eb5f413d885f",
+        "resultDataId":  131495993659,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  14,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "    public static unsafe class CoreLaneAllocator {",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "18b8b31d6f6f7201793148ad0b59344b",
+        "resultDataId":  131495993905,
+        "filePath":  "sandbox/R28_MmioSpscRing/Program.cs",
+        "fileId":  208901233210,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  8,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "    internal static unsafe class Program",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "3c8cba44f42306726778d96152af5455",
+        "resultDataId":  131495994397,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  25,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "    public unsafe sealed class SpscRingV148 : IDisposable {",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "244d0959fb830f080b2c3702334b9623",
+        "resultDataId":  131495993983,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2486",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  158,
+        "message":  "Handle the exception or explain in a comment why it can be ignored.",
+        "language":  "CSharp",
+        "lineText":  "            try { _mmf.Dispose();       } catch { }",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "9330d268e3b16e05f3f088e0c105d32d",
+        "resultDataId":  131495993709,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  15,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "    internal sealed unsafe class MmioSpscRing\u003cT\u003e : IDisposable where T : unmanaged",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "e8492715f4d1e985369a1f8a49751d81",
+        "resultDataId":  131495994361,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  45,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "        public unsafe bool TryEnqueue(double payload) {",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "503e307402d7fe6acaff3ec3cb863197",
+        "resultDataId":  131495994294,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2486",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  156,
+        "message":  "Handle the exception or explain in a comment why it can be ignored.",
+        "language":  "CSharp",
+        "lineText":  "            try { _accessor.SafeMemoryMappedViewHandle.ReleasePointer(); } catch { }",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "7fe3d65be20aa4ae5b729cde4e01d81d",
+        "resultDataId":  131495994235,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6640",
+                            "category":  "Security",
+                            "level":  "High",
+                            "severityLevel":  "High",
+                            "subCategory":  "InsecureModulesLibraries"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  57,
+        "message":  "Make sure that using \"unsafe\" is safe here.",
+        "language":  "CSharp",
+        "lineText":  "        public unsafe bool TryDequeue(out double payload) {",
+        "falsePositiveThreshold":  80
+    }
+]

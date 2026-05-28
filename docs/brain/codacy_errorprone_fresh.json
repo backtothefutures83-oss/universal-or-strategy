@@ -1,0 +1,2309 @@
+﻿[
+    {
+        "issueId":  "73e8fa08257ee043118c44ede39af071",
+        "resultDataId":  131495994458,
+        "filePath":  "benchmarks/StandaloneBench.cs",
+        "fileId":  208901233306,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  103,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            } catch (Exception ex) {",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "8c5f001a3766272d4d4d58955abcc6a7",
+        "resultDataId":  131495994602,
+        "filePath":  "src/V12_002.Orders.Management.StopSync.cs",
+        "fileId":  208901233208,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  675,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception submitEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "49b1b59d289f1ed3022343df06e9095",
+        "resultDataId":  131495994172,
+        "filePath":  "src/V12_002.Trailing.StopUpdate.cs",
+        "fileId":  208901233128,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  501,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception flattenEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "9eaf7e8c269aa0c116e894c271eadd8a",
+        "resultDataId":  131495993587,
+        "filePath":  "tests/Epic1DeltaTests.cs",
+        "fileId":  208901233320,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4143",
+                            "category":  "ErrorProne",
+                            "level":  "Warning",
+                            "severityLevel":  "Warning"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  151,
+        "message":  "Verify this is the index/key that was intended; a value has already been set for it.",
+        "language":  "CSharp",
+        "lineText":  "                            photonSideband[slot] = default(FleetDispatchSideband);",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "a0b7ab7fa3c97ab46e568e355a2c3e7b",
+        "resultDataId":  131495994057,
+        "filePath":  "src/V12_002.REAPER.Audit.cs",
+        "fileId":  208901233119,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  235,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception repairTriggerEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "8bf7e4dca4b9e77b8e12d58d0fc548b4",
+        "resultDataId":  131497460489,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  218,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cEntryUpdateSignal\u003e OnEntryUpdate;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "ddf909a1686d3c94fbd406d34c443be",
+        "resultDataId":  131495994215,
+        "filePath":  "src/V12_002.PositionInfo.cs",
+        "fileId":  208901233347,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S131",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  384,
+        "message":  "Add a \u0027default\u0027 clause to this \u0027switch\u0027 statement.",
+        "language":  "CSharp",
+        "lineText":  "            switch (targetNumber)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "292593f757af65d5029274c4b6816d32",
+        "resultDataId":  131495993974,
+        "filePath":  "src/V12_002.REAPER.Repair.cs",
+        "fileId":  208901233289,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  289,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "3755ebbbd4f396152dcbbd96ef27d729",
+        "resultDataId":  131495994466,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  256,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "26aff7769b1f2355b7155be8cb0af439",
+        "resultDataId":  131495994763,
+        "filePath":  "src/V12_002.Orders.Management.Cleanup.cs",
+        "fileId":  208901233341,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  628,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "5bc830af053ee90cd109c335cae63e07",
+        "resultDataId":  131495994370,
+        "filePath":  "src/V12_002.UI.Snapshot.cs",
+        "fileId":  208901233362,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  46,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "3a80165ef3e7a87773634e133df84442",
+        "resultDataId":  131495994220,
+        "filePath":  "tests/Epic1DeltaTests.cs",
+        "fileId":  208901233320,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  57,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "30a065ec19019f6f29f28c887488d5aa",
+        "resultDataId":  131495993721,
+        "filePath":  "src/V12_002.SIMA.Execution.cs",
+        "fileId":  208901233365,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  115,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1afdb4497a213b4acbf2a0d4fd085a3",
+        "resultDataId":  131495994108,
+        "filePath":  "src/V12_002.REAPER.cs",
+        "fileId":  208901233263,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  174,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "b94a2aa89146cb68d350bbde5a9a0b1b",
+        "resultDataId":  131497460495,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  224,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cOrderCancelSignal\u003e OnOrderCancel;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "a60ffe655cd3c7cae4cbcccbb20c5c44",
+        "resultDataId":  131496795835,
+        "filePath":  "src/V12_002.Orders.Management.Flatten.cs",
+        "fileId":  208901233354,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  363,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception pEx)",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "25b55d5babc7c4b64469fd8c801d8689cb68dc4a",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-26T21:40:25Z"
+                       }
+    },
+    {
+        "issueId":  "6ed5a1ed4600f137733590291870b46",
+        "resultDataId":  131495994109,
+        "filePath":  "src/V12_002.UI.IPC.Commands.Fleet.cs",
+        "fileId":  208901233304,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  424,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "7fbd7f6f9ed2d96a54af7b1b3ede3d48",
+        "resultDataId":  131495994135,
+        "filePath":  "src/V12_002.Orders.Callbacks.Execution.cs",
+        "fileId":  208901233335,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2760",
+                            "category":  "ErrorProne",
+                            "level":  "Warning",
+                            "severityLevel":  "Warning"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  414,
+        "message":  "This condition was just checked on line 442.",
+        "language":  "CSharp",
+        "lineText":  "                        if (remainingAfterStop \u003c= 0)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "37f173d9e8130cc2148c0ccb52e96a63",
+        "resultDataId":  131497460504,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  200,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cFlattenSignal\u003e OnFlattenAll;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "c5f5edd3d50a1421e9e76a4d386012cc",
+        "resultDataId":  131495993459,
+        "filePath":  "src/V12_002.SIMA.Flatten.cs",
+        "fileId":  208901233132,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  97,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "ca70a0fb797d81e5a1a6c81d99498f34",
+        "resultDataId":  131495993704,
+        "filePath":  "src/V12_002.Orders.Callbacks.Execution.cs",
+        "fileId":  208901233335,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  58,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1a347c318d02a0f06f8383842d0c4c1c",
+        "resultDataId":  131495994025,
+        "filePath":  "src/V12_002.Lifecycle.cs",
+        "fileId":  208901233203,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  446,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception _mmioEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "7c359d3eff0b6fd59388f1c771f857a5",
+        "resultDataId":  131495994925,
+        "filePath":  "src/V12_002.Orders.Management.Flatten.cs",
+        "fileId":  208901233354,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  184,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1ebe8ad170e7154ce1317f7136783fd1",
+        "resultDataId":  131495993895,
+        "filePath":  "src/V12_002.Orders.Callbacks.Propagation.cs",
+        "fileId":  208901233337,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  455,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "d9d10e0a47845577f6e79c489db02048",
+        "resultDataId":  131495993891,
+        "filePath":  "tests/T04_SnapshotPattern_ConcurrentModification_Test.cs",
+        "fileId":  208901233294,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  223,
+        "message":  "Replace this use of \u0027Task.Wait\u0027 with \u0027await\u0027.",
+        "language":  "CSharp",
+        "lineText":  "                    mixedTask.Wait();",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "5664f7050bd356b03384e985a67ba099",
+        "resultDataId":  131495993730,
+        "filePath":  "tests/T04_SnapshotPattern_ConcurrentModification_Test.cs",
+        "fileId":  208901233294,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  101,
+        "message":  "Replace this use of \u0027Task.Wait\u0027 with \u0027await\u0027.",
+        "language":  "CSharp",
+        "lineText":  "                    addTask.Wait();",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "255a33023fa38ececaeeed49447961d8",
+        "resultDataId":  131495994606,
+        "filePath":  "tests/V12_Performance.Tests/Core/FSMActorTests.cs",
+        "fileId":  208901233268,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  78,
+        "message":  "Replace this use of \u0027Task.Wait\u0027 with \u0027await\u0027.",
+        "language":  "CSharp",
+        "lineText":  "            Task.WhenAll(tasks).Wait();",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "f4d75a0d93760566499194afb23d3e5",
+        "resultDataId":  131497432175,
+        "filePath":  "src/V12_002.REAPER.Repair.cs",
+        "fileId":  208901233289,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  284,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "35927d13e6ab638da69426ea472b973224b42a31",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T17:11:27Z"
+                       }
+    },
+    {
+        "issueId":  "bf64fe112ffd4625c56685ba9e730e90",
+        "resultDataId":  131495993518,
+        "filePath":  "src/V12_002.SIMA.Execution.cs",
+        "fileId":  208901233365,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  740,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception localEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "947fa5beef4ed68698d7ba293c6ebc07",
+        "resultDataId":  131495994029,
+        "filePath":  "src/V12_002.UI.Compliance.cs",
+        "fileId":  208901233360,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  181,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1104df8e69c1b98af37e32749d5b757e",
+        "resultDataId":  131495994409,
+        "filePath":  "tests/T04_SnapshotPattern_ConcurrentModification_Test.cs",
+        "fileId":  208901233294,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  159,
+        "message":  "Replace this use of \u0027Task.Wait\u0027 with \u0027await\u0027.",
+        "language":  "CSharp",
+        "lineText":  "                    removeTask.Wait();",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1858987624ff1c9d07a2eefd12af9a3e",
+        "resultDataId":  131495993729,
+        "filePath":  "src/V12_002.UI.Compliance.cs",
+        "fileId":  208901233360,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  237,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "d492b527d46c1486e5bb10bf8a99d58a",
+        "resultDataId":  131495994610,
+        "filePath":  "src/V12_002.UI.Panel.Construction.cs",
+        "fileId":  208901233338,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  344,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "ad77451fa54d24724890ab37d62d08dd",
+        "resultDataId":  131495994348,
+        "filePath":  "src/V12_002.UI.Panel.Lifecycle.cs",
+        "fileId":  208901233193,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  90,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "cde9564e4b5c0c46c867ef224cdc754c",
+        "resultDataId":  131495994961,
+        "filePath":  "src/V12_002.Trailing.StopUpdate.cs",
+        "fileId":  208901233128,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  135,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "cb3533feca5da196d63f231bfe83be8b",
+        "resultDataId":  131495993792,
+        "filePath":  "src/V12_002.REAPER.Audit.cs",
+        "fileId":  208901233119,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  821,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "a6044c42852e95a674325ba5aada89a2",
+        "resultDataId":  131495993705,
+        "filePath":  "tests/T04_SnapshotPattern_ConcurrentModification_Test.cs",
+        "fileId":  208901233294,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  170,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "bc482f8a283327172564c52960b26ba6",
+        "resultDataId":  131495994857,
+        "filePath":  "src/V12_002.Entries.MOMO.cs",
+        "fileId":  208901233223,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  267,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "5daf0d28f73b988266ccddb2fabc4b3a",
+        "resultDataId":  131495994281,
+        "filePath":  "sandbox/R28_MmioSpscRing/Program.cs",
+        "fileId":  208901233210,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  37,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "a723ac6c6a18fce594a6fe4fd763a261",
+        "resultDataId":  131495994619,
+        "filePath":  "src/V12_002.REAPER.Audit.cs",
+        "fileId":  208901233119,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  607,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                        catch (Exception _mFlatTriggerEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "9834135b3a7d2b3ba24de623e286d755",
+        "resultDataId":  131495994360,
+        "filePath":  "src/V12_002.Safety.Watchdog.cs",
+        "fileId":  208901233293,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  72,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "33b99757b9d54041d9f7420cc691bb6f",
+        "resultDataId":  131495994620,
+        "filePath":  "src/V12_002.UI.Callbacks.cs",
+        "fileId":  208901233297,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S131",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  431,
+        "message":  "Add a \u0027default\u0027 clause to this \u0027switch\u0027 statement.",
+        "language":  "CSharp",
+        "lineText":  "            switch (key)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "aa47c850107d40ad445aefb166627a3e",
+        "resultDataId":  131495994380,
+        "filePath":  "src/V12_002.SIMA.Dispatch.cs",
+        "fileId":  208901233280,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  80,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "6edd51b20bb88aa23ec17b34e4c714f8",
+        "resultDataId":  131497432176,
+        "filePath":  "src/V12_002.Orders.Management.Flatten.cs",
+        "fileId":  208901233354,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  544,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "35927d13e6ab638da69426ea472b973224b42a31",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T17:11:27Z"
+                       }
+    },
+    {
+        "issueId":  "483bdc69063dd64b70f2e93de0651161",
+        "resultDataId":  131495994604,
+        "filePath":  "src/V12_002.Orders.Callbacks.AccountOrders.cs",
+        "fileId":  208901233274,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  681,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                        catch (Exception tFsmEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "6cab0503d9234d9f58c7bc9d7179ca7f",
+        "resultDataId":  131495994131,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  157,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            try { _accessor.Dispose(); } catch { }",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "14bbea01159019b30b6c9d37ce4888e2",
+        "resultDataId":  131495993822,
+        "filePath":  "src/V12_002.DrawingHelpers.cs",
+        "fileId":  208901233135,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  134,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "38cb98a718de6198880439858ff90589",
+        "resultDataId":  131495993867,
+        "filePath":  "src/V12_002.Telemetry.cs",
+        "fileId":  208901233307,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  226,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "3a2125b80dabb343e75d9e0fdd6ed831",
+        "resultDataId":  131495993571,
+        "filePath":  "src/V12_002.UI.IPC.cs",
+        "fileId":  208901233255,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  315,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "af5c21d9277548f2f2f1d90637b9c2ce",
+        "resultDataId":  131495994952,
+        "filePath":  "src/V12_002.UI.IPC.Commands.Misc.cs",
+        "fileId":  208901233224,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  234,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "2b21cb6c39b96fac1768adc4533c08b2",
+        "resultDataId":  131495994330,
+        "filePath":  "tests/T04_SnapshotPattern_ConcurrentModification_Test.cs",
+        "fileId":  208901233294,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  296,
+        "message":  "Replace this use of \u0027Task.Wait\u0027 with \u0027await\u0027.",
+        "language":  "CSharp",
+        "lineText":  "                    mutateTask.Wait();",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "920e0c378c1c94ff2ea96dbda52d9ffb",
+        "resultDataId":  131496754613,
+        "filePath":  "src/V12_002.UI.IPC.Server.cs",
+        "fileId":  208901233303,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  203,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                            catch (Exception shutdownEx)",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "1183c7d8b7a8b7df249570f254a82202dab060d7",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-26T18:43:48Z"
+                       }
+    },
+    {
+        "issueId":  "609f1784e7916cba531c2a9d23d7cf23",
+        "resultDataId":  131495993962,
+        "filePath":  "src/V12_002.Entries.OR.cs",
+        "fileId":  208901233226,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  343,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "ce94c988b678050a26d00ea89edcf780",
+        "resultDataId":  131495994322,
+        "filePath":  "src/V12_002.REAPER.NakedStop.cs",
+        "fileId":  208901233164,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  68,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "5f69327721e7e8e995ce4e8a2ac02834",
+        "resultDataId":  131495994659,
+        "filePath":  "src/V12_002.Lifecycle.cs",
+        "fileId":  208901233203,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  910,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception exReconnect)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "d9bc836517777094d2711a15f22b8ab8",
+        "resultDataId":  131495994914,
+        "filePath":  "src/V12_002.UI.IPC.Server.cs",
+        "fileId":  208901233303,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  75,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "babb62d764108ca76c35d8b9652b7114",
+        "resultDataId":  131495994951,
+        "filePath":  "src/V12_002.Entries.Trend.cs",
+        "fileId":  208901233174,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  199,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "8d740973d9c412a26c2c13abca1b9033",
+        "resultDataId":  131495993662,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  158,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            try { _mmf.Dispose();       } catch { }",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "a90b25eaebd38e6533d3e94b1e7ab92a",
+        "resultDataId":  131495993893,
+        "filePath":  "src/V12_002.UI.Panel.Helpers.cs",
+        "fileId":  208901233233,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  417,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "c0b1667296ef2acb34404895afda257d",
+        "resultDataId":  131497460494,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  194,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cTargetActionSignal\u003e OnTargetAction;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "f0fecd8a095130c87870b0649ad82730",
+        "resultDataId":  131495993517,
+        "filePath":  "src/V12_002.Orders.Management.cs",
+        "fileId":  208901233308,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  361,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception submitEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "bef9dc4c45a52bc066da046606272ef1",
+        "resultDataId":  131495994561,
+        "filePath":  "src/V12_002.StickyState.cs",
+        "fileId":  208901233177,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  122,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "296f0cd0bedcb6bc680669ded38a2fd8",
+        "resultDataId":  131495994864,
+        "filePath":  "src/V12_002.UI.Callbacks.cs",
+        "fileId":  208901233297,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  122,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "b61eeb7f22d8fd275991c7602d9b6f3b",
+        "resultDataId":  131496754657,
+        "filePath":  "src/V12_002.StickyState.cs",
+        "fileId":  208901233177,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2760",
+                            "category":  "ErrorProne",
+                            "level":  "Warning",
+                            "severityLevel":  "Warning"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  97,
+        "message":  "This condition was just checked on line 87.",
+        "language":  "CSharp",
+        "lineText":  "                if (File.Exists(validStatePath))",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "31f13cc9fe5430c389e6bdc650e3a8e24f54e11d",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-26T18:43:25Z"
+                       }
+    },
+    {
+        "issueId":  "3af6c3c077fdd288187901a8cb3821a4",
+        "resultDataId":  131495993555,
+        "filePath":  "sandbox/R28_MmioSpscRing/MmioSpscRing.cs",
+        "fileId":  208901233228,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  156,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            try { _accessor.SafeMemoryMappedViewHandle.ReleasePointer(); } catch { }",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "a98f32c230ea41dc90e1a46f43d715f2",
+        "resultDataId":  131495994126,
+        "filePath":  "src/V12_002.UI.Callbacks.cs",
+        "fileId":  208901233297,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S131",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  1111,
+        "message":  "Add a \u0027default\u0027 clause to this \u0027switch\u0027 statement.",
+        "language":  "CSharp",
+        "lineText":  "                    switch (action)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "9d2a8391b7719dafcca19e90749f133f",
+        "resultDataId":  131495994224,
+        "filePath":  "src/V12_002.SIMA.Fleet.cs",
+        "fileId":  208901233245,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  67,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "57e63d085cefe57fcffd6034aeb478d4b51e91cd",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-25T22:25:59Z"
+                       }
+    },
+    {
+        "issueId":  "c16fcc63e05ca29139ac213028deb2df",
+        "resultDataId":  131496754663,
+        "filePath":  "src/V12_002.StickyState.cs",
+        "fileId":  208901233177,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  134,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception cleanupEx)",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "1067f1712fecec20702a17087ed2931859b94da6",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-26T18:43:59Z"
+                       }
+    },
+    {
+        "issueId":  "2e80d9f5cb36745aa94476eb41518e25",
+        "resultDataId":  131495994862,
+        "filePath":  "src/V12_002.UI.Compliance.cs",
+        "fileId":  208901233360,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3457",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  790,
+        "message":  "Remove this formatting call and simply use the input string.",
+        "language":  "CSharp",
+        "lineText":  "                Print(string.Format(\"[COMPLIANCE] Execution Update received for account.\"));",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "e9212832cb1d6749ec4831250fd4f7f7",
+        "resultDataId":  131495994624,
+        "filePath":  "src/V12_002.Orders.Callbacks.Propagation.cs",
+        "fileId":  208901233337,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  885,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception createEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "54617db400d7028c19a2f6152398b5b2",
+        "resultDataId":  131495994579,
+        "filePath":  "src/V12_002.Orders.Management.StopSync.cs",
+        "fileId":  208901233208,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  168,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "b868192c8248e79eec56fa8468d335bf",
+        "resultDataId":  131495994723,
+        "filePath":  "src/V12_002.LogicAudit.cs",
+        "fileId":  208901233334,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  501,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "ac61289f2200075df3cf0709a52d3686",
+        "resultDataId":  131495993668,
+        "filePath":  "tests/ThreadStaticSafetyTest.cs",
+        "fileId":  208901233178,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  228,
+        "message":  "Replace this use of \u0027Task.WaitAll\u0027 with \u0027await Task.WhenAll\u0027.",
+        "language":  "CSharp",
+        "lineText":  "                Task.WaitAll(tasks);",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "362d13e8c1f222423aa65a7918884192",
+        "resultDataId":  131495993601,
+        "filePath":  "src/V12_002.UI.Sizing.cs",
+        "fileId":  208901233237,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  307,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "3104c647a67d69130e3721d33e46dd0f",
+        "resultDataId":  131497460503,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  212,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cStopUpdateSignal\u003e OnStopUpdate;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "66e8e64f167d8b9517504870c4a63252",
+        "resultDataId":  131495993940,
+        "filePath":  "src/V12_002.Orders.Management.cs",
+        "fileId":  208901233308,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  84,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "693b0728eeec4f9ae1c572da9c1c7f78",
+        "resultDataId":  131495993430,
+        "filePath":  "tests/Epic1DeltaTests.cs",
+        "fileId":  208901233320,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  183,
+        "message":  "Replace this use of \u0027Task.WaitAll\u0027 with \u0027await Task.WhenAll\u0027.",
+        "language":  "CSharp",
+        "lineText":  "            Task.WaitAll(tasks.ToArray());",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "735274e78db35692038d493858832318",
+        "resultDataId":  131495994868,
+        "filePath":  "tests/ThreadStaticSafetyTest.cs",
+        "fileId":  208901233178,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S6507",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  299,
+        "message":  "Do not lock on local variable \u0027resultsLock\u0027, use a readonly field instead.",
+        "language":  "CSharp",
+        "lineText":  "                            lock (resultsLock)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "ad3084f28ce3285a4d6f91cab0048394",
+        "resultDataId":  131495994100,
+        "filePath":  "tests/ThreadStaticSafetyTest.cs",
+        "fileId":  208901233178,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S4462",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  233,
+        "message":  "Replace this use of \u0027Task.Result\u0027 with \u0027await\u0027.",
+        "language":  "CSharp",
+        "lineText":  "                    if (task.Result)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "9f23bd79731fd0cce84ba936f5c06a6",
+        "resultDataId":  131495994655,
+        "filePath":  "src/V12_002.Entries.RMA.cs",
+        "fileId":  208901233179,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  69,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "d2617031013073e13e3d9aba6ee3147e",
+        "resultDataId":  131495994720,
+        "filePath":  "src/V12_002.Orders.Callbacks.AccountOrders.cs",
+        "fileId":  208901233274,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  171,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "e8b29c0a973d0075cb80988256941fee",
+        "resultDataId":  131495994519,
+        "filePath":  "src/V12_002.Lifecycle.cs",
+        "fileId":  208901233203,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  177,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "ea4c742cfbe23fc458624883f5fddd9b",
+        "resultDataId":  131495994081,
+        "filePath":  "src/V12_002.REAPER.Audit.cs",
+        "fileId":  208901233119,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  363,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception tcEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "e5aedcd43f54c505bb8ab8700babadc6",
+        "resultDataId":  131495994147,
+        "filePath":  "src/V12_002.Lifecycle.cs",
+        "fileId":  208901233203,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  103,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception exOuter)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "4bef529685cfcad388a188f5b6863616",
+        "resultDataId":  131495994234,
+        "filePath":  "src/V12_002.Trailing.Breakeven.cs",
+        "fileId":  208901233198,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  62,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "e93b906e1dff9aaa9a3e11c97876b24e",
+        "resultDataId":  131495993482,
+        "filePath":  "tests/ThreadStaticSafetyTest.cs",
+        "fileId":  208901233178,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  108,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "c85ad7986314b525c17f29785ec5a23c",
+        "resultDataId":  131497432177,
+        "filePath":  "src/V12_002.Photon.MmioMirror.cs",
+        "fileId":  208901233353,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  120,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "35927d13e6ab638da69426ea472b973224b42a31",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T17:11:27Z"
+                       }
+    },
+    {
+        "issueId":  "9433ccb3d95d1a89e1cdfcc36c94bef1",
+        "resultDataId":  131495994783,
+        "filePath":  "src/V12_002.Entries.Retest.cs",
+        "fileId":  208901233331,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  314,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "2bfe8a2c6ca3df00ca56a5d2fe782dab",
+        "resultDataId":  131495993950,
+        "filePath":  "src/V12_002.MetadataGuard.cs",
+        "fileId":  208901233244,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  45,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1860b652db1ed41ca5b44688303f5038",
+        "resultDataId":  131497460488,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  206,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cBreakevenSignal\u003e OnBreakevenRequest;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "499c5b4da4f502191e2c809481346888",
+        "resultDataId":  131495993967,
+        "filePath":  "src/V12_002.UI.IPC.Server.cs",
+        "fileId":  208901233303,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  102,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "dedef975c9184573397589e1020a2457",
+        "resultDataId":  131497460497,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  182,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cTradeSignal\u003e OnTradeSignal;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "5971e2f70605b4a32d8e947351b7de9e",
+        "resultDataId":  131495993781,
+        "filePath":  "src/V12_002.REAPER.Audit.cs",
+        "fileId":  208901233119,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  318,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception _flatTriggerEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "d24bdcbc7676d832fb64b3ae310ca1aa",
+        "resultDataId":  131495993745,
+        "filePath":  "src/V12_002.SIMA.cs",
+        "fileId":  208901233216,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  249,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "fac7a689b4c6ca3c030e375e17ce125c",
+        "resultDataId":  131495993902,
+        "filePath":  "src/V12_002.Lifecycle.cs",
+        "fileId":  208901233203,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  84,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                    catch (Exception exCmd)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "bf4deffaa3f9c6dbdedcb83f36d6a1b2",
+        "resultDataId":  131497460496,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  230,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cExternalCommandSignal\u003e OnExternalCommand;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    },
+    {
+        "issueId":  "46a0c951b049fa1beda06f4ea25173ac",
+        "resultDataId":  131495994013,
+        "filePath":  "src/V12_002.Entries.FFMA.cs",
+        "fileId":  208901233300,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  104,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "8a225586a7de08e4a7788f5889b51e1b",
+        "resultDataId":  131495993092,
+        "filePath":  "extract.py",
+        "fileId":  208901233288,
+        "patternInfo":  {
+                            "id":  "Prospector_pyflakes",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "25673894-eac1-4941-87a6-81f1abd5c321",
+                         "name":  "Prospector"
+                     },
+        "lineNumber":  2,
+        "message":  "\u0027os\u0027 imported but unused (F401)",
+        "language":  "Python",
+        "lineText":  "import os",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "1ecbce26118cfc905a40a571b6267975",
+        "resultDataId":  131495994534,
+        "filePath":  "src/V12_002.BarUpdate.cs",
+        "fileId":  208901233196,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  340,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "93c9876a58a5217a2102208ef3f76469",
+        "resultDataId":  131495993886,
+        "filePath":  "src/V12_002.Trailing.cs",
+        "fileId":  208901233348,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2760",
+                            "category":  "ErrorProne",
+                            "level":  "Warning",
+                            "severityLevel":  "Warning"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  113,
+        "message":  "This condition was just checked on line 99.",
+        "language":  "CSharp",
+        "lineText":  "                if (leaderLongMaxLevel \u003e 0 || leaderShortMaxLevel \u003e 0)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "7782f6725259e300ce8bfcb27921da34",
+        "resultDataId":  131495993750,
+        "filePath":  "src/V12_002.SIMA.Dispatch.cs",
+        "fileId":  208901233280,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  130,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "3c29a5e249e23fe2cb486c6ee18a2736",
+        "resultDataId":  131495994837,
+        "filePath":  "src/V12_002.Orders.Callbacks.Propagation.cs",
+        "fileId":  208901233337,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  793,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception submitEx)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "39d5626f8599c84cfb6c369ab30fefa2",
+        "resultDataId":  131495994270,
+        "filePath":  "src/V12_002.SIMA.Lifecycle.cs",
+        "fileId":  208901233305,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  69,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "                catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "494d3604596a34b770ec00e03be7b077",
+        "resultDataId":  131495993901,
+        "filePath":  "src/V12_002.Orders.Callbacks.cs",
+        "fileId":  208901233238,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S2221",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  254,
+        "message":  "Catch a list of specific exception subtype or use exception filters instead.",
+        "language":  "CSharp",
+        "lineText":  "            catch (Exception ex)",
+        "falsePositiveThreshold":  80
+    },
+    {
+        "issueId":  "32824711f11e3a0e19615d6d7a5ec988",
+        "resultDataId":  131497460490,
+        "filePath":  "src/SignalBroadcaster.cs",
+        "fileId":  208901233123,
+        "patternInfo":  {
+                            "id":  "SonarCSharp_S3906",
+                            "category":  "ErrorProne",
+                            "level":  "High",
+                            "severityLevel":  "High"
+                        },
+        "toolInfo":  {
+                         "uuid":  "8954dff3-f19c-429c-ac76-c45fa5e73b62",
+                         "name":  "SonarC#"
+                     },
+        "lineNumber":  188,
+        "message":  "Change the signature of that event handler to match the specified signature.",
+        "language":  "CSharp",
+        "lineText":  "        public static event Action\u003cTrailUpdateSignal\u003e OnTrailUpdate;",
+        "falsePositiveThreshold":  80,
+        "commitInfo":  {
+                           "sha":  "db35193034ee3ffe70c2043847c8ff1bd1e32896",
+                           "commiter":  "mkalhitti@gmail.com",
+                           "commiterName":  "mdasdispatch-hash",
+                           "timestamp":  "2026-05-27T19:35:28Z"
+                       }
+    }
+]

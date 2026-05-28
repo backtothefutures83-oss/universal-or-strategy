@@ -1,0 +1,137 @@
+# V12 Universal OR Strategy - Mise Configuration
+# https://mise.jdx.dev/
+
+[tools]
+# Core languages with specific versions
+python = "3.12"
+node = "20"
+# Note: .NET SDK managed via system (mise doesn't manage .NET yet)
+
+[env]
+# Environment variables
+_.python.venv = { path = ".venv", create = true }
+PYTHONPATH = "{{config_root}}/scripts:$PYTHONPATH"
+DOTNET_CLI_TELEMETRY_OPTOUT = "1"
+DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
+MISE_SHELL_ENABLED = "1"
+
+[tasks.install]
+description = "Install all dependencies"
+run = [
+    "echo '🚀 V12 Universal OR Strategy - Installing Dependencies'",
+    "echo '=================================================='",
+    "python -m pip install --upgrade pip setuptools wheel",
+    "pip install -r requirements.txt",
+    "npm install",
+    "echo '✅ Dependencies installed!'"
+]
+
+[tasks.start-dev]
+description = "Start all development services"
+run = "powershell -File ./scripts/start-dev-day.ps1"
+
+[tasks.build]
+description = "Build C# project"
+run = "dotnet build"
+
+[tasks.test]
+description = "Run C# tests"
+run = "dotnet test"
+
+[tasks.lint]
+description = "Run linting"
+run = "powershell -File ./scripts/lint.ps1"
+
+[tasks.format]
+description = "Format C# code"
+run = "dotnet csharpier format src/"
+
+[tasks.format-check]
+description = "Check C# formatting"
+run = "dotnet csharpier check src/"
+
+[tasks.pre-push]
+description = "Run pre-push validation (all 13 quality gates)"
+run = "powershell -File ./scripts/pre_push_validation.ps1"
+
+[tasks.pre-push-fast]
+description = "Run pre-push validation (fast mode, skip slow checks)"
+run = "powershell -File ./scripts/pre_push_validation.ps1 -Fast"
+
+[tasks.phoenix]
+description = "Start Phoenix tracing server"
+run = "python -m phoenix.server.main serve"
+
+[tasks.deploy]
+description = "Deploy to NinjaTrader"
+run = "powershell -File ./deploy-sync.ps1"
+
+[tasks.audit]
+description = "Run security and code audit"
+run = "powershell -File ./scripts/audit_scan.ps1"
+
+[tasks.complexity]
+description = "Run complexity analysis"
+run = "python scripts/complexity_audit.py"
+
+[tasks.dead-code]
+description = "Scan for dead code"
+run = "python scripts/dead_code_scan.py"
+
+[tasks.kb-query]
+description = "Query Jane Street knowledge base"
+run = "python scripts/query_kb.py"
+args = ["term"]
+
+[tasks.bootstrap]
+description = "Run agent bootstrap"
+run = "python scripts/agent_bootstrap.py"
+args = ["agent_name", "task_type"]
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = [
+    "dotnet clean",
+    "Remove-Item -Recurse -Force bin,obj -ErrorAction SilentlyContinue",
+    "echo '✅ Clean complete'"
+]
+
+[tasks.setup]
+description = "First-time setup"
+depends = ["install"]
+run = [
+    "echo ''",
+    "echo '🎉 Setup complete!'",
+    "echo ''",
+    "echo '📝 Quick Start:'",
+    "echo '  mise run start-dev    # Start all services'",
+    "echo '  mise run build        # Build C# project'",
+    "echo '  mise run test         # Run tests'",
+    "echo '  mise run pre-push     # Run quality gates'",
+    "echo ''",
+    "echo '🔗 Services:'",
+    "echo '  Phoenix UI: http://localhost:6006'",
+    "echo '  Greptile MCP: http://localhost:8080'",
+    "echo ''",
+    "echo '📚 Documentation: docs/'",
+    "echo '=================================================='",
+]
+
+[tasks.info]
+description = "Show environment info"
+run = [
+    "echo '🔧 V12 Development Environment'",
+    "echo '=============================='",
+    "echo ''",
+    "echo 'Tool Versions:'",
+    "python --version",
+    "node --version",
+    "dotnet --version",
+    "echo ''",
+    "echo 'Python Packages:'",
+    "pip list | grep -E '(phoenix|firebase|opentelemetry|langsmith)'",
+    "echo ''",
+    "echo 'Environment:'",
+    "echo \"PYTHONPATH: $PYTHONPATH\"",
+    "echo \"Working Directory: $(pwd)\"",
+]

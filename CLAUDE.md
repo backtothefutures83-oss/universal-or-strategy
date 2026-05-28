@@ -1,3 +1,16 @@
+﻿# ⚠️ LEGACY FILE - DO NOT USE FOR BOB
+
+**This file is archived and applies ONLY to standalone Claude Opus sessions.**
+
+**If you are Bob (IDE or Shell)**: Read [`BOB.md`](BOB.md) instead. You are NOT Claude Opus.
+
+**Bob Mode Mapping**:
+- Bob's `v12-epic-planner` mode replaces Claude's architect role
+- Bob's `v12-engineer` mode handles implementation
+- See [`AGENTS.md`](AGENTS.md) for complete Bob CLI documentation
+
+---
+
 ﻿# CLAUDE.md - BMad Project Standards & Safety Guide
 
 ## Session Protocol (NON-NEGOTIABLE DEFAULT)

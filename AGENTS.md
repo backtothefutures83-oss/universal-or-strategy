@@ -1,6 +1,29 @@
 # AGENTS.md - Sovereign Agent Protocol
 
 Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repository. This environment is optimized for autonomous multi-agent development under the **Sovereign Droid Protocol (SDP)**.
+
+## 🤖 Bob: Unified Multi-Mode Agent (Current Infrastructure)
+
+**IMPORTANT**: If you are Bob (IDE or Shell), read [`BOB.md`](BOB.md) for your primary instructions.
+
+The V12 project now uses **Bob** (available as both standalone IDE and Shell CLI) as a unified multi-mode agent, replacing the legacy multi-agent system.
+
+### Bob Mode Mapping
+
+| Old Agent | Old Role | Bob Mode | Model | Use For |
+|-----------|----------|----------|-------|---------|
+| **Antigravity** | Orchestrator (P1) | `orchestrator` | Opus 4.8 | Multi-step workflows |
+| **Claude Opus** | Architect (P3) | `v12-epic-planner` | Opus 4.8 | Epic planning |
+| **Codex CLI** | Engineer (P4/P5) | `v12-engineer` | Sonnet 4.6 | Code execution |
+| **Gemini CLI** | Backup Engineer | `advanced` | Sonnet 4.6 | Complex code work |
+| **Jules AI** | GitHub workflows | N/A | N/A | External tool |
+
+**Key Point**: Bob is ONE agent with multiple modes, not multiple agents.
+
+**See [`BOB.md`](BOB.md) for complete Bob documentation.**
+
+---
+
 ## ⚠️ CRITICAL: CodeFactor Protocol
 **MANDATORY READING**: Before accepting ANY automated fixes from CodeFactor or similar tools, read `docs/protocol/CODEFACTOR_PROTOCOL.md`. 
 

@@ -33,18 +33,53 @@ To prevent AI "blindspots" between platforms (Claude Code, Cursor, Codex, Gemini
 - **Local Terminal First**: Prioritize running agents (Codex, Claude) in the local terminal. See [IDE_GUIDE.md](IDE_GUIDE.md) for setup.
 - **Handoff Protocol**: [MASTER_HANDOFF_PROTOCOL.md](docs/protocol/MASTER_HANDOFF_PROTOCOL.md) — Follow this for all agent transitions.
 
-## 🚀 Key Commands
+## 🚀 Quick Start
 
-### Deployment
+### 1. Setup Development Environment (Devbox)
+
+We use [Devbox](https://www.jetify.com/devbox) for reproducible development environments:
+
+```bash
+# Install Devbox (one-time)
+# Windows: iwr https://get.jetify.com/devbox -useb | iex
+# macOS/Linux: curl -fsSL https://get.jetify.com/devbox | bash
+
+# Enter development environment
+devbox shell
+
+# Start all services (Phoenix, Greptile, Obsidian, Compound Intelligence)
+devbox run start-dev
+```
+
+See [docs/DEVBOX_SETUP.md](docs/DEVBOX_SETUP.md) for detailed setup instructions.
+
+### 2. Key Commands
+
+#### Deployment
 Synchronize the repository with your NinjaTrader 8 environment:
 ```powershell
+devbox run deploy_sync
+# or
 ./deploy-sync.ps1
 ```
 
-### Auditing
+#### Build & Test
+```bash
+devbox run build    # Build C# project
+devbox run test     # Run tests
+devbox run lint     # Run linting
+devbox run format   # Format code
+```
+
+#### Auditing
 Run the executive audit scan to discover logic risks:
 ```powershell
-./scripts/audit_scan.ps1
+devbox run -- powershell ./scripts/audit_scan.ps1
+```
+
+#### Pre-Push Validation
+```bash
+devbox run pre-push  # Run all 13 quality gates
 ```
 
 ---

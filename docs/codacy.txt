@@ -1,0 +1,1269 @@
+malhitticrypto-debug
+
+universal-or-strategy
+
+
+main
+
+
+
+
+
+
+
+Overview
+Commits
+Files
+Issues
+Coverage
+Pull requests
+Code patterns
+Settings
+Issues
+About this page
+
+Current
+1943
+
+Ignored
+0
+Filter by
+
+Languages
+
+Severities
+
+Categories
+
+Authors
+
+Tags
+
+Manage Issues
+All issues
+1943
+
+Code patterns
+Enforce Curly Braces on Control Structures
+904
+
+Enforce Medium Cyclomatic Complexity Threshold
+201
+
+Enforce Medium Number of Lines of Code (NLOC) Limit
+138
+
+Mark Assemblies as CLS Compliant
+98
+
+Avoid Redundant Modifiers
+80
+
+Avoid Catching System.Exception Directly
+78
+
+Avoid public fields in classes
+45
+
+Enforce Concise Declarations and Initializations
+44
+
+Avoid Using Write-Host
+39
+
+Avoid Initializing Members to Default Values
+37
+
+Remove Unused Method Parameters
+33
+
+Implement IEquatable<T> on Value Types
+29
+
+Enforce Fields to be Private
+26
+
+Enforce Medium File Length Limit Based on Number of Lines of Code
+21
+
+Remove Unused Local Variables
+15
+
+Enforce Medium Parameter Count Limit
+15
+
+Mark Fields Assigned Only in Constructor as readonly
+13
+
+Remove Unassigned Members
+12
+
+Enforce Correct Signature for Event Handlers
+9
+
+Avoid Using Unsafe Code Blocks
+9
+
+Avoid Public Constructors in Utility Classes
+9
+
+Avoid Throwing General or Reserved Exceptions
+8
+
+Avoid Blocking Calls to Async Methods
+8
+
+Avoid Commenting Out Sections of Code
+8
+
+Remove Unused Assignments
+7
+
+Seal Non-derived Private or File Classes and Records
+6
+
+Avoid Leaving Nested Code Blocks Empty
+5
+
+Avoid Returning Unused Values from Methods
+5
+
+Avoid Redundant ToString() Calls
+5
+
+Remove Empty Statements
+3
+
+Use char overloads of StartsWith and EndsWith instead of string overloads
+3
+
+Avoid Redundant Jump Statements
+3
+
+Enforce default case in switch/select statements
+3
+
+Avoid String Concatenation Using '+' in Loops
+3
+
+Avoid Sequential Tests Checking the Same Condition
+3
+
+Avoid Using Public Constant Members
+3
+
+Avoid Ignoring Generic Exceptions
+3
+
+Others
+12
+
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+92
+try {
+93
+    Expand-Archive -Path $FILE -DestinationPath $TMP_DIR -Force
+94
+    Write-Host "Extraction completed successfully." -ForegroundColor Green
+95
+} catch {
+96
+    Write-Error "Failed to extract $FILE. Error: $($_.Exception.Message)"
+Time to fix: 5 minutes
+
+Create Jira ticket
+About this pattern
+PSScriptAnalyzer's documentation
+Why this is a problem
+Write-Host outputs directly to the host and does not write to the pipeline, making its output unpredictable and unusable for further processing or redirection. Prior to PowerShell 5.0, Write-Host did not write to any stream, limiting control over its output. Using Write-Output or Write-Verbose ensures output can be managed properly.
+
+How to fix it
+Replace Write-Host with Write-Output to send data to the pipeline or Write-Verbose for informational messages that can be optionally displayed by the user. Only use Write-Host in functions with the Show verb, where displaying information directly to the user is intended.
+
+Examples
+Good examples
+function Get-MeaningOfLife
+{
+    [CmdletBinding()]Param() # makes it possible to support Verbose output
+
+    Write-Verbose 'Computing the answer to the ultimate question of life, the universe and everything'
+    Write-Output 42
+}
+
+function Show-Something
+{
+    Write-Host 'show something on screen'
+}
+Bad examples
+function Get-MeaningOfLife
+{
+    Write-Host 'Computing the answer to the ultimate question of life, the universe and everything'
+    Write-Host 42
+}
+Rate the documentation for this pattern
+
+
+
+Related code pattern: Avoid Using Write-Host
+by PSScriptAnalyzer
+
+Applied from Default coding standard, V12 HFT Standard
+
+Disable pattern
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+201
+Write-Host "goose is installed at: $DEST_GOOSE" -ForegroundColor Green
+HIGH
+Best practice
+
+
+'System.Exception' should not be thrown by user code.
+
+benchmarks/
+StandaloneBench.cs
+
+96
+                    if (!ring.TryEnqueue(i)) throw new Exception("Enqueue failed");
+MEDIUM
+Compatibility
+
+
+Provide a 'CLSCompliant' attribute for assembly 'srcassembly.dll'.
+
+src/
+V12_002.Perf.LatencyProbe.cs
+
+1
+using System;
+HIGH
+Performance
+
+
+Private classes which are not derived in the current assembly should be marked as 'sealed'.
+
+src/
+V12_002.PositionInfo.cs
+
+406
+        private class PendingStopReplacement
+HIGH
+Error prone
+
+
+Change the signature of that event handler to match the specified signature.
+
+src/
+SignalBroadcaster.cs
+
+194
+        public static event Action<TargetActionSignal> OnTargetAction;
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.IPC.cs
+
+502
+                if (TryHandleDiagCommand(action, parts))
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.IPC.Commands.Mode.cs
+
+259
+                        if (!activePositions.ContainsKey(kvp.Key))
+MINOR
+Code style
+
+
+'partial' is gratuitous in this context.
+
+src/
+V12_002.REAPER.NakedStop.cs
+
+12
+    public partial class V12_002 : Strategy
+MEDIUM
+Best practice
+
+
+Add a 'protected' constructor or the 'static' keyword to the class declaration.
+
+tests/
+ThreadStaticSafetyTest.cs
+
+16
+    public class ThreadStaticSafetyTest
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+196
+    Write-Host "    `$env:PATH += ';$env:GOOSE_BIN_DIR'" -ForegroundColor Cyan
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Orders.Callbacks.Propagation.cs
+
+193
+                else if (masterPosForType.IsFFMATrade)
+HIGH
+Error prone
+
+
+Catch a list of specific exception subtype or use exception filters instead.
+
+src/
+V12_002.Orders.Callbacks.cs
+
+254
+            catch (Exception ex)
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+55
+Write-Host "`n--- STEP 3: Establishing Dynamic Hardlinks ---" -ForegroundColor Yellow
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+46
+    Write-Host "`nDEPLOY ABORTED - Fix encoding errors first (non-ASCII found)" -ForegroundColor Red
+MEDIUM
+Best practice
+
+
+File 'AutoAcceptLauncher.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+AutoAcceptLauncher.ps1
+
+24
+Write-Host ">>> Next: In the Control Panel, click 'Toggle Background Mode' to enable always-on accepting.";
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Orders.Management.Flatten.cs
+
+481
+            if (pendingStopReplacements.TryRemove(entryName, out _))
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+49
+Write-Host "ASCII GATE PASS - all source files are clean" -ForegroundColor Green
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+34
+Write-Host "`n--- STEP 2: ASCII GATE: Scanning source files ---" -ForegroundColor Yellow
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Trailing.cs
+
+247
+            if (pos.IsTRENDTrade && pos.IsTRENDEntry2 && !pos.IsRMATrade)
+MEDIUM
+Best practice
+
+
+Consider refactoring this method in order to remove the need for this 'out' modifier.
+
+benchmarks/
+StandaloneBench.cs
+
+15
+        public static unsafe void AllocAligned(int capacity, out CoreLane* ptr, out IntPtr handle) {
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Panel.Helpers.cs
+
+469
+                if (child is Grid g && g.ColumnDefinitions.Count >= minColumns)
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+91
+Write-Host "Extracting $FILE to temporary directory..." -ForegroundColor Green
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Symmetry.cs
+
+101
+                    if (idx > 0)
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Panel.Helpers.cs
+
+685
+                        if (parent is FrameworkElement fe && fe.GetType().Name.Contains("ChartTrader"))
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Sizing.cs
+
+209
+                    if (currentState == OrderState.ChangePending)
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Panel.Helpers.cs
+
+108
+            if (TryHandleBackspace(textBox, e.Key))
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Panel.StateSync.cs
+
+165
+                if (!active || target == null)
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Symmetry.cs
+
+208
+            if (symmetryDispatchById.TryGetValue(dispatchId, out var ctx))
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+74
+    Write-Host "Download completed successfully." -ForegroundColor Green
+MINOR
+Code style
+
+
+Remove this initialization to '_ipcClientIdSeed', the compiler will do that for you.
+
+src/
+V12_002.UI.IPC.cs
+
+47
+        private int _ipcClientIdSeed          = 0;
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+195
+    Write-Host "For this session only, you can run:" -ForegroundColor Yellow
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+193
+    Write-Host "    [Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$env:GOOSE_BIN_DIR', 'User')" -ForegroundColor Cyan
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.IPC.cs
+
+343
+            if (!ipcCommandQueue.TryDequeue(out command))
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+190
+    Write-Host "    [Environment]::SetEnvironmentVariable('PATH', `$env:PATH + ';$env:GOOSE_BIN_DIR', 'Machine')" -ForegroundColor Cyan
+MINOR
+Code style
+
+
+'s' is not used. Use discard parameter instead.
+
+src/
+V12_002.UI.Panel.Handlers.cs
+
+206
+                modeRetestButton.Click += (s, e) => SelectConfigMode("RETEST", modeRetestButton);
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Orders.Management.Flatten.cs
+
+84
+            if (!double.TryParse(ChaseIfTouchPoints, out citOffset))
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+71
+        Write-Host "SKIP: Missing Static -> src/$($map.src)" -ForegroundColor Gray
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Panel.StateSync.cs
+
+184
+                if (liveStopPrice != null)
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+91
+Write-Host "`n--- VM SYNC COMPLETE: Environment Hardened (Dynamic Discovery Active) ---" -ForegroundColor Cyan
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+150
+    Write-Host "Moving Windows runtime DLL: $($dll.Name)" -ForegroundColor Green
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+76
+    Write-Host "LINKING (Static): $($map.src) -> NT8" -ForegroundColor Green
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Orders.Management.Cleanup.cs
+
+108
+                        if (IsOrderTerminal(stopOrder.OrderState))
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Photon.Pool.cs
+
+242
+                if (hash == EMPTY_KEY)
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+87
+    Write-Host "LINKING (Dynamic): $($f.Name) -> Strategies" -ForegroundColor Green
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Callbacks.cs
+
+159
+            if (_isTerminating)
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.IPC.cs
+
+209
+            if (string.IsNullOrWhiteSpace(action))
+MEDIUM
+Performance
+
+
+Implement 'IEquatable<T>' in value type 'FlattenSignal'.
+
+src/
+SignalBroadcaster.cs
+
+142
+        public struct FlattenSignal
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+69
+Write-Host "Downloading $RELEASE_TAG release: $FILE..." -ForegroundColor Green
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+172
+    Write-Host ""
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.Panel.StateSync.cs
+
+478
+            if (svT3Type != null)
+HIGH
+Error prone
+
+
+'os' imported but unused (F401)
+
+extract.py
+
+2
+import os
+MEDIUM
+Best practice
+
+
+Add a 'protected' constructor or the 'static' keyword to the class declaration.
+
+benchmarks/
+StandaloneBench.cs
+
+81
+    class Program {
+MEDIUM
+Compatibility
+
+
+Provide a 'CLSCompliant' attribute for assembly 'srcassembly.dll'.
+
+src/
+V12_002.REAPER.cs
+
+1
+// <copyright file="V12_002.REAPER.cs" company="BMad">
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Entries.RMA.cs
+
+389
+                if (!RmaIntelligenceEnabled)
+MEDIUM
+Unused code
+
+
+Remove the unused local variable 'breakevenCount'.
+
+src/
+SignalBroadcaster.cs
+
+410
+            int breakevenCount = OnBreakevenRequest?.GetInvocationList().Length ?? 0;
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+23
+Write-Host "`n--- STEP 1: Nuclear Subfolder Purge ---" -ForegroundColor Yellow
+HIGH
+Error prone
+
+
+Catch a list of specific exception subtype or use exception filters instead.
+
+src/
+V12_002.UI.Snapshot.cs
+
+46
+            catch
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+128
+    Write-Host "Moving goose to $DEST_GOOSE" -ForegroundColor Green
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+tests/
+LogicTests.cs
+
+179
+                    if (currentSection == null)
+MEDIUM
+Performance
+
+
+Implement 'IEquatable<T>' in value type 'TrailUpdateSignal'.
+
+src/
+SignalBroadcaster.cs
+
+56
+        public struct TrailUpdateSignal
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Entries.RMA.cs
+
+395
+                    if (order == null || order.OrderState != OrderState.Working)
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Symmetry.BracketFSM.cs
+
+108
+            if (fsm.EntryOrder != null && !string.IsNullOrEmpty(fsm.EntryOrder.OrderId))
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+14
+Write-Host "--- VM DEPLOY SYNC: Hardening Environment ---" -ForegroundColor Cyan
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+192
+    Write-Host "Or add it to your user PATH (no admin required):" -ForegroundColor Yellow
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+84
+    Write-Host "Created temporary directory: $TMP_DIR" -ForegroundColor Yellow
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Symmetry.Replace.cs
+
+338
+            if (t.StartsWith("OR", StringComparison.Ordinal) || t.Contains("ORLONG") || t.Contains("ORSHORT"))
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+26
+    Write-Host "DELETE: Found legacy subfolder -> $($f.Name). Removing..." -ForegroundColor Red
+HIGH
+Error prone
+
+
+Catch a list of specific exception subtype or use exception filters instead.
+
+src/
+V12_002.Telemetry.cs
+
+226
+            catch
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+200
+Write-Host "goose CLI installation completed successfully!" -ForegroundColor Green
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+188
+    Write-Host "Warning: goose installed, but $env:GOOSE_BIN_DIR is not in your PATH." -ForegroundColor Yellow
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+107
+    Write-Host "Found goose-package subdirectory, using that as extraction directory" -ForegroundColor Yellow
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Safety.Watchdog.cs
+
+94
+            if (masterAccount == null || Instrument == null)
+MEDIUM
+Compatibility
+
+
+Provide a 'CLSCompliant' attribute for assembly 'srcassembly.dll'.
+
+src/
+V12_002.Trailing.Breakeven.cs
+
+1
+// Build 971: Trailing.Breakeven -- MoveStopsToBreakevenWithOffset, MoveSpecificTarget + Stop Management Helpers
+MEDIUM
+Performance
+
+
+Implement 'IEquatable<T>' in value type 'AccountEvent'.
+
+src/
+V12_002.Symmetry.BracketFSM.cs
+
+68
+        public struct AccountEvent
+MEDIUM
+Best practice
+
+
+Remove unassigned field 'T1Contracts', or set its value.
+
+src/
+V12_002.PositionInfo.cs
+
+41
+            public int T1Contracts;   // v5.13: 20% - Fixed 1pt quick profit
+MEDIUM
+Best practice
+
+
+File 'AutoAcceptLauncher.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+AutoAcceptLauncher.ps1
+
+17
+    Write-Host '(!) Antigravity IDE executable not found in standard paths.'; 
+MINOR
+Code style
+
+
+'partial' is gratuitous in this context.
+
+src/
+V12_002.IO.RetryHelper.cs
+
+13
+    public partial class V12_002
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Orders.Callbacks.Execution.cs
+
+54
+                if (marketPosition == MarketPosition.Flat)
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+165
+    Write-Host "Cleaned up temporary directory." -ForegroundColor Yellow
+MINOR
+Code style
+
+
+'s' is not used. Use discard parameter instead.
+
+src/
+V12_002.UI.Panel.Handlers.cs
+
+178
+                cancelButton.Click += (s, e) =>
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.SIMA.Fleet.cs
+
+266
+            if (!_pendingFleetDispatches.TryDequeue(out req))
+HIGH
+Error prone
+
+
+Catch a list of specific exception subtype or use exception filters instead.
+
+sandbox/R28_MmioSpscRing/
+MmioSpscRing.cs
+
+157
+            try { _accessor.Dispose(); } catch { }
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Lifecycle.cs
+
+58
+            else if (state == State.Terminated)
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+41
+        Write-Host "ASCII GATE FAIL: $($csFile.Name) has $($badBytes.Count) non-ASCII bytes" -ForegroundColor Red
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Trailing.StopUpdate.cs
+
+423
+                if (activePositions.TryGetValue(entryName, out cbReset) && cbReset != null)
+MEDIUM
+Best practice
+
+
+File 'AutoAcceptLauncher.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+AutoAcceptLauncher.ps1
+
+21
+Write-Host ">>> Launching Antigravity with Auto-Accept bridge on port $cdpPort...";
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'else' block.
+
+src/
+V12_002.SIMA.Flatten.cs
+
+241
+                    else
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Entries.FFMA.cs
+
+117
+            if (!IsOrderAllowed())
+MEDIUM
+Best practice
+
+
+File 'deploy-vm-safe.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+deploy-vm-safe.ps1
+
+15
+Write-Host "Target: $NtStrategyDir" -ForegroundColor Gray
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+181
+    Write-Host "Skipping 'goose configure', you may need to run this manually later" -ForegroundColor Yellow
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+113
+    Write-Host "Creating directory: $env:GOOSE_BIN_DIR" -ForegroundColor Yellow
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Symmetry.Follower.cs
+
+23
+            if (followerPos == null || !followerPos.IsFollower)
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.Orders.Callbacks.Propagation.cs
+
+277
+                if (pos.IsTRENDTrade)
+MEDIUM
+Best practice
+
+
+File 'AutoAcceptLauncher.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+AutoAcceptLauncher.ps1
+
+23
+Write-Host ">>> SUCCESS. Port: $cdpPort. Keep the Auto-Accept Panel open in the IDE.";
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+189
+    Write-Host "To add it to your PATH permanently, run the following command as Administrator:" -ForegroundColor Yellow
+MEDIUM
+Best practice
+
+
+Remove this unused method parameter 'orderId'.
+
+src/
+V12_002.Orders.Callbacks.Execution.cs
+
+249
+            string orderId,
+MEDIUM
+Best practice
+
+
+File 'download_cli.ps1' uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information.
+
+download_cli.ps1
+
+173
+    Write-Host "Configuring goose" -ForegroundColor Green
+MEDIUM
+Performance
+
+
+Change return type to 'void'; not a single caller uses the returned value.
+
+src/
+V12_002.IO.RetryHelper.cs
+
+37
+            public static T ExecuteWithRetry<T>(
+MINOR
+Code style
+
+
+Add curly braces around the nested statement(s) in this 'if' block.
+
+src/
+V12_002.UI.IPC.Commands.Fleet.cs
+
+213
+                        if (
