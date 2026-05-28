@@ -510,9 +510,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
+            catch (InvalidOperationException ex)
+            {
+                // Fleet bracket submission failed - non-critical
+                Print(string.Format("[SIMA V12.7] Error in fleet bracket submission: {0}", ex.Message));
+            }
             catch (Exception ex)
             {
-                Print(string.Format("[SIMA V12.7] Error in fleet bracket submission: {0}", ex.Message));
+                // Unexpected error in fleet bracket - log and fail fast
+                Print(string.Format("[SIMA V12.7] CRITICAL fleet bracket error: {0}", ex.Message));
+                throw;
             }
         }
 
@@ -720,9 +727,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
             }
+            catch (InvalidOperationException ex)
+            {
+                // Fleet OCO processing failed - non-critical
+                Print(string.Format("[1104.1 OCO] Fleet OCO error: {0}", ex.Message));
+            }
             catch (Exception ex)
             {
-                Print(string.Format("[1104.1 OCO] Fleet OCO error: {0}", ex.Message));
+                // Unexpected error in OCO processing - log and fail fast
+                Print(string.Format("[1104.1 OCO] CRITICAL OCO error: {0}", ex.Message));
+                throw;
             }
         }
 
@@ -787,7 +801,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ProcessQueuedExecution(QueuedAccountExecution item)
         {
             if (EnableComplianceHub)
-                Print(string.Format("[COMPLIANCE] Execution Update received for account."));
+                Print("[COMPLIANCE] Execution Update received for account.");
 
             if (EnableComplianceHub && item.Account != null)
             {
@@ -906,9 +920,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 });
             }
+            catch (System.IO.IOException ex)
+            {
+                // File I/O error - non-critical (compliance log is best-effort)
+                Print("[COMPLIANCE] ERROR writing log: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("[COMPLIANCE] ERROR writing log: " + ex.Message);
+                // Unexpected error in compliance logging - log and fail fast
+                Print("[COMPLIANCE] CRITICAL error: " + ex.Message);
+                throw;
             }
         }
 

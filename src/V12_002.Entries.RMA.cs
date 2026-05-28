@@ -66,9 +66,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return; // Null-abort from bracket submission
                 FinalizeTrendSplitEntry(levels, brackets);
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state issue
+                Print("WARNING ExecuteTrendSplitEntry: NT8 order submission quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteTrendSplitEntry: " + ex.Message);
+                // Unexpected exception in TREND split entry - fail fast
+                Print("CRITICAL ExecuteTrendSplitEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 

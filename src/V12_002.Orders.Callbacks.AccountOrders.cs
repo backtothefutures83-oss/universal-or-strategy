@@ -168,10 +168,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 TriggerCustomEvent(o => ProcessAccountOrderQueue(), null);
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
             {
                 if (_diagFleet)
-                    Print("[FLEET_CATCH] OnAccountOrderUpdate trigger failed: " + ex.Message);
+                    Print("[FLEET_CATCH] OnAccountOrderUpdate trigger failed (known quirk): " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Print("CRITICAL: Unexpected exception in OnAccountOrderUpdate trigger: " + ex.ToString());
+                throw;
             }
         }
 
@@ -192,10 +197,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     TriggerCustomEvent(o => ProcessAccountOrderQueue(), null);
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
                     if (_diagFleet)
-                        Print("[FLEET_CATCH] ProcessAccountOrderQueue flatten gate failed: " + ex.Message);
+                        Print(
+                            "[FLEET_CATCH] ProcessAccountOrderQueue flatten gate failed (known quirk): " + ex.Message
+                        );
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in ProcessAccountOrderQueue flatten gate: " + ex.ToString());
+                    throw;
                 }
                 return;
             }
@@ -211,10 +223,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         TriggerCustomEvent(o => ProcessAccountOrderQueue(), null);
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                     {
                         if (_diagFleet)
-                            Print("[FLEET_CATCH] ProcessAccountOrderQueue drain loop failed: " + ex.Message);
+                            Print(
+                                "[FLEET_CATCH] ProcessAccountOrderQueue drain loop failed (known quirk): " + ex.Message
+                            );
+                    }
+                    catch (Exception ex)
+                    {
+                        Print(
+                            "CRITICAL: Unexpected exception in ProcessAccountOrderQueue drain loop: " + ex.ToString()
+                        );
+                        throw;
                     }
                     return;
                 }
@@ -227,10 +248,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     TriggerCustomEvent(o => ProcessAccountOrderQueue(), null);
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
                     if (_diagFleet)
-                        Print("[FLEET_CATCH] ProcessAccountOrderQueue reschedule failed: " + ex.Message);
+                        Print("[FLEET_CATCH] ProcessAccountOrderQueue reschedule failed (known quirk): " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in ProcessAccountOrderQueue reschedule: " + ex.ToString());
+                    throw;
                 }
         }
 

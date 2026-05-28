@@ -72,9 +72,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 Print(string.Format("IPC SERVER SUCCESS: Listening on 127.0.0.1:{0} (Multi-Client)", IpcPort));
             }
+            catch (System.Net.Sockets.SocketException ex)
+            {
+                // Socket binding failed - port in use or network issue
+                Print("ERROR StartIpcServer: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR StartIpcServer: " + ex.Message);
+                // Unexpected IPC server error - log and fail fast
+                Print("CRITICAL StartIpcServer: " + ex.Message);
+                throw;
             }
         }
 
@@ -99,10 +106,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Task.Run(() => HandleClient(session));
                 }
             }
-            catch (Exception)
+            catch (System.Net.Sockets.SocketException)
             {
+                // Socket accept failed - expected during shutdown
                 isIpcRunning = false;
                 Print("[V12.2] IPC Listener Status: Stopped/Error");
+            }
+            catch (Exception ex)
+            {
+                // Unexpected listener error - log and fail fast
+                isIpcRunning = false;
+                Print("[V12.2] IPC Listener CRITICAL: " + ex.Message);
+                throw;
             }
             finally
             {
@@ -146,9 +161,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("V12 IPC: Sent leader sync to new client");
                 }
             }
+            catch (System.IO.IOException ex)
+            {
+                // Network I/O error - client disconnected
+                Print("V12 IPC: Failed to send fleet state request: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("V12 IPC: Failed to send fleet state request: " + ex.Message);
+                // Unexpected IPC send error - log and fail fast
+                Print("V12 IPC: CRITICAL fleet state send error: " + ex.Message);
+                throw;
             }
         }
 
@@ -179,9 +201,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ProcessClientStream(session);
                 }
             }
+            catch (System.IO.IOException ex)
+            {
+                // Client stream error - expected during disconnect
+                Print("V12 IPC Client Error: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("V12 IPC Client Error: " + ex.Message);
+                // Unexpected client handling error - log and fail fast
+                Print("V12 IPC Client CRITICAL: " + ex.Message);
+                throw;
             }
             finally
             {

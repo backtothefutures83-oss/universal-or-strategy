@@ -312,9 +312,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     ProcessIpc_EnqueueCore(action, parts, senderTicks);
                 }
+                catch (InvalidOperationException ex)
+                {
+                    // IPC command processing failed - non-critical
+                    Print("Error ProcessIpcCommands: " + ex.Message);
+                }
                 catch (Exception ex)
                 {
-                    Print("Error ProcessIpcCommands: " + ex.Message);
+                    // Unexpected IPC processing error - log and fail fast
+                    Print("CRITICAL ProcessIpcCommands: " + ex.Message);
+                    throw;
                 }
             }
 
@@ -521,9 +528,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     )
                 );
             }
+            catch (InvalidOperationException ex)
+            {
+                // IPC command core processing failed - non-critical
+                Print("Error ProcessIpcCommandCore: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("Error ProcessIpcCommandCore: " + ex.Message);
+                // Unexpected IPC core error - log and fail fast
+                Print("CRITICAL ProcessIpcCommandCore: " + ex.Message);
+                throw;
             }
         }
 

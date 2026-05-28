@@ -251,9 +251,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RemoveGhostOrderRef(order, orderState.ToString().ToUpper());
                 }
             }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("RemoveGhostOrderRef") || ex.Message.Contains("PropagateMasterPriceMove"))
+            {
+                Print("WARNING: Known quirk in OnOrderUpdate: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR OnOrderUpdate: " + ex.Message);
+                Print("CRITICAL: Unexpected exception in OnOrderUpdate: " + ex.ToString());
+                throw;
             }
             finally
             {

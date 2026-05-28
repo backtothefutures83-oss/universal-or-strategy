@@ -337,9 +337,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 SyncPendingOrders(); // V12.30: Real-time sizing synchronization
                 PublishUiSnapshot();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("collection was modified"))
+            {
+                // Known NT8 quirk - collection modified during enumeration
+                Print("WARNING OnBarUpdate: Collection modified during iteration - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR OnBarUpdate: " + ex.Message);
+                // Unexpected exception in critical hot path - fail fast
+                Print("CRITICAL OnBarUpdate: Unexpected exception - " + ex.ToString());
+                throw; // Re-throw to crash and alert
             }
             finally
             {

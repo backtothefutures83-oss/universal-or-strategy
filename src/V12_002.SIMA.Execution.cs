@@ -112,15 +112,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                             LogBuffer.Format("    OK | {0,-28} | Market       | submitted", acct.Name)
                         );
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException ex)
+                        when (ex.Message.Contains("Submit") || ex.Message.Contains("CreateOrder"))
                     {
-                        // V12.Phase7 [GAP-3]: Undo expectedPositions reservation if submission failed.
-                        // Delta may or may not have been applied (depends on where exception occurred),
-                        // so rollback is conditional on whether reserve completed.
+                        // Known NT8 order submission quirk - rollback and continue
                         if (reservedDelta != 0)
                             AddExpectedPositionDeltaLocked(ExpKey(acct.Name), -reservedDelta);
                         failCount++;
                         dispatchLog.AppendLine(LogBuffer.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
+                    }
+                    catch (Exception ex)
+                    {
+                        // Unexpected error - rollback and fail fast
+                        if (reservedDelta != 0)
+                            AddExpectedPositionDeltaLocked(ExpKey(acct.Name), -reservedDelta);
+                        Print(
+                            LogBuffer.Format(
+                                "[SIMA] CRITICAL: Unexpected market entry error on {0}: {1}",
+                                acct.Name,
+                                ex.ToString()
+                            )
+                        );
+                        throw;
                     }
                 }
             }
@@ -269,12 +282,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                             LogBuffer.Format("    OK | {0,-28} | Bracket(3)   | submitted", acct.Name)
                         );
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException ex)
+                        when (ex.Message.Contains("Submit") || ex.Message.Contains("CreateOrder"))
                     {
-                        // V12.Phase7 [C-02/GAP-2]: Undo expectedPositions reservation if submission failed.
+                        // Known NT8 bracket submission quirk - rollback and continue
                         if (reservedDelta != 0)
                             AddExpectedPositionDeltaLocked(ExpKey(acct.Name), -reservedDelta);
                         dispatchLog.AppendLine(LogBuffer.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
+                    }
+                    catch (Exception ex)
+                    {
+                        // Unexpected error - rollback and fail fast
+                        if (reservedDelta != 0)
+                            AddExpectedPositionDeltaLocked(ExpKey(acct.Name), -reservedDelta);
+                        Print(
+                            LogBuffer.Format(
+                                "[SIMA] CRITICAL: Unexpected bracket entry error on {0}: {1}",
+                                acct.Name,
+                                ex.ToString()
+                            )
+                        );
+                        throw;
                     }
                 }
             }
@@ -436,13 +464,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 entryOrder = SubmitOrderUnmanaged(0, entryAction, OrderType.Limit, qty, price, 0, "", localKey);
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("SubmitOrderUnmanaged") || ex.Message.Contains("CreateOrder"))
             {
-                // H01: Roll back symmetry dispatch registration on order submission exception
+                // Known NT8 order submission quirk - rollback symmetry and continue
                 SymmetryGuardRollbackDispatch(symmetryDispatchId);
                 Print(
                     LogBuffer.Format("[SIMA RMA V2] ORDER SUBMISSION EXCEPTION: {0} - Dispatch rolled back", ex.Message)
                 );
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - rollback and fail fast
+                SymmetryGuardRollbackDispatch(symmetryDispatchId);
+                Print(LogBuffer.Format("[SIMA RMA V2] CRITICAL: Unexpected local entry error: {0}", ex.ToString()));
                 throw;
             }
 
@@ -656,24 +691,46 @@ namespace NinjaTrader.NinjaScript.Strategies
                 dispatchLog.AppendLine(LogBuffer.Format("    OK | {0,-28} | Limit RMA    | submitted", acct.Name));
                 return true;
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("Submit") || ex.Message.Contains("CreateOrder"))
             {
+                // Known NT8 order submission quirk - full cleanup and continue
                 if (syncPending)
                 {
                     ClearDispatchSyncPending(expectedKey);
                     syncPending = false;
                 }
 
-                // [923B-FIX-B]: Full rollback -- dicts were registered before expectedPositions,
-                // so both must be cleaned up on Submit failure (mirrors ExecuteSmartDispatchEntry catch).
                 if (reservedDelta != 0)
                     AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
                 activePositions.TryRemove(fleetKey, out _);
                 entryOrders.TryRemove(fleetKey, out _);
-                // Phase 6: Clean up proactive FSM on dispatch failure
                 _followerBrackets.TryRemove(fleetKey, out _);
                 dispatchLog.AppendLine(LogBuffer.Format("  FAIL | {0,-28} | {1}", acct.Name, ex.Message));
                 return false;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - full cleanup and fail fast
+                if (syncPending)
+                {
+                    ClearDispatchSyncPending(expectedKey);
+                    syncPending = false;
+                }
+
+                if (reservedDelta != 0)
+                    AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+                activePositions.TryRemove(fleetKey, out _);
+                entryOrders.TryRemove(fleetKey, out _);
+                _followerBrackets.TryRemove(fleetKey, out _);
+                Print(
+                    LogBuffer.Format(
+                        "[SIMA RMA V2] CRITICAL: Unexpected fleet entry error on {0}: {1}",
+                        acct.Name,
+                        ex.ToString()
+                    )
+                );
+                throw;
             }
         }
 
@@ -737,10 +794,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                         symmetryDispatchId
                     );
                 }
-                catch (Exception localEx)
+                catch (InvalidOperationException localEx)
+                    when (localEx.Message.Contains("SubmitLocalRMAEntry")
+                        || localEx.Message.Contains("margin")
+                        || localEx.Message.Contains("tick")
+                    )
                 {
-                    // V12.H01: Rollback symmetry dispatch on local entry failure to prevent orphaned followers
-                    // Specific handling for local submission exceptions (margin, tick size, etc.)
+                    // Known NT8 submission quirk (margin, tick size, etc.) - rollback and abort
                     SymmetryGuardRollbackDispatch(symmetryDispatchId);
                     Print(
                         LogBuffer.Format(
@@ -749,6 +809,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                         )
                     );
                     return;
+                }
+                catch (Exception localEx)
+                {
+                    // Unexpected error - rollback and fail fast
+                    SymmetryGuardRollbackDispatch(symmetryDispatchId);
+                    Print(
+                        LogBuffer.Format(
+                            "[SIMA RMA V2] CRITICAL: Unexpected local entry wrapper error: {0}",
+                            localEx.ToString()
+                        )
+                    );
+                    throw;
                 }
 
                 // P1-FIX (Iteration 3): Check boolean result - abort if local entry returned false (null order)
@@ -837,9 +909,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 report.AppendLine("+==============================================================+");
                 Print(report.ToString().TrimEnd());
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("RMA") || ex.Message.Contains("bracket"))
+            {
+                // Known RMA calculation or bracket quirk - log and continue
+                Print(LogBuffer.Format("[SIMA RMA V2] ERROR: {0}", ex.Message));
+            }
             catch (Exception ex)
             {
-                Print(LogBuffer.Format("[SIMA RMA V2] ERROR: {0}", ex.Message));
+                // Unexpected error - fail fast
+                Print(LogBuffer.Format("[SIMA RMA V2] CRITICAL: Unexpected RMA V2 error: {0}", ex.ToString()));
+                throw;
             }
         }
 

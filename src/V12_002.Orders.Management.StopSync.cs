@@ -433,10 +433,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     CreateNewStopOrder(entryName, pos.RemainingContracts, pos.CurrentStopPrice, pos.Direction);
                 }
             }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("CreateNewStopOrder") || ex.Message.Contains("CancelOrder"))
+            {
+                Print(
+                    string.Format("(!) WARNING UpdateStopQuantity for {0} (known quirk): {1}", entryName, ex.Message)
+                );
+                Print(string.Format("(!) POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
+            }
             catch (Exception ex)
             {
-                Print(string.Format("(!) ERROR UpdateStopQuantity for {0}: {1}", entryName, ex.Message));
+                Print(string.Format("(!) CRITICAL UpdateStopQuantity for {0}: {1}", entryName, ex.ToString()));
                 Print(string.Format("(!) POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
+                throw;
             }
         }
 
@@ -519,9 +528,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     )
                 );
             }
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("SubmitOrderUnmanaged") || ex.Message.Contains("CreateOrder"))
+            {
+                Print(
+                    string.Format("(!) WARNING CreateNewStopOrder for {0} (known quirk): {1}", entryName, ex.Message)
+                );
+            }
             catch (Exception ex)
             {
-                Print(string.Format("(!) ERROR CreateNewStopOrder for {0}: {1}", entryName, ex.Message));
+                Print(string.Format("(!) CRITICAL CreateNewStopOrder for {0}: {1}", entryName, ex.ToString()));
+                throw;
             }
         }
 
