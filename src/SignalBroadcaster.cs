@@ -280,8 +280,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTradeSignal(TradeSignal signal)
         {
-            if (signal == null)
+            if (signal is null)
+            {
                 throw new ArgumentNullException(nameof(signal));
+            }
 
             signal.Timestamp = DateTime.Now;
 
@@ -294,8 +296,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTrailUpdate(TrailUpdateSignal update)
         {
-            if (update == null)
+            if (update is null)
+            {
                 throw new ArgumentNullException(nameof(update));
+            }
 
             update.Timestamp = DateTime.Now;
             SafeInvoke(OnTrailUpdate, update);
@@ -306,8 +310,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTargetAction(TargetActionSignal action)
         {
-            if (action == null)
+            if (action is null)
+            {
                 throw new ArgumentNullException(nameof(action));
+            }
 
             action.Timestamp = DateTime.Now;
             SafeInvoke(OnTargetAction, action);
