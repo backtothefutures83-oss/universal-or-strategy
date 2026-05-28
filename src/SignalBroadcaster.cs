@@ -13,11 +13,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Complete trade signal with all bracket order details.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct TradeSignal
+        public class TradeSignal : EventArgs
         {
             public string SignalId { get; set; }
             public string Instrument { get; set; } // V7.1: For instrument filtering
@@ -49,11 +48,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Trailing stop update signal.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct TrailUpdateSignal
+        public class TrailUpdateSignal : EventArgs
         {
             public string SignalId { get; set; }
             public double NewStopPrice { get; set; }
@@ -64,11 +62,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Full stop synchronization signal.
         /// Master broadcasts every stop update, slaves mirror exact price.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct StopUpdateSignal
+        public class StopUpdateSignal : EventArgs
         {
             public string TradeId { get; set; } // Links to original entry
             public double NewStopPrice { get; set; } // Master's new stop price
@@ -79,11 +76,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Entry order price update signal.
         /// Master broadcasts when pending entry order price changes.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct EntryUpdateSignal
+        public class EntryUpdateSignal : EventArgs
         {
             public string TradeId { get; set; } // Links to original entry
             public double NewEntryPrice { get; set; } // Master's new entry price
@@ -93,11 +89,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Order cancellation signal.
         /// Master broadcasts when pending entry order is cancelled.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct OrderCancelSignal
+        public class OrderCancelSignal : EventArgs
         {
             public string TradeId { get; set; } // Links to original entry
             public string Reason { get; set; } // Why cancelled
@@ -106,11 +101,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Target management action signal (v5.12 feature).
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct TargetActionSignal
+        public class TargetActionSignal : EventArgs
         {
             public string SignalId { get; set; }
             public TargetType Target { get; set; } // T1, T2, or Runner
@@ -135,11 +129,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Flatten all positions signal.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct FlattenSignal
+        public class FlattenSignal : EventArgs
         {
             public string Reason { get; set; }
             public DateTime Timestamp { get; set; }
@@ -147,11 +140,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Manual breakeven signal.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct BreakevenSignal
+        public class BreakevenSignal : EventArgs
         {
             public string SignalId { get; set; } // Empty = all positions
             public DateTime Timestamp { get; set; }
@@ -160,11 +152,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V10.2: External command signal (from TCP Remote).
         /// Allows the TCP owner to broadcast commands to all other strategy instances.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
+        /// Note: This changes from zero-allocation struct to heap-allocated class.
         /// </summary>
-        public struct ExternalCommandSignal
+        public class ExternalCommandSignal : EventArgs
         {
             public string Command { get; set; }
             public string TargetSymbol { get; set; }
@@ -177,57 +168,57 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Fired when Master generates a new trade signal.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<TradeSignal> OnTradeSignal;
+        public static event EventHandler<TradeSignal> OnTradeSignal;
 
         /// <summary>
         /// Fired when Master updates trailing stop.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<TrailUpdateSignal> OnTrailUpdate;
+        public static event EventHandler<TrailUpdateSignal> OnTrailUpdate;
 
         /// <summary>
         /// Fired when Master updates trailing stop update request (v5.12).
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<TargetActionSignal> OnTargetAction;
+        public static event EventHandler<TargetActionSignal> OnTargetAction;
 
         /// <summary>
         /// Fired when Master requests flatten all.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<FlattenSignal> OnFlattenAll;
+        public static event EventHandler<FlattenSignal> OnFlattenAll;
 
         /// <summary>
         /// Fired when Master requests manual breakeven.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<BreakevenSignal> OnBreakevenRequest;
+        public static event EventHandler<BreakevenSignal> OnBreakevenRequest;
 
         /// <summary>
         /// V8.1: Fired when Master updates any stop (for full synchronization).
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<StopUpdateSignal> OnStopUpdate;
+        public static event EventHandler<StopUpdateSignal> OnStopUpdate;
 
         /// <summary>
         /// V8.1: Fired when Master updates pending entry order price.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<EntryUpdateSignal> OnEntryUpdate;
+        public static event EventHandler<EntryUpdateSignal> OnEntryUpdate;
 
         /// <summary>
         /// V8.1: Fired when Master cancels a pending entry order.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<OrderCancelSignal> OnOrderCancel;
+        public static event EventHandler<OrderCancelSignal> OnOrderCancel;
 
         /// <summary>
         /// V10.2: Fired when an external TCP command is received.
-        /// Action delegate for struct-based zero-allocation events.
+        /// EventHandler delegate following .NET convention (S3906).
         /// </summary>
-        public static event Action<ExternalCommandSignal> OnExternalCommand;
+        public static event EventHandler<ExternalCommandSignal> OnExternalCommand;
 
         #endregion
 
@@ -238,9 +229,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// the exception is caught and remaining subscribers still receive the signal.
         /// Prevents a single faulty handler from breaking the entire fan-out chain.
         /// V12.Phase7.2: Added performance profiling to detect slow subscribers.
-        /// V12.Phase8: Updated for Action<T> delegates (struct-based zero-allocation events).
+        /// V12.Phase8: Updated for EventHandler<T> delegates following .NET convention (S3906).
         /// </summary>
-        private static void SafeInvoke<T>(Action<T> handler, T args)
+        private static void SafeInvoke<T>(EventHandler<T> handler, T args)
+            where T : EventArgs
         {
             if (handler == null)
                 return;
@@ -251,7 +243,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 try
                 {
-                    ((Action<T>)d).Invoke(args);
+                    ((EventHandler<T>)d).Invoke(null, args);
                 }
                 catch (Exception)
                 {
@@ -280,7 +272,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTradeSignal(TradeSignal signal)
         {
-            // Struct validation: Check for uninitialized/default state
+            // Validation: Check for uninitialized/default state
             if (string.IsNullOrEmpty(signal.SignalId))
             {
                 throw new ArgumentException("SignalId cannot be null or empty", nameof(signal));
@@ -297,7 +289,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTrailUpdate(TrailUpdateSignal update)
         {
-            // Struct validation: Check for uninitialized/default state
+            // Validation: Check for uninitialized/default state
             if (string.IsNullOrEmpty(update.SignalId))
             {
                 throw new ArgumentException("SignalId cannot be null or empty", nameof(update));
@@ -312,7 +304,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTargetAction(TargetActionSignal action)
         {
-            // Struct validation: Check for uninitialized/default state
+            // Validation: Check for uninitialized/default state
             if (string.IsNullOrEmpty(action.SignalId))
             {
                 throw new ArgumentException("SignalId cannot be null or empty", nameof(action));
