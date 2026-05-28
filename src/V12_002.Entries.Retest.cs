@@ -311,9 +311,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Deactivate RETEST mode after entry (one-shot)
                 DeactivateRetestMode();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state machine issue
+                Print("WARNING ExecuteRetestEntry: NT8 order quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteRetestEntry: " + ex.Message);
+                // Unexpected exception - fail fast per V12 DNA
+                Print("CRITICAL ExecuteRetestEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
@@ -516,9 +523,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     );
                 }
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state machine issue
+                Print("WARNING ExecuteRetestManualEntry: NT8 order quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteRetestManualEntry: " + ex.Message);
+                // Unexpected exception - fail fast per V12 DNA
+                Print("CRITICAL ExecuteRetestManualEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 

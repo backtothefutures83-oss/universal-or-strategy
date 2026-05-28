@@ -196,9 +196,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 );
                 ExecuteTREND_DispatchSima(direction, totalContracts, currentPrice, entry1Name, entry2Name);
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state machine issue
+                Print("WARNING ExecuteTRENDEntry: NT8 order quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteTRENDEntry: " + ex.Message);
+                // Unexpected exception - fail fast per V12 DNA
+                Print("CRITICAL ExecuteTRENDEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
@@ -836,9 +843,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 );
                 ExecuteTRENDManual_DispatchSima(direction, contracts, entryPrice, entryName);
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state machine issue
+                Print("WARNING ExecuteTRENDManualEntry: NT8 order quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteTRENDManualEntry: " + ex.Message);
+                // Unexpected exception - fail fast per V12 DNA
+                Print("CRITICAL ExecuteTRENDManualEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
