@@ -242,7 +242,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Only process primary series
             if (BarsInProgress != 0)
                 return;
-            if (CurrentBar < 5)
+            // P0 CRITICAL: Use BarsRequiredToTrade instead of magic number (Jane Street: Correctness by construction)
+            if (CurrentBar < BarsRequiredToTrade)
                 return;
 
             try

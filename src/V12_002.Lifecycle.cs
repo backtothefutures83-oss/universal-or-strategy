@@ -364,6 +364,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             _configureComplete = false;
             _dataLoadedComplete = false;
+            // P0 CRITICAL: Set BarsRequiredToTrade for safe bar access (Jane Street: Correctness by construction)
+            BarsRequiredToTrade = 20;
 
             // B984-F03: AddDataSeries FIRST -- NT8 requires early registration before any throwing code.
             // Index 1 = 5-min (ATR), Index 2 = 10-min, Index 3 = 15-min (MTF RMA Intelligence Phase 9.2)
