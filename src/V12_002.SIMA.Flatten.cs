@@ -372,8 +372,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                         sigName,
                         null
                     );
-                    acct.Submit(new[] { closeOrder });
-                    closedCount++;
+                    if (closeOrder != null)
+                    {
+                        acct.Submit(new[] { closeOrder });
+                        closedCount++;
+                    }
+                    else
+                    {
+                        Print(
+                            string.Format(
+                                "[FLATTEN_PUMP] Follower close FAILED (null): {0} {1} on {2}",
+                                position.MarketPosition,
+                                qty,
+                                acct.Name
+                            )
+                        );
+                    }
                 }
             }
 
