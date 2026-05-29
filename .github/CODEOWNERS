@@ -8,13 +8,20 @@
 # Core strategy kernel — highest sensitivity
 src/ @mkalhitti-cloud
 
-# Agent configuration — changes affect all AI agent sessions
+# Protocol paths — Director review ONLY (no bot reviews)
+# These paths define agent behavior and must be reviewed by humans only
+# Branch protection rule: "Require review from Code Owners" ensures bots can't approve
+.bob/ @mkalhitti-cloud
 .agent/ @mkalhitti-cloud
 .claude/ @mkalhitti-cloud
 .gemini/ @mkalhitti-cloud
+.codex/ @mkalhitti-cloud
+docs/protocol/ @mkalhitti-cloud
 AGENTS.md @mkalhitti-cloud
 CLAUDE.md @mkalhitti-cloud
 GEMINI.md @mkalhitti-cloud
+BOB.md @mkalhitti-cloud
+CODEX.md @mkalhitti-cloud
 
 # CI/CD and deployment scripts — changes affect live production
 .github/ @mkalhitti-cloud
