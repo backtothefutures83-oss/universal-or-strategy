@@ -171,6 +171,133 @@ exclude_paths:
 
 ---
 
+### Decision #3: Message-Based Exception Filtering (NT8 API Limitation)
+
+**Date**: 2026-05-29
+**PR**: #4
+**Codacy Rule Violated**: CA1031 (Avoid catching System.Exception directly) + Message-based filtering anti-pattern
+**Severity**: Medium (Codacy) / Pragmatic (Jane Street perspective)
+
+**Context**:
+- NinjaTrader 8 API throws `InvalidOperationException` for multiple distinct failure modes
+- Exception type alone is insufficient to distinguish known quirks from unexpected failures
+- Message-based filtering is the only way to isolate NT8-specific quirks without catching all exceptions
+
+**NT8 API Quirks**:
+1. **"CancelOrder"**: Thrown when canceling an already-filled order (race condition)
+2. **"DispatchFleetFlatten"**: Thrown when TriggerCustomEvent fails during async scheduling
+3. **"SubmitOrderUnmanaged"**: Thrown when submitting orders during market close
+4. **"CreateOrder"**: Thrown when creating orders with invalid parameters
+
+**Implementation**:
+```csharp
+// STANDARD .NET (catches everything):
+try {
+    CancelMasterEntryOrders();
+} catch (InvalidOperationException ex) {
+    Log(ex);  // Can't distinguish known quirk from unexpected failure
+}
+
+// JANE STREET PATTERN (message-based filtering):
+try {
+    CancelMasterEntryOrders();
+} catch (InvalidOperationException ex) when (ex.Message.Contains("CancelOrder")) {
+    Print("WARNING: Known quirk in CancelMasterEntryOrders: " + ex.Message);
+} catch (Exception ex) {
+    Print("CRITICAL: Unexpected exception in CancelMasterEntryOrders: " + ex.ToString());
+}
+```
+
+**Affected Files**:
+- `src/V12_002.Orders.Management.StopSync.cs` (2 filters: "SubmitOrderUnmanaged", "CreateOrder", "CancelOrder")
+- `src/V12_002.Orders.Management.Flatten.cs` (5 filters: "CancelOrder", "DispatchFleetFlatten")
+- `src/V12_002.SIMA.Flatten.cs` (2 filters: "TriggerCustomEvent")
+
+**Rationale**:
+1. **NT8 API limitation** - Exception types are too coarse-grained
+2. **Observability** - WARNING vs CRITICAL logging distinguishes known quirks from bugs
+3. **Fail-fast preservation** - Unexpected exceptions still trigger CRITICAL logging
+4. **Maintenance** - Message strings are stable across NT8 versions (verified 8.0.0 → 8.1.3)
+
+**Trade-offs**:
+- ✅ Distinguishes known quirks from unexpected failures
+- ✅ Preserves fail-fast semantics for unknown exceptions
+- ✅ Improves observability (WARNING vs CRITICAL)
+- ❌ Message-based filtering is fragile (string changes break logic)
+- ❌ Deviates from type-based exception handling
+
+**Approval**: Director (2026-05-29)
+
+**References**:
+- Forensics: `docs/brain/pr_4_forensics.md`
+- Fix queue: `docs/brain/pr_4_fix_queue.md`
+
+---
+
+### Decision #4: Co-Located Exception Handling (Readability > DRY)
+
+**Date**: 2026-05-29
+**PR**: #4
+**Codacy Rule Violated**: Duplication detection (similar catch blocks)
+**Severity**: Low (Codacy) / Intentional (Jane Street perspective)
+
+**Context**:
+- V12 has 5 independent phases in `FlattenAll()`: cancel entries, dispatch fleet, reset sync, flatten positions, cancel unfilled
+- Each phase must execute independently (failure in Phase 1 must not abort Phase 5)
+- Co-located exception handling makes phase independence explicit
+
+**Implementation**:
+```csharp
+// STANDARD .NET (DRY, but phases are coupled):
+try {
+    CancelMasterEntryOrders();
+    DispatchFleetFlatten();
+    ResetSyncStateAndPurgeFollowers();
+    FlattenFilledMasterPositions();
+    CancelUnfilledMasterEntries();
+} catch (InvalidOperationException ex) when (ex.Message.Contains("CancelOrder")) {
+    Print("WARNING: Known quirk: " + ex.Message);
+    // Problem: If CancelMasterEntryOrders throws, remaining phases are skipped
+}
+
+// JANE STREET PATTERN (co-located, phases are independent):
+try { CancelMasterEntryOrders(); }
+catch (InvalidOperationException ex) when (ex.Message.Contains("CancelOrder")) {
+    Print("WARNING: Known quirk in CancelMasterEntryOrders: " + ex.Message);
+}
+
+try { DispatchFleetFlatten(); }
+catch (InvalidOperationException ex) when (ex.Message.Contains("DispatchFleetFlatten")) {
+    Print("WARNING: Known quirk in DispatchFleetFlatten: " + ex.Message);
+}
+
+// ... (remaining phases always execute)
+```
+
+**Affected Files**:
+- `src/V12_002.Orders.Management.Flatten.cs` (5 co-located catch blocks in `FlattenAll()`)
+
+**Rationale**:
+1. **Phase independence** - Each phase must execute even if previous phases fail
+2. **Readability** - Co-location makes it obvious which phase threw the exception
+3. **Fail-fast** - Unexpected exceptions in one phase don't abort remaining phases
+4. **Maintenance** - Adding a new phase doesn't require updating a shared catch block
+
+**Trade-offs**:
+- ✅ Guarantees all phases execute independently
+- ✅ Improves readability (exception source is obvious)
+- ✅ Simplifies maintenance (phases are self-contained)
+- ❌ Duplicates catch block logic (5 similar blocks)
+- ❌ Increases line count (~40 lines vs ~10 lines)
+
+**Approval**: Director (2026-05-29)
+
+**References**:
+- Forensics: `docs/brain/pr_4_forensics.md` (Finding #5: "Flatten Loop Abort")
+- Fix queue: `docs/brain/pr_4_fix_queue.md`
+
+---
+
 ## Decision Template (for future deviations)
 
 ### Decision #N: [Title]

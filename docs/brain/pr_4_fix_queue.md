@@ -1,24 +1,19 @@
 ﻿# PR #4 Fix Queue
-Generated: 2026-05-25 16:20:50
+Generated: 2026-05-29 12:35:54
 
 ## Instructions for v12-engineer
 
 Process these issues in priority order. Mark each as FIXED after applying the fix.
 
 ### Fix #1 - [P0] CRITICAL
-[ ] **Bot:** cubic-dev-ai  
+[ ] **Bot:** sourcery-ai  
 [ ] **File:** (extract from body)  
-[ ] **Issue:** **2 issues found** across 1 file
+[ ] **Issue:** Hey - I've found 1 issue, and left some high level feedback:
 
-<details>
-<summary>Prompt for AI agents (unresolved issues)</summary>
-
-```text
-
-Check if these issues are valid ÔÇö if so, understand the root cause of each and fix t...
+- The new exception filters that rely on `ex.Message.Contains("...")` to detect known NT8 quirks are brittle and culture-dependent; consid...
 
 **Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
 2. Apply the fix
 3. Verify locally
 4. Mark as [x] FIXED
@@ -26,91 +21,9 @@ Check if these issues are valid ÔÇö if so, understand the root cause of each 
 ---
 
 ### Fix #2 - [P0] CRITICAL
-[ ] **Bot:** amazon-q-developer  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** ## Summary
-
-This PR claims to eliminate LINQ allocations by removing `.ToArray()` but introduces a **critical concurrency defect** that blocks merge.
-
-### Blocking Issue
-
-**Thread-Safety Violation**: ...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #3 - [P0] CRITICAL
-[ ] **Bot:** codacy-production  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** ### Pull Request Overview
-
-While this PR achieves its goal of eliminating the heap allocation from `.ToArray()`, it re-introduces a critical thread-safety risk. The removal of the defensive snapshot o...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #4 - [P0] CRITICAL
-[ ] **Bot:** sourcery-ai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** Hey - I've found 1 issue, and left some high level feedback:
-
-- The original comment explicitly mentioned snapshotting to avoid broker-thread mutation during iteration; removing the ToArray() snapshot...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #5 - [P0] CRITICAL
 [ ] **Bot:** coderabbitai  
 [ ] **File:** (extract from body)  
-[ ] **Issue:** <!-- This is an auto-generated comment: summarize by coderabbit.ai -->
-<!-- walkthrough_start -->
-
-## Walkthrough
-
-`ShouldSkipFleet_RunHealthCheck` now takes stable snapshots via `.ToArray()` of `_fol...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4#issuecomment-4536832107
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #6 - [P0] CRITICAL
-[ ] **Bot:** gemini-code-assist  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** ## Code Review
-
-This pull request replaces the snapshot-based iteration over `acct.Positions` with a direct `foreach` loop to eliminate heap allocations. However, the reviewer points out that this int...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #7 - [P1] REVIEW
-[ ] **Bot:** coderabbitai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** **Actionable comments posted: 1**
+[ ] **Issue:** **Actionable comments posted: 5**
 
 <details>
 <summary>­ƒñû Prompt for all review comments with AI agents</summary>
@@ -120,27 +33,91 @@ Verify each finding against current code. Fix only still-valid issues, skip the
 ...
 
 **Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
 2. Apply the fix
 3. Verify locally
 4. Mark as [x] FIXED
 
 ---
 
-### Fix #8 - [P2] PERFORMANCE
+### Fix #3 - [P0] CRITICAL
+[ ] **Bot:** cubic-dev-ai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **7 issues found** across 6 files
+
+<details>
+<summary>Prompt for AI agents (unresolved issues)</summary>
+
+```text
+
+Check if these issues are valid ÔÇö if so, understand the root cause of each and fix ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #4 - [P0] CRITICAL
+[ ] **Bot:** amazon-q-developer  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** The PR systematically improves exception handling and documentation across the codebase. All changes follow the stated Jane Street alignment principles and strengthen error isolation to prevent fleet ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #5 - [P0] CRITICAL
 [ ] **Bot:** sourcery-ai  
 [ ] **File:** (extract from body)  
 [ ] **Issue:** <!-- Generated by sourcery-ai[bot]: start review_guide -->
 
-<details>
-<summary>Reviewer's guide (collapsed on small PRs)</summary>
-
 ## Reviewer's Guide
 
-Replaces a LINQ-based snapshot of Positions (To...
+Implements zero-allocation struct-based signal broadcasting, hardens flatten/stop-sync/lifecycle safety paths to avoid ...
 
 **Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4#issuecomment-4536831237
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4#issuecomment-4578904790
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #6 - [P0] CRITICAL
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** <!-- This is an auto-generated comment: summarize by coderabbit.ai -->
+<!-- walkthrough_start -->
+
+## Walkthrough
+
+This PR refines signal documentation and implements defensive exception handling acro...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4#issuecomment-4578905798
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #7 - [P0] CRITICAL
+[ ] **Bot:** gitar-bot  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** <details open>
+<summary><b>Code Review</b> <kbd>ÔÜá´©Å Changes requested</kbd> <kbd>0 resolved / 1 findings</kbd></summary>
+
+Resolves V12 DNA violations by reverting signal types to structs and implem...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4#issuecomment-4578915879
 2. Apply the fix
 3. Verify locally
 4. Mark as [x] FIXED

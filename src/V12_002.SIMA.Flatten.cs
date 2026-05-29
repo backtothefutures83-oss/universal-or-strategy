@@ -96,9 +96,58 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
-                    // Known NT8 TriggerCustomEvent quirk - release guard and log
+                    // Known NT8 TriggerCustomEvent quirk - drain queue and perform fallback flatten
                     isFlattenRunning = false;
                     Print("[FLATTEN] WARNING: TriggerCustomEvent failed: " + ex.Message);
+
+                    // Drain queue and attempt synchronous flatten for each account
+                    var drainedOps = new List<FlattenWorkItem>();
+                    FlattenWorkItem item;
+                    while (_pendingFlattenOps.TryDequeue(out item))
+                    {
+                        drainedOps.Add(item);
+                    }
+
+                    Print(
+                        string.Format(
+                            "[FLATTEN] Attempting fallback flatten for {0} queued accounts...",
+                            drainedOps.Count
+                        )
+                    );
+
+                    foreach (var workItem in drainedOps)
+                    {
+                        try
+                        {
+                            Account acct = workItem.Account;
+                            if (acct == null)
+                            {
+                                Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                continue;
+                            }
+
+                            ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+
+                            if (!workItem.CancelOnly)
+                            {
+                                ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                            }
+
+                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                        }
+                        catch (Exception flatEx)
+                        {
+                            Print(
+                                string.Format(
+                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                    workItem.Account != null ? workItem.Account.Name : "NULL",
+                                    flatEx
+                                )
+                            );
+                        }
+                    }
+                    // Do NOT rethrow - we've done our best to protect positions
                 }
                 catch (Exception ex)
                 {
@@ -368,15 +417,117 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
-                    // Known NT8 TriggerCustomEvent quirk - release guard and log
+                    // Known NT8 TriggerCustomEvent quirk - drain queue and perform fallback flatten
                     isFlattenRunning = false;
                     Print("[FLATTEN] WARNING: ChainNextFlattenOp TriggerCustomEvent failed: " + ex.Message);
+
+                    // Drain queue and attempt synchronous flatten for remaining accounts
+                    var drainedOps = new List<FlattenWorkItem>();
+                    FlattenWorkItem item;
+                    while (_pendingFlattenOps.TryDequeue(out item))
+                    {
+                        drainedOps.Add(item);
+                    }
+
+                    if (drainedOps.Count > 0)
+                    {
+                        Print(
+                            string.Format(
+                                "[FLATTEN] Attempting fallback flatten for {0} remaining accounts...",
+                                drainedOps.Count
+                            )
+                        );
+
+                        foreach (var workItem in drainedOps)
+                        {
+                            try
+                            {
+                                Account acct = workItem.Account;
+                                if (acct == null)
+                                {
+                                    Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                    continue;
+                                }
+
+                                ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+
+                                if (!workItem.CancelOnly)
+                                {
+                                    ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                                }
+
+                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                                Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            }
+                            catch (Exception flatEx)
+                            {
+                                Print(
+                                    string.Format(
+                                        "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                        workItem.Account != null ? workItem.Account.Name : "NULL",
+                                        flatEx
+                                    )
+                                );
+                            }
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected error - release guard and log
+                    // Unexpected error - drain queue and perform fallback flatten
                     isFlattenRunning = false;
                     Print("[FLATTEN] CRITICAL: Unexpected error in ChainNextFlattenOp: " + ex.ToString());
+
+                    // Drain queue and attempt synchronous flatten for remaining accounts
+                    var drainedOps = new List<FlattenWorkItem>();
+                    FlattenWorkItem item;
+                    while (_pendingFlattenOps.TryDequeue(out item))
+                    {
+                        drainedOps.Add(item);
+                    }
+
+                    if (drainedOps.Count > 0)
+                    {
+                        Print(
+                            string.Format(
+                                "[FLATTEN] Attempting fallback flatten for {0} remaining accounts...",
+                                drainedOps.Count
+                            )
+                        );
+
+                        foreach (var workItem in drainedOps)
+                        {
+                            try
+                            {
+                                Account acct = workItem.Account;
+                                if (acct == null)
+                                {
+                                    Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                    continue;
+                                }
+
+                                ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+
+                                if (!workItem.CancelOnly)
+                                {
+                                    ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                                }
+
+                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                                Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            }
+                            catch (Exception flatEx)
+                            {
+                                Print(
+                                    string.Format(
+                                        "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                        workItem.Account != null ? workItem.Account.Name : "NULL",
+                                        flatEx
+                                    )
+                                );
+                            }
+                        }
+                    }
                     // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }

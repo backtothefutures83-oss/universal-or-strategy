@@ -1,128 +1,41 @@
 ﻿# PR #4 Forensics Report
-Generated: 2026-05-25 16:20:50
+Generated: 2026-05-29 12:35:54
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total Findings | 8 |
-| VALID Issues | 8 |
+| Total Findings | 7 |
+| VALID Issues | 7 |
 | HALLUCINATIONS | 0 |
 | INFRA-NOISE | 0 |
-| P0 (Critical) | 6 |
-| P1 (High) |  |
-| P2 (Medium) |  |
+| P0 (Critical) | 7 |
+| P1 (High) | 0 |
+| P2 (Medium) | 0 |
 
 ## VALID Issues (Priority Order)
 
-### [P0] CRITICAL - cubic-dev-ai
-**Source:** review  
-**Timestamp:** 2026-05-25T19:59:43Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-
-**Excerpt:**
-```
-**2 issues found** across 1 file
-
-<details>
-<summary>Prompt for AI agents (unresolved issues)</summary>
-
-```text
-
-Check if these issues are valid ÔÇö if so, understand the root cause of each and fix them. If appropriate, use sub-agents to investigate and fix each issue separately.
-
-
-<file name="src/V12_002.SIMA.Fleet.cs">
-
-<violation number="1" location="src/V12_002.SIMA.Fleet.cs:484">
-P1: Missing null check for `pos.Instrument` before accessing `.FullName`. Other iteration sites in this codebas
-```
-
-### [P0] CRITICAL - amazon-q-developer
-**Source:** review  
-**Timestamp:** 2026-05-25T19:53:13Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-
-**Excerpt:**
-```
-## Summary
-
-This PR claims to eliminate LINQ allocations by removing `.ToArray()` but introduces a **critical concurrency defect** that blocks merge.
-
-### Blocking Issue
-
-**Thread-Safety Violation**: The change removes defensive `.ToArray()` snapshot that protected against broker-thread mutations during iteration. The original code explicitly documented this protection (line 479: "[939-P0]: Snapshot Positions to prevent broker-thread mutation"). Direct iteration over `acct.Positions` risks `Inva
-```
-
-### [P0] CRITICAL - codacy-production
-**Source:** review  
-**Timestamp:** 2026-05-25T19:53:47Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-
-**Excerpt:**
-```
-### Pull Request Overview
-
-While this PR achieves its goal of eliminating the heap allocation from `.ToArray()`, it re-introduces a critical thread-safety risk. The removal of the defensive snapshot on `acct.Positions` makes the iteration susceptible to `InvalidOperationException` if the broker thread modifies the collection during the loop. This contradicts the PR's claim of 'identical logic' and 'behavioral identity.' 
-
-Although Codacy reports the PR is 'up to standards' based on static analys
-```
-
 ### [P0] CRITICAL - sourcery-ai
 **Source:** review  
-**Timestamp:** 2026-05-25T19:53:07Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
+**Timestamp:** 2026-05-29T19:07:37Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
 
 **Excerpt:**
 ```
 Hey - I've found 1 issue, and left some high level feedback:
 
-- The original comment explicitly mentioned snapshotting to avoid broker-thread mutation during iteration; removing the ToArray() snapshot reintroduces potential concurrent-modification issues and InvalidOperationExceptions unless acct.Positions is guaranteed to be thread-safe for concurrent enumeration, so consider either documenting that guarantee or restoring a safe access pattern (e.g., locking or a different non-allocating snapsh
+- The new exception filters that rely on `ex.Message.Contains("...")` to detect known NT8 quirks are brittle and culture-dependent; consider matching on more stable signals (specific exception types, error codes/HResult, or a helper that centralizes and documents the matching logic) so behaviors donÔÇÖt change silently on message text changes.
+- There is a lot of duplicated error-handling/logging logic (e.g., the various `TriggerCusto
 ```
 
 ### [P0] CRITICAL - coderabbitai
-**Source:** comment  
-**Timestamp:** 2026-05-25T19:52:38Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4#issuecomment-4536832107
-
-**Excerpt:**
-```
-<!-- This is an auto-generated comment: summarize by coderabbit.ai -->
-<!-- walkthrough_start -->
-
-## Walkthrough
-
-`ShouldSkipFleet_RunHealthCheck` now takes stable snapshots via `.ToArray()` of `_followerBrackets` and `activePositions` and iterates them with indexed `for` loops to perform the same follower-FSM and active-position presence checks.
-
-## Changes
-
-**Snapshot iteration for health-check lookups**
-
-|Layer / File(s)|Summary|
-|---|---|
-|**Snapshot follower bracket FSM scan** <br> `src/V1
-```
-
-### [P0] CRITICAL - gemini-code-assist
 **Source:** review  
-**Timestamp:** 2026-05-25T19:52:52Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
+**Timestamp:** 2026-05-29T19:12:37Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
 
 **Excerpt:**
 ```
-## Code Review
-
-This pull request replaces the snapshot-based iteration over `acct.Positions` with a direct `foreach` loop to eliminate heap allocations. However, the reviewer points out that this introduces a critical thread-safety risk because the `Positions` collection is updated by the broker thread, which can cause an `InvalidOperationException` during iteration. Reverting to the snapshotting pattern is recommended to ensure stability.
-```
-
-### [P1] REVIEW - coderabbitai
-**Source:** review  
-**Timestamp:** 2026-05-25T19:57:08Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4
-
-**Excerpt:**
-```
-**Actionable comments posted: 1**
+**Actionable comments posted: 5**
 
 <details>
 <summary>­ƒñû Prompt for all review comments with AI agents</summary>
@@ -132,31 +45,108 @@ Verify each finding against current code. Fix only still-valid issues, skip the
 rest with a brief reason, keep changes minimal, and validate.
 
 Inline comments:
-In `@src/V12_002.SIMA.Fleet.cs`:
-- Around line 479-486: In ShouldSkipFleet_RunHealthCheck replace the direct
-foreach over acct.Positions with a stable snapshot (e.g., var positions =
-acct.Positions.ToArray()) and iterate
+In `@src/V12_002.Lifecycle.cs`:
+- Around line 177-181: Change the log prefix used in the ObjectDisposedException
+catch for the MMIO mirror so it reflects an expected shutdown condition rather
+than an error: in the catch 
 ```
 
-### [P2] PERFORMANCE - sourcery-ai
+### [P0] CRITICAL - cubic-dev-ai
+**Source:** review  
+**Timestamp:** 2026-05-29T19:16:13Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
+
+**Excerpt:**
+```
+**7 issues found** across 6 files
+
+<details>
+<summary>Prompt for AI agents (unresolved issues)</summary>
+
+```text
+
+Check if these issues are valid ÔÇö if so, understand the root cause of each and fix them. If appropriate, use sub-agents to investigate and fix each issue separately.
+
+
+<file name="src/V12_002.SIMA.Flatten.cs">
+
+<violation number="1" location="src/V12_002.SIMA.Flatten.cs:97">
+P2: The `InvalidOperationException` catch (the "known NT8 quirk") abandons all enqueued fleet accounts with
+```
+
+### [P0] CRITICAL - amazon-q-developer
+**Source:** review  
+**Timestamp:** 2026-05-29T19:06:51Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4
+
+**Excerpt:**
+```
+The PR systematically improves exception handling and documentation across the codebase. All changes follow the stated Jane Street alignment principles and strengthen error isolation to prevent fleet partitioning. The implementation correctly handles edge cases and maintains position safety. No blocking defects identified.
+
+---
+You can now have the agent implement changes and create commits directly on your pull request's source branch. Simply comment with /q followed by your request in natural 
+```
+
+### [P0] CRITICAL - sourcery-ai
 **Source:** comment  
-**Timestamp:** 2026-05-25T19:52:31Z  
-**URL:** https://github.com/malhitticrypto-debug/universal-or-strategy/pull/4#issuecomment-4536831237
+**Timestamp:** 2026-05-29T19:06:21Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4#issuecomment-4578904790
 
 **Excerpt:**
 ```
 <!-- Generated by sourcery-ai[bot]: start review_guide -->
 
-<details>
-<summary>Reviewer's guide (collapsed on small PRs)</summary>
-
 ## Reviewer's Guide
 
-Replaces a LINQ-based snapshot of Positions (ToArray) with direct foreach iteration to remove heap allocations while preserving existing matching and early-break behavior, and updates comments to reflect the new zero-allocation approach.
+Implements zero-allocation struct-based signal broadcasting, hardens flatten/stop-sync/lifecycle safety paths to avoid fail-fast behavior, and makes IPC broadcasting resilient by isolating per-client failures while preserving fleet-wide operations.
 
-#### Flow diagram for zero-allocation position search in ShouldSkipFleet_RunHealthCheck
+#### Sequence diagram for SIMA flatten fallback and non-fail-fast behavior
 
 ```mermaid
-flowchar
+sequenceDiagram
+    participant Strategy
+    participant SIMA_Flatten
+    particip
+```
+
+### [P0] CRITICAL - coderabbitai
+**Source:** comment  
+**Timestamp:** 2026-05-29T19:06:30Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4#issuecomment-4578905798
+
+**Excerpt:**
+```
+<!-- This is an auto-generated comment: summarize by coderabbit.ai -->
+<!-- walkthrough_start -->
+
+## Walkthrough
+
+This PR refines signal documentation and implements defensive exception handling across order management and flatten operations, distinguishing known operation failures from unexpected critical errors while suppressing rethrows to ensure cleanup and continued processing.
+
+## Changes
+
+**Exception handling resilience and documentation refinement**
+
+|Layer / File(s)|Summary|
+|---|---|
+
+```
+
+### [P0] CRITICAL - gitar-bot
+**Source:** comment  
+**Timestamp:** 2026-05-29T19:08:00Z  
+**URL:** https://github.com/backtothefutures83-oss/universal-or-strategy/pull/4#issuecomment-4578915879
+
+**Excerpt:**
+```
+<details open>
+<summary><b>Code Review</b> <kbd>ÔÜá´©Å Changes requested</kbd> <kbd>0 resolved / 1 findings</kbd></summary>
+
+Resolves V12 DNA violations by reverting signal types to structs and implementing resilient boundary exception guards. The exception filter in the flattening workflow uses an incorrect method name and will not catch targeted errors.
+
+<details>
+<summary>ÔÜá´©Å <b>Bug:</b> Exception filter uses user method name, will never match</summary>
+
+<kbd>­ƒôä <a href="https://github.c
 ```
 

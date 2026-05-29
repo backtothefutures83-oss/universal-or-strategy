@@ -210,22 +210,67 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 Print("FLATTEN: Closing all positions...");
-                CancelMasterEntryOrders();
+
+                // Phase 1: Cancel master entry orders (with known quirk handling)
+                try
+                {
+                    CancelMasterEntryOrders();
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("CancelOrder"))
+                {
+                    Print("WARNING: Known quirk in CancelMasterEntryOrders: " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in CancelMasterEntryOrders: " + ex.ToString());
+                }
+
+                // Phase 2: Dispatch fleet flatten (with known quirk handling)
                 if (EnableSIMA)
-                    DispatchFleetFlatten();
-                ResetSyncStateAndPurgeFollowers();
-                FlattenFilledMasterPositions();
-                CancelUnfilledMasterEntries();
-            }
-            catch (InvalidOperationException ex)
-                when (ex.Message.Contains("DispatchFleetFlatten") || ex.Message.Contains("CancelOrder"))
-            {
-                Print("WARNING: Known quirk in FlattenAll: " + ex.Message);
-            }
-            catch (Exception ex)
-            {
-                Print("CRITICAL: Unexpected exception in FlattenAll: " + ex.ToString());
-                // Do NOT rethrow - log and continue to allow caller to proceed
+                {
+                    try
+                    {
+                        DispatchFleetFlatten();
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("DispatchFleetFlatten"))
+                    {
+                        Print("WARNING: Known quirk in DispatchFleetFlatten: " + ex.Message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("CRITICAL: Unexpected exception in DispatchFleetFlatten: " + ex.ToString());
+                    }
+                }
+
+                // Phase 3: Reset sync state (always execute)
+                try
+                {
+                    ResetSyncStateAndPurgeFollowers();
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in ResetSyncStateAndPurgeFollowers: " + ex.ToString());
+                }
+
+                // Phase 4: Flatten filled positions (always execute)
+                try
+                {
+                    FlattenFilledMasterPositions();
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in FlattenFilledMasterPositions: " + ex.ToString());
+                }
+
+                // Phase 5: Cancel unfilled entries (always execute)
+                try
+                {
+                    CancelUnfilledMasterEntries();
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in CancelUnfilledMasterEntries: " + ex.ToString());
+                }
             }
             finally
             {

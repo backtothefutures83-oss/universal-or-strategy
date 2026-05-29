@@ -434,7 +434,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
             catch (InvalidOperationException ex)
-                when (ex.Message.Contains("CreateNewStopOrder") || ex.Message.Contains("CancelOrder"))
+                when (ex.Message.Contains("SubmitOrderUnmanaged")
+                    || ex.Message.Contains("CreateOrder")
+                    || ex.Message.Contains("CancelOrder")
+                )
             {
                 Print(
                     string.Format("(!) WARNING UpdateStopQuantity for {0} (known quirk): {1}", entryName, ex.Message)
@@ -534,6 +537,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(
                     string.Format("(!) WARNING CreateNewStopOrder for {0} (known quirk): {1}", entryName, ex.Message)
                 );
+                Print(
+                    string.Format("(!) Attempting emergency flatten for {0} due to stop creation failure...", entryName)
+                );
+                try
+                {
+                    FlattenPositionByName(entryName);
+                }
+                catch (Exception flatEx)
+                {
+                    Print(
+                        string.Format(
+                            "(!) CRITICAL: Emergency flatten also failed for {0}: {1}",
+                            entryName,
+                            flatEx.ToString()
+                        )
+                    );
+                }
+                // Do NOT rethrow - position safety requires stop order attempt to complete
             }
             catch (Exception ex)
             {
