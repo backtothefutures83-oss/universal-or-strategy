@@ -439,6 +439,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     || ex.Message.Contains("CancelOrder")
                 )
             {
+                // P0-3: Clean orphaned pendingStopReplacements entry (Jane Street Principle #1: Correctness by Construction)
+                // If CancelOrderForReplace threw, the dictionary entry added before the cancel is never removed.
+                // Future stop-resize calls hit the existing-pending branch and silently update a stale record that will never complete.
+                if (pendingStopReplacements.TryRemove(entryName, out _))
+                    Interlocked.Decrement(ref pendingReplacementCount);
+
                 Print(
                     string.Format("(!) WARNING UpdateStopQuantity for {0} (known quirk): {1}", entryName, ex.Message)
                 );
@@ -467,6 +473,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
+                // P0-3: Clean orphaned pendingStopReplacements entry (Jane Street Principle #1: Correctness by Construction)
+                // If CancelOrderForReplace threw, the dictionary entry added before the cancel is never removed.
+                // Future stop-resize calls hit the existing-pending branch and silently update a stale record that will never complete.
+                if (pendingStopReplacements.TryRemove(entryName, out _))
+                    Interlocked.Decrement(ref pendingReplacementCount);
+
                 Print(string.Format("(!) CRITICAL UpdateStopQuantity for {0}: {1}", entryName, ex.ToString()));
                 Print(
                     string.Format(
@@ -507,13 +519,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 // Phase 1: Validate preconditions (zombie guard, duplicate stop guard, recovery mode)
-                var (canProceed, pos) = ValidateStopOrderPreconditions(
-                    entryName,
-                    quantity,
-                    stopPrice,
-                    direction,
-                    isRecovery
-                );
+                var (canProceed, pos) = ValidateStopOrderPreconditions(entryName, quantity, direction, isRecovery);
 
                 if (!canProceed)
                     return;
@@ -633,7 +639,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private (bool canProceed, PositionInfo pos) ValidateStopOrderPreconditions(
             string entryName,
             int quantity,
-            double _,
             MarketPosition direction,
             bool isRecovery
         )

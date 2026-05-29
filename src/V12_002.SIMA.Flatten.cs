@@ -96,41 +96,31 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
+                    // P0-4: FSM bypass acceptable - async pump failed, positions at risk (Jane Street Decision #2)
                     // Known NT8 TriggerCustomEvent quirk - drain queue and perform fallback flatten
-                    isFlattenRunning = false;
                     Print("[FLATTEN] WARNING: TriggerCustomEvent failed: " + ex.Message);
 
-                    // Drain queue and attempt synchronous flatten for each account
-                    var drainedOps = new List<FlattenWorkItem>();
+                    // P0-1: Direct queue processing (zero heap allocation - Jane Street Principle #2)
+                    // P0-2: Atomic guard semantics - release AFTER fallback completes (Jane Street Principle #3)
+                    int processedCount = 0;
                     FlattenWorkItem item;
                     while (_pendingFlattenOps.TryDequeue(out item))
                     {
-                        drainedOps.Add(item);
-                    }
-
-                    Print(
-                        string.Format(
-                            "[FLATTEN] Attempting fallback flatten for {0} queued accounts...",
-                            drainedOps.Count
-                        )
-                    );
-
-                    foreach (var workItem in drainedOps)
-                    {
+                        processedCount++;
                         try
                         {
-                            Account acct = workItem.Account;
+                            Account acct = item.Account;
                             if (acct == null)
                             {
                                 Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
                                 continue;
                             }
 
-                            ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+                            ProcessFlattenWorkItem_CancelOrders(item, acct);
 
-                            if (!workItem.CancelOnly)
+                            if (!item.CancelOnly)
                             {
-                                ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                                ProcessFlattenWorkItem_ClosePositions(item, acct);
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
@@ -141,40 +131,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(
                                 string.Format(
                                     "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    workItem.Account != null ? workItem.Account.Name : "NULL",
+                                    item.Account != null ? item.Account.Name : "NULL",
                                     flatEx
                                 )
                             );
                         }
                     }
+
+                    Print(string.Format("[FLATTEN] Fallback processed {0} queued accounts", processedCount));
+                    isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - we've done our best to protect positions
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected error - release guard, drain queue, and attempt fallback flatten
-                    isFlattenRunning = false;
+                    // P0-4: FSM bypass acceptable - async pump failed, positions at risk (Jane Street Decision #2)
+                    // Unexpected error - drain queue and attempt fallback flatten
+                    Print(string.Format("[FLATTEN] CRITICAL: Unexpected error in FlattenAllApexAccounts: {0}", ex));
 
-                    // Drain queue and attempt synchronous flatten for each account
-                    var drainedOps = new List<FlattenWorkItem>();
+                    // P0-1: Direct queue processing (zero heap allocation - Jane Street Principle #2)
+                    // P0-2: Atomic guard semantics - release AFTER fallback completes (Jane Street Principle #3)
+                    int processedCount = 0;
                     FlattenWorkItem item;
                     while (_pendingFlattenOps.TryDequeue(out item))
                     {
-                        drainedOps.Add(item);
-                    }
-
-                    Print(string.Format("[FLATTEN] CRITICAL: Unexpected error in FlattenAllApexAccounts: {0}", ex));
-                    Print(
-                        string.Format(
-                            "[FLATTEN] Attempting fallback flatten for {0} queued accounts...",
-                            drainedOps.Count
-                        )
-                    );
-
-                    foreach (var workItem in drainedOps)
-                    {
+                        processedCount++;
                         try
                         {
-                            Account acct = workItem.Account;
+                            Account acct = item.Account;
                             if (acct == null)
                             {
                                 Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
@@ -182,11 +165,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             // Use existing SIMA infrastructure for synchronous flatten
-                            ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+                            ProcessFlattenWorkItem_CancelOrders(item, acct);
 
-                            if (!workItem.CancelOnly)
+                            if (!item.CancelOnly)
                             {
-                                ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                                ProcessFlattenWorkItem_ClosePositions(item, acct);
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
@@ -197,13 +180,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(
                                 string.Format(
                                     "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    workItem.Account != null ? workItem.Account.Name : "NULL",
+                                    item.Account != null ? item.Account.Name : "NULL",
                                     flatEx
                                 )
                             );
                         }
                     }
 
+                    Print(string.Format("[FLATTEN] Fallback processed {0} queued accounts", processedCount));
+                    isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - we've done our best to protect positions
                 }
             }
@@ -417,117 +402,103 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
+                    // P0-4: FSM bypass acceptable - async pump failed, positions at risk (Jane Street Decision #2)
                     // Known NT8 TriggerCustomEvent quirk - drain queue and perform fallback flatten
-                    isFlattenRunning = false;
                     Print("[FLATTEN] WARNING: ChainNextFlattenOp TriggerCustomEvent failed: " + ex.Message);
 
-                    // Drain queue and attempt synchronous flatten for remaining accounts
-                    var drainedOps = new List<FlattenWorkItem>();
+                    // P0-1: Direct queue processing (zero heap allocation - Jane Street Principle #2)
+                    // P0-2: Atomic guard semantics - release AFTER fallback completes (Jane Street Principle #3)
+                    int processedCount = 0;
                     FlattenWorkItem item;
                     while (_pendingFlattenOps.TryDequeue(out item))
                     {
-                        drainedOps.Add(item);
-                    }
-
-                    if (drainedOps.Count > 0)
-                    {
-                        Print(
-                            string.Format(
-                                "[FLATTEN] Attempting fallback flatten for {0} remaining accounts...",
-                                drainedOps.Count
-                            )
-                        );
-
-                        foreach (var workItem in drainedOps)
+                        processedCount++;
+                        try
                         {
-                            try
+                            Account acct = item.Account;
+                            if (acct == null)
                             {
-                                Account acct = workItem.Account;
-                                if (acct == null)
-                                {
-                                    Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
-                                    continue;
-                                }
-
-                                ProcessFlattenWorkItem_CancelOrders(workItem, acct);
-
-                                if (!workItem.CancelOnly)
-                                {
-                                    ProcessFlattenWorkItem_ClosePositions(workItem, acct);
-                                }
-
-                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                                Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                                Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                continue;
                             }
-                            catch (Exception flatEx)
+
+                            ProcessFlattenWorkItem_CancelOrders(item, acct);
+
+                            if (!item.CancelOnly)
                             {
-                                Print(
-                                    string.Format(
-                                        "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                        workItem.Account != null ? workItem.Account.Name : "NULL",
-                                        flatEx
-                                    )
-                                );
+                                ProcessFlattenWorkItem_ClosePositions(item, acct);
                             }
+
+                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                        }
+                        catch (Exception flatEx)
+                        {
+                            Print(
+                                string.Format(
+                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                    item.Account != null ? item.Account.Name : "NULL",
+                                    flatEx
+                                )
+                            );
                         }
                     }
+
+                    if (processedCount > 0)
+                    {
+                        Print(string.Format("[FLATTEN] Fallback processed {0} remaining accounts", processedCount));
+                    }
+                    isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                 }
                 catch (Exception ex)
                 {
+                    // P0-4: FSM bypass acceptable - async pump failed, positions at risk (Jane Street Decision #2)
                     // Unexpected error - drain queue and perform fallback flatten
-                    isFlattenRunning = false;
                     Print("[FLATTEN] CRITICAL: Unexpected error in ChainNextFlattenOp: " + ex.ToString());
 
-                    // Drain queue and attempt synchronous flatten for remaining accounts
-                    var drainedOps = new List<FlattenWorkItem>();
+                    // P0-1: Direct queue processing (zero heap allocation - Jane Street Principle #2)
+                    // P0-2: Atomic guard semantics - release AFTER fallback completes (Jane Street Principle #3)
+                    int processedCount = 0;
                     FlattenWorkItem item;
                     while (_pendingFlattenOps.TryDequeue(out item))
                     {
-                        drainedOps.Add(item);
-                    }
-
-                    if (drainedOps.Count > 0)
-                    {
-                        Print(
-                            string.Format(
-                                "[FLATTEN] Attempting fallback flatten for {0} remaining accounts...",
-                                drainedOps.Count
-                            )
-                        );
-
-                        foreach (var workItem in drainedOps)
+                        processedCount++;
+                        try
                         {
-                            try
+                            Account acct = item.Account;
+                            if (acct == null)
                             {
-                                Account acct = workItem.Account;
-                                if (acct == null)
-                                {
-                                    Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
-                                    continue;
-                                }
-
-                                ProcessFlattenWorkItem_CancelOrders(workItem, acct);
-
-                                if (!workItem.CancelOnly)
-                                {
-                                    ProcessFlattenWorkItem_ClosePositions(workItem, acct);
-                                }
-
-                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                                Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                                Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                continue;
                             }
-                            catch (Exception flatEx)
+
+                            ProcessFlattenWorkItem_CancelOrders(item, acct);
+
+                            if (!item.CancelOnly)
                             {
-                                Print(
-                                    string.Format(
-                                        "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                        workItem.Account != null ? workItem.Account.Name : "NULL",
-                                        flatEx
-                                    )
-                                );
+                                ProcessFlattenWorkItem_ClosePositions(item, acct);
                             }
+
+                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                        }
+                        catch (Exception flatEx)
+                        {
+                            Print(
+                                string.Format(
+                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                    item.Account != null ? item.Account.Name : "NULL",
+                                    flatEx
+                                )
+                            );
                         }
                     }
+
+                    if (processedCount > 0)
+                    {
+                        Print(string.Format("[FLATTEN] Fallback processed {0} remaining accounts", processedCount));
+                    }
+                    isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
@@ -703,41 +674,31 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
+                    // P0-4: FSM bypass acceptable - async pump failed, positions at risk (Jane Street Decision #2)
                     // Known NT8 TriggerCustomEvent quirk - drain queue and perform fallback flatten
-                    isFlattenRunning = false;
                     Print("[FLATTEN] WARNING: ClosePositionsOnly TriggerCustomEvent failed: " + ex.Message);
 
-                    // Drain queue and attempt synchronous flatten for each account
-                    var drainedOps = new List<FlattenWorkItem>();
+                    // P0-1: Direct queue processing (zero heap allocation - Jane Street Principle #2)
+                    // P0-2: Atomic guard semantics - release AFTER fallback completes (Jane Street Principle #3)
+                    int processedCount = 0;
                     FlattenWorkItem item;
                     while (_pendingFlattenOps.TryDequeue(out item))
                     {
-                        drainedOps.Add(item);
-                    }
-
-                    Print(
-                        string.Format(
-                            "[FLATTEN] Attempting fallback flatten for {0} queued accounts...",
-                            drainedOps.Count
-                        )
-                    );
-
-                    foreach (var workItem in drainedOps)
-                    {
+                        processedCount++;
                         try
                         {
-                            Account acct = workItem.Account;
+                            Account acct = item.Account;
                             if (acct == null)
                             {
                                 Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
                                 continue;
                             }
 
-                            ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+                            ProcessFlattenWorkItem_CancelOrders(item, acct);
 
-                            if (!workItem.CancelOnly)
+                            if (!item.CancelOnly)
                             {
-                                ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                                ProcessFlattenWorkItem_ClosePositions(item, acct);
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
@@ -748,69 +709,65 @@ namespace NinjaTrader.NinjaScript.Strategies
                             Print(
                                 string.Format(
                                     "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    workItem.Account != null ? workItem.Account.Name : "NULL",
+                                    item.Account != null ? item.Account.Name : "NULL",
                                     flatEx
                                 )
                             );
                         }
                     }
+
+                    Print(string.Format("[FLATTEN] Fallback processed {0} queued accounts", processedCount));
+                    isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                 }
                 catch (Exception ex)
                 {
+                    // P0-4: FSM bypass acceptable - async pump failed, positions at risk (Jane Street Decision #2)
                     // Unexpected error - drain queue and perform fallback flatten
-                    isFlattenRunning = false;
                     Print("[FLATTEN] CRITICAL: Unexpected error in ClosePositionsOnlyApexAccounts: " + ex.ToString());
 
-                    // Drain queue and attempt synchronous flatten for remaining accounts
-                    var drainedOps = new List<FlattenWorkItem>();
+                    // P0-1: Direct queue processing (zero heap allocation - Jane Street Principle #2)
+                    // P0-2: Atomic guard semantics - release AFTER fallback completes (Jane Street Principle #3)
+                    int processedCount = 0;
                     FlattenWorkItem item;
                     while (_pendingFlattenOps.TryDequeue(out item))
                     {
-                        drainedOps.Add(item);
-                    }
-
-                    if (drainedOps.Count > 0)
-                    {
-                        Print(
-                            string.Format(
-                                "[FLATTEN] Attempting fallback flatten for {0} remaining accounts...",
-                                drainedOps.Count
-                            )
-                        );
-
-                        foreach (var workItem in drainedOps)
+                        processedCount++;
+                        try
                         {
-                            try
+                            Account acct = item.Account;
+                            if (acct == null)
                             {
-                                Account acct = workItem.Account;
-                                if (acct == null)
-                                {
-                                    Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
-                                    continue;
-                                }
-
-                                ProcessFlattenWorkItem_CancelOrders(workItem, acct);
-
-                                if (!workItem.CancelOnly)
-                                {
-                                    ProcessFlattenWorkItem_ClosePositions(workItem, acct);
-                                }
-
-                                SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                                Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                                Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                continue;
                             }
-                            catch (Exception flatEx)
+
+                            ProcessFlattenWorkItem_CancelOrders(item, acct);
+
+                            if (!item.CancelOnly)
                             {
-                                Print(
-                                    string.Format(
-                                        "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                        workItem.Account != null ? workItem.Account.Name : "NULL",
-                                        flatEx
-                                    )
-                                );
+                                ProcessFlattenWorkItem_ClosePositions(item, acct);
                             }
+
+                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                        }
+                        catch (Exception flatEx)
+                        {
+                            Print(
+                                string.Format(
+                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                    item.Account != null ? item.Account.Name : "NULL",
+                                    flatEx
+                                )
+                            );
                         }
                     }
+
+                    if (processedCount > 0)
+                    {
+                        Print(string.Format("[FLATTEN] Fallback processed {0} remaining accounts", processedCount));
+                    }
+                    isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - we've done our best to protect positions
                 }
             }
