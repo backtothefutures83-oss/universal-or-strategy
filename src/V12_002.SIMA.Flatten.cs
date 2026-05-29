@@ -124,21 +124,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            Print("[FLATTEN] Fallback flatten succeeded for " + acct.Name);
                         }
                         catch (Exception flatEx)
                         {
                             Print(
-                                string.Format(
-                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    item.Account != null ? item.Account.Name : "NULL",
-                                    flatEx
-                                )
+                                "[FLATTEN] CRITICAL: Fallback flatten failed for "
+                                    + (item.Account != null ? item.Account.Name : "NULL")
+                                    + ": "
+                                    + flatEx
                             );
                         }
                     }
 
-                    Print(string.Format("[FLATTEN] Fallback processed {0} queued accounts", processedCount));
+                    Print("[FLATTEN] Fallback processed " + processedCount + " queued accounts");
                     isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - we've done our best to protect positions
                 }
@@ -173,21 +172,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            Print("[FLATTEN] Fallback flatten succeeded for " + acct.Name);
                         }
                         catch (Exception flatEx)
                         {
                             Print(
-                                string.Format(
-                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    item.Account != null ? item.Account.Name : "NULL",
-                                    flatEx
-                                )
+                                "[FLATTEN] CRITICAL: Fallback flatten failed for "
+                                    + (item.Account != null ? item.Account.Name : "NULL")
+                                    + ": "
+                                    + flatEx
                             );
                         }
                     }
 
-                    Print(string.Format("[FLATTEN] Fallback processed {0} queued accounts", processedCount));
+                    Print("[FLATTEN] Fallback processed " + processedCount + " queued accounts");
                     isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - we've done our best to protect positions
                 }
@@ -444,23 +442,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            Print("[FLATTEN] Fallback flatten succeeded for " + acct.Name);
                         }
                         catch (Exception flatEx)
                         {
                             Print(
-                                string.Format(
-                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    item.Account != null ? item.Account.Name : "NULL",
-                                    flatEx
-                                )
+                                "[FLATTEN] CRITICAL: Fallback flatten failed for "
+                                    + (item.Account != null ? item.Account.Name : "NULL")
+                                    + ": "
+                                    + flatEx
                             );
                         }
                     }
 
                     if (processedCount > 0)
                     {
-                        Print(string.Format("[FLATTEN] Fallback processed {0} remaining accounts", processedCount));
+                        Print("[FLATTEN] Fallback processed " + processedCount + " remaining accounts");
                     }
                     isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                 }
@@ -494,23 +491,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            Print("[FLATTEN] Fallback flatten succeeded for " + acct.Name);
                         }
                         catch (Exception flatEx)
                         {
                             Print(
-                                string.Format(
-                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    item.Account != null ? item.Account.Name : "NULL",
-                                    flatEx
-                                )
+                                "[FLATTEN] CRITICAL: Fallback flatten failed for "
+                                    + (item.Account != null ? item.Account.Name : "NULL")
+                                    + ": "
+                                    + flatEx
                             );
                         }
                     }
 
                     if (processedCount > 0)
                     {
-                        Print(string.Format("[FLATTEN] Fallback processed {0} remaining accounts", processedCount));
+                        Print("[FLATTEN] Fallback processed " + processedCount + " remaining accounts");
                     }
                     isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - remaining fleet accounts still need flattening
@@ -716,21 +712,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            Print("[FLATTEN] Fallback flatten succeeded for " + acct.Name);
                         }
                         catch (Exception flatEx)
                         {
                             Print(
-                                string.Format(
-                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    item.Account != null ? item.Account.Name : "NULL",
-                                    flatEx
-                                )
+                                "[FLATTEN] CRITICAL: Fallback flatten failed for "
+                                    + (item.Account != null ? item.Account.Name : "NULL")
+                                    + ": "
+                                    + flatEx
                             );
                         }
                     }
 
-                    Print(string.Format("[FLATTEN] Fallback processed {0} queued accounts", processedCount));
+                    Print("[FLATTEN] Fallback processed " + processedCount + " queued accounts");
                     isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                 }
                 catch (Exception ex)
@@ -763,23 +758,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                             }
 
                             SetExpectedPositionLocked(ExpKey(acct.Name), 0);
-                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                            Print("[FLATTEN] Fallback flatten succeeded for " + acct.Name);
                         }
                         catch (Exception flatEx)
                         {
                             Print(
-                                string.Format(
-                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
-                                    item.Account != null ? item.Account.Name : "NULL",
-                                    flatEx
-                                )
+                                "[FLATTEN] CRITICAL: Fallback flatten failed for "
+                                    + (item.Account != null ? item.Account.Name : "NULL")
+                                    + ": "
+                                    + flatEx
                             );
                         }
                     }
 
                     if (processedCount > 0)
                     {
-                        Print(string.Format("[FLATTEN] Fallback processed {0} remaining accounts", processedCount));
+                        Print("[FLATTEN] Fallback processed " + processedCount + " remaining accounts");
                     }
                     isFlattenRunning = false; // P0-2: Release guard AFTER work completes
                     // Do NOT rethrow - we've done our best to protect positions

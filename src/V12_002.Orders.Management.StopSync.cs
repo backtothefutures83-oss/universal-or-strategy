@@ -448,25 +448,54 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(
                     string.Format("(!) WARNING UpdateStopQuantity for {0} (known quirk): {1}", entryName, ex.Message)
                 );
-                Print(
-                    string.Format(
-                        "(!) POSITION MAY BE UNPROTECTED: {0} contracts - attempting emergency flatten",
-                        pos.RemainingContracts
-                    )
-                );
 
-                // Attempt emergency flatten to protect the position
+                // P0-1: GRADUATED RESPONSE - Only flatten if position truly lacks stop protection
+                // Jane Street Principle #4: Fail-Fast - verify state before emergency action
+                // Check if position still has active stop protection (transient broker errors may resolve)
+                bool hasActiveStop = false;
                 try
                 {
-                    FlattenPositionByName(entryName);
+                    hasActiveStop = acct.Orders.Any(o =>
+                        o.OrderState == OrderState.Working && o.IsStopMarket && o.Name == entryName
+                    );
                 }
-                catch (Exception flatEx)
+                catch
+                {
+                    // If order enumeration fails, assume unprotected (fail-safe)
+                    hasActiveStop = false;
+                }
+
+                if (!hasActiveStop)
                 {
                     Print(
                         string.Format(
-                            "(!) CRITICAL: Emergency flatten also failed for {0}: {1}",
-                            entryName,
-                            flatEx.ToString()
+                            "(!) POSITION UNPROTECTED: {0} contracts - emergency flatten required",
+                            pos.RemainingContracts
+                        )
+                    );
+
+                    // Attempt emergency flatten to protect the position
+                    try
+                    {
+                        FlattenPositionByName(entryName);
+                    }
+                    catch (Exception flatEx)
+                    {
+                        Print(
+                            string.Format(
+                                "(!) CRITICAL: Emergency flatten also failed for {0}: {1}",
+                                entryName,
+                                flatEx.ToString()
+                            )
+                        );
+                    }
+                }
+                else
+                {
+                    Print(
+                        string.Format(
+                            "(!) Active stop still protecting {0} - quirk was transient, no flatten needed",
+                            entryName
                         )
                     );
                 }
@@ -480,25 +509,54 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Interlocked.Decrement(ref pendingReplacementCount);
 
                 Print(string.Format("(!) CRITICAL UpdateStopQuantity for {0}: {1}", entryName, ex.ToString()));
-                Print(
-                    string.Format(
-                        "(!) POSITION MAY BE UNPROTECTED: {0} contracts - attempting emergency flatten",
-                        pos.RemainingContracts
-                    )
-                );
 
-                // Attempt emergency flatten to protect the position
+                // P0-1: GRADUATED RESPONSE - Only flatten if position truly lacks stop protection
+                // Jane Street Principle #4: Fail-Fast - verify state before emergency action
+                // Check if position still has active stop protection (transient broker errors may resolve)
+                bool hasActiveStop = false;
                 try
                 {
-                    FlattenPositionByName(entryName);
+                    hasActiveStop = acct.Orders.Any(o =>
+                        o.OrderState == OrderState.Working && o.IsStopMarket && o.Name == entryName
+                    );
                 }
-                catch (Exception flatEx)
+                catch
+                {
+                    // If order enumeration fails, assume unprotected (fail-safe)
+                    hasActiveStop = false;
+                }
+
+                if (!hasActiveStop)
                 {
                     Print(
                         string.Format(
-                            "(!) CRITICAL: Emergency flatten also failed for {0}: {1}",
-                            entryName,
-                            flatEx.ToString()
+                            "(!) POSITION UNPROTECTED: {0} contracts - emergency flatten required",
+                            pos.RemainingContracts
+                        )
+                    );
+
+                    // Attempt emergency flatten to protect the position
+                    try
+                    {
+                        FlattenPositionByName(entryName);
+                    }
+                    catch (Exception flatEx)
+                    {
+                        Print(
+                            string.Format(
+                                "(!) CRITICAL: Emergency flatten also failed for {0}: {1}",
+                                entryName,
+                                flatEx.ToString()
+                            )
+                        );
+                    }
+                }
+                else
+                {
+                    Print(
+                        string.Format(
+                            "(!) Active stop still protecting {0} - quirk was transient, no flatten needed",
+                            entryName
                         )
                     );
                 }
