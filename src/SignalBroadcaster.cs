@@ -13,10 +13,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Complete trade signal with all bracket order details.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class TradeSignal : EventArgs
+        public struct TradeSignal
         {
             public string SignalId { get; set; }
             public string Instrument { get; set; } // V7.1: For instrument filtering
@@ -48,10 +47,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Trailing stop update signal.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class TrailUpdateSignal : EventArgs
+        public struct TrailUpdateSignal
         {
             public string SignalId { get; set; }
             public double NewStopPrice { get; set; }
@@ -62,10 +60,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Full stop synchronization signal.
         /// Master broadcasts every stop update, slaves mirror exact price.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class StopUpdateSignal : EventArgs
+        public struct StopUpdateSignal
         {
             public string TradeId { get; set; } // Links to original entry
             public double NewStopPrice { get; set; } // Master's new stop price
@@ -76,10 +73,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Entry order price update signal.
         /// Master broadcasts when pending entry order price changes.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class EntryUpdateSignal : EventArgs
+        public struct EntryUpdateSignal
         {
             public string TradeId { get; set; } // Links to original entry
             public double NewEntryPrice { get; set; } // Master's new entry price
@@ -89,10 +85,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Order cancellation signal.
         /// Master broadcasts when pending entry order is cancelled.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class OrderCancelSignal : EventArgs
+        public struct OrderCancelSignal
         {
             public string TradeId { get; set; } // Links to original entry
             public string Reason { get; set; } // Why cancelled
@@ -101,10 +96,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Target management action signal (v5.12 feature).
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class TargetActionSignal : EventArgs
+        public struct TargetActionSignal
         {
             public string SignalId { get; set; }
             public TargetType Target { get; set; } // T1, T2, or Runner
@@ -129,10 +123,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Flatten all positions signal.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class FlattenSignal : EventArgs
+        public struct FlattenSignal
         {
             public string Reason { get; set; }
             public DateTime Timestamp { get; set; }
@@ -140,10 +133,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Manual breakeven signal.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class BreakevenSignal : EventArgs
+        public struct BreakevenSignal
         {
             public string SignalId { get; set; } // Empty = all positions
             public DateTime Timestamp { get; set; }
@@ -152,10 +144,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V10.2: External command signal (from TCP Remote).
         /// Allows the TCP owner to broadcast commands to all other strategy instances.
-        /// Converted to class inheriting EventArgs for .NET event convention compliance (S3906).
-        /// Note: This changes from zero-allocation struct to heap-allocated class.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
-        public class ExternalCommandSignal : EventArgs
+        public struct ExternalCommandSignal
         {
             public string Command { get; set; }
             public string TargetSymbol { get; set; }
@@ -232,7 +223,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.Phase8: Updated for EventHandler<T> delegates following .NET convention (S3906).
         /// </summary>
         private static void SafeInvoke<T>(EventHandler<T> handler, T args)
-            where T : EventArgs
         {
             if (handler == null)
                 return;

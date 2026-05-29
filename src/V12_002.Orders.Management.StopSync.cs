@@ -445,7 +445,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print(string.Format("(!) CRITICAL UpdateStopQuantity for {0}: {1}", entryName, ex.ToString()));
                 Print(string.Format("(!) POSITION MAY BE UNPROTECTED: {0} contracts", pos.RemainingContracts));
-                throw;
+                // Do NOT rethrow - position safety requires stop order attempt to complete
             }
         }
 
@@ -538,7 +538,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception ex)
             {
                 Print(string.Format("(!) CRITICAL CreateNewStopOrder for {0}: {1}", entryName, ex.ToString()));
-                throw;
+                Print(
+                    string.Format("(!) Attempting emergency flatten for {0} due to stop creation failure...", entryName)
+                );
+                try
+                {
+                    FlattenPositionByName(entryName);
+                }
+                catch (Exception flatEx)
+                {
+                    Print(
+                        string.Format(
+                            "(!) CRITICAL: Emergency flatten also failed for {0}: {1}",
+                            entryName,
+                            flatEx.ToString()
+                        )
+                    );
+                }
+                // Do NOT rethrow - position safety requires stop order attempt to complete
             }
         }
 

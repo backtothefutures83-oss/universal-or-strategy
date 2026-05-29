@@ -102,10 +102,60 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected error - release guard and fail fast
+                    // Unexpected error - release guard, drain queue, and attempt fallback flatten
                     isFlattenRunning = false;
-                    Print("[FLATTEN] CRITICAL: Unexpected error in FlattenAllApexAccounts: " + ex.ToString());
-                    throw;
+
+                    // Drain queue and attempt synchronous flatten for each account
+                    var drainedOps = new List<FlattenWorkItem>();
+                    FlattenWorkItem item;
+                    while (_pendingFlattenOps.TryDequeue(out item))
+                    {
+                        drainedOps.Add(item);
+                    }
+
+                    Print(string.Format("[FLATTEN] CRITICAL: Unexpected error in FlattenAllApexAccounts: {0}", ex));
+                    Print(
+                        string.Format(
+                            "[FLATTEN] Attempting fallback flatten for {0} queued accounts...",
+                            drainedOps.Count
+                        )
+                    );
+
+                    foreach (var workItem in drainedOps)
+                    {
+                        try
+                        {
+                            Account acct = workItem.Account;
+                            if (acct == null)
+                            {
+                                Print("[FLATTEN] WARNING: NULL account in fallback flatten queue");
+                                continue;
+                            }
+
+                            // Use existing SIMA infrastructure for synchronous flatten
+                            ProcessFlattenWorkItem_CancelOrders(workItem, acct);
+
+                            if (!workItem.CancelOnly)
+                            {
+                                ProcessFlattenWorkItem_ClosePositions(workItem, acct);
+                            }
+
+                            SetExpectedPositionLocked(ExpKey(acct.Name), 0);
+                            Print(string.Format("[FLATTEN] Fallback flatten succeeded for {0}", acct.Name));
+                        }
+                        catch (Exception flatEx)
+                        {
+                            Print(
+                                string.Format(
+                                    "[FLATTEN] CRITICAL: Fallback flatten failed for {0}: {1}",
+                                    workItem.Account != null ? workItem.Account.Name : "NULL",
+                                    flatEx
+                                )
+                            );
+                        }
+                    }
+
+                    // Do NOT rethrow - we've done our best to protect positions
                 }
             }
             else
@@ -166,7 +216,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                // Unexpected error - log full details and fail fast
+                // Unexpected error - log full details
                 Print(
                     string.Format(
                         "[FLATTEN_PUMP] CRITICAL: Unexpected error on {0}: {1} [{2}]",
@@ -175,7 +225,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         item.Source
                     )
                 );
-                throw;
+                // Do NOT rethrow - remaining fleet accounts still need flattening
             }
             finally
             {
@@ -324,10 +374,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected error - release guard and fail fast
+                    // Unexpected error - release guard and log
                     isFlattenRunning = false;
                     Print("[FLATTEN] CRITICAL: Unexpected error in ChainNextFlattenOp: " + ex.ToString());
-                    throw;
+                    // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
             else
@@ -441,9 +491,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             catch (Exception ex)
             {
-                // Unexpected error - log full details and fail fast
+                // Unexpected error - log full details
                 Print(string.Format("[DEAD-01] EmergencyFlatten CRITICAL ERROR on {0}: {1}", acct.Name, ex.ToString()));
-                throw;
+                // Do NOT rethrow - remaining fleet accounts still need flattening
             }
         }
 
@@ -508,10 +558,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected error - release guard and fail fast
+                    // Unexpected error - release guard and log
                     isFlattenRunning = false;
                     Print("[FLATTEN] CRITICAL: Unexpected error in ClosePositionsOnlyApexAccounts: " + ex.ToString());
-                    throw;
+                    // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
             else
