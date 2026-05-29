@@ -50,6 +50,7 @@ Welcome, Agent. You are operating within the **V12 Universal OR Strategy** repos
 - **ASCII-Only Compliance**: NEVER use Unicode, emoji, or curly quotes in C# string literals.
 - **Jane Street Alignment (V12.17)**: ALL agents (Bob, Codex, Qwen, Antigravity, Jules, Rovo Dev, Cursor, etc.) MUST load and apply the ingested Jane Street Intel from `docs/intel/jane-street/` for every architectural decision.
 - **Hard-Link Integrity**: Every `src/` modification MUST be followed by `powershell -File .\deploy-sync.ps1` to re-synchronize NinjaTrader hard links.
+- **Three-Tier Branch Model (V12.18)**: ALL agents MUST follow the branch strategy documented in `docs/protocol/BRANCH_STRATEGY.md`. Source code, infrastructure, and protocol changes MUST be on separate branches.
 
 
 ## 3. Standard Commands
@@ -160,6 +161,7 @@ powershell -File .\scripts\pre_push_validation.ps1 -SkipBuild -SkipTests
 - **Active Task**: Always check `docs/brain/task.md` before initiating work.
 - **Handoffs**: Use the `docs/brain/nexus_a2a.json` via the **Nexus Bridge** for inter-agent state synchronization.
 - **Expert Knowledge Base (RAG)**: Before starting complex design, refactoring, or performance engineering tasks, query the Jane Street Knowledge Base using `scripts/query_kb.py` to retrieve verified microsecond-latency patterns and testing standards.
+- **Branch Strategy**: Follow the Three-Tier Branch Model documented in `docs/protocol/BRANCH_STRATEGY.md`. NEVER mix source code, infrastructure, and protocol changes on the same branch.
 
 ## 5. Karpathy Behavioral Protocols (LLM Coding Hygiene)
 
