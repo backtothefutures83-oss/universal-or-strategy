@@ -1,0 +1,4 @@
+{"id":"b3021944-9db8-4e04-9300-aacacb12b96b","ts":"2026-05-29T19:26:36.560Z","path":"C:\\WSGTA\\universal-or-strategy\\docs\\brain\\zero_gc_integration_analysis.md","version":"1.0.0","taskID":"dafdf334-6b9a-41b7-9d73-9e7fcfcbfa74"}
+{"id":"25422f15-3caa-4b65-b9c3-a0c26233b1ae","ts":"2026-05-29T19:28:52.913Z","path":"C:\\WSGTA\\universal-or-strategy\\docs\\brain\\zero_gc_nexus_handoff.md","version":"1.0.0","taskID":"dafdf334-6b9a-41b7-9d73-9e7fcfcbfa74"}
+{"id":"600a7170-3ad4-43a3-95d5-77837afce85d","ts":"2026-05-29T19:34:45.602Z","path":"C:\\WSGTA\\universal-or-strategy\\docs\\brain\\bob_model_settings_review.md","version":"1.0.0","taskID":"dafdf334-6b9a-41b7-9d73-9e7fcfcbfa74"}
+{"id":"fbe54d56-32db-4ae1-8f59-389cba7542b6","ts":"2026-05-29T19:37:31.854Z","path":"C:\\WSGTA\\universal-or-strategy\\docs\\brain\\bob_model_configuration_final.md","version":"1.0.0","taskID":"dafdf334-6b9a-41b7-9d73-9e7fcfcbfa74"}

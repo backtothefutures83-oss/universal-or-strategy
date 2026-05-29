@@ -13,9 +13,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Complete trade signal with all bracket order details.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct TradeSignal
         {
@@ -49,9 +47,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Trailing stop update signal.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct TrailUpdateSignal
         {
@@ -64,9 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Full stop synchronization signal.
         /// Master broadcasts every stop update, slaves mirror exact price.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct StopUpdateSignal
         {
@@ -79,9 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Entry order price update signal.
         /// Master broadcasts when pending entry order price changes.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct EntryUpdateSignal
         {
@@ -93,9 +85,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V8.1: Order cancellation signal.
         /// Master broadcasts when pending entry order is cancelled.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct OrderCancelSignal
         {
@@ -106,9 +96,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Target management action signal (v5.12 feature).
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct TargetActionSignal
         {
@@ -135,9 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Flatten all positions signal.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct FlattenSignal
         {
@@ -147,9 +133,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Manual breakeven signal.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct BreakevenSignal
         {
@@ -160,9 +144,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// V10.2: External command signal (from TCP Remote).
         /// Allows the TCP owner to broadcast commands to all other strategy instances.
-        /// Struct for zero-allocation hot path (Jane Street HFT pattern).
-        /// Codacy CA1003 suppressed: EventArgs inheritance causes heap allocation.
-        /// Decision: docs/standards/JANE_STREET_DEVIATIONS.md #1.
+        /// Zero-allocation struct for Jane Street alignment.
         /// </summary>
         public struct ExternalCommandSignal
         {
@@ -177,55 +159,55 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Fired when Master generates a new trade signal.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<TradeSignal> OnTradeSignal;
 
         /// <summary>
         /// Fired when Master updates trailing stop.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<TrailUpdateSignal> OnTrailUpdate;
 
         /// <summary>
         /// Fired when Master updates trailing stop update request (v5.12).
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<TargetActionSignal> OnTargetAction;
 
         /// <summary>
         /// Fired when Master requests flatten all.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<FlattenSignal> OnFlattenAll;
 
         /// <summary>
         /// Fired when Master requests manual breakeven.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<BreakevenSignal> OnBreakevenRequest;
 
         /// <summary>
         /// V8.1: Fired when Master updates any stop (for full synchronization).
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<StopUpdateSignal> OnStopUpdate;
 
         /// <summary>
         /// V8.1: Fired when Master updates pending entry order price.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<EntryUpdateSignal> OnEntryUpdate;
 
         /// <summary>
         /// V8.1: Fired when Master cancels a pending entry order.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<OrderCancelSignal> OnOrderCancel;
 
         /// <summary>
         /// V10.2: Fired when an external TCP command is received.
-        /// Action delegate for struct-based zero-allocation events.
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
         public static event Action<ExternalCommandSignal> OnExternalCommand;
 
@@ -238,7 +220,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// the exception is caught and remaining subscribers still receive the signal.
         /// Prevents a single faulty handler from breaking the entire fan-out chain.
         /// V12.Phase7.2: Added performance profiling to detect slow subscribers.
-        /// V12.Phase8: Updated for Action<T> delegates (struct-based zero-allocation events).
+        /// V12.Phase8: Reverted to Action<T> for zero-allocation struct events (Jane Street Deviation #1).
         /// </summary>
         private static void SafeInvoke<T>(Action<T> handler, T args)
         {
@@ -280,7 +262,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTradeSignal(TradeSignal signal)
         {
-            // Struct validation: Check for uninitialized/default state
+            // Validation: Check for uninitialized/default state
             if (string.IsNullOrEmpty(signal.SignalId))
             {
                 throw new ArgumentException("SignalId cannot be null or empty", nameof(signal));
@@ -297,7 +279,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTrailUpdate(TrailUpdateSignal update)
         {
-            // Struct validation: Check for uninitialized/default state
+            // Validation: Check for uninitialized/default state
             if (string.IsNullOrEmpty(update.SignalId))
             {
                 throw new ArgumentException("SignalId cannot be null or empty", nameof(update));
@@ -312,7 +294,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         public static void BroadcastTargetAction(TargetActionSignal action)
         {
-            // Struct validation: Check for uninitialized/default state
+            // Validation: Check for uninitialized/default state
             if (string.IsNullOrEmpty(action.SignalId))
             {
                 throw new ArgumentException("SignalId cannot be null or empty", nameof(action));
