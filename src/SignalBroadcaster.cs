@@ -159,57 +159,57 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Fired when Master generates a new trade signal.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<TradeSignal> OnTradeSignal;
+        public static event Action<TradeSignal> OnTradeSignal;
 
         /// <summary>
         /// Fired when Master updates trailing stop.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<TrailUpdateSignal> OnTrailUpdate;
+        public static event Action<TrailUpdateSignal> OnTrailUpdate;
 
         /// <summary>
         /// Fired when Master updates trailing stop update request (v5.12).
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<TargetActionSignal> OnTargetAction;
+        public static event Action<TargetActionSignal> OnTargetAction;
 
         /// <summary>
         /// Fired when Master requests flatten all.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<FlattenSignal> OnFlattenAll;
+        public static event Action<FlattenSignal> OnFlattenAll;
 
         /// <summary>
         /// Fired when Master requests manual breakeven.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<BreakevenSignal> OnBreakevenRequest;
+        public static event Action<BreakevenSignal> OnBreakevenRequest;
 
         /// <summary>
         /// V8.1: Fired when Master updates any stop (for full synchronization).
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<StopUpdateSignal> OnStopUpdate;
+        public static event Action<StopUpdateSignal> OnStopUpdate;
 
         /// <summary>
         /// V8.1: Fired when Master updates pending entry order price.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<EntryUpdateSignal> OnEntryUpdate;
+        public static event Action<EntryUpdateSignal> OnEntryUpdate;
 
         /// <summary>
         /// V8.1: Fired when Master cancels a pending entry order.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<OrderCancelSignal> OnOrderCancel;
+        public static event Action<OrderCancelSignal> OnOrderCancel;
 
         /// <summary>
         /// V10.2: Fired when an external TCP command is received.
-        /// EventHandler delegate following .NET convention (S3906).
+        /// Action delegate for struct-based zero-allocation events (Jane Street Deviation #1).
         /// </summary>
-        public static event EventHandler<ExternalCommandSignal> OnExternalCommand;
+        public static event Action<ExternalCommandSignal> OnExternalCommand;
 
         #endregion
 
@@ -220,9 +220,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// the exception is caught and remaining subscribers still receive the signal.
         /// Prevents a single faulty handler from breaking the entire fan-out chain.
         /// V12.Phase7.2: Added performance profiling to detect slow subscribers.
-        /// V12.Phase8: Updated for EventHandler<T> delegates following .NET convention (S3906).
+        /// V12.Phase8: Reverted to Action<T> for zero-allocation struct events (Jane Street Deviation #1).
         /// </summary>
-        private static void SafeInvoke<T>(EventHandler<T> handler, T args)
+        private static void SafeInvoke<T>(Action<T> handler, T args)
         {
             if (handler == null)
                 return;
@@ -233,7 +233,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 try
                 {
-                    ((EventHandler<T>)d).Invoke(null, args);
+                    ((Action<T>)d).Invoke(args);
                 }
                 catch (Exception)
                 {

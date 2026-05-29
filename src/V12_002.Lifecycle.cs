@@ -181,9 +181,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected exception during shutdown - log but continue cleanup
+                    // Jane Street Deviation #2: Boundary exception guards must never rethrow in disposal paths.
+                    // Log error and continue cleanup to ensure subsequent cleanup operations execute.
                     Print("[SHUTDOWN_ERROR] CRITICAL: MMIO mirror dispose failed: " + ex.ToString());
-                    throw;
                 }
                 _photonMmioMirror = null;
             }
