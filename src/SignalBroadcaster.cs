@@ -223,7 +223,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// V12.Phase8: Updated for EventHandler<T> delegates following .NET convention (S3906).
         /// </summary>
         private static void SafeInvoke<T>(EventHandler<T> handler, T args)
-            where T : EventArgs
         {
             if (handler == null)
                 return;
