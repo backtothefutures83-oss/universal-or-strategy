@@ -239,10 +239,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 catch (Exception ex)
                 {
-                    // Unexpected IPC error - log and fail fast
-                    Print($"V14 IPC: CRITICAL Send Error - {ex.Message}");
+                    // Unexpected IPC error - log critical but continue broadcast to remaining clients
+                    // Jane Street Deviation #2: Boundary isolation - one bad client must not partition fleet
+                    Print($"V14 IPC: CRITICAL Send Error to client {clientId} - {ex.Message}");
                     disconnectedClientIds.Add(clientId);
-                    throw;
+                    // DO NOT THROW - continue to next client to avoid fleet partitioning
                 }
             }
 
