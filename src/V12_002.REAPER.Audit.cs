@@ -818,9 +818,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print($"[REAPER] [X] Could not find account '{accountName}' for marshal-flatten");
                     }
                 }
+                catch (InvalidOperationException ex)
+                    when (ex.Message.Contains("Order") || ex.Message.Contains("Account"))
+                {
+                    // Known NT8 quirk - order/account state machine issue during flatten
+                    Print($"[REAPER] [WARNING] MARSHAL-FLATTEN NT8 quirk for {accountName}: {ex.Message}");
+                }
                 catch (Exception ex)
                 {
-                    Print($"[REAPER] [X] MARSHAL-FLATTEN FAILED for {accountName}: {ex.Message}");
+                    // Unexpected exception during emergency flatten - fail fast
+                    Print($"[REAPER] [CRITICAL] MARSHAL-FLATTEN FAILED for {accountName}: {ex.ToString()}");
+                    throw;
                 }
                 finally
                 {

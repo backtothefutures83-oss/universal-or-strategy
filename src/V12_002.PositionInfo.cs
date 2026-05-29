@@ -398,6 +398,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case 5:
                     pos.T5FilledQuantity = safeQty;
                     break;
+                default:
+                    throw new InvalidOperationException($"Unexpected targetNumber: {targetNumber}");
             }
         }
 

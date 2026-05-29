@@ -83,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 floatingAnchor.Click += ToggleLayout_Click;
 
             if (fleetSelectButton != null)
-                fleetSelectButton.Click += (s, e) =>
+                fleetSelectButton.Click += (_, e) =>
                 {
                     if (fleetPopup != null)
                         fleetPopup.IsOpen = !fleetPopup.IsOpen;
@@ -96,14 +96,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AttachExecutionPanelHandlers()
         {
             if (orLongButton != null)
-                orLongButton.Click += (s, e) =>
+                orLongButton.Click += (_, e) =>
                 {
                     PanelCommand("OR_LONG");
                     ResetExecutionMode();
                     TriggerGlow(CyanAccent);
                 };
             if (orShortButton != null)
-                orShortButton.Click += (s, e) =>
+                orShortButton.Click += (_, e) =>
                 {
                     PanelCommand("OR_SHORT");
                     ResetExecutionMode();
@@ -116,28 +116,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (rmaButton != null)
                 rmaButton.Click += OnRmaClick;
             if (momoButton != null)
-                momoButton.Click += (s, e) =>
+                momoButton.Click += (_, e) =>
                 {
                     PanelCommand("MODE_MOMO");
                     ResetExecutionMode();
                     TriggerGlow(GreenFg);
                 };
             if (ffmaButton != null)
-                ffmaButton.Click += (s, e) =>
+                ffmaButton.Click += (_, e) =>
                 {
                     PanelCommand("MODE_FFMA");
                     ResetExecutionMode();
                     TriggerGlow(PinkFg);
                 };
             if (ffmaManualButton != null)
-                ffmaManualButton.Click += (s, e) =>
+                ffmaManualButton.Click += (_, e) =>
                 {
                     PanelCommand("FFMA_MANUAL_MARKET");
                     ResetExecutionMode();
                     TriggerGlow(PinkFg);
                 };
             if (mButton != null)
-                mButton.Click += (s, e) =>
+                mButton.Click += (_, e) =>
                 {
                     PanelCommand("MODE_M");
                     TriggerGlow(OrangeFg);
@@ -165,7 +165,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AttachActionButtonHandlers()
         {
             if (trim50Button != null)
-                trim50Button.Click += (s, e) =>
+                trim50Button.Click += (_, e) =>
                 {
                     PanelCommand("TRIM_50");
                     TriggerGlow(OrangeFg);
@@ -175,13 +175,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (trailButton != null)
                 trailButton.Click += OnTrailClick;
             if (cancelButton != null)
-                cancelButton.Click += (s, e) =>
+                cancelButton.Click += (_, e) =>
                 {
                     PanelCommand("CANCEL_ALL");
                     TriggerGlow(RedFg);
                 };
             if (flattenButton != null)
-                flattenButton.Click += (s, e) =>
+                flattenButton.Click += (_, e) =>
                 {
                     PanelCommand("FLATTEN_ONLY");
                     TriggerGlow(RedFg);
@@ -191,7 +191,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AttachSyncButtonHandlers()
         {
             if (mktSyncButton != null)
-                mktSyncButton.Click += (s, e) => PanelCommand("MKT_SYNC");
+                mktSyncButton.Click += (_, e) => PanelCommand("MKT_SYNC");
             if (syncAllButton != null)
                 syncAllButton.Click += OnSyncAllClick;
         }
@@ -199,31 +199,31 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AttachConfigModeHandlers()
         {
             if (modeOrbButton != null)
-                modeOrbButton.Click += (s, e) => SelectConfigMode("ORB", modeOrbButton);
+                modeOrbButton.Click += (_, e) => SelectConfigMode("ORB", modeOrbButton);
             if (modeRmaButton != null)
-                modeRmaButton.Click += (s, e) => SelectConfigMode("RMA", modeRmaButton);
+                modeRmaButton.Click += (_, e) => SelectConfigMode("RMA", modeRmaButton);
             if (modeRetestButton != null)
-                modeRetestButton.Click += (s, e) => SelectConfigMode("RETEST", modeRetestButton);
+                modeRetestButton.Click += (_, e) => SelectConfigMode("RETEST", modeRetestButton);
             if (modeMomoButton != null)
-                modeMomoButton.Click += (s, e) => SelectConfigMode("MOMO", modeMomoButton);
+                modeMomoButton.Click += (_, e) => SelectConfigMode("MOMO", modeMomoButton);
             if (modeFfmaButton != null)
-                modeFfmaButton.Click += (s, e) => SelectConfigMode("FFMA", modeFfmaButton);
+                modeFfmaButton.Click += (_, e) => SelectConfigMode("FFMA", modeFfmaButton);
             if (modeTrendButton != null)
-                modeTrendButton.Click += (s, e) => SelectConfigMode("TREND", modeTrendButton);
+                modeTrendButton.Click += (_, e) => SelectConfigMode("TREND", modeTrendButton);
         }
 
         private void AttachTargetCountHandlers()
         {
             if (cnt1 != null)
-                cnt1.Click += (s, e) => SelectTargetCount(1, cnt1);
+                cnt1.Click += (_, e) => SelectTargetCount(1, cnt1);
             if (cnt2 != null)
-                cnt2.Click += (s, e) => SelectTargetCount(2, cnt2);
+                cnt2.Click += (_, e) => SelectTargetCount(2, cnt2);
             if (cnt3 != null)
-                cnt3.Click += (s, e) => SelectTargetCount(3, cnt3);
+                cnt3.Click += (_, e) => SelectTargetCount(3, cnt3);
             if (cnt4 != null)
-                cnt4.Click += (s, e) => SelectTargetCount(4, cnt4);
+                cnt4.Click += (_, e) => SelectTargetCount(4, cnt4);
             if (cnt5 != null)
-                cnt5.Click += (s, e) => SelectTargetCount(5, cnt5);
+                cnt5.Click += (_, e) => SelectTargetCount(5, cnt5);
         }
 
         private void DetachPanelHandlers()

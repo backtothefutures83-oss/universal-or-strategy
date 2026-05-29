@@ -231,10 +231,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                         disconnectedClientIds.Add(clientId);
                     }
                 }
-                catch (Exception ex)
+                catch (System.IO.IOException ex)
                 {
+                    // Network I/O error - client disconnected
                     Print($"V14 IPC: Send Error - {ex.Message}");
                     disconnectedClientIds.Add(clientId);
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected IPC error - log critical but continue broadcast to remaining clients
+                    // Jane Street Deviation #2: Boundary isolation - one bad client must not partition fleet
+                    Print($"V14 IPC: CRITICAL Send Error to client {clientId} - {ex.Message}");
+                    disconnectedClientIds.Add(clientId);
+                    // DO NOT THROW - continue to next client to avoid fleet partitioning
                 }
             }
 
@@ -306,9 +315,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     FlattenSpecificTarget_SubmitMarketExit(entryName, pos, qtyToClose, targetName);
                 }
             }
+            catch (InvalidOperationException ex)
+            {
+                // Flatten operation failed - non-critical
+                Print("ERROR FlattenSpecificTarget: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR FlattenSpecificTarget: " + ex.Message);
+                // Unexpected error in flatten - log and fail fast
+                Print("CRITICAL FlattenSpecificTarget: " + ex.Message);
+                throw;
             }
         }
 

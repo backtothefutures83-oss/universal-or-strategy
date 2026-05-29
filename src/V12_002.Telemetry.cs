@@ -33,10 +33,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private long _metricIpcCommands = 0; // Every IPC command processed
 
         // -- State Persistence Diagnostic Counters (EPIC-7-QUALITY) ----------------
-        private long _statePersistenceFailures = 0; // Failed state write/read operations
-        private long _stateSecurityViolations = 0; // Path validation failures
-        private long _stateRetryAttempts = 0; // File I/O retry attempts
-        private long _stateRollbacksExecuted = 0; // Rollback to backup operations
+        private long _statePersistenceFailures; // Failed state write/read operations
+        private long _stateSecurityViolations; // Path validation failures
+        private long _stateRetryAttempts; // File I/O retry attempts
+        private long _stateRollbacksExecuted; // Rollback to backup operations
         #endregion
 
         #region Trace ID Management

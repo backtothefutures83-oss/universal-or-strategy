@@ -246,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ProcessOnExecutionUpdate(
             string orderName,
             string executionId,
-            string orderId,
+            string _,
             int orderFilled,
             OrderState orderState,
             double price,
@@ -297,9 +297,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // execution events (stop fill, target fill) where next trailing cycle is too late.
                 ProcessOnExecution_RunShadowCheck();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("ProcessOnExecution_RunShadowCheck"))
+            {
+                Print("WARNING: Known quirk in OnExecutionUpdate shadow check: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("Error OnExecutionUpdate: " + ex.Message);
+                Print("CRITICAL: Unexpected exception in OnExecutionUpdate: " + ex.ToString());
+                throw;
             }
         }
 
@@ -410,9 +415,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Interlocked.Decrement(ref pendingReplacementCount);
                     activePositions.TryRemove(entryName, out _);
                     entryOrders.TryRemove(entryName, out _);
-                }
-                if (remainingAfterStop <= 0)
-                {
                     SymmetryGuardForgetEntry(entryName);
                     Print(string.Format("Position {0} fully closed by stop.", entryName));
                 }

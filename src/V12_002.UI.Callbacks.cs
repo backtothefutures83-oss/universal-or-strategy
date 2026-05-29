@@ -95,9 +95,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _chartOverlayParentGrid = parentGrid;
                     }
                 }
+                catch (InvalidOperationException ex)
+                {
+                    // WPF visual tree operation failed - non-critical UI issue
+                    Print("[V12] Overlay creation failed: " + ex.Message);
+                }
                 catch (Exception ex)
                 {
-                    Print("[V12] Overlay creation failed: " + ex.Message);
+                    // Unexpected error in UI setup - log and continue
+                    Print("[V12] CRITICAL: Unexpected overlay error: " + ex.Message);
+                    throw;
                 }
             }
         }
@@ -253,9 +260,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 e.Handled = true;
             }
+            catch (InvalidOperationException ex)
+            {
+                // Chart click handler failed - non-critical UI event
+                Print("ERROR OnChartClick: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR OnChartClick: " + ex.Message);
+                // Unexpected error in chart click - log and fail fast
+                Print("CRITICAL OnChartClick: " + ex.Message);
+                throw;
             }
         }
 
@@ -448,6 +462,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case Key.C:
                     ExecuteTargetAction(target, "cancel");
                     break;
+                default:
+                    throw new InvalidOperationException($"Unexpected key for target action: {key}");
             }
         }
 
@@ -1133,6 +1149,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case "disabletrail":
                     ExecuteRunner_DisableTrail(entryName, pos);
                     break;
+
+                default:
+                    throw new InvalidOperationException($"Unexpected runner action: {action}");
             }
         }
 

@@ -104,14 +104,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             FleetSync_FindLeaderMaxLevels(positionSnapshot, out leaderLongMaxLevel, out leaderShortMaxLevel);
 
             // V12.12: Diagnostic -- log leader trail levels for fleet sync visibility
-            if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
-                Print(
-                    $"[SIMA] Fleet Sync: Leader trail levels -- Long={leaderLongMaxLevel}, Short={leaderShortMaxLevel}"
-                );
-
             // Phase 2: Sync lagging followers UP to the leader's level
             if (leaderLongMaxLevel > 0 || leaderShortMaxLevel > 0)
             {
+                Print(
+                    $"[SIMA] Fleet Sync: Leader trail levels -- Long={leaderLongMaxLevel}, Short={leaderShortMaxLevel}"
+                );
                 FleetSync_SyncFollowersToLevel(positionSnapshot, leaderLongMaxLevel, leaderShortMaxLevel);
             }
         }

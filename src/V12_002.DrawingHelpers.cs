@@ -131,9 +131,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                     );
                 }
             }
+            catch (TimeZoneNotFoundException ex)
+            {
+                // Known issue - invalid timezone configuration
+                Print("ERROR DrawORBox: Invalid timezone - " + ex.Message);
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("rectangle"))
+            {
+                // Known NT8 quirk - invalid rectangle coordinates
+                Print("WARNING DrawORBox: Invalid rectangle coordinates - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR DrawORBox: " + ex.Message);
+                // Unexpected drawing exception - fail fast
+                Print("CRITICAL DrawORBox: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
@@ -187,10 +199,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 return TimeZoneInfo.ConvertTime(localTime, TimeZoneInfo.Local, targetZone);
             }
+            catch (TimeZoneNotFoundException ex)
+            {
+                // Known issue - invalid timezone ID
+                Print("WARNING ConvertToSelectedTimeZone: Invalid timezone, using local - " + ex.Message);
+                return localTime;
+            }
+            catch (ArgumentException ex)
+            {
+                // Invalid time conversion argument
+                Print("WARNING ConvertToSelectedTimeZone: Invalid argument, using local - " + ex.Message);
+                return localTime;
+            }
             catch (Exception ex)
             {
-                Print("ERROR ConvertToSelectedTimeZone: " + ex.Message);
-                return localTime;
+                // Unexpected timezone conversion failure - fail fast
+                Print("CRITICAL ConvertToSelectedTimeZone: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 

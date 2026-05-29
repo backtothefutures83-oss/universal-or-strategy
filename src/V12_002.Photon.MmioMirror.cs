@@ -117,17 +117,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     _accessor.Dispose();
                 }
-                catch
+                catch (ObjectDisposedException)
                 {
-                    // Swallow: Dispose may throw if already disposed or handle is invalid
+                    // Expected: Dispose may throw if already disposed or handle is invalid
                 }
                 try
                 {
                     _mmf.Dispose();
                 }
-                catch
+                catch (ObjectDisposedException)
                 {
-                    // Swallow: Dispose may throw if already disposed or handle is invalid
+                    // Expected: Dispose may throw if already disposed or handle is invalid
                 }
             }
 

@@ -127,9 +127,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 Dispatch_FinalizeAndReport(sw, t0Ticks, tLoopStartTicks, dispatchLog);
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
+            {
+                Print("[DISPATCH] WARNING: TriggerCustomEvent failed during dispatch: " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("[DISPATCH] CRITICAL ERROR in ExecuteSmartDispatchEntry: " + ex.Message);
+                Print("[DISPATCH] CRITICAL ERROR in ExecuteSmartDispatchEntry: " + ex.ToString());
+                throw;
             }
             finally
             {
@@ -311,8 +316,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     rmaCount++;
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex)
+                    when (ex.Message.Contains("Submit") || ex.Message.Contains("CreateOrder"))
                 {
+                    // Known NT8 order submission quirk - cleanup and continue
                     if (syncPending)
                     {
                         ClearDispatchSyncPending(expectedKey);
@@ -341,6 +348,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     dispatchLog.AppendLine($"[DISPATCH] [X] FAILED on {acct.Name}: {ex.Message}");
                 }
+                catch (Exception ex)
+                {
+                    // Unexpected error - cleanup and fail fast
+                    if (syncPending)
+                    {
+                        ClearDispatchSyncPending(expectedKey);
+                        syncPending = false;
+                    }
+
+                    if (reservedDelta != 0)
+                        AddExpectedPositionDeltaLocked(expectedKey, -reservedDelta);
+
+                    if (registeredForCleanup)
+                    {
+                        activePositions.TryRemove(fleetEntryName, out _);
+                        entryOrders.TryRemove(fleetEntryName, out _);
+                        stopOrders.TryRemove(fleetEntryName, out _);
+                        for (int tNum = 1; tNum <= 5; tNum++)
+                        {
+                            var targetDict = GetTargetOrdersDictionary(tNum);
+                            if (targetDict != null)
+                                targetDict.TryRemove(fleetEntryName, out _);
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(fleetEntryName))
+                        _followerBrackets.TryRemove(fleetEntryName, out _);
+
+                    Print($"[DISPATCH] CRITICAL: Unexpected error on {acct.Name}: {ex.ToString()}");
+                    throw;
+                }
             }
 
             return rmaCount;
@@ -359,10 +396,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     TriggerCustomEvent(o => PumpFleetDispatch(), null);
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                 {
                     if (_diagFleet)
                         Print("[FLEET_CATCH] ExecuteSmartDispatchEntry pump prime failed: " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Print("[FLEET_CATCH] CRITICAL: Unexpected pump prime error: " + ex.ToString());
+                    throw;
                 }
 
             // [Phase 7.2 LATENCY] T_Final: Fleet loop complete (setup+enqueue only; no blocking Submit) -- stop clock, flush forensic report.
@@ -827,10 +869,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         _photonMmioMirror.TryPublish(ref _slot);
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException ex)
+                        when (ex.Message.Contains("MMIO") || ex.Message.Contains("TryPublish"))
                     {
                         if (_diagIpc)
                             Print("[IPC_CATCH] Dispatch_PublishMarketBracketToPhoton MMIO failed: " + ex.Message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[IPC_CATCH] CRITICAL: Unexpected MMIO error: " + ex.ToString());
+                        throw;
                     }
                 }
             }
@@ -985,10 +1033,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         _photonMmioMirror.TryPublish(ref _slotLmt);
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException ex)
+                        when (ex.Message.Contains("MMIO") || ex.Message.Contains("TryPublish"))
                     {
                         if (_diagIpc)
                             Print("[IPC_CATCH] Dispatch_BuildFollowerOrders MMIO failed: " + ex.Message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("[IPC_CATCH] CRITICAL: Unexpected MMIO error: " + ex.ToString());
+                        throw;
                     }
                 }
             }

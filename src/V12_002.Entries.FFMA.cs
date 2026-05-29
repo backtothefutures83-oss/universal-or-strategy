@@ -101,9 +101,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
             }
+            catch (NullReferenceException ex)
+            {
+                // Known issue - indicator not initialized
+                Print("WARNING CheckFFMAConditions: Indicator not ready - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR CheckFFMAConditions: " + ex.Message);
+                // Unexpected exception in FFMA condition check - fail fast
+                Print("CRITICAL CheckFFMAConditions: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
@@ -282,9 +289,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Disarm FFMA after execution (one-shot)
                 DeactivateFFMAMode();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state issue
+                Print("WARNING ExecuteFFMAEntry: NT8 order submission quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteFFMAEntry: " + ex.Message);
+                // Unexpected exception in FFMA entry execution - fail fast
+                Print("CRITICAL ExecuteFFMAEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
@@ -489,9 +503,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 DeactivateFFMAMode();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state issue
+                Print("WARNING ExecuteFFMALimitEntry: NT8 order submission quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteFFMALimitEntry: " + ex.Message);
+                // Unexpected exception in FFMA limit entry - fail fast
+                Print("CRITICAL ExecuteFFMALimitEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 
@@ -712,9 +733,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 DeactivateFFMAMode();
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Order") || ex.Message.Contains("submit"))
+            {
+                // Known NT8 quirk - order submission state issue
+                Print("WARNING ExecuteFFMAManualMarketEntry: NT8 order submission quirk - " + ex.Message);
+            }
             catch (Exception ex)
             {
-                Print("ERROR ExecuteFFMAManualMarketEntry: " + ex.Message);
+                // Unexpected exception in FFMA manual market entry - fail fast
+                Print("CRITICAL ExecuteFFMAManualMarketEntry: Unexpected exception - " + ex.ToString());
+                throw;
             }
         }
 

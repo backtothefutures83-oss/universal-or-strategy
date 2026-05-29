@@ -452,16 +452,29 @@ namespace NinjaTrader.NinjaScript.Strategies
                     string.Format("[MOVE-SYNC] T{0} resubmitted: {1} @ {2:F2}", targetNum, fleetEntryName, roundedLimit)
                 );
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
+                when (ex.Message.Contains("SubmitOrderUnmanaged") || ex.Message.Contains("ChangeOrder"))
             {
                 Print(
                     string.Format(
-                        "[MOVE-SYNC] ERROR PropagateMasterTargetMove T{0} {1}: {2}",
+                        "[MOVE-SYNC] WARNING PropagateMasterTargetMove T{0} {1} (known quirk): {2}",
                         targetNum,
                         fleetEntryName,
                         ex.Message
                     )
                 );
+            }
+            catch (Exception ex)
+            {
+                Print(
+                    string.Format(
+                        "[MOVE-SYNC] CRITICAL PropagateMasterTargetMove T{0} {1}: {2}",
+                        targetNum,
+                        fleetEntryName,
+                        ex.ToString()
+                    )
+                );
+                throw;
             }
             finally
             {
@@ -633,10 +646,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 acct.Cancel(orderArray);
                 Print("[FSM] Cancel sent for " + fleetEntryName + " OrderId=" + currentEntry.OrderId);
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("CancelOrder"))
+            {
+                Print("[FSM] WARNING Cancel failed for " + fleetEntryName + " (known quirk): " + ex.Message);
+                _followerReplaceSpecs.TryRemove(fleetEntryName, out _);
+            }
             catch (Exception ex)
             {
-                Print("[FSM] Cancel failed for " + fleetEntryName + ": " + ex.Message);
+                Print("[FSM] CRITICAL Cancel failed for " + fleetEntryName + ": " + ex.ToString());
                 _followerReplaceSpecs.TryRemove(fleetEntryName, out _);
+                throw;
             }
             finally
             {
