@@ -232,7 +232,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         DispatchFleetFlatten();
                     }
-                    catch (InvalidOperationException ex) when (ex.Message.Contains("DispatchFleetFlatten"))
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
                     {
                         Print("WARNING: Known quirk in DispatchFleetFlatten: " + ex.Message);
                     }
