@@ -174,9 +174,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     _photonMmioMirror.Dispose();
                 }
+                catch (ObjectDisposedException ex)
+                {
+                    // Known issue - MMIO already disposed
+                    Print("[SHUTDOWN_ERROR] MMIO mirror already disposed: " + ex.Message);
+                }
                 catch (Exception ex)
                 {
-                    Print("[SHUTDOWN_ERROR] MMIO mirror dispose failed: " + ex.ToString());
+                    // Jane Street Deviation #2: Boundary exception guards must never rethrow in disposal paths.
+                    // Log error and continue cleanup to ensure subsequent cleanup operations execute.
+                    Print("[SHUTDOWN_ERROR] CRITICAL: MMIO mirror dispose failed: " + ex.ToString());
                 }
                 _photonMmioMirror = null;
             }
