@@ -455,7 +455,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool hasActiveStop = false;
                 try
                 {
-                    hasActiveStop = acct.Orders.Any(o =>
+                    hasActiveStop = Account.Orders.Any(o =>
                         o.OrderState == OrderState.Working && o.IsStopMarket && o.Name == entryName
                     );
                 }
@@ -516,7 +516,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool hasActiveStop = false;
                 try
                 {
-                    hasActiveStop = acct.Orders.Any(o =>
+                    hasActiveStop = Account.Orders.Any(o =>
                         o.OrderState == OrderState.Working && o.IsStopMarket && o.Name == entryName
                     );
                 }
