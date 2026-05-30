@@ -181,9 +181,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     _citNudgedKeys.TryAdd(key, true); // [BUILD 949] one-shot: mark as nudged
                 }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("ChangeOrder"))
+                {
+                    Print($"[CIT] WARNING chasing {key} (known quirk): {ex.Message}");
+                }
                 catch (Exception ex)
                 {
-                    Print($"[CIT] ERROR chasing {key}: {ex.Message}");
+                    Print($"[CIT] CRITICAL chasing {key}: {ex.ToString()}");
+                    // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
         }
@@ -205,16 +210,67 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
                 Print("FLATTEN: Closing all positions...");
-                CancelMasterEntryOrders();
+
+                // Phase 1: Cancel master entry orders (with known quirk handling)
+                try
+                {
+                    CancelMasterEntryOrders();
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("CancelOrder"))
+                {
+                    Print("WARNING: Known quirk in CancelMasterEntryOrders: " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in CancelMasterEntryOrders: " + ex.ToString());
+                }
+
+                // Phase 2: Dispatch fleet flatten (with known quirk handling)
                 if (EnableSIMA)
-                    DispatchFleetFlatten();
-                ResetSyncStateAndPurgeFollowers();
-                FlattenFilledMasterPositions();
-                CancelUnfilledMasterEntries();
-            }
-            catch (Exception ex)
-            {
-                Print("ERROR FlattenAll: " + ex.Message);
+                {
+                    try
+                    {
+                        DispatchFleetFlatten();
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("TriggerCustomEvent"))
+                    {
+                        Print("WARNING: Known NT8 quirk in TriggerCustomEvent: " + ex.Message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Print("CRITICAL: Unexpected exception in DispatchFleetFlatten: " + ex.ToString());
+                    }
+                }
+
+                // Phase 3: Reset sync state (always execute)
+                try
+                {
+                    ResetSyncStateAndPurgeFollowers();
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in ResetSyncStateAndPurgeFollowers: " + ex.ToString());
+                }
+
+                // Phase 4: Flatten filled positions (always execute)
+                try
+                {
+                    FlattenFilledMasterPositions();
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in FlattenFilledMasterPositions: " + ex.ToString());
+                }
+
+                // Phase 5: Cancel unfilled entries (always execute)
+                try
+                {
+                    CancelUnfilledMasterEntries();
+                }
+                catch (Exception ex)
+                {
+                    Print("CRITICAL: Unexpected exception in CancelUnfilledMasterEntries: " + ex.ToString());
+                }
             }
             finally
             {
