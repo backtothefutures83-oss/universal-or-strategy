@@ -97,7 +97,7 @@ ignore:
   - 'src/V12_002.SIMA.Dispatch.cs'
   - 'src/V12_002.SIMA.Execution.cs'
   - 'src/V12_002.SIMA.Lifecycle.cs'
-  - 'src/V12_002.SIMA.Fleet.cs'
+  - 'src/V12_002.SIMA.Fleet.cs'  # Also suppresses SA1119 (Jane Street Deviation #3: line 528 parentheses for clarity)
   - 'src/V12_002.SIMA.Flatten.cs'
   - 'src/V12_002.REAPER.cs'
   - 'src/V12_002.REAPER.Audit.cs'

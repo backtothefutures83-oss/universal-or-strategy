@@ -9,9 +9,9 @@ Generated: 2026-05-31 07:47:58
 | VALID Issues | 5 |
 | HALLUCINATIONS | 0 |
 | INFRA-NOISE | 0 |
-| P0 (Critical) |  |
+| P0 (Critical) | 1 |
 | P1 (High) | 3 |
-| P2 (Medium) |  |
+| P2 (Medium) | 1 |
 
 ## VALID Issues (Priority Order)
 

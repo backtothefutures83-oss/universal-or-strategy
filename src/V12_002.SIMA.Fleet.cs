@@ -502,7 +502,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception ex)
             {
                 if (_diagFleet)
-                    Print("[FLEET_CATCH] ProcessFleetSlot account iteration failed: " + ex.Message);
+                    Print("[FLEET_CATCH] ShouldSkipFleet_RunHealthCheck failed: " + ex.Message);
             }
         }
 
