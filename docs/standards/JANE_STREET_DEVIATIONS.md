@@ -168,8 +168,6 @@ exclude_paths:
 **References**:
 - Analysis: `docs/brain/PR_1B_JANE_STREET_ANALYSIS.md`
 - Suppression rationale: `docs/brain/CODACY_PATTERN_SUPPRESSIONS.md`
-**Note on SA1119 (Redundant Parentheses)**:
-Files under Decision #2 also suppress SA1119 warnings for explicit return parentheses in compound boolean expressions (e.g., `return (a || b);`). This pattern improves cognitive clarity in microsecond-latency reasoning contexts. See Decision #3 below for full rationale.
 
 ---
 
