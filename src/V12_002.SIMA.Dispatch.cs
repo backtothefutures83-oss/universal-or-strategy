@@ -937,6 +937,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
+                    TrackPhotonPoolExhausted();
                     _proxyOrdersLmt = new Order[MaxOrdersPerSlot];
                     _poolSlotIndexLmt = -1;
                 }
@@ -1000,6 +1001,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (_poolSlotIndexLmt >= 0)
                 {
+                    TrackPhotonRingFull();
                     Order[] legacyOrdersLmt = new Order[] { entry };
                     _photonPool.ReleaseByIndex(_poolSlotIndexLmt);
                     _photonSideband[_poolSlotIndexLmt] = default(FleetDispatchSideband);
