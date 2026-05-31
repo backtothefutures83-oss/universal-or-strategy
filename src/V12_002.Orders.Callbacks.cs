@@ -414,6 +414,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Handles stop order fills with dictionary lookup and name-based fallback.
         /// Extracted from HandleSecondaryOrderFilled.
         /// Phase 7 NEW-1: Complexity reduction (CYC 17 -> 4).
+        /// CRITICAL: Mutation-safety guard prevents double-cleanup race condition.
+        /// If platform delivers callbacks from multiple threads OR another actor message
+        /// races between snapshot and cleanup, we must verify the key still exists.
         /// </summary>
         /// <param name="order">The filled order.</param>
         /// <param name="orderName">Order name for fallback matching.</param>
@@ -427,7 +430,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             KeyValuePair<string, PositionInfo>[] snapshot
         )
         {
-            // Stop filled
+            // Stop filled.
             if (!orderName.StartsWith("Stop_") && !orderName.StartsWith("S_"))
             {
                 return false;
@@ -435,21 +438,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (var kvp in snapshot)
             {
-                // Single TryGetValue for mutation safety + lookup efficiency
+                // Single TryGetValue for mutation safety + lookup efficiency.
                 if (stopOrders.TryGetValue(kvp.Key, out var sOrder) && sOrder == order)
                 {
-                    Print(
-                        LogBuffer.Format(
-                            "STOP FILLED: {0} contracts @ {1:F2}",
-                            kvp.Value.RemainingContracts,
-                            averageFillPrice
-                        )
-                    );
-                    CleanupPosition(kvp.Key);
+                    // CRITICAL: Re-check existence before cleanup (mutation-safety guard).
+                    // Prevents double-cleanup if another thread/actor removed the position.
+                    if (activePositions.ContainsKey(kvp.Key))
+                    {
+                        Print(
+                            LogBuffer.Format(
+                                "STOP FILLED: {0} contracts @ {1:F2}",
+                                kvp.Value.RemainingContracts,
+                                averageFillPrice
+                            )
+                        );
+                        CleanupPosition(kvp.Key);
+                    }
                     return true;
                 }
             }
-            // Fallback by name
+            // Fallback by name.
             string entryName = ExtractEntryNameFromStop(orderName);
             if (activePositions.TryGetValue(entryName, out var pos))
             {
