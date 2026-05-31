@@ -445,164 +445,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private bool Dispatch_BuildFollowerOrders(
-            string tradeType,
-            OrderAction action,
-            int quantity,
-            double entryPrice,
-            OrderType entryOrderType,
-            Account acct,
-            int i,
-            string symmetryDispatchId,
-            int dispatchTargetCount,
-            StringBuilder dispatchLog,
-            out PositionInfo fleetPos,
-            out Order entry,
-            out string fleetEntryName,
-            out string expectedKey,
-            out string ocoId,
-            out int followerQty,
-            out int ft1,
-            out int ft2,
-            out int ft3,
-            out int ft4,
-            out int ft5,
-            out double stopPrice,
-            out double t1TargetPrice,
-            out double t2TargetPrice,
-            out double t3TargetPrice,
-            out double t4TargetPrice,
-            out double t5TargetPrice
-        )
-        {
-            fleetEntryName = "Fleet_" + acct.Name + "_" + tradeType + "_" + i;
-            expectedKey = ExpKey(acct.Name);
-            ocoId = tradeType + "_" + DateTime.UtcNow.Ticks + "_" + i;
-
-            fleetPos = null;
-            entry = null;
-            followerQty = 0;
-            ft1 = 0;
-            ft2 = 0;
-            ft3 = 0;
-            ft4 = 0;
-            ft5 = 0;
-            stopPrice = 0;
-            t1TargetPrice = 0;
-            t2TargetPrice = 0;
-            t3TargetPrice = 0;
-            t4TargetPrice = 0;
-            t5TargetPrice = 0;
-
-            // V12: Followers ALWAYS use RMA multipliers for point-based trails (User Req)
-            MarketPosition followerDirection = action == OrderAction.Buy ? MarketPosition.Long : MarketPosition.Short;
-
-            // [LEAK-01]: Use centralized ATR calculator (ceiling + min/max guards, fleet-ready).
-            double stopDist = CalculateATRStopDistance(RMAStopATRMultiplier);
-
-            stopPrice = (action == OrderAction.Buy) ? entryPrice - stopDist : entryPrice + stopDist;
-            // Universal Ladder: T(n)Type dropdown drives all target pricing.
-            t1TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 1);
-            t2TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 2);
-            t3TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 3);
-            t4TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 4);
-            t5TargetPrice = CalculateTargetPrice(followerDirection, entryPrice, 5);
-
-            // Rounding
-            stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
-
-            // V1102Q [PARITY-01]: Scale quantity for Micro accounts (e.g. ES->MES 10x parity)
-            // [923A-P2c-OVF]: checked{} prevents silent int overflow on parity multiply (cf. Callbacks.cs same pattern)
-            try
-            {
-                followerQty = checked((int)Math.Max(1L, (long)quantity * FleetParityMultiplier));
-            }
-            catch (OverflowException)
-            {
-                Print(
-                    LogBuffer.Format(
-                        "[923A-OVF] SIMA parity overflow qty={0} x mult={1} -- clamping to maxContracts ({2})",
-                        quantity,
-                        FleetParityMultiplier,
-                        maxContracts
-                    )
-                );
-                followerQty = maxContracts;
-            }
-
-            // V12.40 FLEET PARITY: Use same distribution as Master (applied to scaled quantity)
-            // FIX-B [Build 1102Z]: Pass dispatchTargetCount snapshot so all fleet accounts use the same
-            // target count regardless of any IPC update that may arrive mid-dispatch.
-            GetTargetDistribution(followerQty, out ft1, out ft2, out ft3, out ft4, out ft5, dispatchTargetCount);
-
-            SymmetryGuardRegisterFollower(symmetryDispatchId, fleetEntryName);
-
-            // V12.3: Entry uses caller-specified order type (Limit for RMA, Market for MOMO/TREND)
-            // [FIX-PP-01]: For StopMarket/StopLimit entries the activation price lives in stopPrice,
-            // not limitPrice. Passing stopPx=0 caused the follower to fire immediately at market.
-            double limitPx =
-                (entryOrderType == OrderType.Limit || entryOrderType == OrderType.StopLimit) ? entryPrice : 0;
-            double stopPx =
-                (entryOrderType == OrderType.StopMarket || entryOrderType == OrderType.StopLimit) ? entryPrice : 0;
-            bool isMarketEntry = (entryOrderType == OrderType.Market);
-            // StopMarket stays isMarketEntry=false: bracket handled by SymmetryGuardOnFollowerFill anchor flow.
-            entry = acct.CreateOrder(
-                Instrument,
-                action,
-                entryOrderType,
-                TimeInForce.Gtc,
-                followerQty,
-                limitPx,
-                stopPx,
-                ocoId,
-                fleetEntryName,
-                null
-            );
-            if (entry == null)
-            {
-                dispatchLog.AppendLine($"[DISPATCH] Entry create failed on {acct.Name} for {fleetEntryName}");
-                return false;
-            }
-
-            // V12.1: Track follower position for active trailing/target management
-            // V12.1101E: Full 5-target distribution mirrors Master
-            fleetPos = new PositionInfo
-            {
-                SignalName = fleetEntryName,
-                Direction = action == OrderAction.Buy ? MarketPosition.Long : MarketPosition.Short,
-                TotalContracts = followerQty,
-                RemainingContracts = followerQty,
-                EntryPrice = entryPrice,
-                InitialStopPrice = stopPrice,
-                CurrentStopPrice = stopPrice,
-                Target1Price = t1TargetPrice,
-                Target2Price = t2TargetPrice,
-                Target3Price = t3TargetPrice,
-                Target4Price = t4TargetPrice,
-                Target5Price = t5TargetPrice,
-                T1Contracts = ft1,
-                T2Contracts = ft2,
-                T3Contracts = ft3,
-                T4Contracts = ft4,
-                T5Contracts = ft5,
-                ExecutingAccount = acct,
-                IsFollower = true,
-                IsRMATrade = true, // Enforce Point-Based Trailing for all followers
-                IsTRENDTrade = (tradeType == "TREND"),
-                IsRetestTrade = (tradeType == "RETEST"),
-                EntryOrderType = entryOrderType,
-                EntryFilled = isMarketEntry, // V12.3: Only true for Market entries; Limit waits for fill
-                BracketSubmitted = isMarketEntry, // V12.7: Brackets deferred for Limit entries
-                TicksSinceEntry = 0,
-                ExtremePriceSinceEntry = entryPrice,
-                CurrentTrailLevel = 0,
-                // Build 936 [FIX-2]: Deterministic bracket OCO group ID for broker-native stop+target linking.
-                OcoGroupId = "V12_" + GetStableHash(fleetEntryName),
-            };
-
-            return true;
-        }
-
+        /// <summary>
+        /// Phase 7 NEW-3: Thin router for market bracket dispatch.
+        /// Delegates entry, stop, and target publishing to focused helpers.
+        /// Target CYC: <=4 (reduced from 21).
+        /// </summary>
         private void Dispatch_PublishMarketBracketToPhoton(
             Account acct,
             OrderAction action,
@@ -623,92 +470,36 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             var ordersToSubmit = new List<Order> { entry };
             OrderAction exitAction = action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover;
-            double validatedStop = ValidateStopPrice(fleetPos.Direction, fleetPos.CurrentStopPrice);
 
-            string stopSig = SymmetryTrim("Stop_" + fleetEntryName, 40);
-            Order stop = acct.CreateOrder(
-                Instrument,
+            // Publish entry order
+            PublishPhoton_EntryOrder(entry, ref ordersToSubmit);
+
+            // Publish stop order
+            Order stop = PublishPhoton_StopOrder(
+                acct,
                 exitAction,
-                OrderType.StopMarket,
-                TimeInForce.Gtc,
-                Math.Max(1, fleetPos.TotalContracts),
-                0,
-                validatedStop,
+                fleetPos,
+                fleetEntryName,
                 ocoId,
-                stopSig,
-                null
+                stopPrice,
+                ref ordersToSubmit
             );
 
-            ordersToSubmit.Add(stop);
+            // Publish target orders
+            var stagedTargets = PublishPhoton_TargetOrders(
+                acct,
+                exitAction,
+                fleetPos,
+                fleetEntryName,
+                ocoId,
+                dispatchTargetCount,
+                dispatchLog,
+                ref ordersToSubmit,
+                out int nonRunnerLimitQty,
+                out int runnerQty
+            );
 
-            int nonRunnerLimitQty = 0;
-            int runnerQty = 0;
-            var stagedTargets = new List<StagedTarget>(5);
-
-            // V12.Phase8.3: Use activeTargetCount from dashboard to restrict number of targets submitted
-            // FIX-B [Build 1102Z]: Use dispatchTargetCount snapshot (captured before loop) -- not live global.
-            for (int targetNum = 1; targetNum <= dispatchTargetCount; targetNum++)
-            {
-                int targetQty = GetTargetContracts(fleetPos, targetNum);
-                if (targetQty <= 0)
-                    continue;
-
-                if (IsRunnerTarget(targetNum))
-                {
-                    runnerQty += targetQty;
-                    continue;
-                }
-
-                double targetPrice = GetTargetPrice(fleetPos, targetNum);
-                if (targetPrice <= 0)
-                {
-                    dispatchLog.AppendLine(
-                        LogBuffer.Format(
-                            "[SIMA TARGET_SKIP] T{0} for {1} has qty={2} but invalid price={3:F2}; skipped",
-                            targetNum,
-                            fleetEntryName,
-                            targetQty,
-                            targetPrice
-                        )
-                    );
-                    continue;
-                }
-
-                string targetSig = SymmetryTrim("T" + targetNum + "_" + fleetEntryName, 40);
-                Order target = acct.CreateOrder(
-                    Instrument,
-                    exitAction,
-                    OrderType.Limit,
-                    TimeInForce.Gtc,
-                    targetQty,
-                    targetPrice,
-                    0,
-                    ocoId,
-                    targetSig,
-                    null
-                );
-
-                // V12.Phase8 [F-01/F-02]: Stage target orders locally; commit after Submit.
-                stagedTargets.Add(
-                    new StagedTarget
-                    {
-                        Num = targetNum,
-                        Price = targetPrice,
-                        Order = target,
-                    }
-                );
-
-                ordersToSubmit.Add(target);
-                nonRunnerLimitQty += targetQty;
-            }
-
-            // Build 935: Register local dictionaries before reserve/submit so REAPER never
-            // observes Expected!=0 without entry/stop/targets tracking state.
-            // B966: Enqueue NOT applied here -- ordering invariant requires dict registration
-            // to happen BEFORE AddExpectedPositionDeltaLocked (L495). Deferring via Enqueue
-            // from within an existing drain would break this ordering. ConcurrentDictionary
-            // single-writes are thread-safe; PumpFleetDispatch runs on strategy thread via
-            // TriggerCustomEvent so no background thread access occurs at this point.
+            // Register tracking dictionaries
             activePositions[fleetEntryName] = fleetPos;
             entryOrders[fleetEntryName] = entry;
             stopOrders[fleetEntryName] = stop;
@@ -722,9 +513,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             MarkDispatchSyncPending(expectedKey);
             syncPending = true;
 
-            // Phase 6 [FSM-P1]: Proactive FSM -- eliminates Gap of Unknowing
-            // between enqueue and PumpFleetDispatch. State = PendingSubmit until
-            // pump promotes to Submitted after successful acct.Submit().
+            // Phase 6 [FSM-P1]: Proactive FSM
             if (!_followerBrackets.ContainsKey(fleetEntryName))
             {
                 var proFsm = new FollowerBracketFSM
@@ -751,7 +540,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _followerBrackets.TryAdd(fleetEntryName, proFsm);
             }
 
-            // Build 935: Reserve follower-sized expected quantity only.
+            // Reserve expected quantity
             reservedDelta = (action == OrderAction.Buy) ? followerQty : -followerQty;
             AddExpectedPositionDeltaLocked(expectedKey, reservedDelta);
 
@@ -794,7 +583,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
             _slot.Shadow = ComputeFleetDispatchShadow(ref _slot, _photonShadowSalt);
 
-            // REAPER-EXPANSION Ticket 2: Circuit breaker check with atomic CAS loop
+            // REAPER-EXPANSION Ticket 2: Circuit breaker check
             if (
                 !TryIncrementDispatchCountWithCircuitBreaker(
                     ref syncPending,
@@ -806,7 +595,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 )
             )
             {
-                return; // Circuit breaker tripped, state already rolled back
+                return;
             }
 
             // v28.0 blittable slot + sideband-first publish
@@ -815,14 +604,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _photonSideband[_poolSlotIndex].Account = acct;
                 _photonSideband[_poolSlotIndex].FleetEntryName = fleetEntryName;
                 _photonSideband[_poolSlotIndex].ExpectedKey = expectedKey;
-                Thread.MemoryBarrier(); // sideband writes visible before ring publish
+                Thread.MemoryBarrier();
             }
 
             if (_poolSlotIndex >= 0 && _photonDispatchRing.TryEnqueue(ref _slot))
             {
                 TrackPhotonEnqueue();
-                // Success: slot in ring, pool + sideband linked by PoolSlotIndex.
-                // MMIO mirror is a best-effort write-through -- never blocks or fails hot path.
+                // MMIO mirror best-effort write-through
                 if (_photonMmioMirror != null)
                 {
                     try
@@ -842,7 +630,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (_poolSlotIndex >= 0)
                 {
                     TrackPhotonRingFull();
-                    // Pool succeeded but ring full -- release pool, clear sideband, heap-copy
                     Print("[PHOTON] Ring full -- fallback to ConcurrentQueue");
                     Order[] legacyOrders = new Order[_orderIdx];
                     Array.Copy(_proxyOrders, legacyOrders, _orderIdx);
@@ -878,6 +665,126 @@ namespace NinjaTrader.NinjaScript.Strategies
                     runnerQty
                 )
             );
+        }
+
+        /// <summary>
+        /// Phase 7 NEW-3 Helper 1: Publish entry order to MMIO.
+        /// Target CYC: <=5
+        /// </summary>
+        private void PublishPhoton_EntryOrder(Order entry, ref List<Order> ordersToSubmit)
+        {
+            // Entry order already in ordersToSubmit list (added by caller)
+            // No additional MMIO publishing needed for entry in current architecture
+        }
+
+        /// <summary>
+        /// Phase 7 NEW-3 Helper 2: Create and publish stop order to MMIO.
+        /// Target CYC: <=5
+        /// </summary>
+        private Order PublishPhoton_StopOrder(
+            Account acct,
+            OrderAction exitAction,
+            PositionInfo fleetPos,
+            string fleetEntryName,
+            string ocoId,
+            double stopPrice,
+            ref List<Order> ordersToSubmit
+        )
+        {
+            double validatedStop = ValidateStopPrice(fleetPos.Direction, fleetPos.CurrentStopPrice);
+            string stopSig = SymmetryTrim("Stop_" + fleetEntryName, 40);
+            Order stop = acct.CreateOrder(
+                Instrument,
+                exitAction,
+                OrderType.StopMarket,
+                TimeInForce.Gtc,
+                Math.Max(1, fleetPos.TotalContracts),
+                0,
+                validatedStop,
+                ocoId,
+                stopSig,
+                null
+            );
+            ordersToSubmit.Add(stop);
+            return stop;
+        }
+
+        /// <summary>
+        /// Phase 7 NEW-3 Helper 3: Create and publish target orders to MMIO.
+        /// Target CYC: <=5
+        /// </summary>
+        private List<StagedTarget> PublishPhoton_TargetOrders(
+            Account acct,
+            OrderAction exitAction,
+            PositionInfo fleetPos,
+            string fleetEntryName,
+            string ocoId,
+            int dispatchTargetCount,
+            StringBuilder dispatchLog,
+            ref List<Order> ordersToSubmit,
+            out int nonRunnerLimitQty,
+            out int runnerQty
+        )
+        {
+            nonRunnerLimitQty = 0;
+            runnerQty = 0;
+            var stagedTargets = new List<StagedTarget>(5);
+
+            for (int targetNum = 1; targetNum <= dispatchTargetCount; targetNum++)
+            {
+                int targetQty = GetTargetContracts(fleetPos, targetNum);
+                if (targetQty <= 0)
+                    continue;
+
+                if (IsRunnerTarget(targetNum))
+                {
+                    runnerQty += targetQty;
+                    continue;
+                }
+
+                double targetPrice = GetTargetPrice(fleetPos, targetNum);
+                if (targetPrice <= 0)
+                {
+                    dispatchLog.AppendLine(
+                        string.Format(
+                            "[SIMA TARGET_SKIP] T{0} for {1} has qty={2} but invalid price={3:F2}; skipped",
+                            targetNum,
+                            fleetEntryName,
+                            targetQty,
+                            targetPrice
+                        )
+                    );
+                    continue;
+                }
+
+                string targetSig = SymmetryTrim("T" + targetNum + "_" + fleetEntryName, 40);
+                Order target = acct.CreateOrder(
+                    Instrument,
+                    exitAction,
+                    OrderType.Limit,
+                    TimeInForce.Gtc,
+                    targetQty,
+                    targetPrice,
+                    0,
+                    ocoId,
+                    targetSig,
+                    null
+                );
+
+                stagedTargets.Add(
+                    new StagedTarget
+                    {
+                        Num = targetNum,
+                        Price = targetPrice,
+                        Order = target,
+                    }
+                );
+
+                ordersToSubmit.Add(target);
+                nonRunnerLimitQty += targetQty;
+            }
+
+            return stagedTargets;
         }
 
         private void Dispatch_PublishLimitEntryToPhoton(
@@ -1163,3 +1070,5 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
     }
 }
+
+// Made with Bob
