@@ -767,6 +767,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else
                 {
+                    TrackPhotonPoolExhausted();
                     Print("[PHOTON] Pool exhausted -- fallback to heap alloc");
                     _proxyOrders = new Order[MaxOrdersPerSlot];
                     _poolSlotIndex = -1;
@@ -819,6 +820,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (_poolSlotIndex >= 0 && _photonDispatchRing.TryEnqueue(ref _slot))
             {
+                TrackPhotonEnqueue();
                 // Success: slot in ring, pool + sideband linked by PoolSlotIndex.
                 // MMIO mirror is a best-effort write-through -- never blocks or fails hot path.
                 if (_photonMmioMirror != null)
@@ -839,6 +841,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Ring full or pool exhausted -- fallback to ConcurrentQueue
                 if (_poolSlotIndex >= 0)
                 {
+                    TrackPhotonRingFull();
                     // Pool succeeded but ring full -- release pool, clear sideband, heap-copy
                     Print("[PHOTON] Ring full -- fallback to ConcurrentQueue");
                     Order[] legacyOrders = new Order[_orderIdx];
@@ -979,6 +982,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (_poolSlotIndexLmt >= 0 && _photonDispatchRing.TryEnqueue(ref _slotLmt))
             {
+                TrackPhotonEnqueue();
                 if (_photonMmioMirror != null)
                 {
                     try

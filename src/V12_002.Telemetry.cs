@@ -32,6 +32,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private long _metricOrderSubmissions = 0; // Every SubmitOrderUnmanaged call
         private long _metricIpcCommands = 0; // Every IPC command processed
 
+        // -- Photon SPSC Ring Buffer Counters (GAP-2) ------------------------------
+        private long _metricPhotonEnqueues = 0; // Successful ring buffer enqueues
+        private long _metricPhotonDequeues = 0; // Successful ring buffer dequeues
+        private long _metricPhotonRingFull = 0; // Ring full fallback to ConcurrentQueue
+        private long _metricPhotonPoolExhausted = 0; // Pool exhausted fallback to heap
+        private long _metricPhotonCrcFailures = 0; // XorShadow integrity failures
+
         // -- State Persistence Diagnostic Counters (EPIC-7-QUALITY) ----------------
         private long _statePersistenceFailures = 0; // Failed state write/read operations
         private long _stateSecurityViolations = 0; // Path validation failures
@@ -65,6 +72,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             Interlocked.Exchange(ref _metricSymmetryReplace, 0L);
             Interlocked.Exchange(ref _metricOrderSubmissions, 0L);
             Interlocked.Exchange(ref _metricIpcCommands, 0L);
+            Interlocked.Exchange(ref _metricPhotonEnqueues, 0L);
+            Interlocked.Exchange(ref _metricPhotonDequeues, 0L);
+            Interlocked.Exchange(ref _metricPhotonRingFull, 0L);
+            Interlocked.Exchange(ref _metricPhotonPoolExhausted, 0L);
+            Interlocked.Exchange(ref _metricPhotonCrcFailures, 0L);
             Interlocked.Exchange(ref _statePersistenceFailures, 0L);
             Interlocked.Exchange(ref _stateSecurityViolations, 0L);
             Interlocked.Exchange(ref _stateRetryAttempts, 0L);
@@ -139,6 +151,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             Interlocked.Increment(ref _stateRollbacksExecuted);
         }
 
+        /// <summary>Increment Photon ring buffer enqueue counter. Call on successful TryEnqueue.</summary>
+        private void TrackPhotonEnqueue()
+        {
+            Interlocked.Increment(ref _metricPhotonEnqueues);
+        }
+
+        /// <summary>Increment Photon ring buffer dequeue counter. Call on successful TryDequeue.</summary>
+        private void TrackPhotonDequeue()
+        {
+            Interlocked.Increment(ref _metricPhotonDequeues);
+        }
+
+        /// <summary>Increment Photon ring full counter. Call when ring full triggers ConcurrentQueue fallback.</summary>
+        private void TrackPhotonRingFull()
+        {
+            Interlocked.Increment(ref _metricPhotonRingFull);
+        }
+
+        /// <summary>Increment Photon pool exhausted counter. Call when pool exhausted triggers heap allocation.</summary>
+        private void TrackPhotonPoolExhausted()
+        {
+            Interlocked.Increment(ref _metricPhotonPoolExhausted);
+        }
+
+        /// <summary>Increment Photon CRC failure counter. Call when XorShadow integrity check fails.</summary>
+        private void TrackPhotonCrcFailure()
+        {
+            Interlocked.Increment(ref _metricPhotonCrcFailures);
+        }
+
         #endregion
 
         #region TraceSpan -- Stack-Allocated Stopwatch Token
@@ -204,6 +246,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 long symmetry = Interlocked.Read(ref _metricSymmetryReplace);
                 long orders = Interlocked.Read(ref _metricOrderSubmissions);
                 long ipc = Interlocked.Read(ref _metricIpcCommands);
+                long photonEnq = Interlocked.Read(ref _metricPhotonEnqueues);
+                long photonDeq = Interlocked.Read(ref _metricPhotonDequeues);
+                long photonFull = Interlocked.Read(ref _metricPhotonRingFull);
+                long photonExhaust = Interlocked.Read(ref _metricPhotonPoolExhausted);
+                long photonCrc = Interlocked.Read(ref _metricPhotonCrcFailures);
                 long stateFailures = Interlocked.Read(ref _statePersistenceFailures);
                 long stateViolations = Interlocked.Read(ref _stateSecurityViolations);
                 long stateRetries = Interlocked.Read(ref _stateRetryAttempts);
@@ -217,6 +264,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print(string.Format("  Symmetry Replaces : {0}", symmetry));
                 Print(string.Format("  Order Submissions : {0}", orders));
                 Print(string.Format("  IPC Commands      : {0}", ipc));
+                Print(string.Format("  Photon Enqueues   : {0}", photonEnq));
+                Print(string.Format("  Photon Dequeues   : {0}", photonDeq));
+                Print(string.Format("  Photon Ring Full  : {0}", photonFull));
+                Print(string.Format("  Photon Pool Exhaust: {0}", photonExhaust));
+                Print(string.Format("  Photon CRC Fails  : {0}", photonCrc));
                 Print(string.Format("  State Failures    : {0}", stateFailures));
                 Print(string.Format("  Security Violations: {0}", stateViolations));
                 Print(string.Format("  State Retries     : {0}", stateRetries));

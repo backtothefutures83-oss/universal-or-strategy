@@ -244,6 +244,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             FleetDispatchSlot _ringSlot;
             if (_photonDispatchRing != null && _photonDispatchRing.TryDequeue(out _ringSlot))
             {
+                TrackPhotonDequeue();
                 int _sbIdx = _ringSlot.PoolSlotIndex;
 
                 // Sideband read (BEFORE shadow verify -- sideband is required for rollback logs)
@@ -332,6 +333,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             _ringSlot.Shadow = _stored; // restore for downstream logging
             if (_recomputed != _stored)
             {
+                TrackPhotonCrcFailure();
                 Interlocked.Increment(ref _photonCrcFailures);
                 Print(
                     string.Format(
