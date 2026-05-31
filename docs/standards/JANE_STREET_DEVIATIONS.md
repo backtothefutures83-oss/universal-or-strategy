@@ -169,8 +169,65 @@ exclude_paths:
 - Analysis: `docs/brain/PR_1B_JANE_STREET_ANALYSIS.md`
 - Suppression rationale: `docs/brain/CODACY_PATTERN_SUPPRESSIONS.md`
 **Note on SA1119 (Redundant Parentheses)**:
-Files under Decision #3 also suppress SA1119 warnings for explicit return parentheses in compound boolean expressions (e.g., `return (a || b);`). This pattern improves cognitive clarity in microsecond-latency reasoning contexts. See PR #6 for rationale.
+Files under Decision #2 also suppress SA1119 warnings for explicit return parentheses in compound boolean expressions (e.g., `return (a || b);`). This pattern improves cognitive clarity in microsecond-latency reasoning contexts. See Decision #3 below for full rationale.
 
+---
+
+### Decision #3: Explicit Return Parentheses (Cognitive Clarity)
+
+**Date**: 2026-05-31
+**PR**: #6
+**Codacy Rule Violated**: SA1119 (Statement should not use unnecessary parentheses)
+**Severity**: Style (not correctness)
+
+**Context**:
+- V12 uses explicit parentheses in return statements with compound boolean expressions
+- SA1119 flags these as "redundant" from a compiler perspective
+- Jane Street HFT systems prioritize cognitive clarity over minimal syntax
+
+**Cognitive Load Impact**:
+- **Without parentheses**: `return brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat;`
+  - Requires mental parsing: "Is this returning a bool or is the || part of a larger expression?"
+- **With parentheses**: `return (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);`
+  - Explicit grouping: "This entire boolean expression is the return value"
+
+**Implementation**:
+```csharp
+// SA1119 RECOMMENDATION (minimal syntax):
+return brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat;
+
+// JANE STREET PATTERN (explicit grouping):
+return (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
+```
+
+**Affected Files**:
+- `src/V12_002.SIMA.Fleet.cs` (line 528)
+
+**Codacy Suppression**:
+```yaml
+exclude_paths:
+  - "src/V12_002.SIMA.Fleet.cs"  # Jane Street Deviation #3: SA1119 parentheses
+```
+
+**Rationale**:
+1. **Microsecond reasoning** - HFT developers must parse code instantly under pressure
+2. **Explicit > implicit** - Parentheses make intent unambiguous
+3. **Consistency** - V12 uses this pattern across all compound boolean returns
+4. **Style vs correctness** - SA1119 is aesthetic, not functional
+
+**Trade-offs**:
+- ✅ Improves readability for compound boolean expressions
+- ✅ Reduces cognitive load in latency-critical code review
+- ✅ Aligns with Jane Street "explicit is better than implicit" philosophy
+- ❌ Reintroduces 1 SA1119 warning in Codacy
+- ❌ Deviates from StyleCop default style
+
+**Approval**: Director (2026-05-31)
+
+**References**:
+- Protocol: `docs/brain/pr_6_suppress_queue.md`
+- Jane Street Intel: Cognitive load minimization in HFT code
+- **Note**: Codacy suppression will be applied in separate infrastructure PR per Three-Tier Branch Strategy
 
 ---
 
