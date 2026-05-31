@@ -232,6 +232,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void PumpFleetDispatch()
         {
+            TrackSimaDispatch();
             // A3-1: Abort and drain if SIMA disabled or flatten running
             if (isFlattenRunning || !EnableSIMA)
             {
@@ -477,88 +478,130 @@ namespace NinjaTrader.NinjaScript.Strategies
             try
             {
                 // [939-P0]: Snapshot Positions to prevent broker-thread mutation during iteration.
-                // T-W1-Perf: for-loop replaces FirstOrDefault lambda -- eliminates delegate allocation.
+                // T-W1-Perf: Extracted helpers reduce CYC from 31 to <=15
                 // [PR6-P0]: Null safety hardening - check acct and Positions before snapshot
                 if (acct == null || acct.Positions == null)
                 {
                     return; // Skip health check if account or positions are null
                 }
-                Position[] posSnapshot = acct.Positions.ToArray();
-                Position brokerPos = null;
-                for (int pi = 0; pi < posSnapshot.Length; pi++)
-                {
-                    if (
-                        posSnapshot[pi] != null
-                        && posSnapshot[pi].Instrument != null
-                        && posSnapshot[pi].Instrument.FullName == Instrument.FullName
-                    )
-                    {
-                        brokerPos = posSnapshot[pi];
-                        break;
-                    }
-                }
-                bool brokerFlat = (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
 
-                // H-13: Check for active FSM entries for this account
-                // ConcurrentDictionary is thread-safe for enumeration - no snapshot needed
-                bool hasActiveFsmForAcct = false;
-                foreach (var fkvp in _followerBrackets)
-                {
-                    var f = fkvp.Value;
-                    if (
-                        f != null
-                        && f.AccountName == acct.Name
-                        && (
-                            f.State == FollowerBracketState.Active
-                            || f.State == FollowerBracketState.Accepted
-                            || f.State == FollowerBracketState.Submitted
-                            || f.State == FollowerBracketState.Replacing
-                        )
-                    )
-                    {
-                        hasActiveFsmForAcct = true;
-                        break;
-                    }
-                }
-                bool hasActivePositionForAcct = false;
-                foreach (var pkvp in activePositions)
-                {
-                    var p = pkvp.Value;
-                    if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == acct.Name)
-                    {
-                        hasActivePositionForAcct = true;
-                        break;
-                    }
-                }
+                bool brokerFlat = IsBrokerPositionFlat(acct);
+                bool hasActiveFsmForAcct = HasActiveFsmForAccount(acct.Name);
+                bool hasActivePositionForAcct = HasActivePositionForAccount(acct.Name);
                 bool hasDispatchPending = _dispatchSyncPendingExpKeys.ContainsKey(ExpKey(acct.Name));
 
-                if (brokerFlat && !hasActiveFsmForAcct && !hasActivePositionForAcct && !hasDispatchPending)
-                {
-                    // Truly stale: broker flat, no FSM, no position, no dispatch in flight. No-op (nothing to reset).
-                    dispatchLog.AppendLine(
-                        string.Format(
-                            "[DISPATCH] H-13: {0} broker flat, no FSM/position/dispatch -- no action",
-                            acct.Name
-                        )
-                    );
-                }
-                else if (brokerFlat && (hasActiveFsmForAcct || hasActivePositionForAcct || hasDispatchPending))
-                {
-                    dispatchLog.AppendLine(
-                        string.Format(
-                            "[DISPATCH] H-13 SKIP: {0} Flat but {1} -- not resetting",
-                            acct.Name,
-                            hasActiveFsmForAcct
-                                ? "FSM active"
-                                : (hasDispatchPending ? "dispatch pending" : "activePos present")
-                        )
-                    );
-                }
+                LogHealthCheckResult(
+                    acct.Name,
+                    brokerFlat,
+                    hasActiveFsmForAcct,
+                    hasActivePositionForAcct,
+                    hasDispatchPending,
+                    dispatchLog
+                );
             }
             catch (Exception ex)
             {
                 if (_diagFleet)
                     Print("[FLEET_CATCH] ProcessFleetSlot account iteration failed: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// T-W1-Perf Helper: Check if broker position is flat for the current instrument.
+        /// </summary>
+        private bool IsBrokerPositionFlat(Account acct)
+        {
+            Position[] posSnapshot = acct.Positions.ToArray();
+            Position brokerPos = null;
+            for (int pi = 0; pi < posSnapshot.Length; pi++)
+            {
+                if (
+                    posSnapshot[pi] != null
+                    && posSnapshot[pi].Instrument != null
+                    && posSnapshot[pi].Instrument.FullName == Instrument.FullName
+                )
+                {
+                    brokerPos = posSnapshot[pi];
+                    break;
+                }
+            }
+            return (brokerPos == null || brokerPos.MarketPosition == MarketPosition.Flat);
+        }
+
+        /// <summary>
+        /// T-W1-Perf Helper: Check if account has active FSM entries.
+        /// </summary>
+        private bool HasActiveFsmForAccount(string accountName)
+        {
+            var followerBracketsSnapshot = _followerBrackets.ToArray();
+            for (int fi = 0; fi < followerBracketsSnapshot.Length; fi++)
+            {
+                var f = followerBracketsSnapshot[fi].Value;
+                if (
+                    f != null
+                    && f.AccountName == accountName
+                    && (
+                        f.State == FollowerBracketState.Active
+                        || f.State == FollowerBracketState.Accepted
+                        || f.State == FollowerBracketState.Submitted
+                        || f.State == FollowerBracketState.Replacing
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// T-W1-Perf Helper: Check if account has active positions.
+        /// </summary>
+        private bool HasActivePositionForAccount(string accountName)
+        {
+            var activePositionsSnapshot = activePositions.ToArray();
+            for (int api = 0; api < activePositionsSnapshot.Length; api++)
+            {
+                var p = activePositionsSnapshot[api].Value;
+                if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == accountName)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// T-W1-Perf Helper: Log health check result based on account state.
+        /// </summary>
+        private void LogHealthCheckResult(
+            string accountName,
+            bool brokerFlat,
+            bool hasActiveFsm,
+            bool hasActivePosition,
+            bool hasDispatchPending,
+            StringBuilder dispatchLog
+        )
+        {
+            if (brokerFlat && !hasActiveFsm && !hasActivePosition && !hasDispatchPending)
+            {
+                // Truly stale: broker flat, no FSM, no position, no dispatch in flight. No-op (nothing to reset).
+                dispatchLog.AppendLine(
+                    string.Format(
+                        "[DISPATCH] H-13: {0} broker flat, no FSM/position/dispatch -- no action",
+                        accountName
+                    )
+                );
+            }
+            else if (brokerFlat && (hasActiveFsm || hasActivePosition || hasDispatchPending))
+            {
+                dispatchLog.AppendLine(
+                    string.Format(
+                        "[DISPATCH] H-13 SKIP: {0} Flat but {1} -- not resetting",
+                        accountName,
+                        hasActiveFsm ? "FSM active" : (hasDispatchPending ? "dispatch pending" : "activePos present")
+                    )
+                );
             }
         }
 
