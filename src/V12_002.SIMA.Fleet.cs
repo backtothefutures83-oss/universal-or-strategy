@@ -232,7 +232,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void PumpFleetDispatch()
         {
-            TrackSimaDispatch();
             // A3-1: Abort and drain if SIMA disabled or flatten running
             if (isFlattenRunning || !EnableSIMA)
             {
@@ -240,6 +239,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("[PUMP] Abort: SIMA inactive or flatten running. Ring+Queue drained with delta rollback.");
                 return;
             }
+            TrackSimaDispatch();
 
             // v28.0 [ADR-012 + ADR-016]: Photon ring, XorShadow integrity, sideband refs
             FleetDispatchSlot _ringSlot;
@@ -530,13 +530,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// T-W1-Perf Helper: Check if account has active FSM entries.
+        /// Zero-allocation: direct ConcurrentDictionary enumeration (lock-free).
         /// </summary>
         private bool HasActiveFsmForAccount(string accountName)
         {
-            var followerBracketsSnapshot = _followerBrackets.ToArray();
-            for (int fi = 0; fi < followerBracketsSnapshot.Length; fi++)
+            foreach (var kvp in _followerBrackets)
             {
-                var f = followerBracketsSnapshot[fi].Value;
+                var f = kvp.Value;
                 if (
                     f != null
                     && f.AccountName == accountName
@@ -556,13 +556,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// T-W1-Perf Helper: Check if account has active positions.
+        /// Zero-allocation: direct ConcurrentDictionary enumeration (lock-free).
         /// </summary>
         private bool HasActivePositionForAccount(string accountName)
         {
-            var activePositionsSnapshot = activePositions.ToArray();
-            for (int api = 0; api < activePositionsSnapshot.Length; api++)
+            foreach (var kvp in activePositions)
             {
-                var p = activePositionsSnapshot[api].Value;
+                var p = kvp.Value;
                 if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == accountName)
                 {
                     return true;

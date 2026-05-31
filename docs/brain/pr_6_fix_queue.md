@@ -1,125 +1,134 @@
-﻿# PR #6 Fix Queue
-Generated: 2026-05-25 19:15:48
+﻿# PR #6 Fix Queue (Jane Street Audited)
+Generated: 2026-05-31 14:48:00
 
-## Instructions for v12-engineer
+## VALID-FIX Issues (Priority Order)
 
-Process these issues in priority order. Mark each as FIXED after applying the fix.
+### Fix #1 - [P0] CRITICAL - Metric Tracking Before Abort Guard
+[x] **Bot:** cubic-dev-ai  
+[x] **File:** src/V12_002.SIMA.Fleet.cs:235  
+[x] **Issue:** TrackSimaDispatch() called before abort guard - metrics track aborted work
 
-### Fix #1 - [P0] CRITICAL
-[x] **Bot:** amazon-q-developer
-[x] **File:** (extract from body)
-[x] **Issue:** ## Review Summary
+**Jane Street Analysis:**
+- **Category**: VALID-FIX
+- **Rationale**: Metrics should only track actual work, not aborted paths
+- **V12 DNA Alignment**: Correctness by construction - metrics must reflect reality
 
-This PR successfully addresses the stated goals of null safety improvements and code cleanup in the `ShouldSkipFleet_RunHealthCheck` method. The changes are well-contained to a sing...
+**Fix Required:**
+Move `TrackSimaDispatch();` from line 235 to line 243 (after abort guard passes)
 
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
+```csharp
+// BEFORE (line 233-242):
+private void PumpFleetDispatch()
+{
+    TrackSimaDispatch();  // ❌ Tracks even when aborting
+    if (isFlattenRunning || !EnableSIMA)
+    {
+        DrainAllDispatchQueuesOnAbort();
+        Print("[PUMP] Abort: SIMA inactive or flatten running...");
+        return;
+    }
 
----
-
-### Fix #2 - [P0] CONCURRENCY
-[x] **Bot:** gemini-code-assist
-[x] **File:** src/V12_002.SIMA.Fleet.cs
-[x] **Issue:** ## Code Review - FIXED: Added null safety checks for acct and acct.Positions before snapshot creation
-
-This pull request refactors local variable names in `src/V12_002.SIMA.Fleet.cs` to remove leading underscores and adds a null check for `Instrument` when evaluating position snapshots....
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #3 - [P0] CRITICAL
-[ ] **Bot:** cubic-dev-ai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** **No issues found** across 1 file
-
-<sub>[Re-trigger cubic](https://www.cubic.dev/action/re-review/pr/malhitticrypto-debug/universal-or-strategy/6/ai_pr_review_1779759686208_91c0120f-c942-4f75-addf-fb0...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
+// AFTER:
+private void PumpFleetDispatch()
+{
+    // A3-1: Abort and drain if SIMA disabled or flatten running
+    if (isFlattenRunning || !EnableSIMA)
+    {
+        DrainAllDispatchQueuesOnAbort();
+        Print("[PUMP] Abort: SIMA inactive or flatten running...");
+        return;
+    }
+    TrackSimaDispatch();  // ✅ Only tracks actual dispatches
+```
 
 ---
 
-### Fix #4 - [P0] CRITICAL
-[x] **Bot:** codacy-production
-[x] **File:** PR description
-[x] **Issue:** ### Pull Request Overview - FIXED: Updated PR description to accurately reflect null safety changes
+### Fix #3/#5 - [P1] PERFORMANCE - ToArray() Allocations in Hot Path
+[x] **Bot:** sourcery-ai + gitar-bot (duplicate)  
+[x] **File:** src/V12_002.SIMA.Fleet.cs:536, 562  
+[x] **Issue:** HasActiveFsmForAccount and HasActivePositionForAccount call ToArray() on ConcurrentDictionary
 
-This PR's implementation deviates significantly from its description. While titled as a performance and null-safety update, the actual diff is limited to a single file, miss...
+**Jane Street Analysis:**
+- **Category**: VALID-FIX (CRITICAL)
+- **Rationale**: Violates V12 DNA zero-allocation mandate
+- **V12 DNA Alignment**: Zero-allocation hot paths are non-negotiable
+- **Performance Impact**: Each ToArray() = heap allocation in dispatch hot path
 
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
+**Fix Required:**
+Replace ToArray() with direct enumeration on ConcurrentDictionary (lock-free, zero-allocation)
+
+```csharp
+// BEFORE (line 534-555):
+private bool HasActiveFsmForAccount(string accountName)
+{
+    var followerBracketsSnapshot = _followerBrackets.ToArray();  // ❌ Heap allocation
+    for (int fi = 0; fi < followerBracketsSnapshot.Length; fi++)
+    {
+        var f = followerBracketsSnapshot[fi].Value;
+        // ... check logic
+    }
+    return false;
+}
+
+// AFTER:
+private bool HasActiveFsmForAccount(string accountName)
+{
+    foreach (var kvp in _followerBrackets)  // ✅ Zero-allocation enumeration
+    {
+        var f = kvp.Value;
+        if (
+            f != null
+            && f.AccountName == accountName
+            && (
+                f.State == FollowerBracketState.Active
+                || f.State == FollowerBracketState.Accepted
+                || f.State == FollowerBracketState.Submitted
+                || f.State == FollowerBracketState.Replacing
+            )
+        )
+        {
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+Same fix for HasActivePositionForAccount (line 560-572):
+```csharp
+// BEFORE:
+private bool HasActivePositionForAccount(string accountName)
+{
+    var activePositionsSnapshot = activePositions.ToArray();  // ❌ Heap allocation
+    for (int api = 0; api < activePositionsSnapshot.Length; api++)
+    {
+        var p = activePositionsSnapshot[api].Value;
+        // ... check logic
+    }
+    return false;
+}
+
+// AFTER:
+private bool HasActivePositionForAccount(string accountName)
+{
+    foreach (var kvp in activePositions)  // ✅ Zero-allocation enumeration
+    {
+        var p = kvp.Value;
+        if (p != null && p.IsFollower && p.ExecutingAccount != null && p.ExecutingAccount.Name == accountName)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+```
 
 ---
 
-### Fix #5 - [P1] REVIEW
-[ ] **Bot:** sourcery-ai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** Hey - I've reviewed your changes and they look great!
-
-***
-
-<details>
-<summary>Sourcery is free for open source - if you like our reviews please consider sharing them Ô£¿</summary>
-
-- [X](https://twit...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #6 - [P2] PERFORMANCE
-[ ] **Bot:** sourcery-ai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** <!-- Generated by sourcery-ai[bot]: start review_guide -->
-
-<details>
-<summary>Reviewer's guide (collapsed on small PRs)</summary>
-
-## Reviewer's Guide
-
-This PR refines a performance-related health ch...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6#issuecomment-4538933819
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
-### Fix #7 - [P2] PERFORMANCE
-[ ] **Bot:** coderabbitai  
-[ ] **File:** (extract from body)  
-[ ] **Issue:** <!-- This is an auto-generated comment: summarize by coderabbit.ai -->
-<!-- walkthrough_start -->
-
-## Walkthrough
-
-This PR refactors local variable naming in the `ShouldSkipFleet_RunHealthCheck` helpe...
-
-**Action Required:**
-1. Read the full finding at: https://github.com/malhitticrypto-debug/universal-or-strategy/pull/6#issuecomment-4538933934
-2. Apply the fix
-3. Verify locally
-4. Mark as [x] FIXED
-
----
-
+## Completion Checklist
+- [ ] Fix #1: Move TrackSimaDispatch() after abort guard
+- [ ] Fix #3/#5: Replace ToArray() with foreach in HasActiveFsmForAccount
+- [ ] Fix #3/#5: Replace ToArray() with foreach in HasActivePositionForAccount
+- [ ] Run: `powershell -File .\scripts\format_all_csharp.ps1`
+- [ ] Run: `powershell -File .\scripts\pre_push_validation.ps1`
+- [ ] Verify: All 13/13 checks pass
