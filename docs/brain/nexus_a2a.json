@@ -1,23 +1,23 @@
 {
-  "mission": "Phase 6 - SIMA Subgraph Extraction",
+  "mission": "Phase 7 - Concurrency Hardening + Complexity Extraction",
   "mission_status": "ACTIVE",
   "milestone": "M3",
-  "build_tag": "1111.006-phase-6-t3b",
-  "branch": "phase-6-sima-extraction",
-  "pr": "#TBD",
-  "plan_path": "docs/brain/implementation_plan.md",
-  "last_updated": "2026-05-31T16:22:00Z",
+  "build_tag": "1111.007-phase7-new1",
+  "branch": "main",
+  "pr": "#8 (merged), #9 (pending), #10 (pending)",
+  "plan_path": "docs/brain/master_roadmap.md",
+  "last_updated": "2026-05-31T19:23:00Z",
   "morpheus_mode": true,
   "agent_readiness_target": "LEVEL_5",
-  "phase": "P6",
-  "current_phase": "VALIDATION_READY",
-  "status": "T3B_COMPLETE",
+  "phase": "P7",
+  "current_phase": "COMPLEXITY_EXTRACTION",
+  "status": "17_OF_18_COMPLETE",
   "agents": {
     "P1_orchestrator": "Antigravity",
     "P2_forensics": "Codex",
-    "P3_architect": "Claude",
+    "P3_architect": "Bob CLI (v12-engineer)",
     "P4_adjudicator": "Arena",
-    "P5_engineer": "Codex/Jules/Bob",
+    "P5_engineer": "Advanced Mode / Bob CLI",
     "P6_validator": "Gemini CLI (independent session)",
     "P7_sentinel": "Sentry/LangSmith/GitHub"
   },
@@ -51,6 +51,16 @@
       "phase": "PHASE_5_GOD_FUNCTION_EXTRACTION",
       "status": "CLOSED",
       "timestamp": "2026-05-08T01:09:00Z"
+    },
+    {
+      "phase": "PHASE_6_HOT_PATH_EXECUTION",
+      "status": "COMPLETE",
+      "timestamp": "2026-05-31T00:00:00Z"
+    },
+    {
+      "phase": "PHASE_7_COMPLEXITY_EXTRACTION",
+      "status": "IN_PROGRESS",
+      "timestamp": "2026-05-31T19:23:00Z"
     }
   ],
   "current_blockers": [],
@@ -74,23 +84,55 @@
       "commit_hash": "d89f6e04",
       "f5_verified": true,
       "notes": "Added 5 Photon counters, fixed 3 telemetry bugs, PHS 92.3/100 (approved)"
+    },
+    {
+      "task_id": "NEW-1",
+      "title": "Reduce HandleSecondaryOrderFilled complexity (CYC 17→<15)",
+      "status": "COMPLETE",
+      "completion_date": "2026-05-31",
+      "pr_number": 8,
+      "commit_hash": "TBD",
+      "f5_verified": true,
+      "notes": "Extracted 3 helpers, PHS 96/100, all V12 DNA gates passed"
     }
   ],
+  "pending_tasks": [
+    {
+      "task_id": "NEW-2",
+      "title": "Reduce UpdateStopQuantity complexity (CYC 25→≤15)",
+      "status": "QUEUED",
+      "target_file": "src/V12_002.Orders.Management.StopSync.cs",
+      "target_method": "UpdateStopQuantity",
+      "extraction_strategy": "Extract quantity calculation rules into helpers"
+    },
+    {
+      "task_id": "NEW-3",
+      "title": "Reduce Dispatch_PublishMarketBracketToPhoton complexity (CYC 21→≤15)",
+      "status": "QUEUED",
+      "target_file": "src/V12_002.SIMA.Dispatch.cs",
+      "target_method": "Dispatch_PublishMarketBracketToPhoton",
+      "extraction_strategy": "Extract Photon publish helpers per order type"
+    }
+  ],
+  "phase_7_progress": {
+    "total_tickets": 18,
+    "completed": 17,
+    "remaining": 1,
+    "percentage": 94
+  },
   "open_findings": {
-    "source": "Phase 5 Refactor Audit (Antigravity, 2026-05-07)",
-    "count": 5,
-    "triage": "SIMA Engine God Functions requiring partition",
+    "source": "Phase 7 Complexity Audit (2026-05-13)",
+    "count": 2,
+    "triage": "Final complexity reduction tasks",
     "targets": [
-      "ExecuteSmartDispatchEntry (CC=471)",
-      "HydrateWorkingOrdersFromBroker",
-      "HydrateFSMsFromWorkingOrders",
-      "EnumerateApexAccounts",
-      "HydrateExpectedPositionsFromBroker"
+      "UpdateStopQuantity (CYC=25)",
+      "Dispatch_PublishMarketBracketToPhoton (CYC=21)"
     ]
   },
   "previous_missions": {
     "Build-984-Source-Hardening": "COMPLETE",
-    "Phase-1-Monolith-Partition": "COMPLETE"
+    "Phase-1-Monolith-Partition": "COMPLETE",
+    "Phase-6-Hot-Path-Execution": "COMPLETE"
   },
-  "nexus_relay_timestamp": "2026-05-07T22:19:00Z"
+  "nexus_relay_timestamp": "2026-05-31T19:23:00Z"
 }
