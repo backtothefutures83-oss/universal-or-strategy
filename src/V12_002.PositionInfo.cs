@@ -402,6 +402,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         // V8.11: Class to track pending stop replacements
+        /// <summary>
+        /// Result of stale pending check for stop quantity updates
+        /// Makes illegal states unrepresentable (Jane Street principle)
+        /// </summary>
+        private enum StaleCheckResult
+        {
+            /// <summary>Pending is fresh (age < threshold), quantity updated</summary>
+            Fresh,
+
+            /// <summary>Stale pending purged successfully, caller should retry</summary>
+            Purged,
+
+            /// <summary>TryRemove lost race (another thread purged), caller should retry</summary>
+            RaceLost,
+        }
+
         // V8.30: Added CreatedTime for timeout support
         private class PendingStopReplacement
         {

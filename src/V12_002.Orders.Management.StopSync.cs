@@ -338,9 +338,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// [Phase 7 NEW-2] Helper: Handle stale pending replacement detection and purge
         /// Extracted from UpdateStopQuantity to reduce complexity (CYC 25->15)
+        /// [Round 6 Fix] P1 CRITICAL: Use enum to distinguish fresh vs race-lost cases
         /// </summary>
-        /// <returns>True if stale pending was purged and should re-initiate, False if updated existing pending</returns>
-        private bool UpdateStopQuantity_HandleStalePending(
+        /// <returns>StaleCheckResult indicating whether to early-return or retry</returns>
+        private StaleCheckResult UpdateStopQuantity_HandleStalePending(
             string entryName,
             PendingStopReplacement existingPendingQty,
             int remainingContracts
@@ -350,7 +351,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             double pendingAgeSeconds = (DateTime.UtcNow - existingPendingQty.CreatedTime).TotalSeconds;
             if (pendingAgeSeconds > STALE_PENDING_FAST_PATH_SEC)
             {
-                if (pendingStopReplacements.TryRemove(entryName, out _))
+                bool removed = pendingStopReplacements.TryRemove(entryName, out _);
+                if (removed)
                 {
                     Interlocked.Decrement(ref pendingReplacementCount);
                     Print(
@@ -360,22 +362,21 @@ namespace NinjaTrader.NinjaScript.Strategies
                             pendingAgeSeconds
                         )
                     );
-                    return true; // Stale removed, re-initiate
                 }
-                return false; // Removal failed, do not re-initiate
+                // [Round 6 Fix] Distinguish purge success vs race-lost
+                return removed ? StaleCheckResult.Purged : StaleCheckResult.RaceLost;
             }
-            else
-            {
-                existingPendingQty.Quantity = remainingContracts;
-                Print(
-                    string.Format(
-                        "V8.31: Updated existing pending replacement for {0} to {1} contracts",
-                        entryName,
-                        remainingContracts
-                    )
-                );
-                return false; // Signal early return
-            }
+
+            // Fresh pending -- update quantity in-place
+            existingPendingQty.Quantity = remainingContracts;
+            Print(
+                string.Format(
+                    "V8.31: Updated existing pending replacement for {0} to {1} contracts",
+                    entryName,
+                    remainingContracts
+                )
+            );
+            return StaleCheckResult.Fresh;
         }
 
         /// <summary>
@@ -539,14 +540,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (pendingStopReplacements.TryGetValue(entryName, out var existingPendingQty))
                     {
                         // [Phase 7 NEW-2] Extracted: Handle stale pending detection
-                        bool shouldReInitiate = UpdateStopQuantity_HandleStalePending(
+                        StaleCheckResult staleCheck = UpdateStopQuantity_HandleStalePending(
                             entryName,
                             existingPendingQty,
                             pos.RemainingContracts
                         );
-                        if (!shouldReInitiate)
+
+                        // [Round 6 Fix] Handle three cases explicitly
+                        switch (staleCheck)
                         {
-                            return;
+                            case StaleCheckResult.Fresh:
+                                return; // Quantity updated in-place, done
+
+                            case StaleCheckResult.Purged:
+                            case StaleCheckResult.RaceLost:
+                                // Fall through to create new replacement (retry logic)
+                                break;
                         }
                     }
 
