@@ -398,7 +398,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StopPrice = currentStopPrice,
                 Direction = direction,
                 OldOrder = currentStop,
-                CreatedTime = DateTime.Now, // V8.31: Added for timeout support
+                CreatedTime = DateTime.UtcNow, // V8.31: Added for timeout support
             };
 
             // V8.31: Thread-safe add
@@ -449,7 +449,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     o.OrderState == OrderState.Working
                     && o.IsStopMarket
                     && o.Name != null
-                    && o.Name.StartsWith(stopPrefix)
+                    && (o.Name == stopPrefix || o.Name.StartsWith(stopPrefix + "_"))
                 );
             }
             catch
@@ -647,7 +647,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // confirmed -> new stop submitted -- the full OCO lifecycle round-trip.
                 if (pendingStopReplacements.TryGetValue(entryName, out var pendingForLatency))
                 {
-                    double ocoLatencyMs = (DateTime.Now - pendingForLatency.CreatedTime).TotalMilliseconds;
+                    double ocoLatencyMs = (DateTime.UtcNow - pendingForLatency.CreatedTime).TotalMilliseconds;
                     Print(
                         string.Format(
                             "[LATENCY_AUDIT] Target Fill -> Stop Cancel Delta: {0:F1}ms (Entry: {1})",
@@ -880,7 +880,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string _b950OcoId = pos.OcoGroupId ?? string.Empty;
 
                 // Local: use SubmitOrderUnmanaged with truncated signal name
-                string suffix = (DateTime.Now.Ticks % 100000000).ToString();
+                string suffix = (DateTime.UtcNow.Ticks % 100000000).ToString();
                 string sigName = "S_" + entryName + "_" + suffix;
                 if (sigName.Length > 50)
                     sigName = sigName.Substring(0, 50);

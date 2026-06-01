@@ -669,7 +669,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Phase 7 NEW-3 Helper 2: Create and publish stop order to MMIO.
-        /// Target CYC: <=5
+        /// Target CYC: <=5.
         /// </summary>
         private Order PublishPhoton_StopOrder(
             Account acct,
@@ -706,7 +706,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         /// <summary>
         /// Phase 7 NEW-3 Helper 3: Create and publish target orders to MMIO.
-        /// Target CYC: <=5
+        /// Target CYC: <=5.
         /// </summary>
         private List<StagedTarget> PublishPhoton_TargetOrders(
             Account acct,
