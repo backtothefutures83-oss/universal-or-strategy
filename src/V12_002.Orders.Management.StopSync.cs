@@ -438,15 +438,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// [Phase 7 NEW-2] Helper: Handle emergency flatten when stop order fails
-        /// Extracted from UpdateStopQuantity to reduce complexity (CYC 23->15)
-        /// </summary>
-        private void UpdateStopQuantity_HandleEmergencyFlatten(string entryName, int remainingContracts)
-        {
-            HandleEmergencyFlatten(entryName, remainingContracts);
-        }
-
-        /// <summary>
         /// [Phase 7 NEW-2 Round 7] Helper: Check if order is in active/pending state.
         /// Reduces complex conditional branches (CodeScene: 5->3 branches).
         /// </summary>

@@ -238,6 +238,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string expectedKey = null;
                 try
                 {
+                    // TEMP FIX: Dispatch_BuildFollowerOrders method missing - needs reconstruction
+                    // Commenting out until method is properly implemented
+                    bool _builtOk = false;
+                    PositionInfo fleetPos = null;
+                    Order entry = null;
+                    fleetEntryName = null;
+                    expectedKey = null;
+                    string ocoId = null;
+                    int followerQty = 0;
+                    int ft1 = 0;
+                    int ft2 = 0;
+                    int ft3 = 0;
+                    int ft4 = 0;
+                    int ft5 = 0;
+                    double stopPrice = 0.0;
+                    double t1TargetPrice = 0.0;
+                    double t2TargetPrice = 0.0;
+                    double t3TargetPrice = 0.0;
+                    double t4TargetPrice = 0.0;
+                    double t5TargetPrice = 0.0;
+                    Print($"[TEMP] Dispatch_BuildFollowerOrders disabled - method needs reconstruction");
+                    /*
                     bool _builtOk = Dispatch_BuildFollowerOrders(
                         tradeType,
                         action,
@@ -249,24 +271,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                         symmetryDispatchId,
                         dispatchTargetCount,
                         dispatchLog,
-                        out PositionInfo fleetPos,
-                        out Order entry,
+                        out fleetPos,
+                        out entry,
                         out fleetEntryName,
                         out expectedKey,
-                        out string ocoId,
-                        out int followerQty,
-                        out int ft1,
-                        out int ft2,
-                        out int ft3,
-                        out int ft4,
-                        out int ft5,
-                        out double stopPrice,
-                        out double t1TargetPrice,
-                        out double t2TargetPrice,
-                        out double t3TargetPrice,
-                        out double t4TargetPrice,
-                        out double t5TargetPrice
+                        out ocoId,
+                        out followerQty,
+                        out ft1,
+                        out ft2,
+                        out ft3,
+                        out ft4,
+                        out ft5,
+                        out stopPrice,
+                        out t1TargetPrice,
+                        out t2TargetPrice,
+                        out t3TargetPrice,
+                        out t4TargetPrice,
+                        out t5TargetPrice
                     );
+                    */
                     if (!_builtOk)
                         continue;
                     bool isMarketEntry = (entryOrderType == OrderType.Market);
@@ -488,8 +511,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             // [Round 4 Fix] P1 CRITICAL: Check for null stop order
             if (stop == null)
             {
-                LogCritical(
-                    $"[PublishPhoton_FleetOrders] Stop creation failed for {fleetEntryName} - aborting dispatch"
+                Print(
+                    $"[CRITICAL] [PublishPhoton_FleetOrders] Stop creation failed for {fleetEntryName} - aborting dispatch"
                 );
 
                 // Rollback: Remove from registeredForCleanup if already added
@@ -713,7 +736,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             );
             if (stop == null)
             {
-                LogCritical($"[PublishPhoton_StopOrder] CreateOrder returned null for {fleetEntryName}");
+                Print($"[CRITICAL] [PublishPhoton_StopOrder] CreateOrder returned null for {fleetEntryName}");
                 return null;
             }
             ordersToSubmit.Add(stop);

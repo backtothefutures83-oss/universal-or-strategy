@@ -289,58 +289,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 )
                 {
                     PositionInfo pos = kvp.Value;
-                    if (!pos.IsFollower)
-                    {
-                        int masterFillQty = filled > 0 ? filled : quantity;
-                        SymmetryGuardOnMasterFill(
-                            kvp.Key,
-                            pos,
-                            averageFillPrice,
-                            masterFillQty,
-                            time.ToUniversalTime()
-                        );
-                        // Build 1001: Seed expectedPositions[master] immediately on fill to prevent desync in CANCEL_ALL/REAPER.
-                        SetExpectedPositionLocked(
-                            ExpKey(Account.Name),
-                            (pos.Direction == MarketPosition.Long ? masterFillQty : -masterFillQty)
-                        );
-                    }
 
-                    if (averageFillPrice <= 0)
+                    // EXTRACTION 1: Validate and prepare entry fill
+                    if (!ValidateAndPrepareEntryFill(kvp.Key, pos, order, averageFillPrice, filled, quantity, time))
                     {
-                        pos.EntryFilled = true;
-                        pos.InitialTargetCount = activeTargetCount;
-                        Print(
-                            LogBuffer.Format(
-                                "[PRICE_GUARD] CRITICAL: averageFillPrice=0 for {0}. Keeping intended price {1:F2}. NOT re-anchoring.",
-                                kvp.Key,
-                                pos.EntryPrice
-                            )
-                        );
+                        // Price guard triggered, skip recalculation but submit brackets
                         SubmitBracketOrders(kvp.Key, pos);
                         return true;
                     }
 
-                    pos.EntryFilled = true;
-                    pos.InitialTargetCount = activeTargetCount;
-                    pos.EntryPrice = averageFillPrice;
-                    pos.ExtremePriceSinceEntry = averageFillPrice;
-                    // Recalculate targets and stop
-                    double stopDistance = pos.IsRMATrade
-                        ? currentATR * RMAStopATRMultiplier
-                        : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
-                    pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
-                    pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
-                    pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
-                    pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
-                    pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
-                    stopDistance = Math.Min(stopDistance, 12.0);
-                    pos.InitialStopPrice =
-                        pos.Direction == MarketPosition.Long
-                            ? averageFillPrice - stopDistance
-                            : averageFillPrice + stopDistance;
-                    pos.CurrentStopPrice = pos.InitialStopPrice;
-                    ApplyTargetLadderGuard(pos);
+                    // EXTRACTION 2: Recalculate targets and stop
+                    RecalculateTargetsAndStop(pos, averageFillPrice);
 
                     Print(
                         LogBuffer.Format(
@@ -356,6 +315,68 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
             return false;
+        }
+
+        private bool ValidateAndPrepareEntryFill(
+            string signalKey,
+            PositionInfo pos,
+            Order order,
+            double averageFillPrice,
+            int filled,
+            int quantity,
+            DateTime time
+        )
+        {
+            if (!pos.IsFollower)
+            {
+                int masterFillQty = filled > 0 ? filled : quantity;
+                SymmetryGuardOnMasterFill(signalKey, pos, averageFillPrice, masterFillQty, time.ToUniversalTime());
+                // Build 1001: Seed expectedPositions[master] immediately on fill to prevent desync in CANCEL_ALL/REAPER.
+                SetExpectedPositionLocked(
+                    ExpKey(Account.Name),
+                    (pos.Direction == MarketPosition.Long ? masterFillQty : -masterFillQty)
+                );
+            }
+
+            if (averageFillPrice <= 0)
+            {
+                pos.EntryFilled = true;
+                pos.InitialTargetCount = activeTargetCount;
+                Print(
+                    LogBuffer.Format(
+                        "[PRICE_GUARD] CRITICAL: averageFillPrice=0 for {0}. Keeping intended price {1:F2}. NOT re-anchoring.",
+                        signalKey,
+                        pos.EntryPrice
+                    )
+                );
+                return false; // Price guard triggered, skip recalculation
+            }
+
+            pos.EntryFilled = true;
+            pos.InitialTargetCount = activeTargetCount;
+            return true; // Validation passed, proceed to recalculation
+        }
+
+        private void RecalculateTargetsAndStop(PositionInfo pos, double averageFillPrice)
+        {
+            pos.EntryPrice = averageFillPrice;
+            pos.ExtremePriceSinceEntry = averageFillPrice;
+            // Recalculate targets and stop
+            double stopDistance = pos.IsRMATrade
+                ? currentATR * RMAStopATRMultiplier
+                : Math.Abs(pos.InitialStopPrice - pos.EntryPrice);
+            pos.Target1Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 1);
+            pos.Target2Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 2);
+            pos.Target3Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 3);
+            pos.Target4Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 4);
+            pos.Target5Price = CalculateTargetPriceFromPos(pos.Direction, averageFillPrice, pos, 5);
+            stopDistance = Math.Min(stopDistance, 12.0);
+            pos.InitialStopPrice =
+                pos.Direction == MarketPosition.Long
+                    ? averageFillPrice - stopDistance
+                    : averageFillPrice + stopDistance;
+            pos.CurrentStopPrice = pos.InitialStopPrice;
+            ApplyTargetLadderGuard(pos);
         }
 
         /// <summary>

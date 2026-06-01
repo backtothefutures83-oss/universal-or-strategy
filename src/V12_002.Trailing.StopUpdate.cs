@@ -206,15 +206,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (pendingStopReplacements.TryGetValue(entryName, out var pending))
             {
-                // Just update the pending price
-                pending.StopPrice = validatedStopPrice;
+                // Struct modification: retrieve, modify, put back
+                var updatedPending = pending;
+                updatedPending.StopPrice = validatedStopPrice;
                 // Build 950: Refresh CapturedTargets on the live pending record if not yet populated
-                if (!pending.BracketRestorationNeeded)
+                if (!updatedPending.BracketRestorationNeeded)
                 {
                     var _b950Refresh = RefreshTargetSnapshot(entryName);
-                    pending.CapturedTargets = _b950Refresh;
-                    pending.BracketRestorationNeeded = _b950Refresh != null && _b950Refresh.Length > 0;
+                    updatedPending.CapturedTargets = _b950Refresh;
+                    updatedPending.BracketRestorationNeeded = _b950Refresh != null && _b950Refresh.Length > 0;
                 }
+                pendingStopReplacements[entryName] = updatedPending;
             }
 
             pos.CurrentStopPrice = validatedStopPrice;

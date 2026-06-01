@@ -18,6 +18,7 @@ namespace NinjaTrader.NinjaScript.Strategies
     {
         #region Sticky State - Persistence Layer
 
+        // H18-FIX: Snapshot isolation for StickyState reads (atomic Clear + AddOrUpdate)
         [Serializable]
         public class StateSnapshot
         {

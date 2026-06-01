@@ -74,6 +74,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 );
                 Print(msg);
 
+                // H20-FIX: Trigger CANCEL_ALL (flatten all followers) on overflow
+                EnqueueReaperMasterFlatten();
+
                 // TODO: Trigger backpressure NACK (Epic 4 Ticket 03)
             }
             else if (shouldLog && queueDepth > 0)
