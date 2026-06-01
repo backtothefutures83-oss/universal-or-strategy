@@ -401,36 +401,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        // V8.11: Class to track pending stop replacements
-        /// <summary>
-        /// Result of stale pending check for stop quantity updates
-        /// Makes illegal states unrepresentable (Jane Street principle)
-        /// </summary>
-        private enum StaleCheckResult
-        {
-            /// <summary>Pending is fresh (age < threshold), quantity updated</summary>
-            Fresh,
-
-            /// <summary>Stale pending purged successfully, caller should retry</summary>
-            Purged,
-
-            /// <summary>TryRemove lost race (another thread purged), caller should retry</summary>
-            RaceLost,
-        }
-
+        // V8.11: Struct to track pending stop replacements (V12 Round 11: converted from class for zero-allocation)
         // V8.30: Added CreatedTime for timeout support
-        private class PendingStopReplacement
+        // V12 Round 11: Converted to readonly struct to eliminate heap allocation in hot path (Jane Street principle)
+        private readonly struct PendingStopReplacement
         {
-            public string EntryName;
-            public int Quantity;
-            public double StopPrice;
-            public MarketPosition Direction;
-            public Order OldOrder; // Track the old order being cancelled
-            public DateTime CreatedTime; // V8.30: Timeout support - clean up stale replacements
+            public string EntryName { get; init; }
+
+            public int Quantity { get; init; }
+
+            public double StopPrice { get; init; }
+
+            public MarketPosition Direction { get; init; }
+
+            public Order OldOrder { get; init; } // Track the old order being cancelled
+
+            public DateTime CreatedTime { get; init; } // V8.30: Timeout support - clean up stale replacements
 
             // Build 950: Bracket restoration -- populated before stop cancel is sent.
-            public TargetSnapshot[] CapturedTargets; // null if no Working targets at cancel time
-            public bool BracketRestorationNeeded; // true when CapturedTargets is non-null
+            public TargetSnapshot[] CapturedTargets { get; init; } // null if no Working targets at cancel time
+
+            public bool BracketRestorationNeeded { get; init; } // true when CapturedTargets is non-null
         }
 
         // V8.22: Thread-Safe UI Snapshot Struct

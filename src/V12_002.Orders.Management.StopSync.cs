@@ -338,45 +338,55 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// [Phase 7 NEW-2] Helper: Handle stale pending replacement detection and purge
         /// Extracted from UpdateStopQuantity to reduce complexity (CYC 25->15)
-        /// [Round 6 Fix] P1 CRITICAL: Use enum to distinguish fresh vs race-lost cases
         /// </summary>
-        /// <returns>StaleCheckResult indicating whether to early-return or retry</returns>
-        private StaleCheckResult UpdateStopQuantity_HandleStalePending(
+        /// <returns>True if stale pending was purged and should re-initiate, False if updated existing pending</returns>
+        private bool UpdateStopQuantity_HandleStalePending(
             string entryName,
             PendingStopReplacement existingPendingQty,
             int remainingContracts
         )
         {
             // Build 1104.2: Staleness fast-path -- purge stale pending and re-initiate
-            double pendingAgeSeconds = (DateTime.UtcNow - existingPendingQty.CreatedTime).TotalSeconds;
+            // Fix #1: Cache DateTime.UtcNow for determinism (Jane Street: Microsecond Latency)
+            DateTime now = DateTime.UtcNow;
+            double pendingAgeSeconds = (now - existingPendingQty.CreatedTime).TotalSeconds;
             if (pendingAgeSeconds > STALE_PENDING_FAST_PATH_SEC)
             {
-                bool removed = pendingStopReplacements.TryRemove(entryName, out _);
-                if (removed)
-                {
+                if (pendingStopReplacements.TryRemove(entryName, out _))
                     Interlocked.Decrement(ref pendingReplacementCount);
-                    Print(
-                        string.Format(
-                            "[1104.2] Stale pending purged for {0} ({1:F1}s). Re-initiating stop resize.",
-                            entryName,
-                            pendingAgeSeconds
-                        )
-                    );
-                }
-                // [Round 6 Fix] Distinguish purge success vs race-lost
-                return removed ? StaleCheckResult.Purged : StaleCheckResult.RaceLost;
+                Print(
+                    string.Format(
+                        "[1104.2] Stale pending purged for {0} ({1:F1}s). Re-initiating stop resize.",
+                        entryName,
+                        pendingAgeSeconds
+                    )
+                );
+                return true; // Signal to re-initiate
             }
-
-            // Fresh pending -- update quantity in-place
-            existingPendingQty.Quantity = remainingContracts;
-            Print(
-                string.Format(
-                    "V8.31: Updated existing pending replacement for {0} to {1} contracts",
-                    entryName,
-                    remainingContracts
-                )
-            );
-            return StaleCheckResult.Fresh;
+            else
+            {
+                // V12 Round 11: Immutable struct reassignment pattern (readonly struct requires new instance)
+                var updatedPending = new PendingStopReplacement
+                {
+                    EntryName = existingPendingQty.EntryName,
+                    Quantity = remainingContracts, // Updated quantity
+                    StopPrice = existingPendingQty.StopPrice,
+                    Direction = existingPendingQty.Direction,
+                    OldOrder = existingPendingQty.OldOrder,
+                    CreatedTime = existingPendingQty.CreatedTime,
+                    CapturedTargets = existingPendingQty.CapturedTargets,
+                    BracketRestorationNeeded = existingPendingQty.BracketRestorationNeeded,
+                };
+                pendingStopReplacements[entryName] = updatedPending; // Reassign to dictionary
+                Print(
+                    string.Format(
+                        "V8.31: Updated existing pending replacement for {0} to {1} contracts",
+                        entryName,
+                        remainingContracts
+                    )
+                );
+                return false; // Signal early return
+            }
         }
 
         /// <summary>
@@ -428,45 +438,89 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// [Round 4 Fix] P2: Extract active stop check logic
-        /// Reduces UpdateStopQuantity_HandleEmergencyFlatten complexity (CYC 9->8, LOC 55->35)
-        /// Target CYC: <=5
-        /// </summary>
-        private bool CheckForActiveStop(string entryName)
-        {
-            try
-            {
-                // Compute expected stop name prefix (as SubmitStopOrderToBroker does)
-                string stopPrefix = "S_" + entryName;
-                if (stopPrefix.Length > 50)
-                {
-                    stopPrefix = stopPrefix.Substring(0, 50);
-                }
-
-                return Account.Orders.Any(o =>
-                    o.OrderState == OrderState.Working
-                    && o.IsStopMarket
-                    && o.Name != null
-                    && (o.Name == stopPrefix || o.Name.StartsWith(stopPrefix + "_"))
-                );
-            }
-            catch
-            {
-                // If order enumeration fails, assume unprotected (fail-safe)
-                return false;
-            }
-        }
-
-        /// <summary>
         /// [Phase 7 NEW-2] Helper: Handle emergency flatten when stop order fails
         /// Extracted from UpdateStopQuantity to reduce complexity (CYC 23->15)
         /// </summary>
         private void UpdateStopQuantity_HandleEmergencyFlatten(string entryName, int remainingContracts)
         {
+            HandleEmergencyFlatten(entryName, remainingContracts);
+        }
+
+        /// <summary>
+        /// [Phase 7 NEW-2 Round 7] Helper: Check if order is in active/pending state.
+        /// Reduces complex conditional branches (CodeScene: 5->3 branches).
+        /// </summary>
+        private bool IsOrderActiveOrPending(Order order)
+        {
+            return order.OrderState == OrderState.Working
+                || order.OrderState == OrderState.Accepted
+                || order.OrderState == OrderState.ChangeSubmitted;
+        }
+
+        /// <summary>
+        /// [Phase 7 NEW-2 Round 10] Helper: Check if dictionary contains active stop order.
+        /// Reduces cognitive complexity (nested condition extraction).
+        /// </summary>
+        private bool HasActiveStopInDictionary(string entryName)
+        {
+            if (!stopOrders.TryGetValue(entryName, out Order stopOrder))
+            {
+                return false;
+            }
+            return IsOrderActiveOrPending(stopOrder)
+                && (stopOrder.OrderType == OrderType.StopMarket || stopOrder.OrderType == OrderType.StopLimit);
+        }
+
+        /// <summary>
+        /// [Phase 7 NEW-2 Round 10] Helper: Check if Account.Orders contains active stop with suffix.
+        /// Reduces cognitive complexity (nested loop extraction).
+        /// </summary>
+        private bool IsProtectiveStopOrder(Order o)
+        {
+            return o.OrderType == OrderType.StopMarket || o.OrderType == OrderType.StopLimit;
+        }
+
+        private bool HasActiveStopInAccountOrders(string suffix, string entryName)
+        {
+            string prefix = "S_" + entryName + "_";
+            foreach (Order o in Account.Orders)
+            {
+                if (IsOrderActiveOrPending(o) && IsProtectiveStopOrder(o) && IsStopOrderForEntry(o, suffix, prefix))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// [Phase 7 NEW-2 Round 12] Helper: Check if order name matches entry stop naming patterns.
+        /// Supports both legacy "_entryName" suffix and new "S_entryName_" prefix formats.
+        /// Reduces complex conditional branches (CodeScene: 3->2 branches).
+        /// </summary>
+        private bool IsStopOrderForEntry(Order o, string suffix, string prefix)
+        {
+            return o.Name.EndsWith(suffix) || o.Name.StartsWith(prefix);
+        }
+
+        private void UpdateStopQuantity_HandleEmergencyFlatten(string entryName, int remainingContracts)
+        {
             // P0-1: GRADUATED RESPONSE - Only flatten if position truly lacks stop protection
             // Jane Street Principle #4: Fail-Fast - verify state before emergency action
-            // Check if position still has active stop protection (transient broker errors may resolve)
-            bool hasActiveStop = CheckForActiveStop(entryName);
+
+            // [Round 10] Extracted nested checks to helpers (Cognitive 19->15)
+            bool hasActiveStop = false;
+            string suffix = string.Concat("_", entryName);
+
+            try
+            {
+                hasActiveStop = HasActiveStopInDictionary(entryName) || HasActiveStopInAccountOrders(suffix, entryName);
+            }
+            catch
+            {
+                // If order enumeration fails, assume unprotected (fail-safe)
+                hasActiveStop = false;
+            }
 
             if (!hasActiveStop)
             {
@@ -509,21 +563,41 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         /// <remarks>
         /// V12.Audit [C-08]: Callers MUST ensure the <paramref name="pos"/> reference is
-        /// read under <c>stateLock</c> or from within a callback that is already serialized
-        /// by the NinjaTrader dispatch thread. Passing a stale <paramref name="pos"/> can
+        /// obtained from the NinjaTrader dispatch thread or from within a callback that is
+        /// already serialized by that actor. Passing a stale <paramref name="pos"/> can
         /// result in the stop being undersized relative to actual remaining contracts.
+        /// DO NOT use lock(stateLock) for internal logic - this pattern is BANNED.
         /// </remarks>
+        /// <summary>
+        /// [Phase 7 NEW-2 Round 10] Helper: Validate preconditions for stop quantity update.
+        /// Reduces cognitive complexity (early return pattern extraction).
+        /// </summary>
+        private bool ShouldSkipStopQuantityUpdate(string entryName, PositionInfo pos)
+        {
+            if (!stopOrders.TryGetValue(entryName, out _))
+            {
+                return true;
+            }
+            if (pos.RemainingContracts <= 0)
+            {
+                return true;
+            }
+            // V12.41: No trailing/updates before entry fill is confirmed
+            if (!pos.EntryFilled)
+            {
+                return true;
+            }
+            return false;
+        }
+
         private void UpdateStopQuantity(string entryName, PositionInfo pos)
         {
             // V12.Hardening [RISK-01]: Atomic update guard
-            // Locks stateLock to prevent dirty reads of pos.RemainingContracts while ApplyTargetFill is modifying it
-            if (!stopOrders.ContainsKey(entryName))
+            // Actor/dispatch-thread serialization prevents dirty reads of pos.RemainingContracts
+            if (ShouldSkipStopQuantityUpdate(entryName, pos))
+            {
                 return;
-            if (pos.RemainingContracts <= 0)
-                return;
-            // V12.41: No trailing/updates before entry fill is confirmed
-            if (!pos.EntryFilled)
-                return;
+            }
 
             try
             {
@@ -540,23 +614,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (pendingStopReplacements.TryGetValue(entryName, out var existingPendingQty))
                     {
                         // [Phase 7 NEW-2] Extracted: Handle stale pending detection
-                        StaleCheckResult staleCheck = UpdateStopQuantity_HandleStalePending(
+                        bool shouldReInitiate = UpdateStopQuantity_HandleStalePending(
                             entryName,
                             existingPendingQty,
                             pos.RemainingContracts
                         );
-
-                        // [Round 6 Fix] Handle three cases explicitly
-                        switch (staleCheck)
-                        {
-                            case StaleCheckResult.Fresh:
-                                return; // Quantity updated in-place, done
-
-                            case StaleCheckResult.Purged:
-                            case StaleCheckResult.RaceLost:
-                                // Fall through to create new replacement (retry logic)
-                                break;
-                        }
+                        if (!shouldReInitiate)
+                            return;
                     }
 
                     // [Phase 7 NEW-2] Extracted: Create replacement info
@@ -667,7 +731,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // confirmed -> new stop submitted -- the full OCO lifecycle round-trip.
                 if (pendingStopReplacements.TryGetValue(entryName, out var pendingForLatency))
                 {
-                    double ocoLatencyMs = (DateTime.UtcNow - pendingForLatency.CreatedTime).TotalMilliseconds;
+                    double ocoLatencyMs = (DateTime.Now - pendingForLatency.CreatedTime).TotalMilliseconds;
                     Print(
                         string.Format(
                             "[LATENCY_AUDIT] Target Fill -> Stop Cancel Delta: {0:F1}ms (Entry: {1})",
@@ -900,7 +964,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string _b950OcoId = pos.OcoGroupId ?? string.Empty;
 
                 // Local: use SubmitOrderUnmanaged with truncated signal name
-                string suffix = (DateTime.UtcNow.Ticks % 100000000).ToString();
+                string suffix = (DateTime.Now.Ticks % 100000000).ToString();
                 string sigName = "S_" + entryName + "_" + suffix;
                 if (sigName.Length > 50)
                     sigName = sigName.Substring(0, 50);
