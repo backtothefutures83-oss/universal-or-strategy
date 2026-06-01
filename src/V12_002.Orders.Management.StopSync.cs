@@ -427,15 +427,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// [Phase 7 NEW-2] Helper: Handle emergency flatten when stop order fails
-        /// Extracted from UpdateStopQuantity to reduce complexity (CYC 23->15)
+        /// [Round 4 Fix] P2: Extract active stop check logic
+        /// Reduces UpdateStopQuantity_HandleEmergencyFlatten complexity (CYC 9->8, LOC 55->35)
+        /// Target CYC: <=5
         /// </summary>
-        private void UpdateStopQuantity_HandleEmergencyFlatten(string entryName, int remainingContracts)
+        private bool CheckForActiveStop(string entryName)
         {
-            // P0-1: GRADUATED RESPONSE - Only flatten if position truly lacks stop protection
-            // Jane Street Principle #4: Fail-Fast - verify state before emergency action
-            // Check if position still has active stop protection (transient broker errors may resolve)
-            bool hasActiveStop = false;
             try
             {
                 // Compute expected stop name prefix (as SubmitStopOrderToBroker does)
@@ -445,7 +442,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     stopPrefix = stopPrefix.Substring(0, 50);
                 }
 
-                hasActiveStop = Account.Orders.Any(o =>
+                return Account.Orders.Any(o =>
                     o.OrderState == OrderState.Working
                     && o.IsStopMarket
                     && o.Name != null
@@ -455,8 +452,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch
             {
                 // If order enumeration fails, assume unprotected (fail-safe)
-                hasActiveStop = false;
+                return false;
             }
+        }
+
+        /// <summary>
+        /// [Phase 7 NEW-2] Helper: Handle emergency flatten when stop order fails
+        /// Extracted from UpdateStopQuantity to reduce complexity (CYC 23->15)
+        /// </summary>
+        private void UpdateStopQuantity_HandleEmergencyFlatten(string entryName, int remainingContracts)
+        {
+            // P0-1: GRADUATED RESPONSE - Only flatten if position truly lacks stop protection
+            // Jane Street Principle #4: Fail-Fast - verify state before emergency action
+            // Check if position still has active stop protection (transient broker errors may resolve)
+            bool hasActiveStop = CheckForActiveStop(entryName);
 
             if (!hasActiveStop)
             {
@@ -536,7 +545,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                             pos.RemainingContracts
                         );
                         if (!shouldReInitiate)
+                        {
                             return;
+                        }
                     }
 
                     // [Phase 7 NEW-2] Extracted: Create replacement info

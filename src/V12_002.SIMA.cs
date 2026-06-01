@@ -57,6 +57,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
+        /// [Round 4 Fix] P3: Result struct for PublishPhoton_TargetOrders
+        /// Replaces tuple return type for better type safety and readability
+        /// Reduces parameter count from 10 to 8 (Codacy compliance)
+        /// </summary>
+        private struct TargetOrdersResult
+        {
+            public int SuccessCount;
+            public int FailureCount;
+        }
+
+        /// <summary>
         /// Build 936 [FIX-1]: Self-contained unit for deferred acct.Submit() via TriggerCustomEvent pump.
         /// Created in ExecuteSmartDispatchEntry setup phase (fast path); consumed by PumpFleetDispatch
         /// on the strategy thread one-at-a-time, breaking the 7-second monolithic blocking window into

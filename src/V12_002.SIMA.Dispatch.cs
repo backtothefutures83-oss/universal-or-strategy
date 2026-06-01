@@ -485,6 +485,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ref ordersToSubmit
             );
 
+            // [Round 4 Fix] P1 CRITICAL: Check for null stop order
+            if (stop == null)
+            {
+                LogCritical(
+                    $"[PublishPhoton_FleetOrders] Stop creation failed for {fleetEntryName} - aborting dispatch"
+                );
+
+                // Rollback: Remove from registeredForCleanup if already added
+                if (registeredForCleanup)
+                {
+                    registeredForCleanup = false;
+                }
+
+                return; // Do NOT proceed to dictionary registration
+            }
+
             // Publish target orders
             var stagedTargets = PublishPhoton_TargetOrders(
                 acct,
@@ -705,6 +721,37 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
+        /// [Round 4 Fix] P2: Extract single target order creation logic
+        /// Reduces PublishPhoton_TargetOrders complexity (LOC 72->30)
+        /// Target CYC: <=5
+        /// </summary>
+        private Order CreateSingleTargetOrder(
+            Account acct,
+            OrderAction exitAction,
+            string fleetEntryName,
+            int targetQty,
+            double targetPrice,
+            string ocoId,
+            int targetNum
+        )
+        {
+            string targetSig = SymmetryTrim("T" + targetNum + "_" + fleetEntryName, 40);
+            Order target = acct.CreateOrder(
+                Instrument,
+                exitAction,
+                OrderType.Limit,
+                TimeInForce.Gtc,
+                targetQty,
+                targetPrice,
+                0,
+                ocoId,
+                targetSig,
+                null
+            );
+            return target;
+        }
+
+        /// <summary>
         /// Phase 7 NEW-3 Helper 3: Create and publish target orders to MMIO.
         /// Target CYC: <=5.
         /// </summary>
@@ -729,7 +776,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 int targetQty = GetTargetContracts(fleetPos, targetNum);
                 if (targetQty <= 0)
+                {
                     continue;
+                }
 
                 if (IsRunnerTarget(targetNum))
                 {
@@ -752,18 +801,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     continue;
                 }
 
-                string targetSig = SymmetryTrim("T" + targetNum + "_" + fleetEntryName, 40);
-                Order target = acct.CreateOrder(
-                    Instrument,
+                Order target = CreateSingleTargetOrder(
+                    acct,
                     exitAction,
-                    OrderType.Limit,
-                    TimeInForce.Gtc,
+                    fleetEntryName,
                     targetQty,
                     targetPrice,
-                    0,
                     ocoId,
-                    targetSig,
-                    null
+                    targetNum
                 );
 
                 if (target == null)
