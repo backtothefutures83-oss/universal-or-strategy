@@ -472,7 +472,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             OrderAction exitAction = action == OrderAction.Buy ? OrderAction.Sell : OrderAction.BuyToCover;
 
             // Publish entry order
-            PublishPhoton_EntryOrder(entry, ref ordersToSubmit);
+            // Entry already added to ordersToSubmit by caller - no additional MMIO publish needed
 
             // Publish stop order
             Order stop = PublishPhoton_StopOrder(
@@ -668,16 +668,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Phase 7 NEW-3 Helper 1: Publish entry order to MMIO.
-        /// Target CYC: <=5
-        /// </summary>
-        private void PublishPhoton_EntryOrder(Order entry, ref List<Order> ordersToSubmit)
-        {
-            // Entry order already in ordersToSubmit list (added by caller)
-            // No additional MMIO publishing needed for entry in current architecture
-        }
-
-        /// <summary>
         /// Phase 7 NEW-3 Helper 2: Create and publish stop order to MMIO.
         /// Target CYC: <=5
         /// </summary>
@@ -691,7 +681,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             ref List<Order> ordersToSubmit
         )
         {
-            double validatedStop = ValidateStopPrice(fleetPos.Direction, fleetPos.CurrentStopPrice);
+            double validatedStop = ValidateStopPrice(fleetPos.Direction, stopPrice);
             string stopSig = SymmetryTrim("Stop_" + fleetEntryName, 40);
             Order stop = acct.CreateOrder(
                 Instrument,
@@ -705,6 +695,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 stopSig,
                 null
             );
+            if (stop == null)
+            {
+                LogCritical($"[PublishPhoton_StopOrder] CreateOrder returned null for {fleetEntryName}");
+                return null;
+            }
             ordersToSubmit.Add(stop);
             return stop;
         }
@@ -770,6 +765,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     targetSig,
                     null
                 );
+
+                if (target == null)
+                {
+                    dispatchLog.AppendLine($"[Target {targetNum}] CreateOrder returned null - skipping");
+                    continue;
+                }
 
                 stagedTargets.Add(
                     new StagedTarget
@@ -1070,5 +1071,3 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
     }
 }
-
-// Made with Bob

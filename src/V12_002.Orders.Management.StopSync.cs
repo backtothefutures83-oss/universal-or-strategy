@@ -336,15 +336,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         /// <summary>
-        /// Updates the stop order quantity after a partial target fill.
-        /// </summary>
-        /// <remarks>
-        /// V12.Audit [C-08]: Callers MUST ensure the <paramref name="pos"/> reference is
-        /// read under <c>stateLock</c> or from within a callback that is already serialized
-        /// by the NinjaTrader dispatch thread. Passing a stale <paramref name="pos"/> can
-        /// result in the stop being undersized relative to actual remaining contracts.
-        /// </remarks>
-        /// <summary>
         /// [Phase 7 NEW-2] Helper: Handle stale pending replacement detection and purge
         /// Extracted from UpdateStopQuantity to reduce complexity (CYC 25->15)
         /// </summary>
@@ -356,19 +347,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         )
         {
             // Build 1104.2: Staleness fast-path -- purge stale pending and re-initiate
-            double pendingAgeSeconds = (DateTime.Now - existingPendingQty.CreatedTime).TotalSeconds;
+            double pendingAgeSeconds = (DateTime.UtcNow - existingPendingQty.CreatedTime).TotalSeconds;
             if (pendingAgeSeconds > STALE_PENDING_FAST_PATH_SEC)
             {
                 if (pendingStopReplacements.TryRemove(entryName, out _))
+                {
                     Interlocked.Decrement(ref pendingReplacementCount);
-                Print(
-                    string.Format(
-                        "[1104.2] Stale pending purged for {0} ({1:F1}s). Re-initiating stop resize.",
-                        entryName,
-                        pendingAgeSeconds
-                    )
-                );
-                return true; // Signal to re-initiate
+                    Print(
+                        string.Format(
+                            "[1104.2] Stale pending purged for {0} ({1:F1}s). Re-initiating stop resize.",
+                            entryName,
+                            pendingAgeSeconds
+                        )
+                    );
+                    return true; // Stale removed, re-initiate
+                }
+                return false; // Removal failed, do not re-initiate
             }
             else
             {
@@ -444,8 +438,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool hasActiveStop = false;
             try
             {
+                // Compute expected stop name prefix (as SubmitStopOrderToBroker does)
+                string stopPrefix = "S_" + entryName;
+                if (stopPrefix.Length > 50)
+                {
+                    stopPrefix = stopPrefix.Substring(0, 50);
+                }
+
                 hasActiveStop = Account.Orders.Any(o =>
-                    o.OrderState == OrderState.Working && o.IsStopMarket && o.Name == entryName
+                    o.OrderState == OrderState.Working
+                    && o.IsStopMarket
+                    && o.Name != null
+                    && o.Name.StartsWith(stopPrefix)
                 );
             }
             catch
@@ -490,6 +494,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        /// <summary>
+        /// Updates the stop order quantity after a partial target fill.
+        /// </summary>
+        /// <remarks>
+        /// V12.Audit [C-08]: Callers MUST ensure the <paramref name="pos"/> reference is
+        /// read under <c>stateLock</c> or from within a callback that is already serialized
+        /// by the NinjaTrader dispatch thread. Passing a stale <paramref name="pos"/> can
+        /// result in the stop being undersized relative to actual remaining contracts.
+        /// </remarks>
         private void UpdateStopQuantity(string entryName, PositionInfo pos)
         {
             // V12.Hardening [RISK-01]: Atomic update guard
