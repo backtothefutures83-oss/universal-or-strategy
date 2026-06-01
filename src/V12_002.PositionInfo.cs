@@ -404,6 +404,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         // V8.11: Struct to track pending stop replacements (V12 Round 11: converted from class for zero-allocation)
         // V8.30: Added CreatedTime for timeout support
         // V12 Round 11: Converted to struct to eliminate heap allocation in hot path (Jane Street principle)
+        // WARNING: Mutable struct - copy-by-value semantics apply. Do NOT mutate properties after
+        // retrieving from ConcurrentDictionary. Always re-insert a new instance to update state.
         private struct PendingStopReplacement
         {
             public string EntryName { get; set; }
