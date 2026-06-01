@@ -26,11 +26,7 @@ customModes:
       phases sequentially (/epic-intake, /epic-plan, /epic-validate, /epic-tickets).
       Switch to v12-engineer mode for ticket execution in separate sessions.
     groups:
-      - read
-      - - edit
-        - fileRegex: ^docs/
-          description: Documentation files only -- no src/ access
-      - mcp
+      - advanced
     customRules:
       - dna: rules-v12-engineer/dna.md
       - epicProtocol: rules-v12-epic-planner/01-planning-protocol.md
@@ -57,10 +53,7 @@ customModes:
       7. Bump BUILD_TAG in src/V12_002.cs.
       8. Report: list of files modified, CYC before/after, deploy-sync result to Director.
     groups:
-      - read
-      - edit
-      - mcp
-      - terminal
+      - advanced
     customRules:
       - dna: rules-v12-engineer/dna.md
 
@@ -99,7 +92,6 @@ customModes:
       3. Report: BUILD_TAG from banner and lock-audit result to Director.
     groups:
       - advanced
-      - terminal
     customRules:
       - dna: rules-v12-engineer/dna.md
 

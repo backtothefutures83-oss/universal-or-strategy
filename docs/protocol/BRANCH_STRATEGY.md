@@ -216,10 +216,10 @@ gh pr create --title "[PROTOCOL] Complex change" --body "Rationale..."
 - Pre-commit validation
 - Branch pattern matching
 
-**Bob Shell/IDE Isolation:**
-- Bob IDE → src branches only
-- Bob Shell → infra/protocol branches only
-- Separate terminal windows recommended
+**Tool Flexibility:**
+- Bob IDE and Bob Shell can work on ANY branch type
+- Branch model organizes commits, not tools
+- Use the right tool for the task, regardless of branch
 
 ---
 
