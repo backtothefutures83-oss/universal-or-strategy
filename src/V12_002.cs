@@ -13,10 +13,6 @@
 //   - Reaper Audit thread for position verification
 //   - [SIMA] logging prefix for all multi-account operations
 
-// EPIC-CCN-12: Enable unit testing of internal helper methods
-using System.Runtime.CompilerServices;
-[assembly: InternalsVisibleTo("V12_Performance.Tests")]
-
 using System;
 using System.Collections.Concurrent; // V8.30: Thread-safe collections
 using System.Collections.Generic;
@@ -26,6 +22,8 @@ using System.Globalization;
 using System.Linq; // V8.30: For .Values.Contains() on ConcurrentDictionary
 using System.Net;
 using System.Net.Sockets;
+// EPIC-CCN-12: Enable unit testing of internal helper methods
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading; // V8.30: For Interlocked operations
 using System.Threading.Tasks; // V12.2: For Task.Run in async operations
@@ -44,6 +42,8 @@ using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies;
+
+[assembly: InternalsVisibleTo("V12_Performance.Tests")]
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
