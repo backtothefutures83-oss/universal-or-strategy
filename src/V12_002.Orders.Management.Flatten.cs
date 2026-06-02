@@ -67,21 +67,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private void ManageCIT()
         {
-            if (activePositions.Count == 0 && entryOrders.Count == 0)
-                return;
-            if (string.IsNullOrEmpty(ChaseIfTouchPoints) || ChaseIfTouchPoints == "0")
-                return;
-
-            // [BUILD 924 -- Fix C] Suppress CIT during price-move propagation to prevent
-            // race-fire on freshly resubmitted follower limit orders before sync cycle completes.
-            if (_propagationActive)
-            {
-                Print("[CIT] Suppressed during price-move propagation (Build 924 Fix C)");
-                return;
-            }
-
-            double citOffset = 0;
-            if (!double.TryParse(ChaseIfTouchPoints, out citOffset))
+            if (!ValidateCitConfiguration(out double citOffset))
                 return;
 
             int _citBrokerBudget = MaxBrokerCallsPerCycle; // 5 calls max per cycle (constant at V12_002.cs:303)
@@ -191,6 +177,33 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
+        }
+
+        /// <summary>
+        /// Validates CIT configuration and returns parsed offset.
+        /// Returns false if CIT should be skipped (no positions, invalid config, or propagation active).
+        /// </summary>
+        private bool ValidateCitConfiguration(out double citOffset)
+        {
+            citOffset = 0;
+
+            if (activePositions.Count == 0 && entryOrders.Count == 0)
+                return false;
+            if (string.IsNullOrEmpty(ChaseIfTouchPoints) || ChaseIfTouchPoints == "0")
+                return false;
+
+            // [BUILD 924 -- Fix C] Suppress CIT during price-move propagation to prevent
+            // race-fire on freshly resubmitted follower limit orders before sync cycle completes.
+            if (_propagationActive)
+            {
+                Print("[CIT] Suppressed during price-move propagation (Build 924 Fix C)");
+                return false;
+            }
+
+            if (!double.TryParse(ChaseIfTouchPoints, out citOffset))
+                return false;
+
+            return true;
         }
 
         private void FlattenAll()
