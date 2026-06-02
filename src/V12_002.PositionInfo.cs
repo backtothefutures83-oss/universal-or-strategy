@@ -303,15 +303,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (targetNumber < 1 || targetNumber > 5)
                 return;
             if (targetNumber == 1)
+            {
                 pos.T1Filled = true;
+            }
             else if (targetNumber == 2)
+            {
                 pos.T2Filled = true;
+            }
             else if (targetNumber == 3)
+            {
                 pos.T3Filled = true;
+            }
             else if (targetNumber == 4)
+            {
                 pos.T4Filled = true;
+            }
             else if (targetNumber == 5)
+            {
                 pos.T5Filled = true;
+            }
         }
 
         private int GetTargetFilledQuantity(PositionInfo pos, int targetNumber) =>
@@ -328,15 +338,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             int safeQty = Math.Max(0, filledQuantity);
             if (targetNumber == 1)
+            {
                 pos.T1FilledQuantity = safeQty;
+            }
             else if (targetNumber == 2)
+            {
                 pos.T2FilledQuantity = safeQty;
+            }
             else if (targetNumber == 3)
+            {
                 pos.T3FilledQuantity = safeQty;
+            }
             else if (targetNumber == 4)
+            {
                 pos.T4FilledQuantity = safeQty;
+            }
             else if (targetNumber == 5)
+            {
                 pos.T5FilledQuantity = safeQty;
+            }
         }
 
         // V8.11: Struct to track pending stop replacements (V12 Round 11: converted from class for zero-allocation)
