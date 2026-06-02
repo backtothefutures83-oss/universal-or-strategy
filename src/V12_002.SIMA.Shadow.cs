@@ -65,12 +65,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Validates leader position eligibility for stop propagation.
         /// Returns true if position is a filled leader with a valid stop order.
         /// </summary>
-        /// <param name="pos">Position to validate</param>
-        /// <param name="entryKey">Entry key for stop order lookup</param>
-        /// <param name="stopOrders">Stop orders dictionary for lookup</param>
-        /// <param name="leaderStop">Output: leader stop order if valid</param>
-        /// <returns>True if position is eligible for propagation</returns>
-        internal bool ValidateLeaderPosition(
+        /// <param name="pos">Position to validate.</param>
+        /// <param name="entryKey">Entry key for stop order lookup.</param>
+        /// <param name="stopOrders">Stop orders dictionary for lookup.</param>
+        /// <param name="leaderStop">Output: leader stop order if valid.</param>
+        /// <returns>True if position is eligible for propagation.</returns>
+        internal static bool ValidateLeaderPosition(
             PositionInfo pos,
             string entryKey,
             ConcurrentDictionary<string, Order> stopOrders,
@@ -104,13 +104,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Detects if leader stop price changed beyond noise threshold.
         /// Uses half-tick threshold to filter out insignificant price movements.
         /// </summary>
-        /// <param name="entryKey">Entry key for cache lookup</param>
-        /// <param name="currentStopPrice">Current stop price from order</param>
-        /// <param name="leaderLastStopPrice">Cache dictionary for price tracking</param>
-        /// <param name="tickSize">Tick size for noise threshold calculation</param>
-        /// <param name="lastKnownPrice">Output: last known price from cache</param>
-        /// <returns>True if price changed beyond threshold</returns>
-        internal bool DetectStopPriceChange(
+        /// <param name="entryKey">Entry key for cache lookup.</param>
+        /// <param name="currentStopPrice">Current stop price from order.</param>
+        /// <param name="leaderLastStopPrice">Cache dictionary for price tracking.</param>
+        /// <param name="tickSize">Tick size for noise threshold calculation.</param>
+        /// <param name="lastKnownPrice">Output: last known price from cache.</param>
+        /// <returns>True if price changed beyond threshold.</returns>
+        internal static bool DetectStopPriceChange(
             string entryKey,
             double currentStopPrice,
             ConcurrentDictionary<string, double> leaderLastStopPrice,
@@ -132,9 +132,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Propagates stop price to followers and updates cache on success.
         /// Cache is only updated if propagation succeeds (all followers ready).
         /// </summary>
-        /// <param name="leaderEntryKey">Leader entry key</param>
-        /// <param name="newStopPrice">New stop price to propagate</param>
-        /// <param name="leaderLastStopPrice">Cache dictionary for price tracking</param>
+        /// <param name="leaderEntryKey">Leader entry key.</param>
+        /// <param name="newStopPrice">New stop price to propagate.</param>
+        /// <param name="leaderLastStopPrice">Cache dictionary for price tracking.</param>
         internal void PropagateAndCacheStopPrice(
             string leaderEntryKey,
             double newStopPrice,
@@ -151,11 +151,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// Validates cached entry still has valid leader position and stop order.
         /// Used for cache cleanup - removes stale entries when leader position closes.
         /// </summary>
-        /// <param name="entryKey">Entry key to validate</param>
-        /// <param name="activePositions">Active positions dictionary</param>
-        /// <param name="stopOrders">Stop orders dictionary</param>
-        /// <returns>True if entry is still valid (has active leader position with stop)</returns>
-        internal bool ValidateCachedEntry(
+        /// <param name="entryKey">Entry key to validate.</param>
+        /// <param name="activePositions">Active positions dictionary.</param>
+        /// <param name="stopOrders">Stop orders dictionary.</param>
+        /// <returns>True if entry is still valid (has active leader position with stop).</returns>
+        internal static bool ValidateCachedEntry(
             string entryKey,
             ConcurrentDictionary<string, PositionInfo> activePositions,
             ConcurrentDictionary<string, Order> stopOrders
