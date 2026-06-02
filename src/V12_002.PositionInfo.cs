@@ -271,44 +271,64 @@ namespace NinjaTrader.NinjaScript.Strategies
             return CalculateTargetPrice(direction, entryPrice, targetNumber);
         }
 
-        // Array-based accessors (Jane Street principle: prefer data-driven over control flow)
-        // CYC = 2 each (bounds check + array access)
+        // Switch-based accessors (V12 DNA: Zero-allocation hot paths)
+        // CYC = 11 each (acceptable per Jane Street threshold <=15)
+        // Reverted from array-based to eliminate heap allocation per AMAL harness requirement
         private int GetTargetContracts(PositionInfo pos, int targetNumber)
         {
-            if (targetNumber < 1 || targetNumber > 5)
-                return 0;
-            int[] contracts = new int[]
+            switch (targetNumber)
             {
-                pos.T1Contracts,
-                pos.T2Contracts,
-                pos.T3Contracts,
-                pos.T4Contracts,
-                pos.T5Contracts,
-            };
-            return contracts[targetNumber - 1];
+                case 1:
+                    return pos.T1Contracts;
+                case 2:
+                    return pos.T2Contracts;
+                case 3:
+                    return pos.T3Contracts;
+                case 4:
+                    return pos.T4Contracts;
+                case 5:
+                    return pos.T5Contracts;
+                default:
+                    return 0;
+            }
         }
 
         private double GetTargetPrice(PositionInfo pos, int targetNumber)
         {
-            if (targetNumber < 1 || targetNumber > 5)
-                return 0.0;
-            double[] prices = new double[]
+            switch (targetNumber)
             {
-                pos.Target1Price,
-                pos.Target2Price,
-                pos.Target3Price,
-                pos.Target4Price,
-                pos.Target5Price,
-            };
-            return prices[targetNumber - 1];
+                case 1:
+                    return pos.Target1Price;
+                case 2:
+                    return pos.Target2Price;
+                case 3:
+                    return pos.Target3Price;
+                case 4:
+                    return pos.Target4Price;
+                case 5:
+                    return pos.Target5Price;
+                default:
+                    return 0.0;
+            }
         }
 
         private bool IsTargetFilled(PositionInfo pos, int targetNumber)
         {
-            if (targetNumber < 1 || targetNumber > 5)
-                return false;
-            bool[] filled = new bool[] { pos.T1Filled, pos.T2Filled, pos.T3Filled, pos.T4Filled, pos.T5Filled };
-            return filled[targetNumber - 1];
+            switch (targetNumber)
+            {
+                case 1:
+                    return pos.T1Filled;
+                case 2:
+                    return pos.T2Filled;
+                case 3:
+                    return pos.T3Filled;
+                case 4:
+                    return pos.T4Filled;
+                case 5:
+                    return pos.T5Filled;
+                default:
+                    return false;
+            }
         }
 
         private void MarkTargetFilled(PositionInfo pos, int targetNumber)
@@ -337,17 +357,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int GetTargetFilledQuantity(PositionInfo pos, int targetNumber)
         {
-            if (targetNumber < 1 || targetNumber > 5)
-                return 0;
-            int[] filledQty = new int[]
+            switch (targetNumber)
             {
-                pos.T1FilledQuantity,
-                pos.T2FilledQuantity,
-                pos.T3FilledQuantity,
-                pos.T4FilledQuantity,
-                pos.T5FilledQuantity,
-            };
-            return filledQty[targetNumber - 1];
+                case 1:
+                    return pos.T1FilledQuantity;
+                case 2:
+                    return pos.T2FilledQuantity;
+                case 3:
+                    return pos.T3FilledQuantity;
+                case 4:
+                    return pos.T4FilledQuantity;
+                case 5:
+                    return pos.T5FilledQuantity;
+                default:
+                    return 0;
+            }
         }
 
         private void SetTargetFilledQuantity(PositionInfo pos, int targetNumber, int filledQuantity)
