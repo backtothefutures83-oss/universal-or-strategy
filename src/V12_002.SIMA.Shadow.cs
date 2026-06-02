@@ -217,6 +217,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if (string.IsNullOrEmpty(followerEntryName))
                     continue;
+
                 if (!symmetryFleetEntryToDispatch.TryGetValue(followerEntryName, out var linkedDispatch))
                     continue;
                 if (!string.Equals(linkedDispatch, dispatchId, StringComparison.Ordinal))
