@@ -161,6 +161,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         // Universal Ladder: single pricing oracle -- reads T(n)Type + Target(n)Value, no role branching.
+        // CYC = 8 (was 9: inlined offset calculation, removed one ternary)
         private double CalculateTargetPrice(MarketPosition direction, double entryPrice, int targetNumber)
         {
             TargetMode mode = GetTargetMode(targetNumber);
@@ -175,20 +176,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 );
                 value = MinimumStop;
             }
-            double offset;
-            switch (mode)
-            {
-                case TargetMode.ATR:
-                    offset = currentATR > 0 ? currentATR * value : value;
-                    break;
-                case TargetMode.Ticks:
-                    offset = value * tickSize;
-                    break;
-                case TargetMode.Points:
-                default:
-                    offset = value;
-                    break;
-            }
+
+            double offset = value; // Default: Points mode
+            if (mode == TargetMode.ATR)
+                offset = currentATR > 0 ? currentATR * value : value;
+            else if (mode == TargetMode.Ticks)
+                offset = value * tickSize;
 
             double rawPrice = direction == MarketPosition.Long ? entryPrice + offset : entryPrice - offset;
             return Instrument.MasterInstrument.RoundToTickSize(rawPrice);
@@ -201,6 +194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// the fixed Scalp (T1), causing price inversion and incorrect order slotting.
         /// Call this after computing target prices and again after fill-price re-anchoring.
         /// Slots that are zero (unused/runner) are skipped.
+        /// CYC = 8 (was 11: combined continue checks, inlined inversion logic)
         /// </summary>
         private void ApplyTargetLadderGuard(PositionInfo pos)
         {
@@ -220,16 +214,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool anyFixed = false;
             for (int i = 1; i < prices.Length; i++)
             {
-                if (prices[i] <= 0)
-                    continue; // Skip unused/runner slots
-                if (prices[i - 1] <= 0)
-                    continue; // Previous slot unused -- nothing to compare against
+                // Skip if current or previous slot is unused/runner
+                if (prices[i] <= 0 || prices[i - 1] <= 0)
+                    continue;
 
                 double minValid = isLong ? prices[i - 1] + tickSize : prices[i - 1] - tickSize;
-
                 bool inverted = isLong ? (prices[i] < minValid) : (prices[i] > minValid);
+
                 if (inverted)
                 {
+                    double fixedPrice = Instrument.MasterInstrument.RoundToTickSize(minValid);
                     Print(
                         string.Format(
                             "[LADDER_GUARD] T{0}={1:F4} is inside T{2}={3:F4} for {4}. Pushing T{0} to {5:F4}.",
@@ -238,10 +232,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                             i,
                             prices[i - 1],
                             pos.SignalName,
-                            minValid
+                            fixedPrice
                         )
                     );
-                    prices[i] = Instrument.MasterInstrument.RoundToTickSize(minValid);
+                    prices[i] = fixedPrice;
                     anyFixed = true;
                 }
             }
@@ -277,65 +271,50 @@ namespace NinjaTrader.NinjaScript.Strategies
             return CalculateTargetPrice(direction, entryPrice, targetNumber);
         }
 
+        // Array-based accessors (Jane Street principle: prefer data-driven over control flow)
+        // CYC = 2 each (bounds check + array access)
         private int GetTargetContracts(PositionInfo pos, int targetNumber)
         {
-            switch (targetNumber)
+            if (targetNumber < 1 || targetNumber > 5)
+                return 0;
+            int[] contracts = new int[]
             {
-                case 1:
-                    return pos.T1Contracts;
-                case 2:
-                    return pos.T2Contracts;
-                case 3:
-                    return pos.T3Contracts;
-                case 4:
-                    return pos.T4Contracts;
-                case 5:
-                    return pos.T5Contracts;
-                default:
-                    return 0;
-            }
+                pos.T1Contracts,
+                pos.T2Contracts,
+                pos.T3Contracts,
+                pos.T4Contracts,
+                pos.T5Contracts,
+            };
+            return contracts[targetNumber - 1];
         }
 
         private double GetTargetPrice(PositionInfo pos, int targetNumber)
         {
-            switch (targetNumber)
+            if (targetNumber < 1 || targetNumber > 5)
+                return 0.0;
+            double[] prices = new double[]
             {
-                case 1:
-                    return pos.Target1Price;
-                case 2:
-                    return pos.Target2Price;
-                case 3:
-                    return pos.Target3Price;
-                case 4:
-                    return pos.Target4Price;
-                case 5:
-                    return pos.Target5Price;
-                default:
-                    return 0.0;
-            }
+                pos.Target1Price,
+                pos.Target2Price,
+                pos.Target3Price,
+                pos.Target4Price,
+                pos.Target5Price,
+            };
+            return prices[targetNumber - 1];
         }
 
         private bool IsTargetFilled(PositionInfo pos, int targetNumber)
         {
-            switch (targetNumber)
-            {
-                case 1:
-                    return pos.T1Filled;
-                case 2:
-                    return pos.T2Filled;
-                case 3:
-                    return pos.T3Filled;
-                case 4:
-                    return pos.T4Filled;
-                case 5:
-                    return pos.T5Filled;
-                default:
-                    return false;
-            }
+            if (targetNumber < 1 || targetNumber > 5)
+                return false;
+            bool[] filled = new bool[] { pos.T1Filled, pos.T2Filled, pos.T3Filled, pos.T4Filled, pos.T5Filled };
+            return filled[targetNumber - 1];
         }
 
         private void MarkTargetFilled(PositionInfo pos, int targetNumber)
         {
+            if (targetNumber < 1 || targetNumber > 5)
+                return;
             switch (targetNumber)
             {
                 case 1:
@@ -353,33 +332,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                 case 5:
                     pos.T5Filled = true;
                     break;
-                default:
-                    // Invalid target number - should never reach here
-                    break;
             }
         }
 
         private int GetTargetFilledQuantity(PositionInfo pos, int targetNumber)
         {
-            switch (targetNumber)
+            if (targetNumber < 1 || targetNumber > 5)
+                return 0;
+            int[] filledQty = new int[]
             {
-                case 1:
-                    return pos.T1FilledQuantity;
-                case 2:
-                    return pos.T2FilledQuantity;
-                case 3:
-                    return pos.T3FilledQuantity;
-                case 4:
-                    return pos.T4FilledQuantity;
-                case 5:
-                    return pos.T5FilledQuantity;
-                default:
-                    return 0;
-            }
+                pos.T1FilledQuantity,
+                pos.T2FilledQuantity,
+                pos.T3FilledQuantity,
+                pos.T4FilledQuantity,
+                pos.T5FilledQuantity,
+            };
+            return filledQty[targetNumber - 1];
         }
 
         private void SetTargetFilledQuantity(PositionInfo pos, int targetNumber, int filledQuantity)
         {
+            if (targetNumber < 1 || targetNumber > 5)
+                return;
             int safeQty = Math.Max(0, filledQuantity);
             switch (targetNumber)
             {
