@@ -106,12 +106,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 try
                 {
-                    double tickSize = Instrument.MasterInstrument.TickSize;
-                    double nudgeDistance = citOffset * tickSize;
-                    double newLimitPrice =
-                        (order.OrderAction == OrderAction.Buy)
-                            ? Instrument.MasterInstrument.RoundToTickSize(limitPrice + nudgeDistance)
-                            : Instrument.MasterInstrument.RoundToTickSize(limitPrice - nudgeDistance);
+                    double newLimitPrice = CalculateNudgedPrice(order.OrderAction, limitPrice, citOffset);
 
                     if (isFollower)
                     {
@@ -177,6 +172,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
+        }
+
+        /// <summary>
+        /// Calculates the nudged limit price by moving N ticks toward market.
+        /// Long orders: nudge UP (add ticks). Short orders: nudge DOWN (subtract ticks).
+        /// </summary>
+        private double CalculateNudgedPrice(OrderAction action, double limitPrice, double citOffset)
+        {
+            double tickSize = Instrument.MasterInstrument.TickSize;
+            double nudgeDistance = citOffset * tickSize;
+            return (action == OrderAction.Buy)
+                ? Instrument.MasterInstrument.RoundToTickSize(limitPrice + nudgeDistance)
+                : Instrument.MasterInstrument.RoundToTickSize(limitPrice - nudgeDistance);
         }
 
         /// <summary>
