@@ -2,6 +2,7 @@
 // Complements fleet symmetry sync (Trailing.cs) which syncs by trail LEVEL.
 // Shadow syncs by stop PRICE and auto-propagates leader flatten.
 using System;
+using System.Collections.Concurrent;
 using NinjaTrader.Cbi;
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -35,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             foreach (var kvp in activePositions.ToArray())
             {
                 Order leaderStop;
-                if (!ValidateLeaderPosition(kvp.Value, kvp.Key, out leaderStop))
+                if (!ValidateLeaderPosition(kvp.Value, kvp.Key, stopOrders, out leaderStop))
                     continue;
 
                 double lastKnown;
@@ -62,33 +63,33 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         /// <param name="pos">Position to validate</param>
         /// <param name="entryKey">Entry key for stop order lookup</param>
+        /// <param name="stopOrders">Stop orders dictionary for lookup</param>
         /// <param name="leaderStop">Output: leader stop order if valid</param>
         /// <returns>True if position is eligible for propagation</returns>
-        internal bool ValidateLeaderPosition(PositionInfo pos, string entryKey, out Order leaderStop)
+        internal bool ValidateLeaderPosition(
+            PositionInfo pos,
+            string entryKey,
+            ConcurrentDictionary<string, Order> stopOrders,
+            out Order leaderStop
+        )
         {
             leaderStop = null;
 
             if (pos == null || pos.IsFollower)
             {
-                Print("[SHADOW] Validation: Position is null or follower");
                 return false;
             }
             if (!pos.EntryFilled || pos.RemainingContracts <= 0)
             {
-                Print("[SHADOW] Validation: Position not filled or no contracts");
                 return false;
             }
 
             if (!stopOrders.TryGetValue(entryKey, out leaderStop))
             {
-                Print("[SHADOW] Validation: Stop order not found");
                 return false;
             }
             if (leaderStop == null || leaderStop.StopPrice <= 0)
             {
-                Print(
-                    string.Format("[SHADOW] Validation: Stop order invalid (price={0:F2})", leaderStop?.StopPrice ?? 0)
-                );
                 return false;
             }
 
@@ -117,24 +118,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (Math.Abs(currentStopPrice - lastKnownPrice) < tickSize * 0.5)
             {
-                Print(
-                    string.Format(
-                        "[SHADOW] Detection: Price change {0:F2} within noise threshold (last={1:F2})",
-                        currentStopPrice,
-                        lastKnownPrice
-                    )
-                );
                 return false;
             }
 
-            Print(
-                string.Format(
-                    "[SHADOW] Detection: Price changed {0:F2} -> {1:F2} (delta={2:F2} ticks)",
-                    lastKnownPrice,
-                    currentStopPrice,
-                    Math.Abs(currentStopPrice - lastKnownPrice) / tickSize
-                )
-            );
             return true;
         }
 
@@ -154,13 +140,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (ShadowMoveFollowerStops(leaderEntryKey, newStopPrice))
             {
                 leaderLastStopPrice[leaderEntryKey] = newStopPrice;
-                Print(
-                    string.Format("[SHADOW] Propagation: Success - cached {0:F2} for {1}", newStopPrice, leaderEntryKey)
-                );
-            }
-            else
-            {
-                Print(string.Format("[SHADOW] Propagation: Failed - followers not ready for {0}", leaderEntryKey));
             }
         }
 
@@ -192,7 +171,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || liveStop.StopPrice <= 0
             )
             {
-                Print(string.Format("[SHADOW] Cache: Entry {0} is stale (position closed or stop removed)", entryKey));
                 return false;
             }
 

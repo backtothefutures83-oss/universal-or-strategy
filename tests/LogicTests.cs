@@ -1,10 +1,10 @@
-using NUnit.Framework;
-using NinjaTrader.NinjaScript.Strategies;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Linq;
+using System.Text;
+using NinjaTrader.NinjaScript.Strategies;
+using NUnit.Framework;
 
 namespace UniversalOrStrategy.Tests
 {
@@ -29,7 +29,7 @@ namespace UniversalOrStrategy.Tests
         [TestCase(10, 2, new[] { 5, 5, 0, 0, 0 })]
         [TestCase(10, 3, new[] { 4, 3, 3, 0, 0 })] // Remainder 10%3=1 goes to T1
         [TestCase(10, 4, new[] { 3, 3, 2, 2, 0 })] // Remainder 10%4=2 goes to T1, T2
-        [TestCase(7, 5, new[] { 2, 2, 1, 1, 1 })]  // Remainder 7%5=2 goes to T1, T2
+        [TestCase(7, 5, new[] { 2, 2, 1, 1, 1 })] // Remainder 7%5=2 goes to T1, T2
         public void GetTargetDistribution_ValidInputs_ReturnsExpectedBuckets(int contracts, int count, int[] expected)
         {
             var result = V12_PureLogic.GetTargetDistribution(contracts, count);
@@ -78,53 +78,55 @@ namespace UniversalOrStrategy.Tests
         [Test]
         public void StickyState_RoundTrip_PreservesState()
         {
-            string fixture = string.Join(
-                Environment.NewLine,
-                "# V12 StickyState v1",
-                "# Symbol: MES 06-26",
-                "[CONFIG]",
-                "MODE=RMA",
-                "COUNT=3",
-                "T1=10.5",
-                "T1TYPE=Points",
-                "T2=12",
-                "T2TYPE=ATR",
-                "T3=18.25",
-                "T3TYPE=Runner",
-                "STR=2.5",
-                "MAX=750",
-                "CIT=4",
-                "TRMA=1",
-                "RRMA=0",
-                "",
-                "[FLEET]",
-                "LEADER=Apex_Main",
-                "Apex_F01=1",
-                "Apex_F02=0",
-                "",
-                "[ANCHOR]",
-                "TYPE=EMA65",
-                "MNL_PRICE=5312.25",
-                "",
-                "[CONFIG_OR]",
-                "COUNT=2",
-                "T1=8",
-                "T1TYPE=Ticks",
-                "STR=1.5",
-                "MAX=500",
-                "",
-                "[CONFIG_RMA]",
-                "COUNT=3",
-                "T1=10.5",
-                "T1TYPE=Points",
-                "T2=12",
-                "T2TYPE=ATR",
-                "STR=2.5",
-                "MAX=750",
-                "",
-                "[POSITIONS]",
-                "# key|extremePrice|trailLevel|beArmed|beTriggered|initialTargetCount",
-                "ENTRY_1|5315.75|2|1|0|3") + Environment.NewLine;
+            string fixture =
+                string.Join(
+                    Environment.NewLine,
+                    "# V12 StickyState v1",
+                    "# Symbol: MES 06-26",
+                    "[CONFIG]",
+                    "MODE=RMA",
+                    "COUNT=3",
+                    "T1=10.5",
+                    "T1TYPE=Points",
+                    "T2=12",
+                    "T2TYPE=ATR",
+                    "T3=18.25",
+                    "T3TYPE=Runner",
+                    "STR=2.5",
+                    "MAX=750",
+                    "CIT=4",
+                    "TRMA=1",
+                    "RRMA=0",
+                    "",
+                    "[FLEET]",
+                    "LEADER=Apex_Main",
+                    "Apex_F01=1",
+                    "Apex_F02=0",
+                    "",
+                    "[ANCHOR]",
+                    "TYPE=EMA65",
+                    "MNL_PRICE=5312.25",
+                    "",
+                    "[CONFIG_OR]",
+                    "COUNT=2",
+                    "T1=8",
+                    "T1TYPE=Ticks",
+                    "STR=1.5",
+                    "MAX=500",
+                    "",
+                    "[CONFIG_RMA]",
+                    "COUNT=3",
+                    "T1=10.5",
+                    "T1TYPE=Points",
+                    "T2=12",
+                    "T2TYPE=ATR",
+                    "STR=2.5",
+                    "MAX=750",
+                    "",
+                    "[POSITIONS]",
+                    "# key|extremePrice|trailLevel|beArmed|beTriggered|initialTargetCount",
+                    "ENTRY_1|5315.75|2|1|0|3"
+                ) + Environment.NewLine;
             string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".v12state");
 
             try
@@ -167,9 +169,11 @@ namespace UniversalOrStrategy.Tests
                     if (string.IsNullOrEmpty(line) || line.StartsWith("#", StringComparison.Ordinal))
                         continue;
 
-                    if (line.StartsWith("[", StringComparison.Ordinal) &&
-                        line.EndsWith("]", StringComparison.Ordinal) &&
-                        line.Length > 2)
+                    if (
+                        line.StartsWith("[", StringComparison.Ordinal)
+                        && line.EndsWith("]", StringComparison.Ordinal)
+                        && line.Length > 2
+                    )
                     {
                         currentSection = new StickyStateSection(line.Substring(1, line.Length - 2).ToUpperInvariant());
                         sections.Add(currentSection);
@@ -208,7 +212,8 @@ namespace UniversalOrStrategy.Tests
 
         private static bool StickyStateSectionsEqual(
             IReadOnlyList<StickyStateSection> left,
-            IReadOnlyList<StickyStateSection> right)
+            IReadOnlyList<StickyStateSection> right
+        )
         {
             if (ReferenceEquals(left, right))
                 return true;
