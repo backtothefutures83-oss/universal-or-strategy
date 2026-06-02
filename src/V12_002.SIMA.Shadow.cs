@@ -49,18 +49,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             foreach (var cacheKvp in _leaderLastStopPrice.ToArray())
             {
-                PositionInfo livePos;
-                Order liveStop;
-                if (
-                    !activePositions.TryGetValue(cacheKvp.Key, out livePos)
-                    || livePos == null
-                    || livePos.IsFollower
-                    || !livePos.EntryFilled
-                    || livePos.RemainingContracts <= 0
-                    || !stopOrders.TryGetValue(cacheKvp.Key, out liveStop)
-                    || liveStop == null
-                    || liveStop.StopPrice <= 0
-                )
+                if (!ValidateCachedEntry(cacheKvp.Key, activePositions, stopOrders))
                 {
                     _leaderLastStopPrice.TryRemove(cacheKvp.Key, out _);
                 }
@@ -173,6 +162,41 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print(string.Format("[SHADOW] Propagation: Failed - followers not ready for {0}", leaderEntryKey));
             }
+        }
+
+        /// <summary>
+        /// Validates cached entry still has valid leader position and stop order.
+        /// Used for cache cleanup - removes stale entries when leader position closes.
+        /// </summary>
+        /// <param name="entryKey">Entry key to validate</param>
+        /// <param name="activePositions">Active positions dictionary</param>
+        /// <param name="stopOrders">Stop orders dictionary</param>
+        /// <returns>True if entry is still valid (has active leader position with stop)</returns>
+        internal bool ValidateCachedEntry(
+            string entryKey,
+            ConcurrentDictionary<string, PositionInfo> activePositions,
+            ConcurrentDictionary<string, Order> stopOrders
+        )
+        {
+            PositionInfo livePos;
+            Order liveStop;
+
+            if (
+                !activePositions.TryGetValue(entryKey, out livePos)
+                || livePos == null
+                || livePos.IsFollower
+                || !livePos.EntryFilled
+                || livePos.RemainingContracts <= 0
+                || !stopOrders.TryGetValue(entryKey, out liveStop)
+                || liveStop == null
+                || liveStop.StopPrice <= 0
+            )
+            {
+                Print(string.Format("[SHADOW] Cache: Entry {0} is stale (position closed or stop removed)", entryKey));
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
