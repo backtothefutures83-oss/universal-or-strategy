@@ -169,11 +169,7 @@ namespace UniversalOrStrategy.Tests
                     if (string.IsNullOrEmpty(line) || line.StartsWith("#", StringComparison.Ordinal))
                         continue;
 
-                    if (
-                        line.StartsWith("[", StringComparison.Ordinal)
-                        && line.EndsWith("]", StringComparison.Ordinal)
-                        && line.Length > 2
-                    )
+                    if (line.StartsWith('[') && line.EndsWith(']') && line.Length > 2)
                     {
                         currentSection = new StickyStateSection(line.Substring(1, line.Length - 2).ToUpperInvariant());
                         sections.Add(currentSection);
