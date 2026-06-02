@@ -68,7 +68,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void ManageCIT()
         {
             if (!ValidateCitConfiguration(out double citOffset))
+            {
                 return;
+            }
 
             int _citBrokerBudget = MaxBrokerCallsPerCycle; // 5 calls max per cycle (constant at V12_002.cs:303)
             // Iterate ALL entry orders in the unified dictionary (local + every fleet account)
@@ -78,7 +80,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Order order = kvp.Value;
 
                 if (!ShouldChaseOrder(order, key))
+                {
                     continue;
+                }
 
                 // Determine local vs follower
                 PositionInfo pos = null;
