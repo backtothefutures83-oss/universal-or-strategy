@@ -37,13 +37,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Order leaderStop;
                 if (!ValidateLeaderPosition(kvp.Value, kvp.Key, stopOrders, out leaderStop))
+                {
                     continue;
+                }
 
                 double lastKnown;
                 if (
                     !DetectStopPriceChange(kvp.Key, leaderStop.StopPrice, _leaderLastStopPrice, tickSize, out lastKnown)
                 )
+                {
                     continue;
+                }
 
                 PropagateAndCacheStopPrice(kvp.Key, leaderStop.StopPrice, _leaderLastStopPrice);
             }
