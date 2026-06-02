@@ -91,14 +91,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (isFollower)
                     {
-                        ExecuteFollowerNudge(
-                            key,
-                            order,
-                            newLimitPrice,
-                            citOffset,
-                            pos.ExecutingAccount,
-                            ref _citBrokerBudget
-                        );
+                        if (
+                            !ExecuteFollowerNudge(
+                                key,
+                                order,
+                                newLimitPrice,
+                                citOffset,
+                                pos.ExecutingAccount,
+                                ref _citBrokerBudget
+                            )
+                        )
+                        {
+                            return; // Budget exhausted - stop iteration (original behavior)
+                        }
                     }
                     else
                     {
@@ -132,8 +137,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// <summary>
         /// Executes a follower account nudge by canceling and resubmitting the order.
         /// Handles budget exhaustion by self-enqueuing for deferred execution.
+        /// Returns false if budget exhausted (signals caller to stop iteration), true if nudge succeeded.
         /// </summary>
-        private void ExecuteFollowerNudge(
+        private bool ExecuteFollowerNudge(
             string key,
             Order order,
             double newLimitPrice,
@@ -151,7 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print("[CIT] Broker budget exhausted -- deferring remaining nudges");
                 Enqueue(ctx => ctx.ManageCIT());
-                return;
+                return false; // Signal caller to stop iteration
             }
             citBrokerBudget -= 2; // Cancel + Submit = 2 broker calls
 
@@ -172,13 +178,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (nudgedOrder == null)
             {
                 Print($"[CIT] ERROR: CreateOrder returned null for {key} on {followerAcct.Name} -- nudge aborted");
-                return;
+                return false; // Signal failure without marking as nudged
             }
             followerAcct.Submit(new[] { nudgedOrder });
 
             // B966: No Enqueue needed -- ManageCIT is always called via Enqueue(ctx => ctx.ManageCIT())
             // from OnBarUpdate (Phase C), so this write is already inside the actor drain.
             entryOrders[key] = nudgedOrder;
+            return true; // Nudge succeeded
         }
 
         /// <summary>
