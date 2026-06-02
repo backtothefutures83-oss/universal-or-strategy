@@ -274,129 +274,69 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Switch-based accessors (V12 DNA: Zero-allocation hot paths)
         // CYC = 11 each (acceptable per Jane Street threshold <=15)
         // Reverted from array-based to eliminate heap allocation per AMAL harness requirement
-        private int GetTargetContracts(PositionInfo pos, int targetNumber)
-        {
-            switch (targetNumber)
-            {
-                case 1:
-                    return pos.T1Contracts;
-                case 2:
-                    return pos.T2Contracts;
-                case 3:
-                    return pos.T3Contracts;
-                case 4:
-                    return pos.T4Contracts;
-                case 5:
-                    return pos.T5Contracts;
-                default:
-                    return 0;
-            }
-        }
+        private int GetTargetContracts(PositionInfo pos, int targetNumber) =>
+            targetNumber == 1 ? pos.T1Contracts
+            : targetNumber == 2 ? pos.T2Contracts
+            : targetNumber == 3 ? pos.T3Contracts
+            : targetNumber == 4 ? pos.T4Contracts
+            : targetNumber == 5 ? pos.T5Contracts
+            : 0;
 
-        private double GetTargetPrice(PositionInfo pos, int targetNumber)
-        {
-            switch (targetNumber)
-            {
-                case 1:
-                    return pos.Target1Price;
-                case 2:
-                    return pos.Target2Price;
-                case 3:
-                    return pos.Target3Price;
-                case 4:
-                    return pos.Target4Price;
-                case 5:
-                    return pos.Target5Price;
-                default:
-                    return 0.0;
-            }
-        }
+        private double GetTargetPrice(PositionInfo pos, int targetNumber) =>
+            targetNumber == 1 ? pos.Target1Price
+            : targetNumber == 2 ? pos.Target2Price
+            : targetNumber == 3 ? pos.Target3Price
+            : targetNumber == 4 ? pos.Target4Price
+            : targetNumber == 5 ? pos.Target5Price
+            : 0.0;
 
-        private bool IsTargetFilled(PositionInfo pos, int targetNumber)
-        {
-            switch (targetNumber)
-            {
-                case 1:
-                    return pos.T1Filled;
-                case 2:
-                    return pos.T2Filled;
-                case 3:
-                    return pos.T3Filled;
-                case 4:
-                    return pos.T4Filled;
-                case 5:
-                    return pos.T5Filled;
-                default:
-                    return false;
-            }
-        }
+        private bool IsTargetFilled(PositionInfo pos, int targetNumber) =>
+            targetNumber == 1 ? pos.T1Filled
+            : targetNumber == 2 ? pos.T2Filled
+            : targetNumber == 3 ? pos.T3Filled
+            : targetNumber == 4 ? pos.T4Filled
+            : targetNumber == 5 ? pos.T5Filled
+            : false;
 
         private void MarkTargetFilled(PositionInfo pos, int targetNumber)
         {
             if (targetNumber < 1 || targetNumber > 5)
                 return;
-            switch (targetNumber)
-            {
-                case 1:
-                    pos.T1Filled = true;
-                    break;
-                case 2:
-                    pos.T2Filled = true;
-                    break;
-                case 3:
-                    pos.T3Filled = true;
-                    break;
-                case 4:
-                    pos.T4Filled = true;
-                    break;
-                case 5:
-                    pos.T5Filled = true;
-                    break;
-            }
+            if (targetNumber == 1)
+                pos.T1Filled = true;
+            else if (targetNumber == 2)
+                pos.T2Filled = true;
+            else if (targetNumber == 3)
+                pos.T3Filled = true;
+            else if (targetNumber == 4)
+                pos.T4Filled = true;
+            else if (targetNumber == 5)
+                pos.T5Filled = true;
         }
 
-        private int GetTargetFilledQuantity(PositionInfo pos, int targetNumber)
-        {
-            switch (targetNumber)
-            {
-                case 1:
-                    return pos.T1FilledQuantity;
-                case 2:
-                    return pos.T2FilledQuantity;
-                case 3:
-                    return pos.T3FilledQuantity;
-                case 4:
-                    return pos.T4FilledQuantity;
-                case 5:
-                    return pos.T5FilledQuantity;
-                default:
-                    return 0;
-            }
-        }
+        private int GetTargetFilledQuantity(PositionInfo pos, int targetNumber) =>
+            targetNumber == 1 ? pos.T1FilledQuantity
+            : targetNumber == 2 ? pos.T2FilledQuantity
+            : targetNumber == 3 ? pos.T3FilledQuantity
+            : targetNumber == 4 ? pos.T4FilledQuantity
+            : targetNumber == 5 ? pos.T5FilledQuantity
+            : 0;
 
         private void SetTargetFilledQuantity(PositionInfo pos, int targetNumber, int filledQuantity)
         {
             if (targetNumber < 1 || targetNumber > 5)
                 return;
             int safeQty = Math.Max(0, filledQuantity);
-            switch (targetNumber)
-            {
-                case 1:
-                    pos.T1FilledQuantity = safeQty;
-                    break;
-                case 2:
-                    pos.T2FilledQuantity = safeQty;
-                    break;
-                case 3:
-                    pos.T3FilledQuantity = safeQty;
-                    break;
-                case 4:
-                    pos.T4FilledQuantity = safeQty;
-                    break;
-                case 5:
-                    pos.T5FilledQuantity = safeQty;
-                    break;
-            }
+            if (targetNumber == 1)
+                pos.T1FilledQuantity = safeQty;
+            else if (targetNumber == 2)
+                pos.T2FilledQuantity = safeQty;
+            else if (targetNumber == 3)
+                pos.T3FilledQuantity = safeQty;
+            else if (targetNumber == 4)
+                pos.T4FilledQuantity = safeQty;
+            else if (targetNumber == 5)
+                pos.T5FilledQuantity = safeQty;
         }
 
         // V8.11: Struct to track pending stop replacements (V12 Round 11: converted from class for zero-allocation)
