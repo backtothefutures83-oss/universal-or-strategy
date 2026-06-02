@@ -1,220 +1,275 @@
-﻿# PR #14 Fix Queue (Jane Street Audited)
-Generated: 2026-06-01 18:51:03  
-**Updated**: 2026-06-01 18:52:00 (Jane Street Audit Complete)
+﻿# PR #14 Fix Queue
+Generated: 2026-06-01 19:17:37
 
 ## Instructions for v12-engineer
 
 Process these issues in priority order. Mark each as FIXED after applying the fix.
 
----
+### Fix #1 - [P0] CRITICAL
+[ ] **Bot:** amazon-q-developer  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## Review Summary
 
-## VALID-FIX Issues (3 total)
-
-### Fix #1 - [P1] Array Allocation in GetTargetContracts
-[x] **Bot:** coderabbitai, gitar-bot (consensus)
-[x] **File:** `src/V12_002.PositionInfo.cs:280-288`
-[x] **Severity:** P1 (High) - Performance regression
-[x] **Category:** VALID-FIX - **FIXED**
-
-**Issue**: `new int[]` allocation on every call breaks zero-allocation requirement.
-
-**Jane Street Rationale**: 
-- Violates V12 DNA Principle #2 (Zero-Allocation Hot Paths)
-- AMAL harness gate requires `Allocated = 0 B`
-- Switch statements are allocation-free and equally readable
-
-**Current Code** (lines 280-288):
-```csharp
-int[] contracts = new int[]
-{
-    pos.T1Contracts,
-    pos.T2Contracts,
-    pos.T3Contracts,
-    pos.T4Contracts,
-    pos.T5Contracts,
-};
-return contracts[targetNumber - 1];
-```
-
-**Required Fix**: Revert to switch-based accessor:
-```csharp
-switch (targetNumber)
-{
-    case 1: return pos.T1Contracts;
-    case 2: return pos.T2Contracts;
-    case 3: return pos.T3Contracts;
-    case 4: return pos.T4Contracts;
-    case 5: return pos.T5Contracts;
-    default: return 0;
-}
-```
+This PR successfully addresses the .NET Framework 4.8 compatibility issue by replacing C# 9.0 language features with C# 7.3 equivalents. The code changes are correct and necessary f...
 
 **Action Required:**
-1. Replace array allocation with switch statement
-2. Verify AMAL harness: `Allocated = 0 B`
-3. Mark as [x] FIXED
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-### Fix #2 - [P2] Array Allocation in GetTargetPrice
-[x] **Bot:** coderabbitai, gitar-bot (consensus)
-[x] **File:** `src/V12_002.PositionInfo.cs:295-303`
-[x] **Severity:** P2 (Medium) - Performance regression
-[x] **Category:** VALID-FIX - **FIXED**
+### Fix #2 - [P0] CRITICAL
+[ ] **Bot:** codescene-delta-analysis  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** 
+[//]: # (cs-code-health)
+[![](https://codescene.io/imgs/svg/pass1.svg)](#) Code Health Improved `(1 files improve in Code Health)`
 
-**Issue**: `new double[]` allocation on every call.
-
-**Jane Street Rationale**: Same as Fix #1.
-
-**Current Code** (lines 295-303):
-```csharp
-double[] prices = new double[]
-{
-    pos.Target1Price,
-    pos.Target2Price,
-    pos.Target3Price,
-    pos.Target4Price,
-    pos.Target5Price,
-};
-return prices[targetNumber - 1];
-```
-
-**Required Fix**: Revert to switch-based accessor:
-```csharp
-switch (targetNumber)
-{
-    case 1: return pos.Target1Price;
-    case 2: return pos.Target2Price;
-    case 3: return pos.Target3Price;
-    case 4: return pos.Target4Price;
-    case 5: return pos.Target5Price;
-    default: return 0.0;
-}
-```
+**Gates Failed**
+[![](https://codescene.io/imgs/svg/x1.svg)](#) New...
 
 **Action Required:**
-1. Replace array allocation with switch statement
-2. Verify AMAL harness: `Allocated = 0 B`
-3. Mark as [x] FIXED
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-### Fix #3 - [P2] Array Allocation in GetTargetFilledQuantity
-[x] **Bot:** coderabbitai, gitar-bot (consensus)
-[x] **File:** `src/V12_002.PositionInfo.cs:342-350`
-[x] **Severity:** P2 (Medium) - Performance regression
-[x] **Category:** VALID-FIX - **FIXED**
+### Fix #3 - [P0] CRITICAL
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **Actionable comments posted: 3**
 
-**Issue**: `new int[]` allocation on every call.
-
-**Jane Street Rationale**: Same as Fix #1.
-
-**Current Code** (lines 342-350):
-```csharp
-int[] filledQty = new int[]
-{
-    pos.T1FilledQuantity,
-    pos.T2FilledQuantity,
-    pos.T3FilledQuantity,
-    pos.T4FilledQuantity,
-    pos.T5FilledQuantity,
-};
-return filledQty[targetNumber - 1];
-```
-
-**Required Fix**: Revert to switch-based accessor:
-```csharp
-switch (targetNumber)
-{
-    case 1: return pos.T1FilledQuantity;
-    case 2: return pos.T2FilledQuantity;
-    case 3: return pos.T3FilledQuantity;
-    case 4: return pos.T4FilledQuantity;
-    case 5: return pos.T5FilledQuantity;
-    default: return 0;
-}
-```
+> [!CAUTION]
+> Some comments are outside the diff and canÔÇÖt be posted inline due to platform limitations.
+> 
+> 
+> 
+> <details>
+> <summary>ÔÜá´©Å Outside diff range...
 
 **Action Required:**
-1. Replace array allocation with switch statement
-2. Verify AMAL harness: `Allocated = 0 B`
-3. Mark as [x] FIXED
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-### Fix #4 - [P2] Array Allocation in IsTargetFilled (Not flagged by bots, but same issue)
-[x] **Bot:** N/A (consistency fix)
-[x] **File:** `src/V12_002.PositionInfo.cs:310-311`
-[x] **Severity:** P2 (Medium) - Performance regression
-[x] **Category:** VALID-FIX - **FIXED**
-
-**Issue**: `new bool[]` allocation on every call (same pattern as other accessors).
-
-**Jane Street Rationale**: Same as Fix #1.
-
-**Current Code** (line 310):
-```csharp
-bool[] filled = new bool[] { pos.T1Filled, pos.T2Filled, pos.T3Filled, pos.T4Filled, pos.T5Filled };
-return filled[targetNumber - 1];
-```
-
-**Required Fix**: Revert to switch-based accessor:
-```csharp
-switch (targetNumber)
-{
-    case 1: return pos.T1Filled;
-    case 2: return pos.T2Filled;
-    case 3: return pos.T3Filled;
-    case 4: return pos.T4Filled;
-    case 5: return pos.T5Filled;
-    default: return false;
-}
-```
+### Fix #4 - [P1] REVIEW
+[ ] **Bot:** greptile-apps  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** `backtothefutures83-oss` has reached the 50-review limit for trial accounts. To continue receiving code reviews, [upgrade your plan](https://app.greptile.com/review/github)....
 
 **Action Required:**
-1. Replace array allocation with switch statement
-2. Verify AMAL harness: `Allocated = 0 B`
-3. Mark as [x] FIXED
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-## Complexity Trade-off Analysis
+### Fix #5 - [P1] REVIEW
+[ ] **Bot:** codescene-delta-analysis  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** 
+[//]: # (cs-code-health)
 
-**Original Code** (CYC 11):
-- ✅ Zero allocation
-- ✅ AMAL harness compliant
-- ❌ Higher cyclomatic complexity
 
-**Refactored Code** (CYC 8):
-- ✅ Lower cyclomatic complexity
-- ❌ Heap allocation on every call
-- ❌ AMAL harness violation
 
-**Jane Street Verdict**: **Revert to switch-based accessors.**
+Our agent can fix these. [Install it.](https://codescene.io/docs/developer-tools/pr-refactoring-agent.html)
 
-**Rationale**:
-1. **Performance > Complexity**: Jane Street prioritizes zero-allocation hot paths over cyclomatic complexity metrics
-2. **CYC 11 is acceptable**: V12 threshold is CYC ≤ 15 (Jane Street aligned)
-3. **Switch statements are readable**: 5-case switches are cognitively simple
-4. **AMAL gate is non-negotiable**: `Allocated = 0 B` is a hard requirement
+**Gates Passed**
+[![](https://codescene.io/imgs/svg/pass1.svg)...
 
----
-
-## Verification Checklist
-
-After applying all fixes:
-- [x] All 4 fixes applied (2026-06-01 18:54 PST)
-- [ ] Run AMAL harness: `python scripts/amal_harness.py`
-- [ ] Verify: `Allocated = 0 B`
-- [ ] Run build: `powershell -File .\scripts\build_readiness.ps1`
-- [ ] Verify: Zero compilation errors
-- [ ] Update PR description with Jane Street rationale
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
 
 ---
 
-## References
+### Fix #6 - [P1] REVIEW
+[ ] **Bot:** codescene-delta-analysis  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** 
+[//]: # (cs-code-health)
+[![](https://codescene.io/imgs/svg/pass1.svg)](#) Code Health Improved `(1 files improve in Code Health)`
 
-- **Jane Street Audit**: `docs/brain/pr_14_jane_street_audit.md`
-- **Jane Street Deviations**: `docs/standards/JANE_STREET_DEVIATIONS.md`
-- **V12 DNA**: AGENTS.md Section 2 (Architectural Mandates)
-- **AMAL Harness**: `scripts/amal_harness.py`
+
+
+Our agent can fix these. [Install it.](https://codescene.io/docs/...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #7 - [P1] REVIEW
+[ ] **Bot:** greptile-apps  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** `backtothefutures83-oss` has reached the 50-review limit for trial accounts. To continue receiving code reviews, [upgrade your plan](https://app.greptile.com/review/github)....
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #8 - [P1] REVIEW
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **Actionable comments posted: 2**
+
+<details>
+<summary>­ƒñû Prompt for all review comments with AI agents</summary>
+
+```
+Verify each finding against current code. Fix only still-valid issues, skip the
+...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #9 - [P1] REVIEW
+[ ] **Bot:** greptile-apps  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** `backtothefutures83-oss` has reached the 50-review limit for trial accounts. To continue receiving code reviews, [upgrade your plan](https://app.greptile.com/review/github)....
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #10 - [P1] REVIEW
+[ ] **Bot:** codacy-production  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ### Pull Request Overview
+
+The PR successfully addresses the C# 9.0 compatibility issues (CS0518 and CS8341) for .NET Framework 4.8 by removing `init` accessors and the `readonly` struct modifier. How...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #11 - [P1] REVIEW
+[ ] **Bot:** gemini-code-assist  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** ## Code Review
+
+This pull request resolves .NET Framework 4.8 compilation errors (CS0518 and CS8341) by converting the PendingStopReplacement struct from a readonly struct with C# 9.0 init properties ...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #12 - [P1] REVIEW
+[ ] **Bot:** greptile-apps  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** `backtothefutures83-oss` has reached the 50-review limit for trial accounts. To continue receiving code reviews, [upgrade your plan](https://app.greptile.com/review/github)....
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #13 - [P1] REVIEW
+[ ] **Bot:** coderabbitai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** **Actionable comments posted: 1**
+
+<details>
+<summary>­ƒñû Prompt for all review comments with AI agents</summary>
+
+```
+Verify each finding against current code. Fix only still-valid issues, skip the
+...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #14 - [P1] REVIEW
+[ ] **Bot:** codescene-delta-analysis  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** 
+[//]: # (cs-code-health)
+
+
+
+Our agent can fix these. [Install it.](https://codescene.io/docs/developer-tools/pr-refactoring-agent.html)
+
+**Gates Passed**
+[![](https://codescene.io/imgs/svg/pass1.svg)...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #15 - [P1] REVIEW
+[ ] **Bot:** sourcery-ai  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** Hey - I've left some high level feedback:
+
+- Removing the `readonly` modifier from `PendingStopReplacement` changes its semantics (mutable value type); if possible, consider retaining immutability (e....
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
+### Fix #16 - [P2] PERFORMANCE
+[ ] **Bot:** gitar-bot  
+[ ] **File:** (extract from body)  
+[ ] **Issue:** <details>
+<summary><b>Code Review</b> <kbd>Ô£à Approved</kbd> <kbd>1 resolved / 1 findings</kbd></summary>
+
+Restores .NET Framework 4.8 compatibility by removing `readonly` and updating accessors in `...
+
+**Action Required:**
+1. Read the full finding at: https://github.com/backtothefutures83-oss/universal-or-strategy/pull/14#issuecomment-4598107779
+2. Apply the fix
+3. Verify locally
+4. Mark as [x] FIXED
+
+---
+
