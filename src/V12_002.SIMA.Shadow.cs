@@ -74,8 +74,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             PositionInfo pos,
             string entryKey,
             ConcurrentDictionary<string, Order> stopOrders,
-            out Order leaderStop
-        )
+            out Order leaderStop)
         {
             leaderStop = null;
 
@@ -115,8 +114,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             double currentStopPrice,
             ConcurrentDictionary<string, double> leaderLastStopPrice,
             double tickSize,
-            out double lastKnownPrice
-        )
+            out double lastKnownPrice)
         {
             leaderLastStopPrice.TryGetValue(entryKey, out lastKnownPrice);
 
@@ -138,8 +136,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         internal void PropagateAndCacheStopPrice(
             string leaderEntryKey,
             double newStopPrice,
-            ConcurrentDictionary<string, double> leaderLastStopPrice
-        )
+            ConcurrentDictionary<string, double> leaderLastStopPrice)
         {
             if (ShadowMoveFollowerStops(leaderEntryKey, newStopPrice))
             {
@@ -158,8 +155,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         internal static bool ValidateCachedEntry(
             string entryKey,
             ConcurrentDictionary<string, PositionInfo> activePositions,
-            ConcurrentDictionary<string, Order> stopOrders
-        )
+            ConcurrentDictionary<string, Order> stopOrders)
         {
             PositionInfo livePos;
             Order liveStop;
@@ -192,8 +188,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 string.IsNullOrEmpty(leaderEntryKey)
                 || !symmetryMasterEntryToDispatch.TryGetValue(leaderEntryKey, out dispatchId)
                 || !symmetryDispatchById.TryGetValue(dispatchId, out ctx)
-                || ctx == null
-            )
+                || ctx == null)
             {
                 return false;
             }
@@ -206,8 +201,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         /// </summary>
         private System.Collections.Generic.List<string> ShadowBuildFollowerEntryList(
             SymmetryDispatchContext ctx,
-            string dispatchId
-        )
+            string dispatchId)
         {
             // ADR-019: snapshot via Volatile.Read on immutable string[] -- zero-alloc, lock-free.
             string[] followerSnapshot = ctx.Followers;
@@ -246,9 +240,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool ShadowProcessFollowerStopUpdate(
             string followerEntryName,
             double newStopPrice,
-            out bool waitingOnFollower
-        )
+            out bool waitingOnFollower)
         {
+
             waitingOnFollower = false;
 
             FollowerBracketFSM fsm;
@@ -282,8 +276,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     "[SHADOW] Propagating stop {0:F2} -> {1} on {2}",
                     newStopPrice,
                     followerEntryName,
-                    fsm.AccountName
-                )
+                    fsm.AccountName)
             );
             UpdateStopOrder(followerEntryName, followerPos, newStopPrice, followerPos.CurrentTrailLevel);
 
