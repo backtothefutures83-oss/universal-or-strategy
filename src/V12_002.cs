@@ -12,6 +12,11 @@
 //   - IPC command distribution to multiple accounts
 //   - Reaper Audit thread for position verification
 //   - [SIMA] logging prefix for all multi-account operations
+
+// EPIC-CCN-12: Enable unit testing of internal helper methods
+using System.Runtime.CompilerServices;
+[assembly: InternalsVisibleTo("V12_Performance.Tests")]
+
 using System;
 using System.Collections.Concurrent; // V8.30: Thread-safe collections
 using System.Collections.Generic;

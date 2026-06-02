@@ -34,28 +34,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             foreach (var kvp in activePositions.ToArray())
             {
-                PositionInfo pos = kvp.Value;
-                if (pos == null || pos.IsFollower)
-                    continue;
-                if (!pos.EntryFilled || pos.RemainingContracts <= 0)
-                    continue;
-
                 Order leaderStop;
-                if (!stopOrders.TryGetValue(kvp.Key, out leaderStop))
-                    continue;
-                if (leaderStop == null || leaderStop.StopPrice <= 0)
+                if (!ValidateLeaderPosition(kvp.Value, kvp.Key, out leaderStop))
                     continue;
 
                 double lastKnown;
-                _leaderLastStopPrice.TryGetValue(kvp.Key, out lastKnown);
-
-                // Only propagate if price actually changed (beyond half-tick noise)
-                if (Math.Abs(leaderStop.StopPrice - lastKnown) < tickSize * 0.5)
+                if (
+                    !DetectStopPriceChange(kvp.Key, leaderStop.StopPrice, _leaderLastStopPrice, tickSize, out lastKnown)
+                )
                     continue;
 
-                // Find and update all follower positions linked to this leader entry
-                if (ShadowMoveFollowerStops(kvp.Key, leaderStop.StopPrice))
-                    _leaderLastStopPrice[kvp.Key] = leaderStop.StopPrice;
+                PropagateAndCacheStopPrice(kvp.Key, leaderStop.StopPrice, _leaderLastStopPrice);
             }
 
             foreach (var cacheKvp in _leaderLastStopPrice.ToArray())
@@ -75,6 +64,114 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     _leaderLastStopPrice.TryRemove(cacheKvp.Key, out _);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Validates leader position eligibility for stop propagation.
+        /// Returns true if position is a filled leader with a valid stop order.
+        /// </summary>
+        /// <param name="pos">Position to validate</param>
+        /// <param name="entryKey">Entry key for stop order lookup</param>
+        /// <param name="leaderStop">Output: leader stop order if valid</param>
+        /// <returns>True if position is eligible for propagation</returns>
+        internal bool ValidateLeaderPosition(PositionInfo pos, string entryKey, out Order leaderStop)
+        {
+            leaderStop = null;
+
+            if (pos == null || pos.IsFollower)
+            {
+                Print("[SHADOW] Validation: Position is null or follower");
+                return false;
+            }
+            if (!pos.EntryFilled || pos.RemainingContracts <= 0)
+            {
+                Print("[SHADOW] Validation: Position not filled or no contracts");
+                return false;
+            }
+
+            if (!stopOrders.TryGetValue(entryKey, out leaderStop))
+            {
+                Print("[SHADOW] Validation: Stop order not found");
+                return false;
+            }
+            if (leaderStop == null || leaderStop.StopPrice <= 0)
+            {
+                Print(
+                    string.Format("[SHADOW] Validation: Stop order invalid (price={0:F2})", leaderStop?.StopPrice ?? 0)
+                );
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Detects if leader stop price changed beyond noise threshold.
+        /// Uses half-tick threshold to filter out insignificant price movements.
+        /// </summary>
+        /// <param name="entryKey">Entry key for cache lookup</param>
+        /// <param name="currentStopPrice">Current stop price from order</param>
+        /// <param name="leaderLastStopPrice">Cache dictionary for price tracking</param>
+        /// <param name="tickSize">Tick size for noise threshold calculation</param>
+        /// <param name="lastKnownPrice">Output: last known price from cache</param>
+        /// <returns>True if price changed beyond threshold</returns>
+        internal bool DetectStopPriceChange(
+            string entryKey,
+            double currentStopPrice,
+            ConcurrentDictionary<string, double> leaderLastStopPrice,
+            double tickSize,
+            out double lastKnownPrice
+        )
+        {
+            leaderLastStopPrice.TryGetValue(entryKey, out lastKnownPrice);
+
+            if (Math.Abs(currentStopPrice - lastKnownPrice) < tickSize * 0.5)
+            {
+                Print(
+                    string.Format(
+                        "[SHADOW] Detection: Price change {0:F2} within noise threshold (last={1:F2})",
+                        currentStopPrice,
+                        lastKnownPrice
+                    )
+                );
+                return false;
+            }
+
+            Print(
+                string.Format(
+                    "[SHADOW] Detection: Price changed {0:F2} -> {1:F2} (delta={2:F2} ticks)",
+                    lastKnownPrice,
+                    currentStopPrice,
+                    Math.Abs(currentStopPrice - lastKnownPrice) / tickSize
+                )
+            );
+            return true;
+        }
+
+        /// <summary>
+        /// Propagates stop price to followers and updates cache on success.
+        /// Cache is only updated if propagation succeeds (all followers ready).
+        /// </summary>
+        /// <param name="leaderEntryKey">Leader entry key</param>
+        /// <param name="newStopPrice">New stop price to propagate</param>
+        /// <param name="leaderLastStopPrice">Cache dictionary for price tracking</param>
+        internal void PropagateAndCacheStopPrice(
+            string leaderEntryKey,
+            double newStopPrice,
+            ConcurrentDictionary<string, double> leaderLastStopPrice
+        )
+        {
+            if (ShadowMoveFollowerStops(leaderEntryKey, newStopPrice))
+            {
+                leaderLastStopPrice[leaderEntryKey] = newStopPrice;
+                Print(
+                    string.Format("[SHADOW] Propagation: Success - cached {0:F2} for {1}", newStopPrice, leaderEntryKey)
+                );
+            }
+            else
+            {
+                Print(string.Format("[SHADOW] Propagation: Failed - followers not ready for {0}", leaderEntryKey));
             }
         }
 

@@ -20,12 +20,17 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- 
-    NOTE: This is a UNIT TEST project for testing extracted helper methods in isolation.
-    It does NOT link V12_002 source files or require NT8 assemblies.
-    Tests validate business logic using simple mock types.
+  <ItemGroup>
+    <!-- EPIC-CCN-12: Reference V12_002 to test internal helpers via InternalsVisibleTo -->
+    <ProjectReference Include="..\..\src\V12_002.csproj" />
+  </ItemGroup>
+
+  <!--
+    NOTE: UNIT TEST project for testing extracted helper methods.
+    EPIC-CCN-12: References V12_002.csproj to test internal helpers via InternalsVisibleTo.
+    Jane Street Alignment: Tests are part of same codebase (not separate enforcement gate).
     
-    For integration tests that require full NT8 runtime, see the integration test project (future).
+    For full integration tests requiring NT8 runtime, see integration test project (future).
   -->
 </Project>
 
