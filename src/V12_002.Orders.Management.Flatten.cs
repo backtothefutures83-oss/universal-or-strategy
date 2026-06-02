@@ -152,8 +152,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 $"[CIT] FLEET nudge: {key} on {followerAcct.Name} | {order.LimitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
             );
 
-            // Build 1109 [FREEZE-PROOF]: Budget broker calls to prevent strategy thread stall
-            if (citBrokerBudget <= 0)
+            // Build 1109 [FREEZE-PROOF]: Ensure 2 slots available BEFORE consuming (Cancel + Submit)
+            if (citBrokerBudget < 2)
             {
                 Print("[CIT] Broker budget exhausted -- deferring remaining nudges");
                 Enqueue(ctx => ctx.ManageCIT());
