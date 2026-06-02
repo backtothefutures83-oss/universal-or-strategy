@@ -87,59 +87,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 try
                 {
-                    double newLimitPrice = CalculateNudgedPrice(order.OrderAction, limitPrice, citOffset);
+                    double newLimitPrice = CalculateNudgedPrice(order.OrderAction, order.LimitPrice, citOffset);
 
                     if (isFollower)
                     {
-                        // Fleet follower: cancel limit, resubmit as nudged limit via account API
-                        Account followerAcct = pos.ExecutingAccount;
-                        Print(
-                            $"[CIT] FLEET nudge: {key} on {followerAcct.Name} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
-                        );
-
-                        // Build 1109 [FREEZE-PROOF]: Budget broker calls to prevent strategy thread stall
-                        if (_citBrokerBudget <= 0)
-                        {
-                            Print("[CIT] Broker budget exhausted -- deferring remaining nudges");
-                            Enqueue(ctx => ctx.ManageCIT());
-                            return;
-                        }
-                        _citBrokerBudget -= 2; // Cancel + Submit = 2 broker calls
-
-                        followerAcct.Cancel(new[] { order });
-
-                        Order nudgedOrder = followerAcct.CreateOrder(
-                            Instrument,
-                            order.OrderAction,
-                            OrderType.Limit,
-                            TimeInForce.Gtc,
-                            order.Quantity,
+                        ExecuteFollowerNudge(
+                            key,
+                            order,
                             newLimitPrice,
-                            0,
-                            "",
-                            "CIT_" + key,
-                            null
+                            citOffset,
+                            pos.ExecutingAccount,
+                            ref _citBrokerBudget
                         );
-                        if (nudgedOrder == null)
-                        {
-                            Print(
-                                $"[CIT] ERROR: CreateOrder returned null for {key} on {followerAcct.Name} -- nudge aborted"
-                            );
-                            continue;
-                        }
-                        followerAcct.Submit(new[] { nudgedOrder });
-
-                        // B966: No Enqueue needed -- ManageCIT is always called via Enqueue(ctx => ctx.ManageCIT())
-                        // from OnBarUpdate (Phase C), so this write is already inside the actor drain.
-                        entryOrders[key] = nudgedOrder;
                     }
                     else
                     {
-                        // Local account: ChangeOrder moves limit N ticks toward market
-                        Print(
-                            $"[CIT] LOCAL nudge: {key} | {limitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
-                        );
-                        ChangeOrder(order, order.Quantity, newLimitPrice, 0);
+                        ExecuteLocalNudge(key, order, newLimitPrice, citOffset);
                     }
                     _citNudgedKeys.TryAdd(key, true); // [BUILD 949] one-shot: mark as nudged
                 }
@@ -153,6 +116,69 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Do NOT rethrow - remaining fleet accounts still need flattening
                 }
             }
+        }
+
+        /// <summary>
+        /// Executes a local account nudge by calling ChangeOrder.
+        /// </summary>
+        private void ExecuteLocalNudge(string key, Order order, double newLimitPrice, double citOffset)
+        {
+            Print(
+                $"[CIT] LOCAL nudge: {key} | {order.LimitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
+            );
+            ChangeOrder(order, order.Quantity, newLimitPrice, 0);
+        }
+
+        /// <summary>
+        /// Executes a follower account nudge by canceling and resubmitting the order.
+        /// Handles budget exhaustion by self-enqueuing for deferred execution.
+        /// </summary>
+        private void ExecuteFollowerNudge(
+            string key,
+            Order order,
+            double newLimitPrice,
+            double citOffset,
+            Account followerAcct,
+            ref int citBrokerBudget
+        )
+        {
+            Print(
+                $"[CIT] FLEET nudge: {key} on {followerAcct.Name} | {order.LimitPrice:F2} -> {newLimitPrice:F2} ({citOffset} ticks toward mkt)"
+            );
+
+            // Build 1109 [FREEZE-PROOF]: Budget broker calls to prevent strategy thread stall
+            if (citBrokerBudget <= 0)
+            {
+                Print("[CIT] Broker budget exhausted -- deferring remaining nudges");
+                Enqueue(ctx => ctx.ManageCIT());
+                return;
+            }
+            citBrokerBudget -= 2; // Cancel + Submit = 2 broker calls
+
+            followerAcct.Cancel(new[] { order });
+
+            Order nudgedOrder = followerAcct.CreateOrder(
+                Instrument,
+                order.OrderAction,
+                OrderType.Limit,
+                TimeInForce.Gtc,
+                order.Quantity,
+                newLimitPrice,
+                0,
+                "",
+                "CIT_" + key,
+                null
+            );
+            if (nudgedOrder == null)
+            {
+                Print($"[CIT] ERROR: CreateOrder returned null for {key} on {followerAcct.Name} -- nudge aborted");
+                return;
+            }
+            followerAcct.Submit(new[] { nudgedOrder });
+
+            // B966: No Enqueue needed -- ManageCIT is always called via Enqueue(ctx => ctx.ManageCIT())
+            // from OnBarUpdate (Phase C), so this write is already inside the actor drain.
+            entryOrders[key] = nudgedOrder;
         }
 
         /// <summary>
