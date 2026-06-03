@@ -391,7 +391,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 foreach (var kvp in entryOrders)
                 {
                     if (!ShouldMonitorOrder(kvp.Value, kvp.Key, out var pos))
+                    {
                         continue;
+                    }
 
                     double distTicks = CalculateProximityDistance(pos, Close[0]);
 
@@ -417,10 +419,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             pos = null;
             if (order == null || order.OrderState != OrderState.Working)
+            {
                 return false;
+            }
 
             if (!activePositions.TryGetValue(entryName, out pos) || !pos.IsRMATrade)
+            {
                 return false;
+            }
 
             return true;
         }
@@ -500,7 +506,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
             {
                 if (GetDrawObject("Prox_" + entryName) != null)
+                {
                     RemoveDrawObject("Prox_" + entryName);
+                }
             }
         }
 
