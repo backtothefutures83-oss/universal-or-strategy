@@ -15,7 +15,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         
       - name: CodiumAI PR-Agent
         uses: The-PR-Agent/pr-agent@v0.34
